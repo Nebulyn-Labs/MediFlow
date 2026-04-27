@@ -29,16 +29,18 @@ class _SidebarLayoutState extends State<SidebarLayout> {
       if (location.endsWith('/overview')) return 0;
       if (location.endsWith('/forecast')) return 1;
       if (location.endsWith('/indent')) return 2;
-      if (location.endsWith('/logging')) return 3;
-      if (location.endsWith('/alerts')) return 4;
-      if (location.endsWith('/chat')) return 5;
-      if (location.endsWith('/help')) return 6;
+      if (location.endsWith('/active_indents')) return 3;
+      if (location.endsWith('/logging')) return 4;
+      if (location.endsWith('/alerts')) return 5;
+      if (location.endsWith('/chat')) return 6;
+      if (location.endsWith('/help')) return 7;
       return 0;
     } else {
       if (location.endsWith('/overview')) return 0;
-      if (location.endsWith('/routing')) return 1;
-      if (location.endsWith('/chat')) return 2;
-      if (location.endsWith('/help')) return 3;
+      if (location.endsWith('/indent_status')) return 1;
+      if (location.endsWith('/routing')) return 2;
+      if (location.endsWith('/chat')) return 3;
+      if (location.endsWith('/help')) return 4;
       return 0;
     }
   }
@@ -49,17 +51,19 @@ class _SidebarLayoutState extends State<SidebarLayout> {
         case 0: context.go('/facility/${widget.facilityId}/overview'); break;
         case 1: context.go('/facility/${widget.facilityId}/forecast'); break;
         case 2: context.go('/facility/${widget.facilityId}/indent'); break;
-        case 3: context.go('/facility/${widget.facilityId}/logging'); break;
-        case 4: context.go('/facility/${widget.facilityId}/alerts'); break;
-        case 5: context.go('/facility/${widget.facilityId}/chat'); break;
-        case 6: context.go('/facility/${widget.facilityId}/help'); break;
+        case 3: context.go('/facility/${widget.facilityId}/active_indents'); break;
+        case 4: context.go('/facility/${widget.facilityId}/logging'); break;
+        case 5: context.go('/facility/${widget.facilityId}/alerts'); break;
+        case 6: context.go('/facility/${widget.facilityId}/chat'); break;
+        case 7: context.go('/facility/${widget.facilityId}/help'); break;
       }
     } else if (widget.role == 'admin') {
       switch (index) {
         case 0: context.go('/admin/overview'); break;
-        case 1: context.go('/admin/routing'); break;
-        case 2: context.go('/admin/chat'); break;
-        case 3: context.go('/admin/help'); break;
+        case 1: context.go('/admin/indent_status'); break;
+        case 2: context.go('/admin/routing'); break;
+        case 3: context.go('/admin/chat'); break;
+        case 4: context.go('/admin/help'); break;
       }
     }
   }
@@ -69,6 +73,7 @@ class _SidebarLayoutState extends State<SidebarLayout> {
           _NavItem(Icons.grid_view_rounded, 'Overview'),
           _NavItem(Icons.auto_graph_rounded, 'Forecast'),
           _NavItem(Icons.receipt_long_rounded, 'Indents'),
+          _NavItem(Icons.inventory_rounded, 'Active Indents'),
           _NavItem(Icons.edit_calendar_rounded, 'Daily Log'),
           _NavItem(Icons.notifications_active_rounded, 'Alerts'),
           _NavItem(Icons.smart_toy_rounded, 'AI Chat'),
@@ -76,6 +81,7 @@ class _SidebarLayoutState extends State<SidebarLayout> {
         ]
       : [
           _NavItem(Icons.grid_view_rounded, 'Overview'),
+          _NavItem(Icons.assignment_turned_in_rounded, 'Indent Status'),
           _NavItem(Icons.map_rounded, 'Routing'),
           _NavItem(Icons.smart_toy_rounded, 'AI Chat'),
           _NavItem(Icons.help_outline_rounded, 'Help'),
@@ -119,13 +125,20 @@ class _SidebarLayoutState extends State<SidebarLayout> {
                     ),
                   ),
 
-                  // Nav Items
-                  ...List.generate(items.length, (i) {
-                    final isSelected = i == selectedIndex;
-                    return _buildNavItem(items[i], isSelected, () => _onItemTapped(i, context));
-                  }),
+                  // Nav Items - Scrollable
+                  Expanded(
+                    child: SingleChildScrollView(
+                      child: Column(
+                        children: List.generate(items.length, (i) {
+                          final isSelected = i == selectedIndex;
+                          return _buildNavItem(items[i], isSelected, () => _onItemTapped(i, context));
+                        }),
+                      ),
+                    ),
+                  ),
 
-                  const Spacer(),
+                  const Divider(height: 1, color: MediColors.border),
+                  const SizedBox(height: 8),
 
                   // Logout
                   _buildNavItem(
@@ -162,12 +175,14 @@ class _SidebarLayoutState extends State<SidebarLayout> {
           child: AnimatedContainer(
             duration: const Duration(milliseconds: 200),
             padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 12),
+            clipBehavior: Clip.hardEdge,
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(12),
               color: isSelected ? MediColors.primary.withValues(alpha: 0.12) : Colors.transparent,
               border: isSelected ? Border.all(color: MediColors.primary.withValues(alpha: 0.25)) : null,
             ),
             child: Row(
+              mainAxisSize: MainAxisSize.min,
               children: [
                 Icon(
                   item.icon,
@@ -180,7 +195,7 @@ class _SidebarLayoutState extends State<SidebarLayout> {
                 ),
                 if (_isExpanded) ...[
                   const SizedBox(width: 14),
-                  Expanded(
+                  Flexible(
                     child: Text(
                       item.label,
                       style: TextStyle(
@@ -193,6 +208,7 @@ class _SidebarLayoutState extends State<SidebarLayout> {
                                 : MediColors.textSecondary,
                       ),
                       overflow: TextOverflow.ellipsis,
+                      maxLines: 1,
                     ),
                   ),
                 ],

@@ -207,7 +207,33 @@ Answer naturally using the blueprint and data.
 
   // ─── REDISTRIBUTION ────────────────────────────────────────────
   Future<String> generateRedistributionPlan(List<MedRequest> requests, List<Facility> facilities) async {
-    return "Optimizing ${requests.length} requests across ${facilities.length} sites.";
+    final pending = requests.where((r) => r.status == RequestStatus.pending).toList();
+    if (pending.isEmpty) return 'No pending requests to optimize.';
+
+    final localSummary = 'Optimizing ${pending.length} indent requests across ${facilities.length} facilities. '
+        'Prioritizing rural clinics and shortest transfer distances.';
+
+    if (_shouldUseLocal) return localSummary;
+
+    try {
+      final requestSummary = pending.map((r) => '${r.medicineName}: ${r.quantity} units for facility ${r.facilityId}').join('\n');
+      final facilitySummary = facilities.map((f) => '${f.name} (${f.type}, ${f.region})').join(', ');
+      
+      final prompt = '''
+You are MediFlow's logistics AI. Summarize this redistribution scenario in 2-3 sentences.
+Pending Indent Requests:
+$requestSummary
+Facilities: $facilitySummary
+Focus on: which medicines are most in demand, if rural clinics need priority, and the overall health of the network.
+Reply in plain text, no markdown.
+''';
+
+      final response = await _model.generateContent([Content.text(prompt)]);
+      return response.text ?? localSummary;
+    } catch (e) {
+      _handleQuotaError(e.toString());
+      return localSummary;
+    }
   }
 
   // ─── SHIPMENT STRATEGY (SEASONAL AI) ─────────────────────────

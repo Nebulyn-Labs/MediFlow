@@ -203,7 +203,7 @@ class FirebaseService {
 
   Future<void> updateRequestStatus(String requestId, RequestStatus status) async {
     await _firestore.collection('requests').doc(requestId).update({
-      'status': status.name,
+      'status': status.toString(),
     });
   }
 

@@ -17,11 +17,13 @@ import 'views/shared/help_page.dart';
 import 'views/facility/facility_overview.dart';
 import 'views/facility/ai_forecast_page.dart';
 import 'views/facility/indent_creation_page.dart';
+import 'views/facility/active_indents_page.dart';
 import 'views/facility/daily_logging_page.dart';
 import 'views/facility/alerts_page.dart';
 
 // Admin Pages
 import 'views/admin/admin_overview.dart';
+import 'views/admin/admin_indent_status_page.dart';
 import 'views/admin/route_optimization_map.dart';
 import 'views/shared/ai_chat_page.dart';
 
@@ -134,6 +136,7 @@ final _router = GoRouter(
         GoRoute(path: '/facility/:id/overview', builder: (context, state) => FacilityOverview(facilityId: state.pathParameters['id']!)),
         GoRoute(path: '/facility/:id/forecast', builder: (context, state) => AIForecastPage(facilityId: state.pathParameters['id']!)),
         GoRoute(path: '/facility/:id/indent', builder: (context, state) => IndentCreationPage(facilityId: state.pathParameters['id']!)),
+        GoRoute(path: '/facility/:id/active_indents', builder: (context, state) => ActiveIndentsPage(facilityId: state.pathParameters['id']!)),
         GoRoute(path: '/facility/:id/logging', builder: (context, state) => DailyLoggingPage(facilityId: state.pathParameters['id']!)),
         GoRoute(path: '/facility/:id/alerts', builder: (context, state) => AlertsPage(facilityId: state.pathParameters['id']!)),
         GoRoute(path: '/facility/:id/chat', builder: (context, state) => AIChatPage(facilityId: state.pathParameters['id']!, role: 'facility')),
@@ -147,6 +150,7 @@ final _router = GoRouter(
       },
       routes: [
         GoRoute(path: '/admin/overview', builder: (context, state) => const AdminOverview()),
+        GoRoute(path: '/admin/indent_status', builder: (context, state) => const AdminIndentStatusPage()),
         GoRoute(path: '/admin/routing', builder: (context, state) => const RouteOptimizationMap()),
         GoRoute(path: '/admin/chat', builder: (context, state) => const AIChatPage(role: 'admin')),
         GoRoute(path: '/admin/help', builder: (context, state) => const HelpPage(role: 'admin')),

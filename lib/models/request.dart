@@ -1,7 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 enum RequestType { shortage, surplus, regularIndent }
-enum RequestStatus { pending, approved, fulfilled, rejected }
+enum RequestStatus { draft, pending, approved, fulfilled, rejected }
 
 class MedRequest {
   final String id;

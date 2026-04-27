@@ -192,7 +192,8 @@ class _AdminOverviewState extends ConsumerState<AdminOverview> {
             stream: ref.read(firebaseServiceProvider).streamRequests(null),
             builder: (context, snap) {
               if (!snap.hasData) return const Center(child: CircularProgressIndicator());
-              final requests = snap.data ?? [];
+              final allRequests = snap.data ?? [];
+              final requests = allRequests.where((r) => r.status == RequestStatus.pending).toList();
               if (requests.isEmpty) {
                 return Padding(
                   padding: const EdgeInsets.all(24),
@@ -283,8 +284,8 @@ class _AdminOverviewState extends ConsumerState<AdminOverview> {
                   ),
                 );
                 if (confirmed == true) {
-                  await ref.read(firebaseServiceProvider).deleteRequest(requestId);
-                  if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Rejected and removed')));
+                  await ref.read(firebaseServiceProvider).updateRequestStatus(requestId, RequestStatus.rejected);
+                  if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Rejected ✗')));
                 }
               },
             ),
