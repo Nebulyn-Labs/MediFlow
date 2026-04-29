@@ -130,6 +130,21 @@ MediFlow utilizes a hierarchical Firestore schema designed for high-concurrency 
 *   **`/requests`**: Global collection for tracking movement, status (Pending/Approved/Fulfilled), and manifest details.
 
 ---
+### 🔑 Demo Credentials
+| Role | Email ID | Password | Facility Type |
+| :--- | :--- | :--- | :--- |
+| **CMS Admin** | `admin@mediflow.com` | `password123` | Central Management |
+| **Facility Head** | `rampur@mediflow.com` | `password123` | Rural PHC |
+| **Facility Head** | `modinagar@mediflow.com` | `password123` | Urban CHC |
+| **Facility Head** | `loni@mediflow.com` | `password123` | Urban PHC |
+| **Facility Head** | `ghaziabad@mediflow.com` | `password123` | District Hospital |
+| **Facility Head** | `bhojpur@mediflow.com` | `password123` | Rural PHC |
+| **Facility Head** | `hapur@mediflow.com` | `password123` | Urban CHC |
+| **Facility Head** | `dasna@mediflow.com` | `password123` | Rural PHC |
+| **Facility Head** | `pilkhuwa@mediflow.com` | `password123` | Rural Sub-Centre |
+
+> If the dashboard appears empty, use the **"Seed DB"** button on the Login/Role Selection screen to populate the database with demo records.
+___
 
 ## Development & Setup
 
@@ -156,7 +171,7 @@ flutter run -d chrome --web-renderer html
 
 ---
 
-## Roadmap
+## Future Developments
 - [ ] **Offline-First Sync**: Native SQLite integration for zero-connectivity environments.
 - [ ] **Batch Tracking**: QR-code integration for granular tracking of individual medicine strips.
 - [ ] **IoT Cold Chain**: Integration with sensors to track temperature-sensitive vaccines during transit.
