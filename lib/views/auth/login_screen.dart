@@ -37,9 +37,10 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         );
       }
     } catch (e) {
-      if (mounted)
+      if (mounted) {
         ScaffoldMessenger.of(context)
             .showSnackBar(SnackBar(content: Text('Error: $e')));
+      }
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
@@ -47,7 +48,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
   Future<void> _login() async {
     if (_emailController.text.trim().isEmpty ||
-        _passwordController.text.isEmpty) return;
+        _passwordController.text.isEmpty) {
+      return;
+    }
     setState(() => _isLoading = true);
     try {
       await ref.read(firebaseServiceProvider).login(

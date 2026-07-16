@@ -20,9 +20,10 @@ class _AdminIndentStatusPageState extends ConsumerState<AdminIndentStatusPage> {
           .read(firebaseServiceProvider)
           .updateRequestStatus(requestId, status);
     } catch (e) {
-      if (mounted)
+      if (mounted) {
         ScaffoldMessenger.of(context)
             .showSnackBar(SnackBar(content: Text('Failed to update: $e')));
+      }
     }
   }
 
@@ -49,8 +50,9 @@ class _AdminIndentStatusPageState extends ConsumerState<AdminIndentStatusPage> {
       body: StreamBuilder<List<MedRequest>>(
         stream: ref.read(firebaseServiceProvider).streamRequests(null),
         builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting)
+          if (snapshot.connectionState == ConnectionState.waiting) {
             return const Center(child: CircularProgressIndicator());
+          }
 
           final requests = snapshot.data
                   ?.where((r) => r.status != RequestStatus.draft)

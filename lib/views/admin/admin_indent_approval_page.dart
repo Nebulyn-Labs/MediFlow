@@ -66,13 +66,15 @@ class _AdminIndentApprovalPageState
       await ref
           .read(firebaseServiceProvider)
           .updateRequestStatus(requestId, status);
-      if (mounted)
+      if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(content: Text('Request ${status.name} successfully!')));
+      }
     } catch (e) {
-      if (mounted)
+      if (mounted) {
         ScaffoldMessenger.of(context)
             .showSnackBar(SnackBar(content: Text('Failed to update: $e')));
+      }
     } finally {
       if (mounted) setState(() => _isActionInProgress = false);
     }
@@ -86,8 +88,9 @@ class _AdminIndentApprovalPageState
       body: StreamBuilder<List<MedRequest>>(
         stream: ref.read(firebaseServiceProvider).streamRequests(null),
         builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting)
+          if (snapshot.connectionState == ConnectionState.waiting) {
             return const Center(child: CircularProgressIndicator());
+          }
 
           final pending = snapshot.data
                   ?.where((r) => r.status == RequestStatus.pending)

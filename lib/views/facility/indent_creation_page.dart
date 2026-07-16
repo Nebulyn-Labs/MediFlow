@@ -53,9 +53,10 @@ class _IndentCreationPageState extends ConsumerState<IndentCreationPage> {
         }
       });
     } catch (e) {
-      if (mounted)
+      if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(content: Text('Error fetching inventory: $e')));
+      }
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
@@ -76,8 +77,8 @@ class _IndentCreationPageState extends ConsumerState<IndentCreationPage> {
             item.medicineName, logs, _selectedPeriod,
             facilityId: widget.facilityId);
         setState(() {
-          var predRaw;
-          var reasonRaw;
+          dynamic predRaw;
+          dynamic reasonRaw;
           if (result != null && result is Map) {
             predRaw = result['prediction'];
             reasonRaw = result['reasoning'];
@@ -179,9 +180,10 @@ class _IndentCreationPageState extends ConsumerState<IndentCreationPage> {
         context.go('/facility/${widget.facilityId}/active-indents');
       }
     } catch (e) {
-      if (mounted)
+      if (mounted) {
         ScaffoldMessenger.of(context)
             .showSnackBar(SnackBar(content: Text('Submission failed: $e')));
+      }
     } finally {
       if (mounted) setState(() => _isSubmitting = false);
     }
@@ -248,8 +250,9 @@ class _IndentCreationPageState extends ConsumerState<IndentCreationPage> {
                                   );
                                 }).toList(),
                                 onChanged: (val) {
-                                  if (val != null)
+                                  if (val != null) {
                                     setState(() => _selectedPeriod = val);
+                                  }
                                 },
                               ),
                             ),

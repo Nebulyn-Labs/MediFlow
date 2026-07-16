@@ -37,8 +37,12 @@ class _ActiveIndentsPageState extends ConsumerState<ActiveIndentsPage> {
 
   @override
   void dispose() {
-    for (var c in _draftControllers.values) c.dispose();
-    for (var c in _analysisControllers.values) c.dispose();
+    for (var c in _draftControllers.values) {
+      c.dispose();
+    }
+    for (var c in _analysisControllers.values) {
+      c.dispose();
+    }
     super.dispose();
   }
 
@@ -56,9 +60,10 @@ class _ActiveIndentsPageState extends ConsumerState<ActiveIndentsPage> {
         }
       });
     } catch (e) {
-      if (mounted)
+      if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(content: Text('Error fetching inventory: $e')));
+      }
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
@@ -77,8 +82,8 @@ class _ActiveIndentsPageState extends ConsumerState<ActiveIndentsPage> {
             item.medicineName, logs, _selectedPeriod,
             facilityId: widget.facilityId);
         setState(() {
-          var predRaw;
-          var reasonRaw;
+          dynamic predRaw;
+          dynamic reasonRaw;
           if (result != null && result is Map) {
             predRaw = result['prediction'];
             reasonRaw = result['reasoning'];
@@ -186,9 +191,10 @@ class _ActiveIndentsPageState extends ConsumerState<ActiveIndentsPage> {
             const SnackBar(content: Text('Requests saved as drafts.')));
       }
     } catch (e) {
-      if (mounted)
+      if (mounted) {
         ScaffoldMessenger.of(context)
             .showSnackBar(SnackBar(content: Text('Save failed: $e')));
+      }
     } finally {
       if (mounted) setState(() => _isSubmitting = false);
     }
@@ -202,9 +208,10 @@ class _ActiveIndentsPageState extends ConsumerState<ActiveIndentsPage> {
           .read(firebaseServiceProvider)
           .updateRequestQuantity(requestId, quantity);
     } catch (e) {
-      if (mounted)
+      if (mounted) {
         ScaffoldMessenger.of(context)
             .showSnackBar(SnackBar(content: Text('Update failed: $e')));
+      }
     } finally {
       if (mounted) setState(() => _isDraftActionInProgress = false);
     }
@@ -215,9 +222,10 @@ class _ActiveIndentsPageState extends ConsumerState<ActiveIndentsPage> {
     try {
       await ref.read(firebaseServiceProvider).deleteRequest(requestId);
     } catch (e) {
-      if (mounted)
+      if (mounted) {
         ScaffoldMessenger.of(context)
             .showSnackBar(SnackBar(content: Text('Delete failed: $e')));
+      }
     } finally {
       if (mounted) setState(() => _isDraftActionInProgress = false);
     }
@@ -229,13 +237,15 @@ class _ActiveIndentsPageState extends ConsumerState<ActiveIndentsPage> {
       await ref
           .read(firebaseServiceProvider)
           .updateRequestStatus(requestId, RequestStatus.pending);
-      if (mounted)
+      if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text('Request sent to CMS! ✓')));
+      }
     } catch (e) {
-      if (mounted)
+      if (mounted) {
         ScaffoldMessenger.of(context)
             .showSnackBar(SnackBar(content: Text('Submission failed: $e')));
+      }
     } finally {
       if (mounted) setState(() => _isDraftActionInProgress = false);
     }
@@ -464,12 +474,14 @@ class _ActiveIndentsPageState extends ConsumerState<ActiveIndentsPage> {
       stream:
           ref.read(firebaseServiceProvider).streamRequests(widget.facilityId),
       builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting)
+        if (snapshot.connectionState == ConnectionState.waiting) {
           return const Center(child: CircularProgressIndicator());
-        if (snapshot.hasError)
+        }
+        if (snapshot.hasError) {
           return Center(
               child: Text('Error: ${snapshot.error}',
                   style: const TextStyle(color: MediColors.error)));
+        }
         final drafts = snapshot.data
                 ?.where((r) => r.status == RequestStatus.draft)
                 .toList() ??

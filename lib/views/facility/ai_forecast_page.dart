@@ -42,11 +42,12 @@ class _AIForecastPageState extends ConsumerState<AIForecastPage> {
         );
         return usage.unitsDistributed.toDouble();
       }).toList();
-      if (mounted)
+      if (mounted) {
         setState(() {
           _historicalData = data;
           _isLoadingHistory = false;
         });
+      }
     } catch (e) {
       if (mounted) setState(() => _isLoadingHistory = false);
     }
@@ -63,8 +64,9 @@ class _AIForecastPageState extends ConsumerState<AIForecastPage> {
       body: StreamBuilder<List<InventoryItem>>(
         stream: inventoryStream,
         builder: (context, snapshot) {
-          if (!snapshot.hasData)
+          if (!snapshot.hasData) {
             return const Center(child: CircularProgressIndicator());
+          }
           final inventory = snapshot.data ?? [];
           final medNames =
               inventory.map((i) => i.medicineName).toSet().toList();
@@ -105,7 +107,7 @@ class _AIForecastPageState extends ConsumerState<AIForecastPage> {
                   DropdownButtonFormField<String>(
                     decoration: const InputDecoration(labelText: 'Medicine'),
                     dropdownColor: MediColors.surfaceLight,
-                    value: _selectedMed,
+                    initialValue: _selectedMed,
                     style: const TextStyle(color: MediColors.textPrimary),
                     items: medNames
                         .map((m) => DropdownMenuItem(value: m, child: Text(m)))
@@ -122,7 +124,7 @@ class _AIForecastPageState extends ConsumerState<AIForecastPage> {
                   DropdownButtonFormField<int>(
                     decoration: const InputDecoration(labelText: 'Duration'),
                     dropdownColor: MediColors.surfaceLight,
-                    value: _forecastDays,
+                    initialValue: _forecastDays,
                     style: const TextStyle(color: MediColors.textPrimary),
                     items: const [
                       DropdownMenuItem(
@@ -373,12 +375,14 @@ class _AIForecastPageState extends ConsumerState<AIForecastPage> {
           getTitlesWidget: (v, _) {
             final idx = v.toInt();
             if (_historicalData.isEmpty) return const Text('');
-            if (idx == 0)
+            if (idx == 0) {
               return const Text('D-30',
                   style: TextStyle(fontSize: 10, color: MediColors.textMuted));
-            if (idx == _historicalData.length - 1)
+            }
+            if (idx == _historicalData.length - 1) {
               return const Text('Today',
                   style: TextStyle(fontSize: 10, color: MediColors.textMuted));
+            }
             return const Text('');
           },
         )),

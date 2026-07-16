@@ -2,6 +2,7 @@ import 'dart:math';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart' as auth;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter/foundation.dart';
 import '../models/facility.dart';
 import '../models/inventory_item.dart';
 import '../models/daily_usage_log.dart';
@@ -49,7 +50,13 @@ class FirebaseService {
           email: email, password: password);
     } catch (e) {
       // If user exists or rate limit hits, we don't care for seeding Firestore data
-      print('Auth skip/fail for $email: $e');
+      debugPrint('Auth skip/fail for $email: $e');
+      try {
+        await _auth.signInWithEmailAndPassword(
+            email: email, password: password);
+      } catch (loginErr) {
+        debugPrint('Sign in fallback failed for $email: $loginErr');
+      }
     }
 
     // 3. Generate Profile
@@ -317,16 +324,24 @@ class FirebaseService {
         // For hierarchical collections, we need to delete sub-collections too
         if (collection == 'inventory') {
           final meds = await doc.reference.collection('medicines').get();
-          for (var med in meds.docs) deleteFutures.add(med.reference.delete());
+          for (var med in meds.docs) {
+            deleteFutures.add(med.reference.delete());
+          }
         } else if (collection == 'daily_usage_logs') {
           final logs = await doc.reference.collection('logs').get();
-          for (var log in logs.docs) deleteFutures.add(log.reference.delete());
+          for (var log in logs.docs) {
+            deleteFutures.add(log.reference.delete());
+          }
         } else if (collection == 'facilities') {
           // Cleanup legacy sub-collections from old schema
           final stocks = await doc.reference.collection('stocks').get();
-          for (var s in stocks.docs) deleteFutures.add(s.reference.delete());
+          for (var s in stocks.docs) {
+            deleteFutures.add(s.reference.delete());
+          }
           final logs = await doc.reference.collection('usage_logs').get();
-          for (var l in logs.docs) deleteFutures.add(l.reference.delete());
+          for (var l in logs.docs) {
+            deleteFutures.add(l.reference.delete());
+          }
         }
         deleteFutures.add(doc.reference.delete());
 
@@ -341,16 +356,21 @@ class FirebaseService {
 
   Future<String?> seedDemoData() async {
     try {
-      // 1. Clear old data to avoid duplicates and schema conflicts
-      await clearDatabase();
-
-      // 2. Seed Admin
+      // 1. Seed/Login Admin first to ensure authorization for database clearing/seeding
       try {
         await _auth.createUserWithEmailAndPassword(
             email: 'admin@mediflow.com', password: 'password123');
       } catch (e) {
-        // Ignore if exists
+        try {
+          await _auth.signInWithEmailAndPassword(
+              email: 'admin@mediflow.com', password: 'password123');
+        } catch (loginError) {
+          debugPrint('Admin login failed during seed: $loginError');
+        }
       }
+
+      // 2. Clear old data to avoid duplicates and schema conflicts
+      await clearDatabase();
 
       // 3. Seed new facilities
       final List<Map<String, dynamic>> demoFacilities = [
@@ -442,9 +462,17 @@ class FirebaseService {
           // Delay to avoid auth rate limits
           await Future.delayed(const Duration(milliseconds: 1500));
         } catch (e) {
-          print('Error seeding $f: $e');
+          debugPrint('Error seeding $f: $e');
           return 'Failed at ${f['name']}: $e';
         }
+      }
+
+      // Sign back in as admin to have global access to create requests for different facilities
+      try {
+        await _auth.signInWithEmailAndPassword(
+            email: 'admin@mediflow.com', password: 'password123');
+      } catch (e) {
+        debugPrint('Failed to sign back in as admin: $e');
       }
 
       // 4. Seed sample requests for Admin Dashboard KPIs & Route Optimization

@@ -277,8 +277,8 @@ class _RoleSelectionScreenState extends State<RoleSelectionScreen>
           curve: Curves.easeOutCubic,
           width: 420,
           padding: const EdgeInsets.all(24),
-          transform: Matrix4.identity()
-            ..translate(0.0, isHovering ? -4.0 : 0.0),
+          transform:
+              Matrix4.translationValues(0.0, isHovering ? -4.0 : 0.0, 0.0),
           decoration: BoxDecoration(
             color: MediColors.surface,
             borderRadius: BorderRadius.circular(20),

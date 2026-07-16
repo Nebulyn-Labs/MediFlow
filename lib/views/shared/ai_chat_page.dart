@@ -43,7 +43,7 @@ class _AIChatPageState extends ConsumerState<AIChatPage> {
           });
         }
       } catch (e) {
-        print('Error loading context: $e');
+        debugPrint('Error loading context: $e');
       }
     }
   }
@@ -151,8 +151,9 @@ class _AIChatPageState extends ConsumerState<AIChatPage> {
                     padding: const EdgeInsets.all(24),
                     itemCount: _messages.length + (_isTyping ? 1 : 0),
                     itemBuilder: (context, index) {
-                      if (index == _messages.length && _isTyping)
+                      if (index == _messages.length && _isTyping) {
                         return _buildTypingIndicator();
+                      }
                       final msg = _messages[index];
                       return _buildBubble(msg['role']!, msg['content']!);
                     },

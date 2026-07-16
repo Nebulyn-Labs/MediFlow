@@ -2,7 +2,7 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:latlong2/latlong.dart';
-import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:flutter/foundation.dart';
 
 final routingServiceProvider = Provider((ref) => RoutingService());
 
@@ -13,14 +13,14 @@ class RoutingService {
       'https://api.openrouteservice.org/v2/directions/driving-car';
 
   Future<List<LatLng>> getRoute(LatLng start, LatLng end) async {
-    final orsKey = dotenv.env['ORS_API_KEY'];
+    const String? orsKey = null;
 
     // 1. Try OpenRouteService (ORS) if API key exists
     if (orsKey != null && orsKey.isNotEmpty) {
       try {
         final url =
             '$_orsBaseUrl?api_key=$orsKey&start=${start.longitude},${start.latitude}&end=${end.longitude},${end.latitude}';
-        print('RoutingService: Requesting ORS: $url');
+        debugPrint('RoutingService: Requesting ORS: $url');
         final response =
             await http.get(Uri.parse(url)).timeout(const Duration(seconds: 5));
 
@@ -29,18 +29,18 @@ class RoutingService {
           if (data['features'] != null && data['features'].isNotEmpty) {
             final List<dynamic> coords =
                 data['features'][0]['geometry']['coordinates'];
-            print(
+            debugPrint(
                 'RoutingService: ORS Success. ${coords.length} points found.');
             return coords
                 .map((c) => LatLng(c[1].toDouble(), c[0].toDouble()))
                 .toList();
           }
         } else {
-          print(
+          debugPrint(
               'RoutingService: ORS Failed with status: ${response.statusCode}');
         }
       } catch (e) {
-        print('ORS routing error: $e');
+        debugPrint('ORS routing error: $e');
       }
     }
 
@@ -48,7 +48,7 @@ class RoutingService {
     try {
       final url =
           '$_osrmBaseUrl/${start.longitude},${start.latitude};${end.longitude},${end.latitude}?overview=full&geometries=geojson';
-      print('RoutingService: Requesting OSRM (GeoJSON): $url');
+      debugPrint('RoutingService: Requesting OSRM (GeoJSON): $url');
       final response =
           await http.get(Uri.parse(url)).timeout(const Duration(seconds: 5));
 
@@ -57,22 +57,23 @@ class RoutingService {
         if (data['routes'] != null && data['routes'].isNotEmpty) {
           final List<dynamic> coords =
               data['routes'][0]['geometry']['coordinates'];
-          print('RoutingService: OSRM Success. ${coords.length} points found.');
+          debugPrint(
+              'RoutingService: OSRM Success. ${coords.length} points found.');
           // OSRM GeoJSON is [longitude, latitude]
           return coords
               .map((c) => LatLng(c[1].toDouble(), c[0].toDouble()))
               .toList();
         }
       } else {
-        print(
+        debugPrint(
             'RoutingService: OSRM Failed with status: ${response.statusCode}');
       }
     } catch (e) {
-      print('OSRM routing error: $e');
+      debugPrint('OSRM routing error: $e');
     }
 
     // 3. Absolute Fallback to straight line
-    print('RoutingService: Falling back to straight line.');
+    debugPrint('RoutingService: Falling back to straight line.');
     return [start, end];
   }
 }

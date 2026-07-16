@@ -90,8 +90,9 @@ class _RouteOptimizationMapState extends ConsumerState<RouteOptimizationMap> {
       final summary =
           await ai.generateRedistributionPlan(requests, _facilities);
 
-      print('RouteOptimizationMap: Generated ${recs.length} recommendations.');
-      print('RouteOptimizationMap: Fetched ${routes.length} road routes.');
+      debugPrint(
+          'RouteOptimizationMap: Generated ${recs.length} recommendations.');
+      debugPrint('RouteOptimizationMap: Fetched ${routes.length} road routes.');
 
       setState(() {
         _recommendations = recs;
@@ -100,10 +101,11 @@ class _RouteOptimizationMapState extends ConsumerState<RouteOptimizationMap> {
         _showRoutes = true;
       });
     } catch (e) {
-      print('RouteOptimizationMap Error: $e');
-      if (mounted)
+      debugPrint('RouteOptimizationMap Error: $e');
+      if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(content: Text('Error generating routes: $e')));
+      }
     } finally {
       if (mounted) setState(() => _isGenerating = false);
     }
@@ -221,10 +223,12 @@ class _RouteOptimizationMapState extends ConsumerState<RouteOptimizationMap> {
                                     // RE-LOAD FACILITIES AFTER SEEDING
                                     await _loadData();
                                     setState(() => _isGenerating = false);
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                        const SnackBar(
-                                            content: Text(
-                                                'Demo scenario seeded! Click Generate to see routes.')));
+                                    if (context.mounted) {
+                                      ScaffoldMessenger.of(context)
+                                          .showSnackBar(const SnackBar(
+                                              content: Text(
+                                                  'Demo scenario seeded! Click Generate to see routes.')));
+                                    }
                                   },
                                 ),
                               ),
@@ -323,10 +327,11 @@ class _RouteOptimizationMapState extends ConsumerState<RouteOptimizationMap> {
 
                                 Color markerColor = MediColors.textMuted;
                                 if (_showRoutes) {
-                                  if (isDonor)
+                                  if (isDonor) {
                                     markerColor = Colors.green;
-                                  else if (isRecipient)
+                                  } else if (isRecipient) {
                                     markerColor = Colors.orange;
+                                  }
                                 }
 
                                 return Marker(
