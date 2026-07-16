@@ -163,9 +163,10 @@ class _AlertsPageState extends ConsumerState<AlertsPage> {
         _loadAlerts();
       }
     } catch (e) {
-      if (mounted)
+      if (mounted) {
         ScaffoldMessenger.of(context)
             .showSnackBar(SnackBar(content: Text('Error: $e')));
+      }
     }
   }
 

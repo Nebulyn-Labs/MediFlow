@@ -166,14 +166,15 @@ class SimulationService {
 
         int daysToExpiry;
         if (facilityId == 'rampur_mediflow_com') {
-          if (med == 'Paracetamol')
+          if (med == 'Paracetamol') {
             daysToExpiry = -5; // Expired
-          else if (med == 'Cough Syrup')
+          } else if (med == 'Cough Syrup') {
             daysToExpiry = 10; // Expiring soon
-          else if (med == 'ORS')
+          } else if (med == 'ORS') {
             daysToExpiry = 7; // Expiring soon (wastage risk)
-          else
+          } else {
             daysToExpiry = 180 + _random.nextInt(200); // Normal
+          }
         } else {
           daysToExpiry = _random.nextInt(10) < 2
               ? 15 + _random.nextInt(60)

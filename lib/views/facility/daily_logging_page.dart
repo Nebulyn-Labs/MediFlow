@@ -29,7 +29,7 @@ class _DailyLoggingPageState extends ConsumerState<DailyLoggingPage>
   String? _csvStatus;
   bool _isSubmittingCsv = false;
   bool _isScanning = false;
-  List<Map<String, dynamic>> _scannedItems = [];
+  final List<Map<String, dynamic>> _scannedItems = [];
   bool _isSubmittingQr = false;
 
   @override
@@ -50,13 +50,15 @@ class _DailyLoggingPageState extends ConsumerState<DailyLoggingPage>
       final items = await ref
           .read(firebaseServiceProvider)
           .getInventoryOnce(widget.facilityId);
-      if (mounted)
+      if (mounted) {
         setState(() {
           _availableMedicines = items.map((i) => i.medicineName).toList();
-          if (_availableMedicines.isNotEmpty)
+          if (_availableMedicines.isNotEmpty) {
             _medName = _availableMedicines.first;
+          }
           _isLoadingInventory = false;
         });
+      }
     } catch (e) {
       if (mounted) setState(() => _isLoadingInventory = false);
     }
@@ -79,9 +81,10 @@ class _DailyLoggingPageState extends ConsumerState<DailyLoggingPage>
         _formKey.currentState!.reset();
       }
     } catch (e) {
-      if (mounted)
+      if (mounted) {
         ScaffoldMessenger.of(context)
             .showSnackBar(SnackBar(content: Text('Error: $e')));
+      }
     } finally {
       if (mounted) setState(() => _isSubmitting = false);
     }
@@ -105,7 +108,9 @@ class _DailyLoggingPageState extends ConsumerState<DailyLoggingPage>
       final firstCell = rows[0][0].toString().toLowerCase().trim();
       if (firstCell.contains('medicine') ||
           firstCell.contains('name') ||
-          firstCell.contains('drug')) startRow = 1;
+          firstCell.contains('drug')) {
+        startRow = 1;
+      }
       final parsed = <Map<String, dynamic>>[];
       for (int i = startRow; i < rows.length; i++) {
         final row = rows[i];
@@ -115,17 +120,19 @@ class _DailyLoggingPageState extends ConsumerState<DailyLoggingPage>
             row.length > 1 ? int.tryParse(row[1].toString().trim()) ?? 0 : 0;
         final pat =
             row.length > 2 ? int.tryParse(row[2].toString().trim()) ?? 0 : 0;
-        if (med.isNotEmpty && qty > 0)
+        if (med.isNotEmpty && qty > 0) {
           parsed.add({'medicine': med, 'quantity': qty, 'patients': pat});
+        }
       }
       setState(() {
         _csvItems = parsed;
         _csvStatus = 'Parsed ${parsed.length} entries from ${file.name}';
       });
     } catch (e) {
-      if (mounted)
+      if (mounted) {
         ScaffoldMessenger.of(context)
             .showSnackBar(SnackBar(content: Text('CSV Error: $e')));
+      }
     }
   }
 
@@ -150,9 +157,10 @@ class _DailyLoggingPageState extends ConsumerState<DailyLoggingPage>
         });
       }
     } catch (e) {
-      if (mounted)
+      if (mounted) {
         ScaffoldMessenger.of(context)
             .showSnackBar(SnackBar(content: Text('Error: $e')));
+      }
     } finally {
       if (mounted) setState(() => _isSubmittingCsv = false);
     }
@@ -193,9 +201,10 @@ class _DailyLoggingPageState extends ConsumerState<DailyLoggingPage>
         setState(() => _scannedItems.clear());
       }
     } catch (e) {
-      if (mounted)
+      if (mounted) {
         ScaffoldMessenger.of(context)
             .showSnackBar(SnackBar(content: Text('Error: $e')));
+      }
     } finally {
       if (mounted) setState(() => _isSubmittingQr = false);
     }
@@ -287,7 +296,7 @@ class _DailyLoggingPageState extends ConsumerState<DailyLoggingPage>
                   DropdownButtonFormField<String>(
                     decoration: const InputDecoration(labelText: 'Medicine'),
                     dropdownColor: MediColors.surfaceLight,
-                    value: _medName,
+                    initialValue: _medName,
                     style: const TextStyle(color: MediColors.textPrimary),
                     items: _availableMedicines
                         .map((m) => DropdownMenuItem(value: m, child: Text(m)))

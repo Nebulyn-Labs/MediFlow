@@ -43,7 +43,7 @@ class _AIChatPageState extends ConsumerState<AIChatPage> {
           });
         }
       } catch (e) {
-        print('Error loading context: $e');
+        debugPrint('Error loading context: $e');
       }
     }
   }

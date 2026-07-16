@@ -7,10 +7,6 @@ import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
-import 'services/firebase_service.dart';
-import 'services/ai_service.dart';
-import 'services/routing_service.dart';
-import 'services/optimization_service.dart';
 import 'package:med_supply_prototype/constants/colors.dart';
 import 'firebase_options.dart';
 import 'views/auth/role_selection_screen.dart';
@@ -46,16 +42,16 @@ void main() async {
     await Firebase.initializeApp(
       options: DefaultFirebaseOptions.currentPlatform,
     );
-    print('Firebase initialized successfully');
+    debugPrint('Firebase initialized successfully');
   } catch (e) {
-    print('Firebase initialization error: $e');
+    debugPrint('Firebase initialization error: $e');
   }
 
   // Load dotenv in the background or separately
   try {
     await dotenv.load(fileName: '.env');
   } catch (e) {
-    print('Dotenv load error: $e');
+    debugPrint('Dotenv load error: $e');
   }
 
   FirebaseFirestore.instance.settings = const Settings(
@@ -289,8 +285,9 @@ class MediFlowApp extends StatelessWidget {
               const TextStyle(color: MediColors.textPrimary, fontSize: 13),
           headingRowColor: WidgetStateProperty.all(MediColors.surfaceLight),
           dataRowColor: WidgetStateProperty.resolveWith((states) {
-            if (states.contains(WidgetState.hovered))
+            if (states.contains(WidgetState.hovered)) {
               return MediColors.surfaceHover;
+            }
             return Colors.transparent;
           }),
           dividerThickness: 1,

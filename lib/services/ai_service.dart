@@ -1,7 +1,7 @@
 import 'dart:convert';
-import 'dart:typed_data';
 import 'package:google_generative_ai/google_generative_ai.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:cloud_functions/cloud_functions.dart';
@@ -101,7 +101,7 @@ Business Logic:
         errorMsg.contains('limit')) {
       _quotaExhausted = true;
       _quotaResetTime = DateTime.now().add(const Duration(minutes: 1));
-      print('AI Service: Quota hit. Mode switched to local assistance.');
+      debugPrint('AI Service: Quota hit. Mode switched to local assistance.');
     }
   }
 
@@ -203,7 +203,7 @@ Business Logic:
       });
     } catch (e) {
       // BigQuery/audit logging must not block patient-facing stock workflows.
-      print('BigQuery AI decision log skipped: $e');
+      debugPrint('BigQuery AI decision log skipped: $e');
     }
   }
 
@@ -277,7 +277,7 @@ Answer naturally using the blueprint and data.
 
       return response.text ?? "Unavailable.";
     } catch (e) {
-      print('Gemini Exception: $e');
+      debugPrint('Gemini Exception: $e');
       _handleQuotaError(e.toString());
       return _localSystemResponse(query, context, role);
     }
@@ -286,7 +286,6 @@ Answer naturally using the blueprint and data.
   String _localSystemResponse(
       String query, Map<String, dynamic> context, String role) {
     final inventory = (context['current_inventory'] as List? ?? []);
-    final logs = (context['historical_data'] as List? ?? []);
 
     final intro =
         "⚡ [MediFlow Engine]: Gemini is currently optimizing and I'm taking over with local system intelligence.\n\n";
@@ -434,8 +433,8 @@ Output plain text only.
       final prompt = '''
 Scenario: MediFlow shipment split (Target: $targetMonths months active).
 External Context: $externalContext
-Inventory: ${items.map((i) => i.medicineName + ": " + i.remainingQuantity.toString()).join(", ")}
-Logs: ${logs.take(10).map((l) => l.date.toString() + ": " + l.totalPatients.toString()).join(", ")}
+Inventory: ${items.map((i) => '${i.medicineName}: ${i.remainingQuantity}').join(", ")}
+Logs: ${logs.take(10).map((l) => '${l.date}: ${l.totalPatients}').join(", ")}
 Task: Provide a JSON split (active/coldStorage/reasoning) for each medicine. Be analytical and conversational in reasoning. Factor in external context if relevant.
 Output JSON only.
 ''';
