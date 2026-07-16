@@ -1,89 +1,24 @@
 import 'dart:convert';
-import 'package:google_generative_ai/google_generative_ai.dart';
+import 'dart:typed_data';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter/foundation.dart';
-import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:cloud_functions/cloud_functions.dart';
 import '../models/daily_usage_log.dart';
 import '../models/request.dart';
 import '../models/facility.dart';
 import '../models/inventory_item.dart';
-import 'tool_dispatcher.dart';
 
 final aiServiceProvider = Provider<AIService>((ref) {
   return AIService(ref);
 });
 
 class AIService {
-  late final GenerativeModel _model;
   final Ref ref;
   bool _quotaExhausted = false;
   DateTime? _quotaResetTime;
 
-  static const String _mediFlowBlueprint = '''
-System Name: MediFlow AI Intelligence
-Architecture: Medical Logistics Optimization Platform
-Core Data Models:
-- Facility: {id, name, type: rural/urban, region, coordinates}
-- InventoryItem: {medicineName, batchId, remainingQuantity, initialQuantity, expiryDate, arrivalDate}
-- DailyUsageLog: {date, totalPatients, medicines: [{medicineName, unitsDistributed}]}
-- MedRequest: {id, facilityId, medicineName, quantity, status: pending/fulfilled}
-Business Logic:
-1. Burn Rate: Calculated as unitsDistributed / days.
-2. Shipment Strategy: Optimal split of 1yr supply into 1-3 months (Active) and the rest (Cold Storage) based on seasonal historical logs.
-3. Cold Storage: Sub-collection where excess stock is "parked" to improve inventory floor-space efficiency.
-''';
-
-  AIService(this.ref) {
-    final apiKey = dotenv.env['GEMINI_API_KEY'] ?? '';
-
-    final toolCheckSystemInventory = FunctionDeclaration(
-      'check_system_inventory',
-      'Checks the global inventory levels of all facilities.',
-      Schema(SchemaType.object, properties: {}),
-    );
-
-    final toolReportShortage = FunctionDeclaration(
-      'report_shortage',
-      'Reports a shortage of a medicine at a facility.',
-      Schema(SchemaType.object, properties: {
-        'facilityId': Schema(SchemaType.string),
-        'medicineName': Schema(SchemaType.string),
-        'quantity': Schema(SchemaType.integer),
-      }, requiredProperties: [
-        'facilityId',
-        'medicineName',
-        'quantity'
-      ]),
-    );
-
-    final toolReportSurplus = FunctionDeclaration(
-      'report_surplus',
-      'Reports a surplus of a medicine at a facility.',
-      Schema(SchemaType.object, properties: {
-        'facilityId': Schema(SchemaType.string),
-        'medicineName': Schema(SchemaType.string),
-        'quantity': Schema(SchemaType.integer),
-      }, requiredProperties: [
-        'facilityId',
-        'medicineName',
-        'quantity'
-      ]),
-    );
-
-    _model = GenerativeModel(
-      model: 'gemini-flash-lite-latest',
-      apiKey: apiKey,
-      tools: [
-        Tool(functionDeclarations: [
-          toolCheckSystemInventory,
-          toolReportShortage,
-          toolReportSurplus,
-        ])
-      ],
-    );
-  }
+  AIService(this.ref);
 
   bool get _shouldUseLocal {
     if (!_quotaExhausted) return false;
@@ -98,11 +33,23 @@ Business Logic:
   void _handleQuotaError(String errorMsg) {
     if (errorMsg.contains('quota') ||
         errorMsg.contains('Quota') ||
-        errorMsg.contains('limit')) {
+        errorMsg.contains('limit') ||
+        errorMsg.contains('exhausted')) {
       _quotaExhausted = true;
       _quotaResetTime = DateTime.now().add(const Duration(minutes: 1));
       debugPrint('AI Service: Quota hit. Mode switched to local assistance.');
     }
+  }
+
+  // Helper method to call the generic callGeminiSecure Cloud Function
+  Future<String> _callGeminiBackend(String prompt, {String? imageBase64, String? imageMimeType}) async {
+    final callable = FirebaseFunctions.instance.httpsCallable('callGeminiSecure');
+    final response = await callable.call({
+      'prompt': prompt,
+      if (imageBase64 != null) 'imageBase64': imageBase64,
+      if (imageMimeType != null) 'imageMimeType': imageMimeType,
+    });
+    return response.data['text'] as String? ?? '';
   }
 
   // ─── FORECASTING ───────────────────────────────────────────────
@@ -114,7 +61,7 @@ Business Logic:
           (m) => m.medicineName == medicineName,
           orElse: () =>
               MedicineUsage(medicineName: medicineName, unitsDistributed: 0));
-      return {'date': l.date, 'used': usage.unitsDistributed};
+      return {'date': l.date.toIso8601String(), 'used': usage.unitsDistributed};
     }).toList();
 
     if (_shouldUseLocal) {
@@ -133,14 +80,13 @@ Business Logic:
     try {
       final logSummary = medLogs
           .take(30)
-          .map((l) =>
-              'Date: ${(l['date'] as DateTime).toIso8601String()}, Used: ${l['used']}')
+          .map((l) => 'Date: ${l['date']}, Used: ${l['used']}')
           .join('\n');
       final prompt =
           'Forecast $daysToForecast days for $medicineName. History:\n$logSummary\nOutput JSON: {"prediction": int, "reasoning": "string"}';
 
-      final response = await _model.generateContent([Content.text(prompt)]);
-      final raw = response.text ?? '{}';
+      final responseText = await _callGeminiBackend(prompt);
+      final raw = responseText.trim();
       var decoded = jsonDecode(
           raw.replaceAll('```json', '').replaceAll('```', '').trim());
       if (decoded is Map) {
@@ -150,7 +96,7 @@ Business Logic:
           medicineName: medicineName,
           daysToForecast: daysToForecast,
           result: result,
-          model: 'gemini-flash-lite-latest',
+          model: 'gemini-1.5-flash-backend',
           input: {'prompt': prompt, 'logs': medLogs.take(30).toList()},
         );
         return result;
@@ -244,38 +190,14 @@ Business Logic:
   }) async {
     if (_shouldUseLocal) return _localSystemResponse(query, context, role);
     try {
-      final contextStr = jsonEncode(context, toEncodable: (val) {
-        if (val is Timestamp) return val.toDate().toIso8601String();
-        if (val is DateTime) return val.toIso8601String();
-        return val.toString();
+      final callable = FirebaseFunctions.instance.httpsCallable('getChatResponseSecure');
+      final response = await callable.call({
+        'query': query,
+        'context': context,
+        'role': role,
+        'history': history,
       });
-
-      final chat = _model.startChat(
-          history: history
-              .map((m) => Content(m['role'] == 'user' ? 'user' : 'model',
-                  [TextPart(m['content']!)]))
-              .toList());
-
-      final prompt = '''
-Role: $role
-System Blueprint: $_mediFlowBlueprint
-Current Data: $contextStr
-User Query: $query
-Answer naturally using the blueprint and data.
-''';
-
-      var response = await chat.sendMessage(Content.text(prompt));
-
-      if (response.functionCalls.isNotEmpty) {
-        final toolDispatcher = ref.read(toolDispatcherProvider);
-        for (final call in response.functionCalls) {
-          final result = await toolDispatcher.dispatch(call);
-          response = await chat
-              .sendMessage(Content.functionResponse(call.name, result));
-        }
-      }
-
-      return response.text ?? "Unavailable.";
+      return response.data as String? ?? 'Unavailable.';
     } catch (e) {
       debugPrint('Gemini Exception: $e');
       _handleQuotaError(e.toString());
@@ -373,8 +295,8 @@ If type is "low_stock", include:
 
 Output raw JSON array only.
 ''';
-      final response = await _model.generateContent([Content.text(prompt)]);
-      var decoded = jsonDecode(response.text!
+      final responseText = await _callGeminiBackend(prompt);
+      var decoded = jsonDecode(responseText
           .replaceAll('```json', '')
           .replaceAll('```', '')
           .trim());
@@ -412,9 +334,8 @@ ${indents.map((r) => "- ${r.facilityId}: ${r.medicineName} (${r.quantity} units)
 Provide a 2-sentence executive summary explaining the strategy. Mention if any rural facilities were prioritized.
 Output plain text only.
 ''';
-      final response = await _model.generateContent([Content.text(prompt)]);
-      return response.text?.trim() ??
-          "Optimizing redistribution routes based on proximity and stock health.";
+      final responseText = await _callGeminiBackend(prompt);
+      return responseText.trim();
     } catch (e) {
       _handleQuotaError(e.toString());
       return "Optimizing ${indents.length} requests across ${facilities.length} sites by matching local surpluses.";
@@ -439,8 +360,8 @@ Task: Provide a JSON split (active/coldStorage/reasoning) for each medicine. Be 
 Output JSON only.
 ''';
 
-      final response = await _model.generateContent([Content.text(prompt)]);
-      var decoded = jsonDecode(response.text!
+      final responseText = await _callGeminiBackend(prompt);
+      var decoded = jsonDecode(responseText
           .replaceAll('```json', '')
           .replaceAll('```', '')
           .trim());
@@ -458,14 +379,9 @@ Output JSON only.
   Future<String> parseImageWithVision(
       Uint8List imageBytes, String prompt) async {
     try {
-      final content = [
-        Content.multi([
-          TextPart(prompt),
-          DataPart('image/jpeg', imageBytes),
-        ])
-      ];
-      final response = await _model.generateContent(content);
-      return response.text ?? "Could not parse image.";
+      final imageBase64 = base64Encode(imageBytes);
+      final responseText = await _callGeminiBackend(prompt, imageBase64: imageBase64, imageMimeType: 'image/jpeg');
+      return responseText;
     } catch (e) {
       _handleQuotaError(e.toString());
       return "Local Fallback: Image parsing is not available offline or quota exceeded.";

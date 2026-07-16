@@ -6,7 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:flutter_dotenv/flutter_dotenv.dart';
+
 import 'package:med_supply_prototype/constants/colors.dart';
 import 'firebase_options.dart';
 import 'views/auth/role_selection_screen.dart';
@@ -47,12 +47,7 @@ void main() async {
     debugPrint('Firebase initialization error: $e');
   }
 
-  // Load dotenv in the background or separately
-  try {
-    await dotenv.load(fileName: '.env');
-  } catch (e) {
-    debugPrint('Dotenv load error: $e');
-  }
+
 
   FirebaseFirestore.instance.settings = const Settings(
     persistenceEnabled: true,

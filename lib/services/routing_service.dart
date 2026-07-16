@@ -2,7 +2,6 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:latlong2/latlong.dart';
-import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter/foundation.dart';
 
 final routingServiceProvider = Provider((ref) => RoutingService());
@@ -14,7 +13,7 @@ class RoutingService {
       'https://api.openrouteservice.org/v2/directions/driving-car';
 
   Future<List<LatLng>> getRoute(LatLng start, LatLng end) async {
-    final orsKey = dotenv.env['ORS_API_KEY'];
+    const String? orsKey = null;
 
     // 1. Try OpenRouteService (ORS) if API key exists
     if (orsKey != null && orsKey.isNotEmpty) {
