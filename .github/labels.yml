@@ -1,0 +1,113 @@
+# GitHub labels configuration
+
+- name: "good first issue"
+  color: "7057ff"
+  description: "Good for newcomers"
+
+- name: "help wanted"
+  color: "008672"
+  description: "Extra attention is needed"
+
+- name: "bug"
+  color: "d73a4a"
+  description: "Something isn't working"
+
+- name: "enhancement"
+  color: "a2eeef"
+  description: "New feature or request"
+
+- name: "documentation"
+  color: "0075ca"
+  description: "Improvements or additions to documentation"
+
+- name: "easy"
+  color: "c2e0c6"
+  description: "Low complexity issue"
+
+- name: "medium"
+  color: "fef2c0"
+  description: "Medium complexity issue"
+
+- name: "hard"
+  color: "f9d0c4"
+  description: "High complexity issue"
+
+- name: "firebase"
+  color: "ffcc33"
+  description: "Relates to Firebase Services (Auth, Firestore, Functions)"
+
+- name: "frontend"
+  color: "563d7c"
+  description: "Relates to Frontend UI/UX"
+
+- name: "backend"
+  color: "244776"
+  description: "Relates to Backend Services or Analytics"
+
+- name: "tests"
+  color: "0e8a16"
+  description: "Relates to testing (unit/widget/integration)"
+
+- name: "ui"
+  color: "bfdadc"
+  description: "Relates to user interface visual elements"
+
+- name: "performance"
+  color: "861d8f"
+  description: "Relates to performance optimizations"
+
+- name: "security"
+  color: "e11d21"
+  description: "Relates to security issues or guidelines"
+
+- name: "triage"
+  color: "ededed"
+  description: "Needs triage or categorization"
+
+- name: "duplicate"
+  color: "cfd3d7"
+  description: "This issue or PR already exists"
+
+- name: "invalid"
+  color: "e6e6e6"
+  description: "This doesn't seem right"
+
+- name: "wontfix"
+  color: "ffffff"
+  description: "This will not be worked on"
+
+- name: "failing checks"
+  color: "d93f0b"
+  description: "PR has failing CI checks"
+
+- name: "changes requested"
+  color: "c5def5"
+  description: "Maintainer requested changes"
+
+- name: "ECSoC26-L1"
+  color: "0e8a16"
+  description: "5 Points"
+
+- name: "ECSoC26-L2"
+  color: "fbca04"
+  description: "10 Points"
+
+- name: "ECSoC26-L3"
+  color: "d93f0b"
+  description: "15 Points"
+
+- name: "good-issue"
+  color: "1d76db"
+  description: "+10 XP"
+
+- name: "good-pr"
+  color: "006b75"
+  description: "+15 XP"
+
+- name: "good-ui"
+  color: "c2e0c6"
+  description: "+25 XP"
+
+- name: "good-backend"
+  color: "bfd4f2"
+  description: "+50 XP"

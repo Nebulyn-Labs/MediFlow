@@ -89,7 +89,7 @@ class _DailyLoggingPageState extends ConsumerState<DailyLoggingPage>
 
   Future<void> _pickCSV() async {
     try {
-      final result = await FilePicker.platform.pickFiles(
+      final result = await FilePicker.pickFiles(
         type: FileType.custom,
         allowedExtensions: ['csv', 'txt'],
         withData: true,
