@@ -30,6 +30,7 @@ jobs:
 
       - name: Verify Hyperlinks
         uses: lycheeverse/lychee-action@v2.0.0
+        continue-on-error: true
         with:
           args: --verbose --no-progress '**/*.md'
           fail: false # Do not fail documentation build for external links being down

@@ -10,7 +10,7 @@ on:
 
 jobs:
   flutter_ci:
-    name: Flutter Build & Test
+    name: Flutter CI (Build & Test)
     runs-on: ubuntu-latest
 
     steps:
