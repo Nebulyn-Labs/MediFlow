@@ -1,9 +1,7 @@
 import 'package:google_generative_ai/google_generative_ai.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import '../models/inventory_item.dart';
-import '../models/daily_usage_log.dart';
-import '../models/facility.dart';
+import 'package:flutter/foundation.dart';
 
 class ChatMessage {
   final String text;
@@ -22,7 +20,6 @@ class ChatService {
   bool _usingFallback = false;
   bool _offlineMode = false;
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
-  String? _facilityId;
 
   // Cached data for offline responses
   Map<String, dynamic>? _facilityData;
@@ -55,7 +52,6 @@ class ChatService {
       : (_usingFallback ? _fallbackModelName : _primaryModelName);
 
   Future<void> _loadData(String? facilityId) async {
-    _facilityId = facilityId;
     try {
       if (facilityId != null) {
         final facilityDoc =
@@ -107,7 +103,7 @@ class ChatService {
       final requestsSnapshot = await _firestore.collection('requests').get();
       _requests = requestsSnapshot.docs.map((doc) => doc.data()).toList();
     } catch (e) {
-      print('ChatService: Error loading data: $e');
+      debugPrint('ChatService: Error loading data: $e');
     }
   }
 
@@ -271,7 +267,7 @@ Location: (${data['latitude']}, ${data['longitude']})
       } catch (e) {
         final errorStr = e.toString();
         if (_isQuotaError(errorStr)) {
-          print(
+          debugPrint(
               'ChatService: $_primaryModelName quota exceeded, trying $_fallbackModelName...');
           _usingFallback = true;
         } else {
@@ -290,7 +286,7 @@ Location: (${data['latitude']}, ${data['longitude']})
       } catch (e) {
         final errorStr = e.toString();
         if (_isQuotaError(errorStr)) {
-          print(
+          debugPrint(
               'ChatService: Both models exhausted, switching to offline mode.');
           _offlineMode = true;
           return _generateOfflineResponse(message);
@@ -393,12 +389,13 @@ Location: (${data['latitude']}, ${data['longitude']})
           d['facilityName'] != null ? ' _(${d['facilityName']})_' : '';
       final status = pct <= 15 ? '🔴' : (pct <= 40 ? '🟡' : '🟢');
 
-      if (pct <= 15)
+      if (pct <= 15) {
         critical++;
-      else if (pct <= 40)
+      } else if (pct <= 40) {
         warning++;
-      else
+      } else {
         healthy++;
+      }
 
       response +=
           '$status **${d['medicineName']}**$facilityLabel: $remaining/$initial units ($pct%)\n';
@@ -567,7 +564,7 @@ Location: (${data['latitude']}, ${data['longitude']})
     } else {
       for (var entry in medHistory.entries) {
         final avg =
-            entry.value.fold(0, (sum, v) => sum + v) / entry.value.length;
+            entry.value.fold(0, (acc, v) => acc + v) / entry.value.length;
         final forecast30 = (avg * 30 * 1.1).round(); // 10% buffer
         final trend = entry.value.length >= 3
             ? (entry.value.last > entry.value.first
