@@ -1,6 +1,6 @@
 # MediFlow
 
-**AI-powered medical logistics platform focused on smart resource allocation**
+# AI-powered medical logistics platform focused on smart resource allocation
 
 ![Flutter](https://img.shields.io/badge/Flutter-%2302569B.svg?style=for-the-badge&logo=Flutter&logoColor=white)
 ![Firebase](https://img.shields.io/badge/Firebase-039BE5?style=for-the-badge&logo=Firebase&logoColor=white)
@@ -29,22 +29,22 @@
 
 ## Project Overview
 
-**MediFlow** is an enterprise-grade medical logistics platform engineered to solve
-the "Last Mile" medical supply crisis. By combining **Generative AI** for demand
-forecasting with **Heuristic Heuristics**, we optimize redistribution of medical
-supplies across a network of urban and rural healthcare facilities.
+**MediFlow** is an enterprise-grade medical logistics platform engineered to
+solve the "Last Mile" medical supply crisis. By combining **Generative AI** for
+demand forecasting with **Heuristic Heuristics**, we optimize redistribution of
+medical supplies across a network of urban and rural healthcare facilities.
 
 ---
 
 ## The Problem | The Solution
 
 **The Crisis:** Rural clinics often face 30% higher stockout rates for essential
-antibiotics, while urban hospitals simultaneously dispose of expired stock due to
-over-purchasing. This inequality claims lives.
+antibiotics, while urban hospitals simultaneously dispose of expired stock due
+to over-purchasing. This inequality claims lives.
 
-**The MediFlow Solution:** We don't just track inventory; we **predict** shortages
-before they happen and **automate** the movement of medicine from surplus hospitals
-to deficit clinics using road-optimized routing.
+**The MediFlow Solution:** We don't just track inventory; we **predict**
+shortages before they happen and **automate** the movement of medicine from
+surplus hospitals to deficit clinics using road-optimized routing.
 
 ---
 
@@ -63,7 +63,7 @@ Here is a preview of the MediFlow central command dashboard:
 | Feature | Detailed Description |
 | :--- | :--- |
 | **Smart Logging Engine** | Atomically track daily usage while the system computes burn rates in real-time, ensuring zero data loss even in low-connectivity areas. |
-| **AI Forecasting (30-Day)** | Powered by **Gemini-1.5-Flash**, predicting seasonal spikes based on historical usage trends (e.g., ORS demand for summer) with a transparency-first "AI Reasoning" layer. |
+| **AI Forecasting (30-Day)** | Powered by **Gemini-1.5-Flash**, predicting seasonal spikes based on historical usage trends (e.g., ORS demand for summer) with a transparency-first "AI Reasoning". |
 | **Automated Request Drafting** | Intelligent auto-population of restock indents and redistribution offers based on AI predictions, reducing administrative overhead for clinic managers. |
 | **AI Chat Assistant** | A 24/7 logistics expert that facility managers can query for stock status, expiry alerts, or burn-rate insights using natural language. |
 
@@ -80,8 +80,8 @@ Here is a preview of the MediFlow central command dashboard:
 
 ## Technical Architecture
 
-MediFlow utilizes a decoupled, serverless architecture that bridges a responsive
-frontend client with intelligent background processing.
+MediFlow utilizes a decoupled, serverless architecture that bridges a
+responsive frontend client with intelligent background processing.
 
 ### Architecture Overview
 
@@ -97,14 +97,15 @@ graph TD
 
 ### Key Technical Pillars
 
-1. **AI Engine (Gemini 1.5 Flash):** We leverage Gemini's large context window to
-   process months of anonymized usage logs. The model acts as a **Predictive
+1. **AI Engine (Gemini 1.5 Flash):** We leverage Gemini's large context window
+   to process months of anonymized usage logs. The model acts as a **Predictive
    Reasoning Layer**, identifying non-obvious redistribution opportunities.
 
 2. **Optimization Heuristic (OTS):** Our proprietary **Optimal Transfer Score**
    ensures that redistribution is both efficient and equitable:
 
-   $$OTS = (w_{dist} \cdot Proximity) + (w_{prior} \cdot RuralPriority) + (w_{qty} \cdot QtyMatch)$$
+   $$OTS = (w_{dist} \cdot Proximity) + (w_{prior} \cdot RuralPriority) +
+   (w_{qty} \cdot QtyMatch)$$
 
    - **Proximity:** Minimizes logistics cost and time.
    - **Rural Priority:** A weight multiplier ensuring that remote facilities are
@@ -171,8 +172,8 @@ lib/
 
 ## Data & Schema
 
-MediFlow utilizes a hierarchical Firestore schema designed for high-concurrency
-performance:
+MediFlow utilizes a hierarchical Firestore schema designed for
+high-concurrency performance:
 
 - **`/facilities`**: Metadata, type (urban/rural), and geospatial coordinates.
 - **`/inventory/{fac_id}/medicines`**: Sub-collection tracking individual
@@ -209,7 +210,8 @@ performance:
 - [Flutter SDK](https://docs.flutter.dev/get-started/install) (>=3.0.0,
   recommended `3.41.x`)
 - [Node.js](https://nodejs.org/) (for Firebase Cloud Functions deployment)
-- Firebase Project configured on [Firebase Console](https://console.firebase.google.com/)
+- Firebase Project configured on
+  [Firebase Console](https://console.firebase.google.com/)
 - Google AI Studio API Key (for Gemini)
 - OpenRouteService API Key (for route calculations)
 
@@ -230,8 +232,8 @@ performance:
 
 3. **Configure the Environment:**
 
-   Create a `.env` file in the root of the project (and copy from `.env.example`
-   if needed):
+   Create a `.env` file in the root of the project (and copy from
+   `.env.example` if needed):
 
    ```ini
    GEMINI_API_KEY=your_gemini_api_key
@@ -264,8 +266,8 @@ performance:
 If compilation fails with an error indicating `.env` does not exist:
 
 - Make sure you created a `.env` file in the root folder.
-- If you don't have API keys yet, you can create a placeholder `.env` with dummy
-  values:
+- If you don't have API keys yet, you can create a placeholder `.env` with
+  dummy values:
 
   ```ini
   GEMINI_API_KEY=dummy_key
@@ -276,9 +278,9 @@ If compilation fails with an error indicating `.env` does not exist:
 
 If the map does not display in your web browser:
 
-- If the CanvasKit renderer encounters issues fetching tiles from OpenStreetMap
-  due to CORS, check your OpenRouteService API key and network settings. Ensure
-  all Firebase dependencies are up to date.
+- If the CanvasKit renderer encounters issues fetching tiles from
+  OpenStreetMap due to CORS, check your OpenRouteService API key and network
+  settings. Ensure all Firebase dependencies are up to date.
 - Verify that your OpenRouteService API key is valid and has not exceeded its
   request limit.
 
@@ -299,8 +301,8 @@ If calling Gemini forecasts yields an authentication error:
 
 - [ ] **Offline-First Sync:** Native SQLite integration for zero-connectivity
   environments.
-- [ ] **Batch Tracking:** QR-code integration for granular tracking of individual
-  medicine strips.
+- [ ] **Batch Tracking:** QR-code integration for granular tracking of
+  individual medicine strips.
 - [ ] **IoT Cold Chain:** Integration with sensors to track temperature-sensitive
   vaccines during transit.
 
