@@ -44,7 +44,7 @@ jobs:
 
     steps:
       - name: Apply labels
-        uses: actions/labeler@v5
+        uses: actions/labeler@v6
         continue-on-error: true # Will never fail the build if specific labels do not exist in the repo
         with:
           configuration-path: .github/labeler.yml
