@@ -31,8 +31,12 @@ class InventoryItem {
       id: id,
       medicineName: map['medicineName'] ?? '',
       batchId: map['batchId'] ?? '',
-      arrivalDate: (map['arrivalDate'] as Timestamp).toDate(),
-      expiryDate: (map['expiryDate'] as Timestamp).toDate(),
+      arrivalDate: map['arrivalDate'] != null
+          ? (map['arrivalDate'] as Timestamp).toDate()
+          : DateTime.now(),
+      expiryDate: map['expiryDate'] != null
+          ? (map['expiryDate'] as Timestamp).toDate()
+          : DateTime.now(),
       initialQuantity: map['initialQuantity']?.toInt() ?? 0,
       remainingQuantity: map['remainingQuantity']?.toInt() ?? 0,
       unit: map['unit'] ?? 'units',
