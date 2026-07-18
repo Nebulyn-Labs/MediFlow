@@ -5,6 +5,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import '../../models/inventory_item.dart';
 import '../../services/firebase_service.dart';
 import '../../services/simulation_service.dart';
+import '../../services/csv_export_service.dart';
 import 'package:med_supply_prototype/constants/colors.dart';
 
 class FacilityOverview extends ConsumerWidget {
@@ -344,13 +345,32 @@ class FacilityOverview extends ConsumerWidget {
                   },
                 ),
                 const SizedBox(height: 36),
-                _buildInventoryTable(context, inventory),
+                _buildInventoryTable(context, ref, inventory),
               ],
             ),
           ),
         );
       },
     );
+  }
+
+  Future<void> _exportInventoryCsv(BuildContext context, WidgetRef ref,
+      List<InventoryItem> inventory) async {
+    try {
+      final fac =
+          await ref.read(firebaseServiceProvider).getFacility(facilityId);
+      await CsvExportService.exportInventory(inventory,
+          facilityName: fac?.name);
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Inventory CSV exported ✓')));
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('Export failed: $e')));
+      }
+    }
   }
 
   Widget _buildKpiCard(String title, String value, IconData icon, Color accent,
@@ -391,15 +411,33 @@ class FacilityOverview extends ConsumerWidget {
   }
 
   Widget _buildInventoryTable(
-      BuildContext context, List<InventoryItem> inventory) {
+      BuildContext context, WidgetRef ref, List<InventoryItem> inventory) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text('Inventory Status',
-            style: TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.w700,
-                color: MediColors.textPrimary)),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            const Text('Inventory Status',
+                style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.w700,
+                    color: MediColors.textPrimary)),
+            OutlinedButton.icon(
+              onPressed: inventory.isEmpty
+                  ? null
+                  : () => _exportInventoryCsv(context, ref, inventory),
+              icon: const Icon(Icons.file_download_outlined, size: 18),
+              label: const Text('Export CSV'),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: MediColors.textSecondary,
+                side: const BorderSide(color: MediColors.border),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10)),
+              ),
+            ),
+          ],
+        ),
         const SizedBox(height: 16),
         Container(
           width: double.infinity,

@@ -6,6 +6,7 @@ import '../../services/firebase_service.dart';
 import '../../services/ai_service.dart';
 import '../../models/facility.dart';
 import '../../models/request.dart';
+import '../../models/inventory_item.dart';
 import 'package:med_supply_prototype/constants/colors.dart';
 
 class AdminOverview extends ConsumerStatefulWidget {
@@ -28,6 +29,19 @@ class _AdminOverviewState extends ConsumerState<AdminOverview> {
   bool _isLoading = true;
   StreamSubscription? _requestsSub;
 
+  // ---- search state (Sprint 3) ----
+  String _searchQuery = '';
+  final TextEditingController _searchController = TextEditingController();
+
+  // ---- filter state (Sprint 4) ----
+  static const List<String> _filterOptions = [
+    'All',
+    'Low Stock',
+    'Surplus',
+    'Expiring Soon',
+  ];
+  String _selectedFilter = 'All';
+
   @override
   void initState() {
     super.initState();
@@ -37,6 +51,7 @@ class _AdminOverviewState extends ConsumerState<AdminOverview> {
   @override
   void dispose() {
     _requestsSub?.cancel();
+    _searchController.dispose();
     super.dispose();
   }
 
@@ -99,6 +114,131 @@ class _AdminOverviewState extends ConsumerState<AdminOverview> {
     }
   }
 
+  // ---- status + filtering logic (Sprint 5) ----
+  String _getStockStatus(InventoryItem item) {
+    final daysToExpiry = item.expiryDate.difference(DateTime.now()).inDays;
+    if (daysToExpiry <= 90) return 'Expiring Soon';
+
+    if (item.initialQuantity == 0) return 'Healthy';
+    final ratio = item.remainingQuantity / item.initialQuantity;
+    if (ratio < 0.2) return 'Low Stock';
+    if (ratio > 0.8) return 'Surplus';
+    return 'Healthy';
+  }
+
+  List<InventoryItem> _applyFilters(List<InventoryItem> items) {
+    return items.where((item) {
+      final matchesSearch =
+          item.medicineName.toLowerCase().contains(_searchQuery);
+      final matchesFilter =
+          _selectedFilter == 'All' || _getStockStatus(item) == _selectedFilter;
+      return matchesSearch && matchesFilter;
+    }).toList();
+  }
+
+  // ---- medicine list widget (Sprint 6, overflow-fixed in 9c) ----
+  Widget _buildMedicineList() {
+    return StreamBuilder<List<InventoryItem>>(
+      stream: ref.read(firebaseServiceProvider).streamAllMedicines(),
+      builder: (context, snapshot) {
+        if (snapshot.hasError) {
+          return Text('Error loading inventory: ${snapshot.error}');
+        }
+        if (!snapshot.hasData) {
+          return const Center(child: CircularProgressIndicator());
+        }
+
+        final filtered = _applyFilters(snapshot.data!);
+
+        if (filtered.isEmpty) {
+          return const Padding(
+            padding: EdgeInsets.symmetric(vertical: 24),
+            child: Text('No medicines match your search or filter.',
+                style: TextStyle(color: MediColors.textSecondary)),
+          );
+        }
+
+        return ListView.builder(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          itemCount: filtered.length,
+          itemBuilder: (context, index) {
+            final item = filtered[index];
+            final status = _getStockStatus(item);
+            return Container(
+              margin: const EdgeInsets.only(bottom: 8),
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: MediColors.surface,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: MediColors.border),
+              ),
+              child: Row(
+                children: [
+                  Expanded(
+                    flex: 2,
+                    child: Text(item.medicineName,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                            fontWeight: FontWeight.w700,
+                            color: MediColors.textPrimary)),
+                  ),
+                  Expanded(
+                    child: Text(
+                        '${item.remainingQuantity}/${item.initialQuantity} ${item.unit}',
+                        overflow: TextOverflow.ellipsis,
+                        style:
+                            const TextStyle(color: MediColors.textSecondary)),
+                  ),
+                  Flexible(
+                    child: Text(status,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                            fontWeight: FontWeight.w700,
+                            color: MediColors.info)),
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  // ---- filter chips as horizontally-scrollable row (Sprint 9d) ----
+  Widget _buildFilterChips() {
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      child: Row(
+        children: _filterOptions.map((filter) {
+          final isSelected = _selectedFilter == filter;
+          return Padding(
+            padding: const EdgeInsets.only(right: 8),
+            child: ChoiceChip(
+              label: Text(filter),
+              selected: isSelected,
+              onSelected: (_) {
+                setState(() {
+                  _selectedFilter = filter;
+                });
+              },
+              backgroundColor: MediColors.surface,
+              selectedColor: MediColors.info.withValues(alpha: 0.2),
+              labelStyle: TextStyle(
+                color: isSelected ? MediColors.info : MediColors.textSecondary,
+                fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+              ),
+              side: BorderSide(
+                color: isSelected ? MediColors.info : MediColors.border,
+              ),
+            ),
+          );
+        }).toList(),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -135,6 +275,35 @@ class _AdminOverviewState extends ConsumerState<AdminOverview> {
                           onTap: () => context.go('/admin/approvals')),
                     ],
                   ),
+                  const SizedBox(height: 36),
+
+                  // ---- search field (Sprint 3) ----
+                  TextField(
+                    controller: _searchController,
+                    onChanged: (value) {
+                      setState(() {
+                        _searchQuery = value.toLowerCase();
+                      });
+                    },
+                    decoration: InputDecoration(
+                      hintText: 'Search medicines by name...',
+                      prefixIcon: const Icon(Icons.search),
+                      filled: true,
+                      fillColor: MediColors.surface,
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                        borderSide: BorderSide(color: MediColors.border),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+
+                  // ---- filter chips (Sprint 4, horizontal-scroll in 9d) ----
+                  _buildFilterChips(),
+                  const SizedBox(height: 20),
+
+                  // ---- medicine list (Sprint 6) ----
+                  _buildMedicineList(),
                   const SizedBox(height: 36),
 
                   // Facility Health Grid
