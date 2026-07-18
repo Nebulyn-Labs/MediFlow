@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:csv/csv.dart';
 import 'package:file_picker/file_picker.dart';
 import '../../services/firebase_service.dart';
+import '../../services/csv_export_service.dart';
 import 'package:med_supply_prototype/constants/colors.dart';
 
 class DailyLoggingPage extends ConsumerStatefulWidget {
@@ -31,6 +32,7 @@ class _DailyLoggingPageState extends ConsumerState<DailyLoggingPage>
   bool _isScanning = false;
   final List<Map<String, dynamic>> _scannedItems = [];
   bool _isSubmittingQr = false;
+  bool _isExportingCsv = false;
 
   @override
   void initState() {
@@ -87,6 +89,34 @@ class _DailyLoggingPageState extends ConsumerState<DailyLoggingPage>
       }
     } finally {
       if (mounted) setState(() => _isSubmitting = false);
+    }
+  }
+
+  Future<void> _exportUsageLogsCsv() async {
+    setState(() => _isExportingCsv = true);
+    try {
+      final firebase = ref.read(firebaseServiceProvider);
+      final logs = await firebase.getRecentLogs(widget.facilityId, days: 120);
+      if (logs.isEmpty) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('No usage logs to export yet')));
+        }
+        return;
+      }
+      final fac = await firebase.getFacility(widget.facilityId);
+      await CsvExportService.exportUsageLogs(logs, facilityName: fac?.name);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Usage logs CSV exported ✓')));
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('Export failed: $e')));
+      }
+    } finally {
+      if (mounted) setState(() => _isExportingCsv = false);
     }
   }
 
@@ -216,6 +246,19 @@ class _DailyLoggingPageState extends ConsumerState<DailyLoggingPage>
       backgroundColor: MediColors.bg,
       appBar: AppBar(
         title: const Text('Daily Logging'),
+        actions: [
+          IconButton(
+            tooltip: 'Export usage logs (CSV)',
+            icon: _isExportingCsv
+                ? const SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(strokeWidth: 2))
+                : const Icon(Icons.file_download_outlined),
+            onPressed: _isExportingCsv ? null : _exportUsageLogsCsv,
+          ),
+          const SizedBox(width: 8),
+        ],
         bottom: TabBar(
           controller: _tabController,
           tabs: const [

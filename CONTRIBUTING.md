@@ -51,7 +51,7 @@ By participating in this project, you agree to abide by our
    Add the original repository as an upstream remote to keep your fork synced:
 
    ```bash
-   git remote add upstream https://github.com/pavsoss/MediFlow.git
+   git remote add upstream https://github.com/Nebulyn-Labs/MediFlow.git
    ```
 
 4. **Fetch Packages:**
