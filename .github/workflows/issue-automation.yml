@@ -3,8 +3,6 @@ name: Issue & PR Automation
 on:
   issues:
     types: [opened]
-  pull_request:
-    types: [opened]
   pull_request_target:
     types: [opened, synchronize]
   schedule:
@@ -20,7 +18,7 @@ jobs:
   welcome:
     name: Welcome New Contributors
     # Trigger welcome message when an issue or PR is first opened
-    if: (github.event_name == 'issues' || github.event_name == 'pull_request') && github.event.action == 'opened'
+    if: (github.event_name == 'issues' || github.event_name == 'pull_request_target') && github.event.action == 'opened'
     runs-on: ubuntu-latest
     continue-on-error: true # Ensure automation glitches do not block user activity
 
