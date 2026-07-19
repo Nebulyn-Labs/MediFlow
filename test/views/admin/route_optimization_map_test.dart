@@ -84,7 +84,7 @@ class FakeOptimizationService implements OptimizationService {
     RoutingStrategy? routingStrategy,
   }) {
     if (recommendations.isEmpty) return [];
-    
+
     // Convert recommendation to a simple multi-stop route
     final rec = recommendations.first;
     return [
@@ -224,7 +224,7 @@ void main() {
       tester.view.devicePixelRatio = 1.0;
       addTearDown(tester.view.resetPhysicalSize);
       addTearDown(tester.view.resetDevicePixelRatio);
-      
+
       // Build our app and trigger a frame.
       await tester.pumpWidget(createWidgetUnderTest([]));
 
@@ -247,7 +247,7 @@ void main() {
       tester.view.devicePixelRatio = 1.0;
       addTearDown(tester.view.resetPhysicalSize);
       addTearDown(tester.view.resetDevicePixelRatio);
-      
+
       await tester.pumpWidget(createWidgetUnderTest([recommendation]));
       await tester.pumpAndSettle();
 
@@ -283,7 +283,7 @@ void main() {
       tester.view.devicePixelRatio = 1.0;
       addTearDown(tester.view.resetPhysicalSize);
       addTearDown(tester.view.resetDevicePixelRatio);
-      
+
       await tester.pumpWidget(createWidgetUnderTest([recommendation]));
       await tester.pumpAndSettle();
 

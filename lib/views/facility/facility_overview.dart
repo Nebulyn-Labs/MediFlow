@@ -184,7 +184,6 @@ class FacilityOverview extends ConsumerWidget {
                 ],
                 onSelected: (v) async {
                   if (v == 'out') {
-<<<<<<< HEAD
                     final confirmed = await showDialog<bool>(
                       context: context,
                       builder: (context) => AlertDialog(
@@ -207,9 +206,6 @@ class FacilityOverview extends ConsumerWidget {
                     );
                     if (confirmed != true) return;
                     if (context.mounted) context.go('/');
-=======
-                    context.go('/');
->>>>>>> upstream/main
                     await FirebaseAuth.instance.signOut();
                   }
                 },
