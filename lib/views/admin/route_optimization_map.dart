@@ -81,7 +81,8 @@ class _RouteOptimizationMapState extends ConsumerState<RouteOptimizationMap> {
       Map<String, List<LatLng>> routes = {};
       for (var mr in multiRoutes) {
         if (mr.stops.isEmpty) continue;
-        final stopsCoords = mr.stops.map((f) => LatLng(f.latitude, f.longitude)).toList();
+        final stopsCoords =
+            mr.stops.map((f) => LatLng(f.latitude, f.longitude)).toList();
         final path = await router.getMultiStopRoute(stopsCoords);
         routes[mr.transfers.first.donor.id] = path;
       }
@@ -297,13 +298,12 @@ class _RouteOptimizationMapState extends ConsumerState<RouteOptimizationMap> {
                             ),
                             if (_showRoutes)
                               PolylineLayer(
-                                polylines:
-                                    _multiStopRoutes.map<Polyline>((mr) {
+                                polylines: _multiStopRoutes.map<Polyline>((mr) {
                                   final donorId = mr.transfers.first.donor.id;
                                   final points = _roadRoutes[donorId] ??
                                       mr.stops
-                                          .map((s) => LatLng(
-                                              s.latitude, s.longitude))
+                                          .map((s) =>
+                                              LatLng(s.latitude, s.longitude))
                                           .toList();
                                   bool hasRural = mr.stops.any((s) =>
                                       s.type == 'rural' && s.id != donorId);
@@ -319,10 +319,10 @@ class _RouteOptimizationMapState extends ConsumerState<RouteOptimizationMap> {
                               ),
                             MarkerLayer(
                               markers: _facilities.map((f) {
-                                bool isDonor = _multiStopRoutes
-                                    .any((mr) => mr.transfers.first.donor.id == f.id);
-                                bool isRecipient = _multiStopRoutes
-                                    .any((mr) => mr.stops.skip(1).any((s) => s.id == f.id));
+                                bool isDonor = _multiStopRoutes.any((mr) =>
+                                    mr.transfers.first.donor.id == f.id);
+                                bool isRecipient = _multiStopRoutes.any((mr) =>
+                                    mr.stops.skip(1).any((s) => s.id == f.id));
 
                                 Color markerColor = MediColors.textMuted;
                                 if (_showRoutes) {
@@ -499,7 +499,7 @@ class _RouteOptimizationMapState extends ConsumerState<RouteOptimizationMap> {
 
   Widget _buildMultiStopRouteCard(MultiStopRoute mr) {
     if (mr.transfers.isEmpty) return const SizedBox.shrink();
-    
+
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
       padding: const EdgeInsets.all(16),
@@ -512,11 +512,16 @@ class _RouteOptimizationMapState extends ConsumerState<RouteOptimizationMap> {
         children: [
           Row(
             children: [
-              const Icon(Icons.local_shipping_outlined, color: MediColors.primary),
+              const Icon(Icons.local_shipping_outlined,
+                  color: MediColors.primary),
               const SizedBox(width: 8),
               Expanded(
-                child: Text('Multi-Stop Route: ${mr.transfers.first.donor.name}',
-                    style: const TextStyle(fontWeight: FontWeight.w800, color: MediColors.textPrimary, fontSize: 16)),
+                child: Text(
+                    'Multi-Stop Route: ${mr.transfers.first.donor.name}',
+                    style: const TextStyle(
+                        fontWeight: FontWeight.w800,
+                        color: MediColors.textPrimary,
+                        fontSize: 16)),
               ),
             ],
           ),

@@ -35,25 +35,33 @@ class MultiStopRoute {
 }
 
 abstract class RoutingStrategy {
-  List<Facility> buildRouteStops(Facility startNode, List<TransferRecommendation> transfers);
+  List<Facility> buildRouteStops(
+      Facility startNode, List<TransferRecommendation> transfers);
 }
 
 class NearestNeighborRoutingStrategy implements RoutingStrategy {
   const NearestNeighborRoutingStrategy();
 
   @override
-  List<Facility> buildRouteStops(Facility startNode, List<TransferRecommendation> transfers) {
+  List<Facility> buildRouteStops(
+      Facility startNode, List<TransferRecommendation> transfers) {
     final Distance distanceCalc = const Distance();
-    
-    final unvisited = transfers.map((t) => t.recipient).toSet().toList();
-    
+
+    final unvisited = <Facility>[];
+    final seenRecipientIds = <String>{};
+    for (final transfer in transfers) {
+      if (seenRecipientIds.add(transfer.recipient.id)) {
+        unvisited.add(transfer.recipient);
+      }
+    }
+
     List<Facility> orderedStops = [startNode];
     Facility current = startNode;
-    
+
     while (unvisited.isNotEmpty) {
       Facility? nearest;
       double minDistance = double.infinity;
-      
+
       for (var candidate in unvisited) {
         final dist = distanceCalc(
           LatLng(current.latitude, current.longitude),
@@ -64,7 +72,7 @@ class NearestNeighborRoutingStrategy implements RoutingStrategy {
           nearest = candidate;
         }
       }
-      
+
       if (nearest != null) {
         orderedStops.add(nearest);
         unvisited.remove(nearest);
@@ -73,7 +81,7 @@ class NearestNeighborRoutingStrategy implements RoutingStrategy {
         break;
       }
     }
-    
+
     return orderedStops;
   }
 }
@@ -242,7 +250,7 @@ class OptimizationService {
     RoutingStrategy? routingStrategy,
   }) {
     final strategy = routingStrategy ?? _strategy;
-    
+
     final recommendations = calculateOptimalTransfers(
       facilities: facilities,
       inventories: inventories,
@@ -258,10 +266,10 @@ class OptimizationService {
     for (var entry in groupedByDonor.entries) {
       final transfers = entry.value;
       if (transfers.isEmpty) continue;
-      
+
       final donor = transfers.first.donor;
       final stops = strategy.buildRouteStops(donor, transfers);
-      
+
       multiStopRoutes.add(MultiStopRoute(
         transfers: transfers,
         stops: stops,
