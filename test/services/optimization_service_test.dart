@@ -8,8 +8,6 @@ void main() {
   group('OptimizationService', () {
     late OptimizationService service;
     final now = DateTime.now();
-  group('OptimizationService - MultiStopRoutes', () {
-    late OptimizationService service;
 
     setUp(() {
       service = OptimizationService();
@@ -29,7 +27,8 @@ void main() {
       );
     }
 
-    InventoryItem createInventory(String facilityId, String medName, int initial, int remaining) {
+    InventoryItem createInventory(
+        String facilityId, String medName, int initial, int remaining) {
       return InventoryItem(
         id: 'inv_$facilityId',
         medicineName: medName,
@@ -44,7 +43,8 @@ void main() {
       );
     }
 
-    MedRequest createRequest(String id, String facilityId, String medName, RequestType type, int quantity) {
+    MedRequest createRequest(String id, String facilityId, String medName,
+        RequestType type, int quantity) {
       return MedRequest(
         id: id,
         facilityId: facilityId,
@@ -69,12 +69,16 @@ void main() {
     test('returns empty recommendations when no donor has surplus', () {
       final donor = createFacility('d1', 'urban', 28.6, 77.2);
       final recipient = createFacility('r1', 'rural', 28.7, 77.3);
-      final inventory = createInventory(donor.id, 'Paracetamol', 100, 30); // 30 is exactly 30%, no surplus
-      final request = createRequest('req1', recipient.id, 'Paracetamol', RequestType.shortage, 20);
+      final inventory = createInventory(
+          donor.id, 'Paracetamol', 100, 30); // 30 is exactly 30%, no surplus
+      final request = createRequest(
+          'req1', recipient.id, 'Paracetamol', RequestType.shortage, 20);
 
       final result = service.calculateOptimalTransfers(
         facilities: [donor, recipient],
-        inventories: {donor.id: [inventory]},
+        inventories: {
+          donor.id: [inventory]
+        },
         requests: [request],
       );
 
@@ -84,7 +88,8 @@ void main() {
     test('returns empty recommendations when empty inventories', () {
       final donor = createFacility('d1', 'urban', 28.6, 77.2);
       final recipient = createFacility('r1', 'rural', 28.7, 77.3);
-      final request = createRequest('req1', recipient.id, 'Paracetamol', RequestType.shortage, 20);
+      final request = createRequest(
+          'req1', recipient.id, 'Paracetamol', RequestType.shortage, 20);
 
       final result = service.calculateOptimalTransfers(
         facilities: [donor, recipient],
@@ -99,11 +104,14 @@ void main() {
       final donor = createFacility('d1', 'urban', 28.6, 77.2);
       final recipient = createFacility('r1', 'rural', 28.7, 77.3);
       final inventory = createInventory(donor.id, 'Ibuprofen', 100, 100);
-      final request = createRequest('req1', recipient.id, 'Paracetamol', RequestType.shortage, 20);
+      final request = createRequest(
+          'req1', recipient.id, 'Paracetamol', RequestType.shortage, 20);
 
       final result = service.calculateOptimalTransfers(
         facilities: [donor, recipient],
-        inventories: {donor.id: [inventory]},
+        inventories: {
+          donor.id: [inventory]
+        },
         requests: [request],
       );
 
@@ -115,16 +123,20 @@ void main() {
       final donor = createFacility('d1', 'urban', 28.6, 77.2);
       final recipientUrban = createFacility('r_urban', 'urban', 28.7, 77.3);
       final recipientRural = createFacility('r_rural', 'rural', 28.7, 77.3);
-      
+
       // Donor has 50 surplus
-      final inventory = createInventory(donor.id, 'ORS', 100, 80); 
-      
-      final reqUrban = createRequest('reqU', recipientUrban.id, 'ORS', RequestType.regularIndent, 50);
-      final reqRural = createRequest('reqR', recipientRural.id, 'ORS', RequestType.regularIndent, 50);
+      final inventory = createInventory(donor.id, 'ORS', 100, 80);
+
+      final reqUrban = createRequest(
+          'reqU', recipientUrban.id, 'ORS', RequestType.regularIndent, 50);
+      final reqRural = createRequest(
+          'reqR', recipientRural.id, 'ORS', RequestType.regularIndent, 50);
 
       final result = service.calculateOptimalTransfers(
         facilities: [donor, recipientUrban, recipientRural],
-        inventories: {donor.id: [inventory]},
+        inventories: {
+          donor.id: [inventory]
+        },
         requests: [reqUrban, reqRural],
       );
 
@@ -133,14 +145,19 @@ void main() {
     });
 
     test('distance prioritization chooses closer donor', () {
-      final donorClose = createFacility('d_close', 'urban', 28.61, 77.21); // Close to recipient
-      final donorFar = createFacility('d_far', 'urban', 29.0, 78.0); // Far from recipient
+      final donorClose = createFacility(
+          'd_close', 'urban', 28.61, 77.21); // Close to recipient
+      final donorFar =
+          createFacility('d_far', 'urban', 29.0, 78.0); // Far from recipient
       final recipient = createFacility('r1', 'urban', 28.6, 77.2);
 
-      final invClose = createInventory(donorClose.id, 'ORS', 100, 100); // 70 surplus
-      final invFar = createInventory(donorFar.id, 'ORS', 100, 100); // 70 surplus
+      final invClose =
+          createInventory(donorClose.id, 'ORS', 100, 100); // 70 surplus
+      final invFar =
+          createInventory(donorFar.id, 'ORS', 100, 100); // 70 surplus
 
-      final request = createRequest('req1', recipient.id, 'ORS', RequestType.shortage, 40);
+      final request =
+          createRequest('req1', recipient.id, 'ORS', RequestType.shortage, 40);
 
       final result = service.calculateOptimalTransfers(
         facilities: [donorClose, donorFar, recipient],
@@ -155,15 +172,20 @@ void main() {
       expect(result.first.donor.id, 'd_close');
     });
 
-    test('quantity matching chooses full fulfillment over partial fulfillment', () {
+    test('quantity matching chooses full fulfillment over partial fulfillment',
+        () {
       final donorPartial = createFacility('d_partial', 'urban', 28.61, 77.21);
-      final donorFull = createFacility('d_full', 'urban', 28.62, 77.22); // Slightly further but full qty
+      final donorFull = createFacility(
+          'd_full', 'urban', 28.62, 77.22); // Slightly further but full qty
       final recipient = createFacility('r1', 'urban', 28.6, 77.2);
 
-      final invPartial = createInventory(donorPartial.id, 'ORS', 100, 50); // 20 surplus
-      final invFull = createInventory(donorFull.id, 'ORS', 100, 100); // 70 surplus
+      final invPartial =
+          createInventory(donorPartial.id, 'ORS', 100, 50); // 20 surplus
+      final invFull =
+          createInventory(donorFull.id, 'ORS', 100, 100); // 70 surplus
 
-      final request = createRequest('req1', recipient.id, 'ORS', RequestType.shortage, 40);
+      final request =
+          createRequest('req1', recipient.id, 'ORS', RequestType.shortage, 40);
 
       final result = service.calculateOptimalTransfers(
         facilities: [donorPartial, donorFull, recipient],
@@ -188,7 +210,8 @@ void main() {
       final inv2 = createInventory(donor2.id, 'ORS', 100, 60); // 30 surplus
 
       // Need 40. Should take from both.
-      final request = createRequest('req1', recipient.id, 'ORS', RequestType.shortage, 40);
+      final request =
+          createRequest('req1', recipient.id, 'ORS', RequestType.shortage, 40);
 
       final result = service.calculateOptimalTransfers(
         facilities: [donor1, donor2, recipient],
@@ -208,15 +231,20 @@ void main() {
     test('explicit surplus offers take precedence or add to surplus', () {
       final donor = createFacility('d1', 'urban', 28.6, 77.2);
       final recipient = createFacility('r1', 'rural', 28.7, 77.3);
-      final inventory = createInventory(donor.id, 'Paracetamol', 100, 30); // 0 live surplus
+      final inventory =
+          createInventory(donor.id, 'Paracetamol', 100, 30); // 0 live surplus
 
       // Explicit surplus offer of 50
-      final explicitSurplus = createRequest('req_surplus', donor.id, 'Paracetamol', RequestType.surplus, 50);
-      final request = createRequest('req_shortage', recipient.id, 'Paracetamol', RequestType.shortage, 20);
+      final explicitSurplus = createRequest(
+          'req_surplus', donor.id, 'Paracetamol', RequestType.surplus, 50);
+      final request = createRequest('req_shortage', recipient.id, 'Paracetamol',
+          RequestType.shortage, 20);
 
       final result = service.calculateOptimalTransfers(
         facilities: [donor, recipient],
-        inventories: {donor.id: [inventory]},
+        inventories: {
+          donor.id: [inventory]
+        },
         requests: [explicitSurplus, request],
       );
 
@@ -226,19 +254,22 @@ void main() {
 
     test('ignores self transfers', () {
       final facility = createFacility('f1', 'urban', 28.6, 77.2);
-      final inventory = createInventory(facility.id, 'Paracetamol', 100, 100); // 70 surplus
-      final request = createRequest('req1', facility.id, 'Paracetamol', RequestType.shortage, 20);
+      final inventory =
+          createInventory(facility.id, 'Paracetamol', 100, 100); // 70 surplus
+      final request = createRequest(
+          'req1', facility.id, 'Paracetamol', RequestType.shortage, 20);
 
       final result = service.calculateOptimalTransfers(
         facilities: [facility],
-        inventories: {facility.id: [inventory]},
+        inventories: {
+          facility.id: [inventory]
+        },
         requests: [request],
       );
 
       expect(result, isEmpty);
     });
-  });
-}
+
     test('calculateMultiStopRoutes groups by donor and orders stops', () {
       final f1 = Facility(
           id: 'd1',

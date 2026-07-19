@@ -47,8 +47,6 @@ class _RouteOptimizationMapState extends ConsumerState<RouteOptimizationMap> {
     }
   }
 
-
-
   Future<void> _generateOptimalRoutes(
       List<MedRequest> requests, List<InventoryItem> allMeds) async {
     setState(() => _isGenerating = true);
@@ -64,8 +62,6 @@ class _RouteOptimizationMapState extends ConsumerState<RouteOptimizationMap> {
         }
       }
 
-      // 1. Calculate optimal transfers
-      final recs = optimizer.calculateOptimalTransfers(
       // 1. Calculate optimal transfers grouped into multi-stop routes
       final multiRoutes = optimizer.calculateMultiStopRoutes(
         facilities: _facilities,
@@ -198,8 +194,8 @@ class _RouteOptimizationMapState extends ConsumerState<RouteOptimizationMap> {
                                         : 'Generate Optimal Routes'),
                                     onPressed: _isGenerating
                                         ? null
-                                        : () =>
-                                            _generateOptimalRoutes(requests, allMeds),
+                                        : () => _generateOptimalRoutes(
+                                            requests, allMeds),
                                   ),
                                 ),
                               ),
@@ -544,8 +540,10 @@ class _RouteOptimizationMapState extends ConsumerState<RouteOptimizationMap> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          Wrap(
+            alignment: WrapAlignment.spaceBetween,
+            spacing: 8.0,
+            runSpacing: 4.0,
             children: [
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
@@ -612,8 +610,10 @@ class _RouteOptimizationMapState extends ConsumerState<RouteOptimizationMap> {
                   fontSize: 11,
                   fontStyle: FontStyle.italic)),
           const SizedBox(height: 16),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          Wrap(
+            alignment: WrapAlignment.spaceBetween,
+            spacing: 8.0,
+            runSpacing: 4.0,
             children: [
               Row(children: [
                 const Icon(Icons.route_rounded,

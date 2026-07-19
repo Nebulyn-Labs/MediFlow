@@ -35,7 +35,8 @@ class FakeFirebaseService implements FirebaseService {
     return facilities;
   }
 
-  late final Stream<List<InventoryItem>> _inventoryStream = Stream.value(inventory);
+  late final Stream<List<InventoryItem>> _inventoryStream =
+      Stream.value(inventory);
   late final Stream<List<MedRequest>> _requestsStream = Stream.value(requests);
 
   @override
@@ -74,12 +75,36 @@ class FakeOptimizationService implements OptimizationService {
   }) {
     return recommendations;
   }
+
+  @override
+  List<MultiStopRoute> calculateMultiStopRoutes({
+    required List<Facility> facilities,
+    required Map<String, List<InventoryItem>> inventories,
+    required List<MedRequest> requests,
+    RoutingStrategy? routingStrategy,
+  }) {
+    if (recommendations.isEmpty) return [];
+    
+    // Convert recommendation to a simple multi-stop route
+    final rec = recommendations.first;
+    return [
+      MultiStopRoute(
+        stops: [rec.donor, rec.recipient],
+        transfers: [rec],
+      )
+    ];
+  }
 }
 
 class FakeRoutingService implements RoutingService {
   @override
   Future<List<LatLng>> getRoute(LatLng start, LatLng end) async {
     return [start, end];
+  }
+
+  @override
+  Future<List<LatLng>> getMultiStopRoute(List<LatLng> stops) async {
+    return stops;
   }
 }
 
@@ -106,7 +131,6 @@ class DummyHttpOverrides extends HttpOverrides {
 
 void main() {
   setUpAll(() {
-    // Avoid network exceptions from TileLayer loading tiles during tests
     HttpOverrides.global = DummyHttpOverrides();
   });
 
@@ -183,7 +207,8 @@ void main() {
               requests: [request],
             ),
           ),
-          optimizationServiceProvider.overrideWithValue(FakeOptimizationService(recs)),
+          optimizationServiceProvider
+              .overrideWithValue(FakeOptimizationService(recs)),
           routingServiceProvider.overrideWithValue(FakeRoutingService()),
           aiServiceProvider.overrideWithValue(FakeAIService()),
         ],
@@ -193,7 +218,13 @@ void main() {
       );
     }
 
-    testWidgets('initial loading state and empty map state', (WidgetTester tester) async {
+    testWidgets('initial loading state and empty map state',
+        (WidgetTester tester) async {
+      tester.view.physicalSize = const Size(1920, 1080);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      
       // Build our app and trigger a frame.
       await tester.pumpWidget(createWidgetUnderTest([]));
 
@@ -205,18 +236,24 @@ void main() {
       expect(find.text('Transfer Manifest'), findsOneWidget);
       expect(find.text('Generate Optimal Routes'), findsOneWidget);
       expect(find.text('Click Generate to start analysis'), findsOneWidget);
-      
+
       // PolylineLayer should not have any polyline since showRoutes is false initially
       expect(find.byType(PolylineLayer), findsNothing);
     });
 
-    testWidgets('generates routes, displays recommendations and AI summary', (WidgetTester tester) async {
+    testWidgets('generates routes, displays recommendations and AI summary',
+        (WidgetTester tester) async {
+      tester.view.physicalSize = const Size(1920, 1080);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      
       await tester.pumpWidget(createWidgetUnderTest([recommendation]));
       await tester.pumpAndSettle();
 
       // Tap the Generate button
       await tester.tap(find.text('Generate Optimal Routes'));
-      
+
       // Allow async operations (calculateOptimalTransfers, getRoute, AI) to complete
       await tester.pumpAndSettle();
 
@@ -235,12 +272,18 @@ void main() {
 
       // Verify Clear Map button appears
       expect(find.text('Clear Map'), findsOneWidget);
-      
+
       // Map should have routes rendered now
       expect(find.byType(PolylineLayer), findsOneWidget);
     });
 
-    testWidgets('Clear Map behavior hides routes and summary', (WidgetTester tester) async {
+    testWidgets('Clear Map behavior hides routes and summary',
+        (WidgetTester tester) async {
+      tester.view.physicalSize = const Size(1920, 1080);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      
       await tester.pumpWidget(createWidgetUnderTest([recommendation]));
       await tester.pumpAndSettle();
 
@@ -249,7 +292,7 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('Clear Map'), findsOneWidget);
-      
+
       // Tap Clear Map
       await tester.tap(find.text('Clear Map'));
       await tester.pumpAndSettle();
