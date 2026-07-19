@@ -26,7 +26,7 @@ class _RouteOptimizationMapState extends ConsumerState<RouteOptimizationMap> {
   bool _showRoutes = false;
   bool _isGenerating = false;
   String _aiSummary = '';
-  List<TransferRecommendation> _recommendations = [];
+  List<MultiStopRoute> _multiStopRoutes = [];
   Map<String, List<LatLng>> _roadRoutes = {};
 
   @override
@@ -66,18 +66,21 @@ class _RouteOptimizationMapState extends ConsumerState<RouteOptimizationMap> {
 
       // 1. Calculate optimal transfers
       final recs = optimizer.calculateOptimalTransfers(
+      // 1. Calculate optimal transfers grouped into multi-stop routes
+      final multiRoutes = optimizer.calculateMultiStopRoutes(
         facilities: _facilities,
         inventories: inventories,
         requests: requests,
       );
 
-      // 2. Fetch road-accurate routes for each recommendation
+      // 2. Fetch road-accurate routes for each multi-stop route
       Map<String, List<LatLng>> routes = {};
-      for (var rec in recs) {
-        final start = LatLng(rec.donor.latitude, rec.donor.longitude);
-        final end = LatLng(rec.recipient.latitude, rec.recipient.longitude);
-        final path = await router.getRoute(start, end);
-        routes['${rec.donor.id}_${rec.recipient.id}'] = path;
+      for (var mr in multiRoutes) {
+        if (mr.stops.isEmpty) continue;
+        final stopsCoords =
+            mr.stops.map((f) => LatLng(f.latitude, f.longitude)).toList();
+        final path = await router.getMultiStopRoute(stopsCoords);
+        routes[mr.transfers.first.donor.id] = path;
       }
 
       // 3. Generate AI Summary
@@ -85,11 +88,11 @@ class _RouteOptimizationMapState extends ConsumerState<RouteOptimizationMap> {
           await ai.generateRedistributionPlan(requests, _facilities);
 
       debugPrint(
-          'RouteOptimizationMap: Generated ${recs.length} recommendations.');
+          'RouteOptimizationMap: Generated ${multiRoutes.length} multi-stop routes.');
       debugPrint('RouteOptimizationMap: Fetched ${routes.length} road routes.');
 
       setState(() {
-        _recommendations = recs;
+        _multiStopRoutes = multiRoutes;
         _roadRoutes = routes;
         _aiSummary = summary;
         _showRoutes = true;
@@ -256,10 +259,10 @@ class _RouteOptimizationMapState extends ConsumerState<RouteOptimizationMap> {
                                 ))
                               : ListView.builder(
                                   padding: const EdgeInsets.all(24),
-                                  itemCount: _recommendations.length,
+                                  itemCount: _multiStopRoutes.length,
                                   itemBuilder: (context, index) {
-                                    final rec = _recommendations[index];
-                                    return _buildTransferCard(rec);
+                                    final mr = _multiStopRoutes[index];
+                                    return _buildMultiStopRouteCard(mr);
                                   },
                                 ),
                         ),
@@ -289,20 +292,18 @@ class _RouteOptimizationMapState extends ConsumerState<RouteOptimizationMap> {
                             ),
                             if (_showRoutes)
                               PolylineLayer(
-                                polylines:
-                                    _recommendations.map<Polyline>((rec) {
-                                  final key =
-                                      '${rec.donor.id}_${rec.recipient.id}';
-                                  final points = _roadRoutes[key] ??
-                                      [
-                                        LatLng(rec.donor.latitude,
-                                            rec.donor.longitude),
-                                        LatLng(rec.recipient.latitude,
-                                            rec.recipient.longitude)
-                                      ];
+                                polylines: _multiStopRoutes.map<Polyline>((mr) {
+                                  final donorId = mr.transfers.first.donor.id;
+                                  final points = _roadRoutes[donorId] ??
+                                      mr.stops
+                                          .map((s) =>
+                                              LatLng(s.latitude, s.longitude))
+                                          .toList();
+                                  bool hasRural = mr.stops.any((s) =>
+                                      s.type == 'rural' && s.id != donorId);
                                   return Polyline(
                                     points: points,
-                                    color: (rec.recipient.type == 'rural'
+                                    color: (hasRural
                                             ? Colors.blueAccent
                                             : MediColors.primary)
                                         .withValues(alpha: 0.8),
@@ -312,10 +313,10 @@ class _RouteOptimizationMapState extends ConsumerState<RouteOptimizationMap> {
                               ),
                             MarkerLayer(
                               markers: _facilities.map((f) {
-                                bool isDonor = _recommendations
-                                    .any((r) => r.donor.id == f.id);
-                                bool isRecipient = _recommendations
-                                    .any((r) => r.recipient.id == f.id);
+                                bool isDonor = _multiStopRoutes.any((mr) =>
+                                    mr.transfers.first.donor.id == f.id);
+                                bool isRecipient = _multiStopRoutes.any((mr) =>
+                                    mr.stops.skip(1).any((s) => s.id == f.id));
 
                                 Color markerColor = MediColors.textMuted;
                                 if (_showRoutes) {
@@ -490,7 +491,42 @@ class _RouteOptimizationMapState extends ConsumerState<RouteOptimizationMap> {
     );
   }
 
-  Widget _buildTransferCard(TransferRecommendation rec) {
+  Widget _buildMultiStopRouteCard(MultiStopRoute mr) {
+    if (mr.transfers.isEmpty) return const SizedBox.shrink();
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 16),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+          color: MediColors.surface,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: MediColors.border, width: 2)),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.local_shipping_outlined,
+                  color: MediColors.primary),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                    'Multi-Stop Route: ${mr.transfers.first.donor.name}',
+                    style: const TextStyle(
+                        fontWeight: FontWeight.w800,
+                        color: MediColors.textPrimary,
+                        fontSize: 16)),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          ...mr.transfers.map((rec) => _buildSingleTransferInfo(rec)),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSingleTransferInfo(TransferRecommendation rec) {
     final Distance distanceCalc = const Distance();
     final distKm = distanceCalc(LatLng(rec.donor.latitude, rec.donor.longitude),
             LatLng(rec.recipient.latitude, rec.recipient.longitude)) /
@@ -499,11 +535,11 @@ class _RouteOptimizationMapState extends ConsumerState<RouteOptimizationMap> {
     final timeMinutes = (timeHours * 60).toInt();
 
     return Container(
-      margin: const EdgeInsets.only(bottom: 16),
-      padding: const EdgeInsets.all(20),
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
           color: MediColors.surfaceLight,
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(12),
           border: Border.all(color: MediColors.border)),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
