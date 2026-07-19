@@ -257,6 +257,16 @@ high-concurrency performance:
    flutter run -d chrome
    ```
 
+6. **Configure Firebase App Check (Important):**
+
+   This project uses Firebase App Check to protect backend resources.
+   - **Android:** Play Integrity is used in release builds, and debug mode uses a Debug token. You must register your app's SHA-256 certificate in the Firebase Console under App Check.
+   - **Web:** We use reCAPTCHA v3. You must provide your site key during build/run time to enable it:
+     ```bash
+     flutter run -d chrome --dart-define=RECAPTCHA_SITE_KEY=your_recaptcha_site_key
+     ```
+     *Note: If no key is provided, the app will continue to run but App Check will remain inactive for web, exposing Firebase services if enforcement is turned on in the console.*
+
 ---
 
 ## Troubleshooting
