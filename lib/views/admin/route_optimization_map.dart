@@ -22,7 +22,6 @@ class RouteOptimizationMap extends ConsumerStatefulWidget {
 class _RouteOptimizationMapState extends ConsumerState<RouteOptimizationMap> {
   final MapController _mapController = MapController();
   List<Facility> _facilities = [];
-  Map<String, List<InventoryItem>> _allInventories = {};
   bool _isLoading = true;
   bool _showRoutes = false;
   bool _isGenerating = false;
@@ -48,32 +47,27 @@ class _RouteOptimizationMapState extends ConsumerState<RouteOptimizationMap> {
     }
   }
 
-  void _updateInventoriesFromStream(List<InventoryItem> allMeds) {
-    Map<String, List<InventoryItem>> newInventories = {};
-    for (var med in allMeds) {
-      if (med.facilityId != null) {
-        newInventories.putIfAbsent(med.facilityId!, () => []).add(med);
-      }
-    }
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) return;
-      setState(() {
-        _allInventories = newInventories;
-      });
-    });
-  }
 
-  Future<void> _generateOptimalRoutes(List<MedRequest> requests) async {
+
+  Future<void> _generateOptimalRoutes(
+      List<MedRequest> requests, List<InventoryItem> allMeds) async {
     setState(() => _isGenerating = true);
     try {
       final optimizer = ref.read(optimizationServiceProvider);
       final router = ref.read(routingServiceProvider);
       final ai = ref.read(aiServiceProvider);
 
+      Map<String, List<InventoryItem>> inventories = {};
+      for (var med in allMeds) {
+        if (med.facilityId != null) {
+          inventories.putIfAbsent(med.facilityId!, () => []).add(med);
+        }
+      }
+
       // 1. Calculate optimal transfers
       final recs = optimizer.calculateOptimalTransfers(
         facilities: _facilities,
-        inventories: _allInventories,
+        inventories: inventories,
         requests: requests,
       );
 
@@ -125,9 +119,7 @@ class _RouteOptimizationMapState extends ConsumerState<RouteOptimizationMap> {
       body: StreamBuilder<List<InventoryItem>>(
         stream: ref.watch(firebaseServiceProvider).streamAllMedicines(),
         builder: (context, invSnapshot) {
-          if (invSnapshot.hasData) {
-            _updateInventoriesFromStream(invSnapshot.data!);
-          }
+          final allMeds = invSnapshot.data ?? [];
 
           return StreamBuilder<List<MedRequest>>(
             stream: ref.watch(firebaseServiceProvider).streamRequests(null),
@@ -204,7 +196,7 @@ class _RouteOptimizationMapState extends ConsumerState<RouteOptimizationMap> {
                                     onPressed: _isGenerating
                                         ? null
                                         : () =>
-                                            _generateOptimalRoutes(requests),
+                                            _generateOptimalRoutes(requests, allMeds),
                                   ),
                                 ),
                               ),
