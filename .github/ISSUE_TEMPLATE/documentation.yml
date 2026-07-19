@@ -1,0 +1,41 @@
+name: 📝 Documentation Improvement
+description: Suggest improvements or report issues in the documentation
+title: "[Docs]: "
+labels: ["documentation", "triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thank you for helping us improve our documentation!
+  - type: textarea
+    id: problem
+    attributes:
+      label: What needs to be documented, updated, or fixed?
+      description: A clear description of the documentation gap (e.g., outdated setup steps, typos, missing explanations).
+      placeholder: E.g., The setup instructions in README.md are missing details about...
+    validations:
+      required: true
+  - type: input
+    id: location
+    attributes:
+      label: Location of the documentation
+      description: URL of the page or filepath in the repo (e.g., README.md, docs/bigquery.md).
+      placeholder: E.g., CONTRIBUTING.md
+    validations:
+      required: true
+  - type: textarea
+    id: proposed-changes
+    attributes:
+      label: Proposed Changes
+      description: Describe the changes or additions you would like to see.
+      placeholder: Suggest the specific text or layout changes...
+    validations:
+      required: false
+  - type: textarea
+    id: additional-context
+    attributes:
+      label: Additional Context
+      description: Any other information or references that might be useful.
+      placeholder: Extra info...
+    validations:
+      required: false

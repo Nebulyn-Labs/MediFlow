@@ -1,0 +1,65 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Helper functions
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isAdmin() {
+      return isAuthenticated() && request.auth.token.email == 'admin@mediflow.com';
+    }
+
+    function isFacilityUser(facilityId) {
+      return isAuthenticated() && 
+        exists(/databases/$(database)/documents/facilities/$(facilityId)) &&
+        request.auth.token.email.lower() == get(/databases/$(database)/documents/facilities/$(facilityId)).data.email.lower();
+    }
+
+    // Deny by default
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Facilities collection
+    match /facilities/{facilityId} {
+      allow get: if isAdmin() || (isAuthenticated() && (resource == null || request.auth.token.email.lower() == resource.data.email.lower()));
+      allow list: if isAdmin();
+      
+      allow create: if isAdmin() || (isAuthenticated() && request.auth.token.email.lower() == request.resource.data.email.lower());
+      allow update: if isAdmin() || (isAuthenticated() && request.auth.token.email.lower() == resource.data.email.lower() && request.auth.token.email.lower() == request.resource.data.email.lower());
+      allow delete: if isAdmin();
+    }
+
+    // Inventory collection
+    match /inventory/{facilityId} {
+      allow read, write: if isAdmin() || isFacilityUser(facilityId);
+
+      match /medicines/{medicineId} {
+        allow read, write: if isAdmin() || isFacilityUser(facilityId);
+      }
+    }
+
+    // Collection Group rule for medicines
+    match /{path=**}/medicines/{medicineId} {
+      allow read: if isAdmin();
+    }
+
+    // Daily Usage Logs collection
+    match /daily_usage_logs/{facilityId} {
+      allow read, write: if isAdmin() || isFacilityUser(facilityId);
+
+      match /logs/{logId} {
+        allow read, write: if isAdmin() || isFacilityUser(facilityId);
+      }
+    }
+
+    // Requests collection
+    match /requests/{requestId} {
+      allow read: if isAdmin() || (isAuthenticated() && resource != null && isFacilityUser(resource.data.facilityId));
+      allow create: if isAdmin() || (isAuthenticated() && request.resource.data.facilityId != null && isFacilityUser(request.resource.data.facilityId));
+      allow update: if isAdmin() || (isAuthenticated() && isFacilityUser(resource.data.facilityId) && request.resource.data.facilityId == resource.data.facilityId);
+      allow delete: if isAdmin() || (isAuthenticated() && isFacilityUser(resource.data.facilityId));
+    }
+  }
+}

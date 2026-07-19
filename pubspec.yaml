@@ -1,0 +1,49 @@
+name: med_supply_prototype
+description: "MedSupply MVP - Real-time medical inventory tracking & AI redistribution"
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.0.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  # Firebase Core
+  firebase_core: ^3.10.0
+  cloud_firestore: ^5.6.1
+  firebase_auth: ^5.4.1
+  cloud_functions: ^5.1.1
+  firebase_storage: ^12.4.10
+
+  # State Management
+  flutter_riverpod: ^3.3.1
+  riverpod_annotation: ^4.0.2
+
+  # Navigation
+  go_router: ^17.3.0
+
+  # Web Map & Routing
+  flutter_map: ^8.3.1
+  latlong2: ^0.10.1
+  fl_chart: ^1.2.0
+  google_fonts: ^8.2.0
+
+  # Utils
+  http: ^1.6.0
+  intl: ^0.20.3
+  collection: ^1.19.1
+  file_picker: ^11.0.2
+  csv: ^8.0.0
+  firebase_app_check: ^0.3.2+10
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+  riverpod_generator: ^4.0.3
+  build_runner: ^2.15.1
+
+flutter:
+  uses-material-design: true

@@ -1,0 +1,49 @@
+name: ✨ Feature Request
+description: Propose a new feature or improvement for MediFlow
+title: "[Feature]: "
+labels: ["enhancement", "triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thank you for proposing a new feature! Please fill out the form below to help us understand the goal.
+  - type: textarea
+    id: problem
+    attributes:
+      label: Is your feature request related to a problem?
+      description: A clear and concise description of what the problem or limitation is.
+      placeholder: E.g., I'm frustrated when I try to...
+    validations:
+      required: true
+  - type: textarea
+    id: description
+    attributes:
+      label: Describe the Proposed Feature
+      description: A clear and concise description of what you want to happen.
+      placeholder: Explain how the feature would work...
+    validations:
+      required: true
+  - type: textarea
+    id: use-cases
+    attributes:
+      label: Describe Use Cases and Benefits
+      description: Who would benefit from this feature and how would it improve MediFlow?
+      placeholder: Detail the target users and value add...
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives Considered
+      description: A clear and concise description of any alternative solutions or features you've considered.
+      placeholder: E.g., I tried to use...
+    validations:
+      required: false
+  - type: textarea
+    id: additional-context
+    attributes:
+      label: Additional Context
+      description: Any other context, mockups, or screenshots about the feature request.
+      placeholder: Add sketches, mockups, links, etc.
+    validations:
+      required: false

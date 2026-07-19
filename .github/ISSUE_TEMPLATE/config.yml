@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Community Discussions
+    url: https://github.com/Nebulyn-Labs/MediFlow/discussions
+    about: Please ask questions, share ideas, and showcase your projects in our Discussions.
+  - name: Security Vulnerabilities
+    url: https://github.com/Nebulyn-Labs/MediFlow/security/policy
+    about: Please report security issues responsibly according to our Security Policy.

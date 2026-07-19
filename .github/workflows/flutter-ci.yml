@@ -1,0 +1,79 @@
+name: Flutter CI
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  flutter_ci:
+    name: Flutter CI (Build & Test)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+          cache: true
+          pub-cache: true
+
+      - name: Install Dependencies
+        run: flutter pub get
+
+      - name: Verify Code Formatting
+        run: dart format .
+
+      - name: Analyze Code
+        run: flutter analyze
+
+      - name: Run Unit Tests
+        run: flutter test
+
+      - name: Build Web App
+        run: flutter build web --release
+
+  functions_ci:
+    name: Cloud Functions CI
+    runs-on: ubuntu-latest
+    # Run only if files in functions/ have changed to avoid unnecessary runs
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Check for Functions Changes
+        id: filter
+        uses: dorny/paths-filter@v3
+        with:
+          filters: |
+            functions:
+              - 'functions/**'
+
+      - name: Set up Node.js
+        if: steps.filter.outputs.functions == 'true'
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: functions/package-lock.json
+
+      - name: Install Dependencies
+        if: steps.filter.outputs.functions == 'true'
+        working-directory: functions
+        run: npm ci
+
+      - name: Run Linter
+        if: steps.filter.outputs.functions == 'true'
+        working-directory: functions
+        run: npm run lint
+
+      - name: Run Tests
+        if: steps.filter.outputs.functions == 'true'
+        working-directory: functions
+        run: npm test

@@ -1,0 +1,33 @@
+name: ❓ Question
+description: Ask a question or request help with using MediFlow
+title: "[Question]: "
+labels: ["triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        *Note: Before submitting a question here, please check if it has already been answered in our [Discussions](https://github.com/Nebulyn-Labs/MediFlow/discussions).*
+  - type: textarea
+    id: question
+    attributes:
+      label: Your Question
+      description: What are you trying to understand or solve?
+      placeholder: Ask your question...
+    validations:
+      required: true
+  - type: textarea
+    id: attempt
+    attributes:
+      label: What have you tried so far?
+      description: Describe what documentation you read or what steps you attempted to solve the problem.
+      placeholder: E.g., I read the README setup guide and tried to...
+    validations:
+      required: false
+  - type: textarea
+    id: additional-context
+    attributes:
+      label: Additional Context
+      description: Any code snippets, screenshots, or logs that help explain your question.
+      placeholder: Add context here...
+    validations:
+      required: false

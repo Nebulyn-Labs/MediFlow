@@ -1,0 +1,72 @@
+name: 🐛 Bug Report
+description: File a bug report to help us improve MediFlow
+title: "[Bug]: "
+labels: ["bug", "triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thank you for reporting a bug! Please fill out the form below as accurately as possible.
+  - type: textarea
+    id: description
+    attributes:
+      label: Bug Description
+      description: A clear and concise description of what the bug is.
+      placeholder: Describe the issue...
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Steps to Reproduce
+      description: Steps to reproduce the behavior.
+      placeholder: |
+        1. Go to '...'
+        2. Click on '...'
+        3. Scroll down to '...'
+        4. See error
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected Behavior
+      description: A clear and concise description of what you expected to happen.
+      placeholder: What should have happened...
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual Behavior
+      description: What actually happens (including console logs, stack traces, or error messages).
+      placeholder: What actually occurred...
+    validations:
+      required: true
+  - type: textarea
+    id: environment
+    attributes:
+      label: Flutter & Environment Info
+      description: Output of `flutter doctor` or details about your OS, Flutter version, and targets.
+      placeholder: |
+        - Flutter Version: 3.41.x
+        - Target Platform: Web / Android
+        - OS: Windows / macOS
+    validations:
+      required: true
+  - type: textarea
+    id: screenshots
+    attributes:
+      label: Screenshots or Videos
+      description: If applicable, add screenshots or videos to help explain the problem.
+      placeholder: Drag and drop or paste images here...
+    validations:
+      required: false
+  - type: textarea
+    id: additional-context
+    attributes:
+      label: Additional Context
+      description: Any other context or logs about the problem here.
+      placeholder: Extra information...
+    validations:
+      required: false
