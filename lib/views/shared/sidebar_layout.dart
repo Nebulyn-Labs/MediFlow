@@ -220,6 +220,7 @@ class _SidebarLayoutState extends ConsumerState<SidebarLayout> {
     );
   }
 
+  /// Shows a confirmation dialog for logging out. Returns true if the user confirms, false otherwise.
   Future<bool> _confirmLogout(BuildContext context) async {
     final result = await showDialog<bool>(
       context: context,
@@ -228,10 +229,12 @@ class _SidebarLayoutState extends ConsumerState<SidebarLayout> {
         content: const Text('Are you sure you want to log out?'),
         actions: [
           TextButton(
+            // Close the dialog and return false
             onPressed: () => Navigator.of(context).pop(false),
             child: const Text('Cancel'),
           ),
           TextButton(
+            // Close the dialog and return true
             onPressed: () => Navigator.of(context).pop(true),
             style: TextButton.styleFrom(foregroundColor: MediColors.error),
             child: const Text('Log out'),
