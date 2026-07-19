@@ -55,25 +55,12 @@ class _RouteOptimizationMapState extends ConsumerState<RouteOptimizationMap> {
         newInventories.putIfAbsent(med.facilityId!, () => []).add(med);
       }
     }
-    bool changed = _allInventories.length != newInventories.length;
-    if (!changed) {
-      for (var key in newInventories.keys) {
-        if (_allInventories[key]?.length != newInventories[key]?.length) {
-          changed = true;
-          break;
-        }
-      }
-    }
-
-    if (mounted && newInventories.isNotEmpty && changed) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) {
-          setState(() {
-            _allInventories = newInventories;
-          });
-        }
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      setState(() {
+        _allInventories = newInventories;
       });
-    }
+    });
   }
 
   Future<void> _generateOptimalRoutes(List<MedRequest> requests) async {
