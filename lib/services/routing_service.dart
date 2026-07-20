@@ -127,6 +127,26 @@ class RoutingService {
 
     // Final fallback
     debugPrint('RoutingService: Falling back to straight-line route.');
-    return _fallbackRoute(start, end);
+    return _fallbackRoute(start, end);feat/offline-firestore-sync
+=======
+  }
+
+  Future<List<LatLng>> getMultiStopRoute(List<LatLng> stops) async {
+    if (stops.isEmpty) return [];
+    if (stops.length == 1) return stops;
+
+    List<LatLng> fullRoute = [];
+    for (int i = 0; i < stops.length - 1; i++) {
+      final segment = await getRoute(stops[i], stops[i + 1]);
+      if (segment.isNotEmpty) {
+        if (fullRoute.isNotEmpty && fullRoute.last == segment.first) {
+          fullRoute.addAll(segment.skip(1));
+        } else {
+          fullRoute.addAll(segment);
+        }
+      }
+    }
+    return fullRoute;
+ main
   }
 }
