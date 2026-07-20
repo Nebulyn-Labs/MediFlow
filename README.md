@@ -50,9 +50,93 @@ surplus hospitals to deficit clinics using road-optimized routing.
 
 ## Screenshots & UI Preview
 
-Here is a preview of the MediFlow central command dashboard:
+Here is a preview of the MediFlow home page:
 
-![MediFlow Dashboard Mockup](docs/images/dashboard_preview.jpg)
+![MediFlow home page](docs/images/mediflow_main.jpg)
+
+The type of user decides the type of features available.
+
+1. Role = Admin
+
+![Admin login page](docs/images/admin/admin_login.png)
+
+Here is a preview of Admin Dashboard
+
+![Admin dashboard](docs/images/admin/admin_dashboard.png)
+
+<details>
+
+<summary>Features provided to an admin</summary>
+
+### Admin homepage
+
+![Admin dashboard](docs/images/admin/admin_dashboard.png)
+
+### Facility supply approval
+
+![facility supply approval](docs/images/admin/admin_request_approval.png)
+![facility supply ai analytics](docs/images/admin/admin_request_approval_ai_analysed.png)
+
+### Supply status
+
+![supply status](docs/images/admin/admin_supply_status.png)
+
+### Route optimization for delivery
+
+![route optimization page](docs/images/admin/admin_route_optimisation.png)
+![route optimization op](docs/images/admin/admin_route_optimisation_op.png)
+
+### AI Chat
+
+![ai chat page](docs/images/shared/shared_ai_chat.png)
+
+### Help section
+
+![help page](docs/images/shared/shared_help.png)
+
+</details>
+
+2. Role = Facility
+
+![Facility login page](docs/images/facility/facility_login.png)
+
+Here is a preview of Admin Dashboard
+
+![Facility dashboard](docs/images/facility/facility_dashboard.png)
+
+<details>
+
+<summary>Features provided to a facility manager</summary>
+
+### Facility dashboard
+
+![Facility dashboard](docs/images/facility/facility_dashboard.png)
+
+### Daily log of medicine used
+
+![log page for daily usage](docs/images/facility/facility_daily_log.png)
+
+### Usage Trend of medicines
+
+![forecast of usage trend](docs/images/facility/facility_forecast.png)
+
+### Alerts
+
+![facility alerts](docs/images/facility/facility_alert.png)
+
+### Request for supply
+
+![request for medicine](docs/images/facility/facility_request.png)
+
+### AI Chat
+
+![ai chat page](docs/images/shared/shared_ai_chat.png)
+
+### Help section
+
+![help page](docs/images/shared/shared_help.png)
+
+<details>
 
 ---
 
