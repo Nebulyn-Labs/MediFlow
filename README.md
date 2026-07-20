@@ -52,17 +52,18 @@ surplus hospitals to deficit clinics using road-optimized routing.
 
 Here is a preview of the MediFlow home page:
 
-![MediFlow home page](docs/images/mediflow_main.jpg)
+![MediFlow home page](docs/images/mediflow_main.png)
 
 The type of user decides the type of features available.
 
-1. Role = Admin
+1. Role -> Admin
 
 ![Admin login page](docs/images/admin/admin_login.png)
 
 Here is a preview of Admin Dashboard
 
 ![Admin dashboard](docs/images/admin/admin_dashboard.png)
+
 
 <details>
 
@@ -75,6 +76,8 @@ Here is a preview of Admin Dashboard
 ### Facility supply approval
 
 ![facility supply approval](docs/images/admin/admin_request_approval.png)
+
+#### AI analysis of supply
 ![facility supply ai analytics](docs/images/admin/admin_request_approval_ai_analysed.png)
 
 ### Supply status
@@ -84,6 +87,8 @@ Here is a preview of Admin Dashboard
 ### Route optimization for delivery
 
 ![route optimization page](docs/images/admin/admin_route_optimisation.png)
+
+#### Route optimized via AI
 ![route optimization op](docs/images/admin/admin_route_optimisation_op.png)
 
 ### AI Chat
@@ -96,11 +101,11 @@ Here is a preview of Admin Dashboard
 
 </details>
 
-2. Role = Facility
+2. Role -> Facility
 
 ![Facility login page](docs/images/facility/facility_login.png)
 
-Here is a preview of Admin Dashboard
+Here is a preview of Facility manager Dashboard
 
 ![Facility dashboard](docs/images/facility/facility_dashboard.png)
 
@@ -136,7 +141,7 @@ Here is a preview of Admin Dashboard
 
 ![help page](docs/images/shared/shared_help.png)
 
-<details>
+</details>
 
 ---
 
