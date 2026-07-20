@@ -235,7 +235,7 @@ async function auditEvent({ eventId, action, entityType, entityId, before, after
  * 1. forecastDemand(facilityId, medicineNames[])
  * Calls Gemini to predict demand based on 90-day history.
  */
-exports.forecastDemand = onCall({ secrets: [GEMINI_API_KEY], enforceAppCheck: true, },  async (request) => {
+exports.forecastDemand = onCall({ secrets: [GEMINI_API_KEY], },  async (request) => {
   if (!request.auth) throw new HttpsError('unauthenticated', 'User must log in');
 
   const { facilityId, medicineNames } = request.data;
@@ -323,7 +323,7 @@ exports.forecastDemand = onCall({ secrets: [GEMINI_API_KEY], enforceAppCheck: tr
  * 1b. logAIDecision()
  * Explicit audit hook for client-side AI forecasts and stock-analysis decisions.
  */
-exports.logAIDecision = onCall({ enforceAppCheck: true, }, async (request) => {
+exports.logAIDecision = onCall(async (request) => {
   if (!request.auth) throw new HttpsError("unauthenticated", "User must log in");
 
   const db = admin.firestore();
@@ -677,7 +677,7 @@ async function executeTool(name, args, authInfo) {
   throw new Error(`Unknown function call: ${name}`);
 }
 
-exports.getForecastSecure = onCall({ secrets: [GEMINI_API_KEY], enforceAppCheck: true, }, async (request) => {
+exports.getForecastSecure = onCall({ secrets: [GEMINI_API_KEY], }, async (request) => {
   if (!request.auth) throw new HttpsError('unauthenticated', 'User must log in');
 
   const db = admin.firestore();
@@ -709,7 +709,7 @@ exports.getForecastSecure = onCall({ secrets: [GEMINI_API_KEY], enforceAppCheck:
 
 });
 
-exports.generateSmartAlertsSecure = onCall({ secrets: [GEMINI_API_KEY], enforceAppCheck: true, }, async (request) => {
+exports.generateSmartAlertsSecure = onCall({ secrets: [GEMINI_API_KEY], }, async (request) => {
   if (!request.auth) throw new HttpsError('unauthenticated', 'User must log in');
 
   const db = admin.firestore();
@@ -742,7 +742,7 @@ exports.generateSmartAlertsSecure = onCall({ secrets: [GEMINI_API_KEY], enforceA
 
 });
 
-exports.getChatResponseSecure = onCall({ secrets: [GEMINI_API_KEY], enforceAppCheck: true, }, async (request) => {
+exports.getChatResponseSecure = onCall({ secrets: [GEMINI_API_KEY], }, async (request) => {
   if (!request.auth) throw new HttpsError('unauthenticated', 'User must log in');
 
   const { query, context: clientContext, role, history } = request.data;
@@ -840,7 +840,7 @@ exports.getChatResponseSecure = onCall({ secrets: [GEMINI_API_KEY], enforceAppCh
   }
 });
 
-exports.callGeminiSecure = onCall({ secrets: [GEMINI_API_KEY], enforceAppCheck: true, }, async (request) => {
+exports.callGeminiSecure = onCall({ secrets: [GEMINI_API_KEY], }, async (request) => {
   if (!request.auth) throw new HttpsError('unauthenticated', 'User must log in');
 
   const db = admin.firestore();
