@@ -6,6 +6,7 @@ const logger = require("firebase-functions/logger");
 const admin = require("firebase-admin");
 const { GoogleGenerativeAI } = require("@google/generative-ai");
 const { BigQuery } = require("@google-cloud/bigquery");
+const { checkRateLimit, LIMITS } = require("./helpers/rateLimiter");
 
 admin.initializeApp();
 
@@ -245,6 +246,12 @@ exports.forecastDemand = onCall({ secrets: [GEMINI_API_KEY] }, async (request) =
     throw new HttpsError('permission-denied', 'Unauthorized facility access');
   }
 
+  await checkRateLimit(
+    request.auth.uid,
+    "forecastDemand",
+    LIMITS.AI
+  );
+
   // 1. Fetch facility details
   const facilityDoc = await db.collection("facilities").doc(facilityId).get();
   const facility = facilityDoc.data();
@@ -326,6 +333,12 @@ exports.logAIDecision = onCall(async (request) => {
   if (!authInfo.isAdmin && facilityId !== authInfo.userFacilityId) {
     throw new HttpsError("permission-denied", "Unauthorized facility access");
   }
+
+  await checkRateLimit(
+    request.auth.uid,
+    "logAIDecision",
+    LIMITS.GENERAL
+  );
 
   const decisionId = data.decisionId || `${Date.now()}_${Math.random().toString(36).slice(2)}`;
   await insertBigQuery("ai_decisions", {
@@ -670,6 +683,12 @@ exports.getForecastSecure = onCall({ secrets: [GEMINI_API_KEY] }, async (request
   const db = admin.firestore();
   await getUserFacilityAndRole(request.auth, db);
 
+  await checkRateLimit(
+    request.auth.uid,
+    "getForecastSecure",
+    LIMITS.AI
+  );
+
   const { medicineName, logs, daysToForecast } = request.data;
   const logSummary = logs
     .map(l => `Date: ${l.date}, Used: ${l.used}`)
@@ -687,6 +706,7 @@ exports.getForecastSecure = onCall({ secrets: [GEMINI_API_KEY] }, async (request
     logger.error("Gemini Error:", error);
     throw new HttpsError('internal', 'AI forecasting failed');
   }
+
 });
 
 exports.generateSmartAlertsSecure = onCall({ secrets: [GEMINI_API_KEY] }, async (request) => {
@@ -696,6 +716,12 @@ exports.generateSmartAlertsSecure = onCall({ secrets: [GEMINI_API_KEY] }, async 
   await getUserFacilityAndRole(request.auth, db);
 
   const { inventory } = request.data;
+  await checkRateLimit(
+    request.auth.uid,
+    "generateSmartAlertsSecure",
+    LIMITS.AI
+  );
+
   const payload = inventory
     .map(i => `${i.medicineName} (Batch: ${i.batchId}): ${i.remainingQuantity}/${i.initialQuantity} units left. Expiry: ${i.expiryDate}`)
     .join('\n');
@@ -713,6 +739,7 @@ exports.generateSmartAlertsSecure = onCall({ secrets: [GEMINI_API_KEY] }, async 
     logger.error("Gemini Error:", error);
     throw new HttpsError('internal', 'AI alert generation failed');
   }
+
 });
 
 exports.getChatResponseSecure = onCall({ secrets: [GEMINI_API_KEY] }, async (request) => {
@@ -724,7 +751,13 @@ exports.getChatResponseSecure = onCall({ secrets: [GEMINI_API_KEY] }, async (req
 
   if (!authInfo.isAdmin && clientContext && clientContext.current_facility_id && clientContext.current_facility_id !== authInfo.userFacilityId) {
     throw new HttpsError('permission-denied', 'Unauthorized facility access in chat context');
+
   }
+  await checkRateLimit(
+    request.auth.uid,
+    "getChatResponseSecure",
+    LIMITS.AI
+  );
 
   const contextStr = JSON.stringify(clientContext);
 
@@ -812,6 +845,12 @@ exports.callGeminiSecure = onCall({ secrets: [GEMINI_API_KEY] }, async (request)
 
   const db = admin.firestore();
   await getUserFacilityAndRole(request.auth, db);
+  
+  await checkRateLimit(
+    request.auth.uid,
+    "callGeminiSecure",
+    LIMITS.AI
+  );
 
   const { prompt, imageBase64, imageMimeType } = request.data;
   try {
