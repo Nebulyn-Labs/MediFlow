@@ -207,39 +207,61 @@ class _AIChatPageState extends ConsumerState<AIChatPage> {
 
   Widget _buildEmptyState() {
     return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Container(
-            padding: const EdgeInsets.all(24),
-            decoration: BoxDecoration(
-              color: MediColors.primary.withValues(alpha: 0.08),
-              borderRadius: BorderRadius.circular(24),
-            ),
-            child: Icon(Icons.smart_toy_rounded,
-                size: 52, color: MediColors.primary),
-          ),
-          const SizedBox(height: 24),
-          Text('MediFlow AI Assistant',
-              style: TextStyle(
-                  fontSize: 22,
-                  fontWeight: FontWeight.w700,
-                  color: MediColors.textPrimary)),
-          const SizedBox(height: 8),
-          Text('Ask about inventory, forecasts, or supply chain insights',
-              style: TextStyle(color: MediColors.textSecondary)),
-          const SizedBox(height: 32),
-          Wrap(
-            spacing: 12,
-            runSpacing: 12,
-            alignment: WrapAlignment.center,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 24),
+        child: TweenAnimationBuilder<double>(
+          tween: Tween(begin: 0.0, end: 1.0),
+          duration: const Duration(milliseconds: 450),
+          curve: Curves.easeOut,
+          builder: (context, value, child) {
+            return Opacity(
+              opacity: value,
+              child: Transform.translate(
+                offset: Offset(0, (1 - value) * 16),
+                child: child,
+              ),
+            );
+          },
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              _buildSuggestion('Show inventory status'),
-              _buildSuggestion('What is running low?'),
-              _buildSuggestion('Forecast demand'),
+              Container(
+                padding: const EdgeInsets.all(24),
+                decoration: BoxDecoration(
+                  color: MediColors.primary.withValues(alpha: 0.08),
+                  borderRadius: BorderRadius.circular(24),
+                ),
+                child: Icon(Icons.smart_toy_rounded,
+                    size: 52, color: MediColors.primary),
+              ),
+              const SizedBox(height: 24),
+              Text('MediFlow AI Assistant',
+                  style: TextStyle(
+                      fontSize: 22,
+                      fontWeight: FontWeight.w700,
+                      color: MediColors.textPrimary)),
+              const SizedBox(height: 8),
+              Text(
+                'Ask MediFlow AI about inventory, medicine availability, '
+                'stock insights, expiry risks, or healthcare logistics.',
+                textAlign: TextAlign.center,
+                style: TextStyle(color: MediColors.textSecondary),
+              ),
+              const SizedBox(height: 32),
+              Wrap(
+                spacing: 12,
+                runSpacing: 12,
+                alignment: WrapAlignment.center,
+                children: [
+                  _buildSuggestion('Which medicines are expiring soon?'),
+                  _buildSuggestion('Show low stock medicines.'),
+                  _buildSuggestion('Explain inventory trends.'),
+                  _buildSuggestion('How can I improve stock distribution?'),
+                ],
+              ),
             ],
           ),
-        ],
+        ),
       ),
     );
   }
