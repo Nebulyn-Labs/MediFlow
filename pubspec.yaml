@@ -36,6 +36,7 @@ dependencies:
   collection: ^1.19.1
   file_picker: ^11.0.2
   csv: ^8.0.0
+  firebase_app_check: ^0.3.2+10
 
 dev_dependencies:
   flutter_test:

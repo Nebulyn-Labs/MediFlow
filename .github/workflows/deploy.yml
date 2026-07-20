@@ -10,10 +10,19 @@ jobs:
   deploy:
     name: Build & Deploy to Firebase
     runs-on: ubuntu-latest
-    # Safe Guard: Skip deployment if not in the official repo or if production secrets are missing
-    if: github.repository == 'pavsoss/MediFlow' && secrets.FIREBASE_SERVICE_ACCOUNT != ''
+    # Safe Guard: Skip deployment if not in the official repo
+    if: github.repository == 'Nebulyn-Labs/MediFlow'
 
     steps:
+      - name: Verify Firebase Service Account Secret
+        env:
+          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+        run: |
+          if [ -z "$FIREBASE_SERVICE_ACCOUNT" ]; then
+            echo "::error::FIREBASE_SERVICE_ACCOUNT secret is missing or empty."
+            exit 1
+          fi
+
       - name: Checkout Repository
         uses: actions/checkout@v4
 
