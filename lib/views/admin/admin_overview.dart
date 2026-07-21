@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -26,8 +27,9 @@ class _AdminOverviewState extends ConsumerState<AdminOverview> {
   int _surplusOffers = 0;
   int _pendingIndents = 0;
 
-  bool _isLoading = true;
+  bool _isInitialLoading = true;
   String? _errorMessage;
+  List<String> _failedFacilities = [];
   StreamSubscription? _requestsSub;
 
   // ---- search state (Sprint 3) ----
@@ -59,83 +61,96 @@ class _AdminOverviewState extends ConsumerState<AdminOverview> {
   Future<void> _loadData() async {
     await _requestsSub?.cancel();
 
-    setState(() {
-      _isLoading = true;
-      _errorMessage = null;
-    });
+    if (mounted) {
+      setState(() {
+        _errorMessage = null;
+      });
+    }
 
     List<Facility> facs = [];
-    Map<String, double> health = {};
-    Map<String, int> alerts = {};
-    Map<String, int> topMeds = {};
-
     try {
       facs = await ref.read(firebaseServiceProvider).getFacilities();
     } catch (e) {
+      debugPrint('Failed to load facilities: $e');
       if (mounted) {
-        setState(() {
-          _isLoading = false;
-          _errorMessage =
-              'Unable to load dashboard data. Please check your connection and try again.';
-        });
+        if (_facilities.isEmpty) {
+          setState(() {
+            _errorMessage =
+                'Unable to load dashboard data. Please check your connection and try again.';
+            _isInitialLoading = false;
+          });
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Could not refresh dashboard data.'),
+            ),
+          );
+        }
       }
       return;
     }
 
-    for (var f in facs) {
-      try {
-        final inv =
-            await ref.read(firebaseServiceProvider).getInventoryOnce(f.id);
+    Map<String, double> health = {};
+    Map<String, int> alerts = {};
+    Map<String, int> topMeds = {};
+    List<String> failedFacilityNames = [];
 
-        double totalInitial = 0;
-        double totalRemaining = 0;
-        for (var item in inv) {
-          totalInitial += item.initialQuantity;
-          totalRemaining += item.remainingQuantity;
+    await Future.wait(
+      facs.map((f) async {
+        try {
+          final inv =
+              await ref.read(firebaseServiceProvider).getInventoryOnce(f.id);
 
-          topMeds[item.medicineName] =
-              (topMeds[item.medicineName] ?? 0) +
-                  item.remainingQuantity.toInt();
+          double totalInitial = 0;
+          double totalRemaining = 0;
+          for (var item in inv) {
+            totalInitial += item.initialQuantity;
+            totalRemaining += item.remainingQuantity;
+
+            topMeds[item.medicineName] =
+                (topMeds[item.medicineName] ?? 0) +
+                    item.remainingQuantity.toInt();
+          }
+          health[f.id] =
+              totalInitial == 0
+                  ? 100.0
+                  : (totalRemaining / totalInitial) * 100;
+
+          final fAlerts =
+              await ref.read(aiServiceProvider).generateSmartAlerts(inv);
+          alerts[f.id] = fAlerts.length;
+        } catch (e) {
+          debugPrint(
+              'Failed to load data for facility ${f.name} (${f.id}): $e');
+          failedFacilityNames.add(f.name);
         }
-        health[f.id] =
-            totalInitial == 0
-                ? 100.0
-                : (totalRemaining / totalInitial) * 100;
+      }),
+    );
 
-        final fAlerts =
-            await ref.read(aiServiceProvider).generateSmartAlerts(inv);
-        alerts[f.id] = fAlerts.length;
-      } catch (_) {
-        continue;
-      }
-    }
-
-    try {
-      _requestsSub = ref
-          .read(firebaseServiceProvider)
-          .streamRequests(null)
-          .listen(
-            (reqs) {
-              if (!mounted) return;
-              int shortage = 0;
-              int surplus = 0;
-              int pending = 0;
-              for (var r in reqs) {
-                if (r.status == RequestStatus.pending) {
-                  if (r.type == RequestType.shortage) shortage++;
-                  if (r.type == RequestType.surplus) surplus++;
-                  if (r.type == RequestType.regularIndent) pending++;
-                }
+    _requestsSub =
+        ref.read(firebaseServiceProvider).streamRequests(null).listen(
+          (reqs) {
+            if (!mounted) return;
+            int shortage = 0;
+            int surplus = 0;
+            int pending = 0;
+            for (var r in reqs) {
+              if (r.status == RequestStatus.pending) {
+                if (r.type == RequestType.shortage) shortage++;
+                if (r.type == RequestType.surplus) surplus++;
+                if (r.type == RequestType.regularIndent) pending++;
               }
-              setState(() {
-                _openShortageRequests = shortage;
-                _surplusOffers = surplus;
-                _pendingIndents = pending;
-              });
-            },
-            onError: (_) {},
-          );
-    } catch (_) {}
+            }
+            setState(() {
+              _openShortageRequests = shortage;
+              _surplusOffers = surplus;
+              _pendingIndents = pending;
+            });
+          },
+          onError: (e) {
+            debugPrint('Failed to stream facility requests: $e');
+          },
+        );
 
     if (mounted) {
       setState(() {
@@ -143,7 +158,8 @@ class _AdminOverviewState extends ConsumerState<AdminOverview> {
         _stockHealth = health;
         _alertCounts = alerts;
         _topMedicines = topMeds;
-        _isLoading = false;
+        _failedFacilities = failedFacilityNames;
+        _isInitialLoading = false;
       });
     }
   }
@@ -181,7 +197,8 @@ class _AdminOverviewState extends ConsumerState<AdminOverview> {
             decoration: BoxDecoration(
               color: MediColors.surface,
               borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: MediColors.error.withValues(alpha: 0.3)),
+              border: Border.all(
+                  color: MediColors.error.withValues(alpha: 0.3)),
             ),
             child: const Row(
               children: [
@@ -280,7 +297,8 @@ class _AdminOverviewState extends ConsumerState<AdminOverview> {
               backgroundColor: MediColors.surface,
               selectedColor: MediColors.info.withValues(alpha: 0.2),
               labelStyle: TextStyle(
-                color: isSelected ? MediColors.info : MediColors.textSecondary,
+                color:
+                    isSelected ? MediColors.info : MediColors.textSecondary,
                 fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
               ),
               side: BorderSide(
@@ -293,12 +311,43 @@ class _AdminOverviewState extends ConsumerState<AdminOverview> {
     );
   }
 
+  Widget _buildPartialDataWarning() {
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.only(bottom: 16),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: MediColors.warning.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(
+            color: MediColors.warning.withValues(alpha: 0.3)),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.warning_amber_rounded,
+              color: MediColors.warning, size: 20),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              'Some facility data could not be loaded: '
+              '${_failedFacilities.join(", ")}.',
+              style: const TextStyle(
+                color: MediColors.warning,
+                fontSize: 13,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: MediColors.bg,
       appBar: AppBar(title: const Text('Admin Dashboard')),
-      body: _isLoading
+      body: _isInitialLoading
           ? const Center(child: CircularProgressIndicator())
           : _errorMessage != null
               ? _buildErrorView()
@@ -314,6 +363,8 @@ class _AdminOverviewState extends ConsumerState<AdminOverview> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
+                        if (_failedFacilities.isNotEmpty)
+                          _buildPartialDataWarning(),
                         Wrap(
                           spacing: 20,
                           runSpacing: 20,
@@ -533,7 +584,8 @@ class _AdminOverviewState extends ConsumerState<AdminOverview> {
                           color: MediColors.textPrimary),
                       overflow: TextOverflow.ellipsis)),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                 decoration: BoxDecoration(
                     color: MediColors.surfaceLight,
                     borderRadius: BorderRadius.circular(20)),
@@ -550,8 +602,8 @@ class _AdminOverviewState extends ConsumerState<AdminOverview> {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               const Text('Stock Health',
-                  style:
-                      TextStyle(fontSize: 12, color: MediColors.textSecondary)),
+                  style: TextStyle(
+                      fontSize: 12, color: MediColors.textSecondary)),
               Text('${health.round()}%',
                   style: TextStyle(
                       fontSize: 14,
@@ -626,7 +678,8 @@ class _AdminOverviewState extends ConsumerState<AdminOverview> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text('Top Medicines by Total Units Across All Facilities',
+          const Text(
+              'Top Medicines by Total Units Across All Facilities',
               style: TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.w700,
@@ -638,7 +691,8 @@ class _AdminOverviewState extends ConsumerState<AdminOverview> {
               crossAxisAlignment: CrossAxisAlignment.end,
               mainAxisAlignment: MainAxisAlignment.spaceAround,
               children: topEntries.map((e) {
-                final heightFactor = maxQty == 0 ? 0.0 : e.value / maxQty;
+                final heightFactor =
+                    maxQty == 0 ? 0.0 : e.value / maxQty;
                 return Expanded(
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.end,
@@ -648,15 +702,16 @@ class _AdminOverviewState extends ConsumerState<AdminOverview> {
                         height: 150 * heightFactor,
                         decoration: const BoxDecoration(
                           color: MediColors.info,
-                          borderRadius:
-                              BorderRadius.vertical(top: Radius.circular(4)),
+                          borderRadius: BorderRadius.vertical(
+                              top: Radius.circular(4)),
                         ),
                       ),
                       const SizedBox(height: 12),
                       Text(
                         e.key,
                         style: const TextStyle(
-                            fontSize: 10, color: MediColors.textSecondary),
+                            fontSize: 10,
+                            color: MediColors.textSecondary),
                         textAlign: TextAlign.center,
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
