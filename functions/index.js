@@ -583,7 +583,6 @@ exports.onIndentApproved = onDocumentUpdated('requests/{requestId}', async (even
       await db.runTransaction(async (transaction) => {
         const sourcedata = await transaction.get(sourceDoc);
         const qtyAvailable = sourcedata.data()?.qtyRemaining || 0;
-      })
       if(qtyAvailable < qtyRequested){
         throw new Error('Stocks insufficient!  available: ${qtyAvailable}, requested: ${qtyRequested}');
       }
@@ -606,7 +605,7 @@ exports.onIndentApproved = onDocumentUpdated('requests/{requestId}', async (even
     batch.update(event.data.after.ref, {
       resolvedAt: admin.firestore.FieldValue.serverTimestamp()
     });
-
+  });
     await batch.commit();
     logger.log(`Redistribution successful: ${qtyRequested} units of ${medicineName} from ${toFacilityId} to ${fromFacilityId}`);
     }
