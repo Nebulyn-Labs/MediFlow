@@ -53,6 +53,36 @@ class _AIForecastPageState extends ConsumerState<AIForecastPage> {
     }
   }
 
+  Future<void> _generateForecast() async {
+    setState(() => _isForecasting = true);
+    try {
+      final logs = await ref
+          .read(firebaseServiceProvider)
+          .getRecentLogs(widget.facilityId);
+      final result = await ref
+          .read(aiServiceProvider)
+          .forecastDemand(
+              _selectedMed!, logs, _forecastDays,
+              facilityId: widget.facilityId);
+      if (mounted) {
+        setState(() {
+          _forecastResult = result;
+          _isForecasting = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isForecasting = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Forecast failed: ${e.toString()}'),
+            backgroundColor: MediColors.error,
+          ),
+        );
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final inventoryStream =
@@ -157,23 +187,7 @@ class _AIForecastPageState extends ConsumerState<AIForecastPage> {
                                     color: Colors.white, strokeWidth: 2))
                             : const Icon(Icons.auto_awesome_rounded),
                         label: const Text('Generate Forecast'),
-                        onPressed: _isForecasting
-                            ? null
-                            : () async {
-                                setState(() => _isForecasting = true);
-                                final logs = await ref
-                                    .read(firebaseServiceProvider)
-                                    .getRecentLogs(widget.facilityId);
-                                final result = await ref
-                                    .read(aiServiceProvider)
-                                    .forecastDemand(
-                                        _selectedMed!, logs, _forecastDays,
-                                        facilityId: widget.facilityId);
-                                setState(() {
-                                  _forecastResult = result;
-                                  _isForecasting = false;
-                                });
-                              },
+                        onPressed: _isForecasting ? null : _generateForecast,
                       ),
                     ),
                   ),
