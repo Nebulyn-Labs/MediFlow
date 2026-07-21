@@ -107,6 +107,11 @@ Before working on any changes:
 4. **Inactive Issues:** If an assigned issue has no meaningful updates for 7
    days, it may be unassigned to allow others to work on it. If you need more
    time, just leave a comment with a progress update.
+5. **Issue Limit:** Contributors can be assigned to a maximum of 4 open
+   issues at a time. If you are already at the limit, an assignment bot will
+   automatically unassign you from any new issue and leave a comment
+   explaining why. Finish or hand back one of your current issues to free up
+   a slot.
 
 ---
 
