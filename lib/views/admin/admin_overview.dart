@@ -63,7 +63,8 @@ class _AdminOverviewState extends ConsumerState<AdminOverview> {
     Map<String, int> alerts = {};
     Map<String, int> topMeds = {};
 
-    for (var f in facs) {
+    // Parallelize facility inventory and AI alert requests using Future.wait
+    await Future.wait(facs.map((f) async {
       final inv =
           await ref.read(firebaseServiceProvider).getInventoryOnce(f.id);
 
@@ -76,13 +77,14 @@ class _AdminOverviewState extends ConsumerState<AdminOverview> {
         topMeds[item.medicineName] =
             (topMeds[item.medicineName] ?? 0) + item.remainingQuantity.toInt();
       }
+
       health[f.id] =
           totalInitial == 0 ? 100.0 : (totalRemaining / totalInitial) * 100;
 
       final fAlerts =
           await ref.read(aiServiceProvider).generateSmartAlerts(inv);
       alerts[f.id] = fAlerts.length;
-    }
+    }));
 
     _requestsSub =
         ref.read(firebaseServiceProvider).streamRequests(null).listen((reqs) {
