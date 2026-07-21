@@ -191,14 +191,25 @@ class FacilityOverview extends ConsumerWidget {
               ),
             ],
           ),
-          body: SingleChildScrollView(
+          body: RefreshIndicator(
+            onRefresh: () => ref
+                .read(firebaseServiceProvider)
+                .getInventoryOnce(facilityId),
+            color: MediColors.primary,
+            backgroundColor: MediColors.surface,
+            strokeWidth: 2.5,
+            displacement: 48,
+            child: SingleChildScrollView(
+            physics: const AlwaysScrollableScrollPhysics(),
             padding: const EdgeInsets.all(28),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 // Greeting
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                Wrap(
+                  spacing: 16,
+                  runSpacing: 12,
+                  crossAxisAlignment: WrapCrossAlignment.start,
                   children: [
                     Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -347,6 +358,7 @@ class FacilityOverview extends ConsumerWidget {
                 const SizedBox(height: 36),
                 _buildInventoryTable(context, ref, inventory),
               ],
+            ),
             ),
           ),
         );

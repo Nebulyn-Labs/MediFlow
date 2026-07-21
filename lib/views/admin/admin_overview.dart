@@ -56,6 +56,7 @@ class _AdminOverviewState extends ConsumerState<AdminOverview> {
   }
 
   Future<void> _loadData() async {
+    await _requestsSub?.cancel();
     final facs = await ref.read(firebaseServiceProvider).getFacilities();
 
     Map<String, double> health = {};
@@ -246,73 +247,81 @@ class _AdminOverviewState extends ConsumerState<AdminOverview> {
       appBar: AppBar(title: const Text('Admin Dashboard')),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
-          : SingleChildScrollView(
-              padding: const EdgeInsets.all(28),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // KPI Header
-                  Wrap(
-                    spacing: 20,
-                    runSpacing: 20,
-                    children: [
-                      _buildKpiCard('TOTAL FACILITIES', '${_facilities.length}',
-                          Icons.business_rounded,
-                          onTap: () {}),
-                      _buildKpiCard('OPEN SHORTAGE REQUESTS',
-                          '$_openShortageRequests', Icons.warning_amber_rounded,
-                          isAlert: true, onTap: () {}),
-                      _buildKpiCard('SURPLUS / EXPIRY OFFERS',
-                          '$_surplusOffers', Icons.swap_horiz_rounded,
-                          isAlert: false,
-                          iconColor: MediColors.warning,
-                          onTap: () {}),
-                      _buildKpiCard(
-                          'PENDING INDENT APPROVALS',
-                          '$_pendingIndents',
-                          Icons.assignment_turned_in_rounded,
-                          iconColor: MediColors.info,
-                          onTap: () => context.go('/admin/approvals')),
-                    ],
-                  ),
-                  const SizedBox(height: 36),
+          : RefreshIndicator(
+              onRefresh: _loadData,
+              color: MediColors.info,
+              backgroundColor: MediColors.surface,
+              strokeWidth: 2.5,
+              displacement: 48,
+              child: SingleChildScrollView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                padding: const EdgeInsets.all(28),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // KPI Header
+                    Wrap(
+                      spacing: 20,
+                      runSpacing: 20,
+                      children: [
+                        _buildKpiCard('TOTAL FACILITIES', '${_facilities.length}',
+                            Icons.business_rounded,
+                            onTap: () {}),
+                        _buildKpiCard('OPEN SHORTAGE REQUESTS',
+                            '$_openShortageRequests', Icons.warning_amber_rounded,
+                            isAlert: true, onTap: () {}),
+                        _buildKpiCard('SURPLUS / EXPIRY OFFERS',
+                            '$_surplusOffers', Icons.swap_horiz_rounded,
+                            isAlert: false,
+                            iconColor: MediColors.warning,
+                            onTap: () {}),
+                        _buildKpiCard(
+                            'PENDING INDENT APPROVALS',
+                            '$_pendingIndents',
+                            Icons.assignment_turned_in_rounded,
+                            iconColor: MediColors.info,
+                            onTap: () => context.go('/admin/approvals')),
+                      ],
+                    ),
+                    const SizedBox(height: 36),
 
-                  // ---- search field (Sprint 3) ----
-                  TextField(
-                    controller: _searchController,
-                    onChanged: (value) {
-                      setState(() {
-                        _searchQuery = value.toLowerCase();
-                      });
-                    },
-                    decoration: InputDecoration(
-                      hintText: 'Search medicines by name...',
-                      prefixIcon: const Icon(Icons.search),
-                      filled: true,
-                      fillColor: MediColors.surface,
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(8),
-                        borderSide: BorderSide(color: MediColors.border),
+                    // ---- search field (Sprint 3) ----
+                    TextField(
+                      controller: _searchController,
+                      onChanged: (value) {
+                        setState(() {
+                          _searchQuery = value.toLowerCase();
+                        });
+                      },
+                      decoration: InputDecoration(
+                        hintText: 'Search medicines by name...',
+                        prefixIcon: const Icon(Icons.search),
+                        filled: true,
+                        fillColor: MediColors.surface,
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                          borderSide: BorderSide(color: MediColors.border),
+                        ),
                       ),
                     ),
-                  ),
-                  const SizedBox(height: 20),
+                    const SizedBox(height: 20),
 
-                  // ---- filter chips (Sprint 4, horizontal-scroll in 9d) ----
-                  _buildFilterChips(),
-                  const SizedBox(height: 20),
+                    // ---- filter chips (Sprint 4, horizontal-scroll in 9d) ----
+                    _buildFilterChips(),
+                    const SizedBox(height: 20),
 
-                  // ---- medicine list (Sprint 6) ----
-                  _buildMedicineList(),
-                  const SizedBox(height: 36),
+                    // ---- medicine list (Sprint 6) ----
+                    _buildMedicineList(),
+                    const SizedBox(height: 36),
 
-                  // Facility Health Grid
-                  _buildFacilityHealthGrid(),
-                  const SizedBox(height: 36),
+                    // Facility Health Grid
+                    _buildFacilityHealthGrid(),
+                    const SizedBox(height: 36),
 
-                  // Top Medicines Chart
-                  _buildTopMedicinesChart(),
-                ],
+                    // Top Medicines Chart
+                    _buildTopMedicinesChart(),
+                  ],
+                ),
               ),
             ),
     );
