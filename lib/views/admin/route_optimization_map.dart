@@ -23,6 +23,7 @@ class _RouteOptimizationMapState extends ConsumerState<RouteOptimizationMap> {
   final MapController _mapController = MapController();
   List<Facility> _facilities = [];
   bool _isLoading = true;
+  String? _errorMessage;
   bool _showRoutes = false;
   bool _isGenerating = false;
   String _aiSummary = '';
@@ -36,14 +37,31 @@ class _RouteOptimizationMapState extends ConsumerState<RouteOptimizationMap> {
   }
 
   Future<void> _loadData() async {
-    final firebaseService = ref.read(firebaseServiceProvider);
-    final facs = await firebaseService.getFacilities();
+    if (_isLoading && _errorMessage == null && _facilities.isNotEmpty) return;
 
-    if (mounted) {
-      setState(() {
-        _facilities = facs;
-        _isLoading = false;
-      });
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
+
+    try {
+      final firebaseService = ref.read(firebaseServiceProvider);
+      final facs = await firebaseService.getFacilities();
+
+      if (mounted) {
+        setState(() {
+          _facilities = facs;
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      debugPrint('RouteOptimizationMap: Failed to load facilities: $e');
+      if (mounted) {
+        setState(() {
+          _errorMessage = 'Unable to load facilities. Please check your connection and try again.';
+          _isLoading = false;
+        });
+      }
     }
   }
 
@@ -107,6 +125,49 @@ class _RouteOptimizationMapState extends ConsumerState<RouteOptimizationMap> {
   @override
   Widget build(BuildContext context) {
     if (_isLoading) return const Center(child: CircularProgressIndicator());
+
+    if (_errorMessage != null) {
+      return Scaffold(
+        backgroundColor: MediColors.bg,
+        appBar: AppBar(title: const Text('Advanced Route Optimization')),
+        body: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(32),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Icon(Icons.error_outline_rounded,
+                    size: 64, color: MediColors.textMuted),
+                const SizedBox(height: 20),
+                Text(
+                  _errorMessage!,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                      fontSize: 16, color: MediColors.textSecondary),
+                ),
+                const SizedBox(height: 24),
+                SizedBox(
+                  height: 44,
+                  child: Container(
+                    decoration: BoxDecoration(
+                        gradient: MediColors.primaryGradient,
+                        borderRadius: BorderRadius.circular(12)),
+                    child: FilledButton.icon(
+                      style: FilledButton.styleFrom(
+                          backgroundColor: Colors.transparent,
+                          shadowColor: Colors.transparent),
+                      icon: const Icon(Icons.refresh_rounded, size: 18),
+                      label: const Text('Retry'),
+                      onPressed: _loadData,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
 
     final mapCenter = _facilities.isNotEmpty
         ? LatLng(_facilities.first.latitude, _facilities.first.longitude)
@@ -208,12 +269,19 @@ class _RouteOptimizationMapState extends ConsumerState<RouteOptimizationMap> {
                                       style: TextStyle(fontSize: 12)),
                                   onPressed: () async {
                                     setState(() => _isGenerating = true);
-                                    await ref
-                                        .read(firebaseServiceProvider)
-                                        .seedDemoData();
-                                    // RE-LOAD FACILITIES AFTER SEEDING
-                                    await _loadData();
-                                    setState(() => _isGenerating = false);
+                                    try {
+                                      await ref
+                                          .read(firebaseServiceProvider)
+                                          .seedDemoData();
+                                      // RE-LOAD FACILITIES AFTER SEEDING
+                                      await _loadData();
+                                    } catch (e) {
+                                      debugPrint('RouteOptimizationMap: Demo seed failed: $e');
+                                    } finally {
+                                      if (mounted) {
+                                        setState(() => _isGenerating = false);
+                                      }
+                                    }
                                     if (context.mounted) {
                                       ScaffoldMessenger.of(context)
                                           .showSnackBar(const SnackBar(
