@@ -127,8 +127,7 @@ class RoutingService {
 
     // Final fallback
     debugPrint('RoutingService: Falling back to straight-line route.');
-    return _fallbackRoute(start, end);feat/offline-firestore-sync
-=======
+    return _fallbackRoute(start, end);
   }
 
   Future<List<LatLng>> getMultiStopRoute(List<LatLng> stops) async {
@@ -147,6 +146,5 @@ class RoutingService {
       }
     }
     return fullRoute;
- main
   }
 }

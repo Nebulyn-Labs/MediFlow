@@ -22,9 +22,9 @@ class FirebaseService {
   late final SimulationService _simulation;
 
   FirebaseService(this._firestore, this._auth)
-    : _syncService = OfflineSyncService() {
-  _simulation = SimulationService(_firestore);
-}
+      : _syncService = OfflineSyncService() {
+    _simulation = SimulationService(_firestore);
+  }
 
   // --- AUTH & FACILITY ---
 
@@ -185,112 +185,123 @@ class FirebaseService {
   }
 
   // --- LOGGING ---
-Future<void> logUsage({
-  required String facilityId,
-  required DateTime date,
-  required String medicineName,
-  required int quantity,
-  required int patients,
-}) async {
-  final dateStr =
-      "${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}";
+  Future<void> logUsage({
+    required String facilityId,
+    required DateTime date,
+    required String medicineName,
+    required int quantity,
+    required int patients,
+  }) async {
+    final dateStr =
+        "${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}";
 
-  final logRef = _firestore
-      .collection('daily_usage_logs')
-      .doc(facilityId)
-      .collection('logs')
-      .doc(dateStr);
+    final logRef = _firestore
+        .collection('daily_usage_logs')
+        .doc(facilityId)
+        .collection('logs')
+        .doc(dateStr);
 
-  final medicineId = medicineName.toLowerCase().replaceAll(' ', '_');
+    final medicineId = medicineName.toLowerCase().replaceAll(' ', '_');
 
-  final invRef = _firestore
-      .collection('inventory')
-      .doc(facilityId)
-      .collection('medicines')
-      .doc(medicineId);
+    final invRef = _firestore
+        .collection('inventory')
+        .doc(facilityId)
+        .collection('medicines')
+        .doc(medicineId);
 
-  try {
-    await _firestore.runTransaction((transaction) async {
-      // Update inventory safely
-      final invDoc = await transaction.get(invRef);
+    try {
+      await _firestore.runTransaction((transaction) async {
+        // Update inventory safely
+        final invDoc = await transaction.get(invRef);
 
-      if (invDoc.exists) {
-        int remaining = invDoc.data()?['remainingQuantity'] ?? 0;
-        int actualDeduction = min(quantity, remaining);
+        if (invDoc.exists) {
+          int remaining = invDoc.data()?['remainingQuantity'] ?? 0;
+          int actualDeduction = min(quantity, remaining);
 
-        transaction.update(invRef, {
-          'remainingQuantity': remaining - actualDeduction,
-          'lastUpdated': Timestamp.now(),
-        });
-      }
-
-      // Create/update usage log
-      final logDoc = await transaction.get(logRef);
-
-      if (logDoc.exists) {
-        List medicines = logDoc.data()?['medicines'] ?? [];
-        int totalPatients = logDoc.data()?['totalPatients'] ?? 0;
-
-        int index = medicines.indexWhere(
-          (m) => m['medicineName'] == medicineName,
-        );
-
-        if (index >= 0) {
-          medicines[index]['unitsDistributed'] += quantity;
-        } else {
-          medicines.add({
-            'medicineName': medicineName,
-            'unitsDistributed': quantity,
+          transaction.update(invRef, {
+            'remainingQuantity': remaining - actualDeduction,
+            'lastUpdated': Timestamp.now(),
           });
         }
 
-        transaction.update(logRef, {
-          'medicines': medicines,
-          'totalPatients': totalPatients + patients,
-          'syncStatus': 'synced',
-          'updatedAt': FieldValue.serverTimestamp(),
-        });
-      } else {
-        transaction.set(
-          logRef,
-          {
-            'date': Timestamp.fromDate(date),
-            'medicines': [
-              {
-                'medicineName': medicineName,
-                'unitsDistributed': quantity,
-              }
-            ],
-            'totalPatients': patients,
-            'syncStatus': 'synced',
-            'createdAt': FieldValue.serverTimestamp(),
-          },
-          SetOptions(merge: true),
-        );
-      }
-    });
-  } catch (e) {
-    // Firestore offline persistence will keep this write locally
-    // and sync automatically when connection returns.
-    await logRef.set(
-      {
-        'date': Timestamp.fromDate(date),
-        'medicines': [
-          {
-            'medicineName': medicineName,
-            'unitsDistributed': quantity,
-          }
-        ],
-        'totalPatients': patients,
-        'syncStatus': 'pending',
-        'createdAt': FieldValue.serverTimestamp(),
-      },
-      SetOptions(merge: true),
-    );
+        // Create/update usage log
+        final logDoc = await transaction.get(logRef);
 
-    rethrow;
+        if (logDoc.exists) {
+          List medicines = logDoc.data()?['medicines'] ?? [];
+          int totalPatients = logDoc.data()?['totalPatients'] ?? 0;
+
+          int index = medicines.indexWhere(
+            (m) => m['medicineName'] == medicineName,
+          );
+
+          if (index >= 0) {
+            medicines[index]['unitsDistributed'] += quantity;
+          } else {
+            medicines.add({
+              'medicineName': medicineName,
+              'unitsDistributed': quantity,
+            });
+          }
+
+          transaction.update(logRef, {
+            'medicines': medicines,
+            'totalPatients': totalPatients + patients,
+            'syncStatus': 'synced',
+            'updatedAt': FieldValue.serverTimestamp(),
+          });
+        } else {
+          transaction.set(
+            logRef,
+            {
+              'date': Timestamp.fromDate(date),
+              'medicines': [
+                {
+                  'medicineName': medicineName,
+                  'unitsDistributed': quantity,
+                }
+              ],
+              'totalPatients': patients,
+              'syncStatus': 'synced',
+              'createdAt': FieldValue.serverTimestamp(),
+            },
+            SetOptions(merge: true),
+          );
+        }
+      });
+    } catch (e) {
+      // Firestore offline persistence will keep this write locally
+      // and sync automatically when connection returns.
+      _syncService.addPendingWrite(PendingWrite(
+        id: '${facilityId}_${dateStr}_$medicineId',
+        data: {
+          'medicineName': medicineName,
+          'unitsDistributed': quantity,
+          'totalPatients': patients,
+        },
+        createdAt: DateTime.now(),
+      ));
+
+      await logRef.set(
+        {
+          'date': Timestamp.fromDate(date),
+          'medicines': [
+            {
+              'medicineName': medicineName,
+              'unitsDistributed': quantity,
+            }
+          ],
+          'totalPatients': patients,
+          'syncStatus': 'pending',
+          'createdAt': FieldValue.serverTimestamp(),
+        },
+        SetOptions(merge: true),
+      );
+
+      rethrow;
+    }
   }
-}
+
   Stream<List<MedRequest>> streamRequests(String? facilityId) {
     var query = _firestore.collection('requests');
     if (facilityId != null) {
