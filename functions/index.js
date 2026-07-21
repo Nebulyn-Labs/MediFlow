@@ -235,7 +235,7 @@ async function auditEvent({ eventId, action, entityType, entityId, before, after
  * 1. forecastDemand(facilityId, medicineNames[])
  * Calls Gemini to predict demand based on 90-day history.
  */
-exports.forecastDemand = onCall({ secrets: [GEMINI_API_KEY], },  async (request) => {
+exports.forecastDemand = onCall({ secrets: [GEMINI_API_KEY] }, async (request) => {
   if (!request.auth) throw new HttpsError('unauthenticated', 'User must log in');
 
   const { facilityId, medicineNames } = request.data;
@@ -677,7 +677,7 @@ async function executeTool(name, args, authInfo) {
   throw new Error(`Unknown function call: ${name}`);
 }
 
-exports.getForecastSecure = onCall({ secrets: [GEMINI_API_KEY], }, async (request) => {
+exports.getForecastSecure = onCall({ secrets: [GEMINI_API_KEY] }, async (request) => {
   if (!request.auth) throw new HttpsError('unauthenticated', 'User must log in');
 
   const db = admin.firestore();
@@ -706,10 +706,9 @@ exports.getForecastSecure = onCall({ secrets: [GEMINI_API_KEY], }, async (reques
     logger.error("Gemini Error:", error);
     throw new HttpsError('internal', 'AI forecasting failed');
   }
-
 });
 
-exports.generateSmartAlertsSecure = onCall({ secrets: [GEMINI_API_KEY], }, async (request) => {
+exports.generateSmartAlertsSecure = onCall({ secrets: [GEMINI_API_KEY] }, async (request) => {
   if (!request.auth) throw new HttpsError('unauthenticated', 'User must log in');
 
   const db = admin.firestore();
@@ -739,10 +738,9 @@ exports.generateSmartAlertsSecure = onCall({ secrets: [GEMINI_API_KEY], }, async
     logger.error("Gemini Error:", error);
     throw new HttpsError('internal', 'AI alert generation failed');
   }
-
 });
 
-exports.getChatResponseSecure = onCall({ secrets: [GEMINI_API_KEY], }, async (request) => {
+exports.getChatResponseSecure = onCall({ secrets: [GEMINI_API_KEY] }, async (request) => {
   if (!request.auth) throw new HttpsError('unauthenticated', 'User must log in');
 
   const { query, context: clientContext, role, history } = request.data;
@@ -751,7 +749,6 @@ exports.getChatResponseSecure = onCall({ secrets: [GEMINI_API_KEY], }, async (re
 
   if (!authInfo.isAdmin && clientContext && clientContext.current_facility_id && clientContext.current_facility_id !== authInfo.userFacilityId) {
     throw new HttpsError('permission-denied', 'Unauthorized facility access in chat context');
-
   }
   await checkRateLimit(
     request.auth.uid,
@@ -840,12 +837,12 @@ exports.getChatResponseSecure = onCall({ secrets: [GEMINI_API_KEY], }, async (re
   }
 });
 
-exports.callGeminiSecure = onCall({ secrets: [GEMINI_API_KEY], }, async (request) => {
+exports.callGeminiSecure = onCall({ secrets: [GEMINI_API_KEY] }, async (request) => {
   if (!request.auth) throw new HttpsError('unauthenticated', 'User must log in');
 
   const db = admin.firestore();
   await getUserFacilityAndRole(request.auth, db);
-  
+
   await checkRateLimit(
     request.auth.uid,
     "callGeminiSecure",
