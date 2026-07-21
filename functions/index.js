@@ -841,11 +841,31 @@ exports.callGeminiSecure = onCall({ secrets: [GEMINI_API_KEY] }, async (request)
   }
 });
 
+const cspReportLastSeen = new Map();
+const CSP_REPORT_MAX_BODY_BYTES = 10 * 1024; // 10KB
+const CSP_REPORT_MIN_INTERVAL_MS = 5000; // 1 report per IP per 5s
+
 exports.cspReport = onRequest(async (req, res) => {
   if (req.method !== "POST") {
     res.status(405).send("Method Not Allowed");
     return;
   }
+
+  const contentLength = Number(req.headers["content-length"] || 0);
+  if (contentLength > CSP_REPORT_MAX_BODY_BYTES) {
+    res.status(413).send("Payload Too Large");
+    return;
+  }
+
+  const ip = (req.headers["x-forwarded-for"] || req.ip || "unknown").split(",")[0].trim();
+  const now = Date.now();
+  const lastSeen = cspReportLastSeen.get(ip);
+  if (lastSeen && now - lastSeen < CSP_REPORT_MIN_INTERVAL_MS) {
+    res.status(429).send("Too Many Requests");
+    return;
+  }
+  cspReportLastSeen.set(ip, now);
+
   logger.warn("CSP Violation Report", { report: req.body });
   res.status(204).send();
 });
