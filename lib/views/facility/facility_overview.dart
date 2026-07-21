@@ -236,13 +236,17 @@ class _FacilityOverviewState extends ConsumerState<FacilityOverview> {
                       onPressed: _isSimulating
                           ? null
                           : () async {
+                              setState(() => _isSimulating = true);
+
                               final firebase =
                                   ref.read(firebaseServiceProvider);
                               final fac =
                                   await firebase.getFacility(widget.facilityId);
-                              if (fac == null) return;
+                              if (fac == null) {
+                                if (mounted) setState(() => _isSimulating = false);
+                                return;
+                              }
 
-                              setState(() => _isSimulating = true);
                               if (context.mounted) {
                                 ScaffoldMessenger.of(context).showSnackBar(
                                     const SnackBar(
@@ -263,9 +267,9 @@ class _FacilityOverviewState extends ConsumerState<FacilityOverview> {
                               } catch (e) {
                                 if (context.mounted) {
                                   ScaffoldMessenger.of(context).showSnackBar(
-                                      SnackBar(
+                                      const SnackBar(
                                         content: Text(
-                                            'Simulation failed: ${e.toString()}'),
+                                            'Simulation failed. Please try again.'),
                                         backgroundColor: MediColors.error,
                                       ));
                                 }
