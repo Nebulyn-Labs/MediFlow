@@ -5,6 +5,7 @@ import 'package:csv/csv.dart';
 import 'package:file_picker/file_picker.dart';
 import '../../services/firebase_service.dart';
 import '../../services/csv_export_service.dart';
+import '../../services/ai_service.dart';
 import 'package:med_supply_prototype/constants/colors.dart';
 
 class DailyLoggingPage extends ConsumerStatefulWidget {
@@ -33,11 +34,14 @@ class _DailyLoggingPageState extends ConsumerState<DailyLoggingPage>
   final List<Map<String, dynamic>> _scannedItems = [];
   bool _isSubmittingQr = false;
   bool _isExportingCsv = false;
+  bool _isParsingImage = false;
+  String? _imageParseResult;
+  String? _imageParseError;
 
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 3, vsync: this);
+    _tabController = TabController(length: 4, vsync: this);
     _fetchInventory();
   }
 
@@ -240,6 +244,49 @@ class _DailyLoggingPageState extends ConsumerState<DailyLoggingPage>
     }
   }
 
+  Future<void> _parseImage() async {
+    try {
+      final result = await FilePicker.pickFiles(
+        type: FileType.image,
+        withData: true,
+      );
+      if (result == null || result.files.isEmpty) return;
+      final bytes = result.files.first.bytes;
+      if (bytes == null) return;
+      setState(() {
+        _isParsingImage = true;
+        _imageParseResult = null;
+        _imageParseError = null;
+      });
+      final parsed = await ref
+          .read(aiServiceProvider)
+          .parseImageWithVision(
+              bytes, 'Extract all medicine names, quantities, and patient counts from this image. Output JSON: [{"medicine": "string", "quantity": int, "patients": int}]');
+      if (mounted) {
+        setState(() {
+          _imageParseResult = parsed;
+          _isParsingImage = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _imageParseError = e.toString();
+          _isParsingImage = false;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Image parsing failed: $e'),
+            action: SnackBarAction(
+              label: 'Retry',
+              onPressed: _parseImage,
+            ),
+          ),
+        );
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -265,12 +312,13 @@ class _DailyLoggingPageState extends ConsumerState<DailyLoggingPage>
             Tab(icon: Icon(Icons.edit_note_rounded), text: 'Manual'),
             Tab(icon: Icon(Icons.upload_file_rounded), text: 'CSV'),
             Tab(icon: Icon(Icons.qr_code_scanner_rounded), text: 'Scan'),
+            Tab(icon: Icon(Icons.image_rounded), text: 'Image'),
           ],
         ),
       ),
       body: TabBarView(
           controller: _tabController,
-          children: [_buildManualTab(), _buildCsvTab(), _buildQrTab()]),
+          children: [_buildManualTab(), _buildCsvTab(), _buildQrTab(), _buildImageTab()]),
     );
   }
 
@@ -600,6 +648,130 @@ class _DailyLoggingPageState extends ConsumerState<DailyLoggingPage>
                         : Text('Submit ${_scannedItems.length}'),
                     onPressed: _isSubmittingQr ? null : _submitScannedLogs)),
           ]),
+        ],
+      ]),
+    );
+  }
+
+  Widget _buildImageTab() {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(28),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(24),
+          decoration: BoxDecoration(
+              color: MediColors.violet.withValues(alpha: 0.06),
+              borderRadius: BorderRadius.circular(16),
+              border:
+                  Border.all(color: MediColors.violet.withValues(alpha: 0.2))),
+          child:
+              Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Row(children: [
+              Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                      color: MediColors.violet.withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(10)),
+                  child: const Icon(Icons.image_rounded,
+                      color: MediColors.violet, size: 22)),
+              const SizedBox(width: 12),
+              const Text('AI Image Parsing',
+                  style: TextStyle(
+                      fontWeight: FontWeight.w700,
+                      fontSize: 18,
+                      color: MediColors.violet)),
+            ]),
+            const SizedBox(height: 12),
+            const Text(
+                'Upload a photo of medicine records for AI-powered extraction',
+                style: TextStyle(color: MediColors.textMuted, fontSize: 13)),
+            const SizedBox(height: 16),
+            OutlinedButton.icon(
+                icon: _isParsingImage
+                    ? const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(
+                            strokeWidth: 2, color: MediColors.violet))
+                    : const Icon(Icons.photo_camera_rounded),
+                label: Text(_isParsingImage ? 'Parsing...' : 'Choose Image'),
+                onPressed: _isParsingImage ? null : _parseImage),
+          ]),
+        ),
+        if (_imageParseError != null) ...[
+          const SizedBox(height: 16),
+          Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                  color: MediColors.error.withValues(alpha: 0.08),
+                  borderRadius: BorderRadius.circular(12),
+                  border:
+                      Border.all(color: MediColors.error.withValues(alpha: 0.2))),
+              child: Row(children: [
+                const Icon(Icons.error_outline_rounded,
+                    color: MediColors.error, size: 20),
+                const SizedBox(width: 12),
+                Expanded(
+                    child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                      const Text('Parsing Failed',
+                          style: TextStyle(
+                              color: MediColors.error,
+                              fontWeight: FontWeight.w600,
+                              fontSize: 14)),
+                      const SizedBox(height: 4),
+                      Text(_imageParseError!,
+                          style: const TextStyle(
+                              color: MediColors.textMuted, fontSize: 12),
+                          maxLines: 3,
+                          overflow: TextOverflow.ellipsis),
+                    ])),
+                const SizedBox(width: 12),
+                TextButton.icon(
+                    icon: const Icon(Icons.refresh_rounded, size: 18),
+                    label: const Text('Retry'),
+                    onPressed: _parseImage),
+              ])),
+        ],
+        if (_imageParseResult != null) ...[
+          const SizedBox(height: 16),
+          Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                  color: MediColors.success.withValues(alpha: 0.08),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                      color: MediColors.success.withValues(alpha: 0.2))),
+              child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Row(children: [
+                      Icon(Icons.check_circle_rounded,
+                          color: MediColors.success, size: 18),
+                      SizedBox(width: 10),
+                      Text('AI Extraction Result',
+                          style: TextStyle(
+                              color: MediColors.success,
+                              fontWeight: FontWeight.w600,
+                              fontSize: 14)),
+                    ]),
+                    const SizedBox(height: 10),
+                    Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                            color: MediColors.surface,
+                            borderRadius: BorderRadius.circular(8)),
+                        child: Text(_imageParseResult!,
+                            style: const TextStyle(
+                                color: MediColors.textSecondary,
+                                fontSize: 13,
+                                fontFamily: 'monospace'))),
+                  ])),
         ],
       ]),
     );
