@@ -1,8 +1,10 @@
 import 'dart:convert';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:csv/csv.dart';
 import 'package:file_picker/file_picker.dart';
+import '../../models/daily_usage_log.dart';
 import '../../services/firebase_service.dart';
 import '../../services/csv_export_service.dart';
 import '../../services/ai_service.dart';
@@ -43,6 +45,7 @@ class _DailyLoggingPageState extends ConsumerState<DailyLoggingPage>
     super.initState();
     _tabController = TabController(length: 4, vsync: this);
     _fetchInventory();
+    _fetchHistoryFirstPage();
   }
 
   @override
@@ -85,6 +88,8 @@ class _DailyLoggingPageState extends ConsumerState<DailyLoggingPage>
         ScaffoldMessenger.of(context)
             .showSnackBar(const SnackBar(content: Text('Log saved ✓')));
         _formKey.currentState!.reset();
+        // Keep the History tab fresh with the newly saved log.
+        _fetchHistoryFirstPage();
       }
     } catch (e) {
       if (mounted) {
@@ -189,6 +194,7 @@ class _DailyLoggingPageState extends ConsumerState<DailyLoggingPage>
           _csvItems.clear();
           _csvStatus = null;
         });
+        _fetchHistoryFirstPage();
       }
     } catch (e) {
       if (mounted) {
@@ -233,6 +239,7 @@ class _DailyLoggingPageState extends ConsumerState<DailyLoggingPage>
         ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(content: Text('${_scannedItems.length} logs saved ✓')));
         setState(() => _scannedItems.clear());
+        _fetchHistoryFirstPage();
       }
     } catch (e) {
       if (mounted) {
