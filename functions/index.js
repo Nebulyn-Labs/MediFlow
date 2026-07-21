@@ -581,32 +581,30 @@ exports.onIndentApproved = onDocumentUpdated('requests/{requestId}', async (even
 
     try{
       await db.runTransaction(async (transaction) => {
-        const sourcedata = await transaction.get(sourceDoc);
-        const qtyAvailable = sourcedata.data()?.qtyRemaining || 0;
+        const sourceData = await transaction.get(sourceDoc);
+        const qtyAvailable = sourceData.data()?.qtyRemaining || 0;
       if(qtyAvailable < qtyRequested){
-        throw new Error('Stocks insufficient!  available: ${qtyAvailable}, requested: ${qtyRequested}');
+        throw new Error(`Stocks insufficient!  available: ${qtyAvailable}, requested: ${qtyRequested}`);
       }
-      // 3. Execute atomic batch write
-    const batch = db.batch();
+      // 3. Execute atomic transaction write
 
     // Decrement source
-    batch.update(sourceDoc, {
+    transaction.update(sourceDoc, {
       qtyRemaining: admin.firestore.FieldValue.increment(-qtyRequested),
       updatedAt: admin.firestore.FieldValue.serverTimestamp()
     });
 
     // Increment destination
-    batch.update(destDoc, {
+    transaction.update(destDoc, {
       qtyRemaining: admin.firestore.FieldValue.increment(qtyRequested),
       updatedAt: admin.firestore.FieldValue.serverTimestamp()
     });
 
     // Update request resolution
-    batch.update(event.data.after.ref, {
+    transaction.update(event.data.after.ref, {
       resolvedAt: admin.firestore.FieldValue.serverTimestamp()
     });
   });
-    await batch.commit();
     logger.log(`Redistribution successful: ${qtyRequested} units of ${medicineName} from ${toFacilityId} to ${fromFacilityId}`);
     }
     catch(err){
