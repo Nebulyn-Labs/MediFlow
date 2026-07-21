@@ -8,6 +8,7 @@ import '../../models/facility.dart';
 import '../../models/request.dart';
 import '../../models/inventory_item.dart';
 import 'package:med_supply_prototype/constants/colors.dart';
+import '../shared/kpi_card.dart';
 
 class AdminOverview extends ConsumerStatefulWidget {
   const AdminOverview({super.key});
@@ -264,23 +265,34 @@ class _AdminOverviewState extends ConsumerState<AdminOverview> {
                       spacing: 20,
                       runSpacing: 20,
                       children: [
-                        _buildKpiCard('TOTAL FACILITIES', '${_facilities.length}',
-                            Icons.business_rounded,
-                            onTap: () {}),
-                        _buildKpiCard('OPEN SHORTAGE REQUESTS',
-                            '$_openShortageRequests', Icons.warning_amber_rounded,
-                            isAlert: true, onTap: () {}),
-                        _buildKpiCard('SURPLUS / EXPIRY OFFERS',
-                            '$_surplusOffers', Icons.swap_horiz_rounded,
-                            isAlert: false,
-                            iconColor: MediColors.warning,
-                            onTap: () {}),
-                        _buildKpiCard(
-                            'PENDING INDENT APPROVALS',
-                            '$_pendingIndents',
-                            Icons.assignment_turned_in_rounded,
-                            iconColor: MediColors.info,
-                            onTap: () => context.go('/admin/approvals')),
+                        KpiCard(
+                          title: 'TOTAL FACILITIES',
+                          value: '${_facilities.length}',
+                          icon: Icons.business_rounded,
+                          onTap: () {},
+                        ),
+                        KpiCard(
+                          title: 'OPEN SHORTAGE REQUESTS',
+                          value: '$_openShortageRequests',
+                          icon: Icons.warning_amber_rounded,
+                          isAlert: true,
+                          onTap: () {},
+                        ),
+                        KpiCard(
+                          title: 'SURPLUS / EXPIRY OFFERS',
+                          value: '$_surplusOffers',
+                          icon: Icons.swap_horiz_rounded,
+                          isAlert: false,
+                          iconColor: MediColors.warning,
+                          onTap: () {},
+                        ),
+                        KpiCard(
+                          title: 'PENDING INDENT APPROVALS',
+                          value: '$_pendingIndents',
+                          icon: Icons.assignment_turned_in_rounded,
+                          iconColor: MediColors.info,
+                          onTap: () => context.go('/admin/approvals'),
+                        ),
                       ],
                     ),
                     const SizedBox(height: 36),
@@ -324,51 +336,6 @@ class _AdminOverviewState extends ConsumerState<AdminOverview> {
                 ),
               ),
             ),
-    );
-  }
-
-  Widget _buildKpiCard(String title, String value, IconData icon,
-      {bool isAlert = false, Color? iconColor, VoidCallback? onTap}) {
-    final finalIconColor =
-        isAlert ? MediColors.error : (iconColor ?? MediColors.info);
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(12),
-      child: Container(
-        width: 250,
-        padding: const EdgeInsets.all(24),
-        decoration: BoxDecoration(
-          color: MediColors.surface,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: MediColors.border),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Expanded(
-                    child: Text(title,
-                        style: const TextStyle(
-                            fontSize: 11,
-                            fontWeight: FontWeight.w700,
-                            color: MediColors.textSecondary,
-                            letterSpacing: 0.5),
-                        overflow: TextOverflow.ellipsis)),
-                const SizedBox(width: 8),
-                Icon(icon, color: finalIconColor, size: 20),
-              ],
-            ),
-            const SizedBox(height: 16),
-            Text(value,
-                style: const TextStyle(
-                    fontSize: 28,
-                    fontWeight: FontWeight.w800,
-                    color: MediColors.textPrimary)),
-          ],
-        ),
-      ),
     );
   }
 
