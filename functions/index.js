@@ -589,32 +589,45 @@ exports.onIndentApproved = onDocumentUpdated('requests/{requestId}', async (even
       return;
     }
 
-    const sourceDoc = sourceStockQuery.docs[0];
-    const destDoc = destStockQuery.docs[0];
+    const sourceDoc = sourceStockQuery.docs[0].ref;
+    const destDoc = destStockQuery.docs[0].ref;
 
-    // 3. Execute atomic batch write
-    const batch = db.batch();
+    try{
+      await db.runTransaction(async (transaction) => {
+        const sourceData = await transaction.get(sourceDoc);
+        const qtyAvailable = sourceData.data()?.qtyRemaining || 0;
+      if(qtyAvailable < qtyRequested){
+        throw new Error(`Stocks insufficient!  available: ${qtyAvailable}, requested: ${qtyRequested}`);
+      }
+      // 3. Execute atomic transaction write
 
     // Decrement source
-    batch.update(sourceDoc.ref, {
+    transaction.update(sourceDoc, {
       qtyRemaining: admin.firestore.FieldValue.increment(-qtyRequested),
       updatedAt: admin.firestore.FieldValue.serverTimestamp()
     });
 
     // Increment destination
-    batch.update(destDoc.ref, {
+    transaction.update(destDoc, {
       qtyRemaining: admin.firestore.FieldValue.increment(qtyRequested),
       updatedAt: admin.firestore.FieldValue.serverTimestamp()
     });
 
     // Update request resolution
-    batch.update(event.data.after.ref, {
+    transaction.update(event.data.after.ref, {
       resolvedAt: admin.firestore.FieldValue.serverTimestamp()
     });
-
-    await batch.commit();
+  });
     logger.log(`Redistribution successful: ${qtyRequested} units of ${medicineName} from ${toFacilityId} to ${fromFacilityId}`);
-  }
+    }
+    catch(err){
+      logger.log(`Redistribution unsuccessful for request: ${event.params.requestId} : ${err.message}`);
+      await event.data.after.ref.update({
+        status: 'rejected',
+        rejectionReason: err.message
+      });
+    }
+    }
 });
 
 async function executeTool(name, args, authInfo) {

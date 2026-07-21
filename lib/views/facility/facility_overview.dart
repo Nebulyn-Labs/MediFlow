@@ -184,21 +184,44 @@ class FacilityOverview extends ConsumerWidget {
                 ],
                 onSelected: (v) async {
                   if (v == 'out') {
-                    context.go('/');
-                    await FirebaseAuth.instance.signOut();
+                    try {
+                      await FirebaseAuth.instance.signOut();
+                      if (context.mounted) context.go('/');
+                    } catch (e) {
+                      if (context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text(
+                                'Sign out failed: ${e.toString()}'),
+                            backgroundColor: MediColors.error,
+                          ),
+                        );
+                      }
+                    }
                   }
                 },
               ),
             ],
           ),
-          body: SingleChildScrollView(
+          body: RefreshIndicator(
+            onRefresh: () => ref
+                .read(firebaseServiceProvider)
+                .getInventoryOnce(facilityId),
+            color: MediColors.primary,
+            backgroundColor: MediColors.surface,
+            strokeWidth: 2.5,
+            displacement: 48,
+            child: SingleChildScrollView(
+            physics: const AlwaysScrollableScrollPhysics(),
             padding: const EdgeInsets.all(28),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 // Greeting
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                Wrap(
+                  spacing: 16,
+                  runSpacing: 12,
+                  crossAxisAlignment: WrapCrossAlignment.start,
                   children: [
                     Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -347,6 +370,7 @@ class FacilityOverview extends ConsumerWidget {
                 const SizedBox(height: 36),
                 _buildInventoryTable(context, ref, inventory),
               ],
+            ),
             ),
           ),
         );
