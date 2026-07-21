@@ -8,14 +8,21 @@ import '../../services/simulation_service.dart';
 import '../../services/csv_export_service.dart';
 import 'package:med_supply_prototype/constants/colors.dart';
 
-class FacilityOverview extends ConsumerWidget {
+class FacilityOverview extends ConsumerStatefulWidget {
   final String facilityId;
   const FacilityOverview({super.key, required this.facilityId});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<FacilityOverview> createState() => _FacilityOverviewState();
+}
+
+class _FacilityOverviewState extends ConsumerState<FacilityOverview> {
+  bool _isSimulating = false;
+
+  @override
+  Widget build(BuildContext context) {
     final inventoryStream =
-        ref.watch(firebaseServiceProvider).streamInventory(facilityId);
+        ref.watch(firebaseServiceProvider).streamInventory(widget.facilityId);
 
     return StreamBuilder<List<InventoryItem>>(
       stream: inventoryStream,
@@ -103,7 +110,7 @@ class FacilityOverview extends ConsumerWidget {
                             onPressed: () async {
                               await ref
                                   .read(firebaseServiceProvider)
-                                  .restock(facilityId, item.medicineName, 500);
+                                  .restock(widget.facilityId, item.medicineName, 500);
                               if (context.mounted) {
                                 ScaffoldMessenger.of(context).showSnackBar(SnackBar(
                                     content: Text(
@@ -194,7 +201,7 @@ class FacilityOverview extends ConsumerWidget {
           body: RefreshIndicator(
             onRefresh: () => ref
                 .read(firebaseServiceProvider)
-                .getInventoryOnce(facilityId),
+                .getInventoryOnce(widget.facilityId),
             color: MediColors.primary,
             backgroundColor: MediColors.surface,
             strokeWidth: 2.5,
@@ -226,30 +233,57 @@ class FacilityOverview extends ConsumerWidget {
                       ],
                     ),
                     OutlinedButton.icon(
-                      onPressed: () async {
-                        final firebase = ref.read(firebaseServiceProvider);
-                        final fac = await firebase.getFacility(facilityId);
-                        if (fac != null) {
-                          // Show loading
-                          if (context.mounted) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
-                                    content: Text(
-                                        'Simulating 30 days of usage data...')));
-                          }
-                          await ref
-                              .read(simulationServiceProvider)
-                              .runFullSimulation(facilityId, fac.type);
-                          if (context.mounted) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
-                                    content: Text(
-                                        'Simulation complete! Analytics ready.')));
-                          }
-                        }
-                      },
-                      icon: const Icon(Icons.analytics_outlined),
-                      label: const Text('Simulate Analytics'),
+                      onPressed: _isSimulating
+                          ? null
+                          : () async {
+                              final firebase =
+                                  ref.read(firebaseServiceProvider);
+                              final fac =
+                                  await firebase.getFacility(widget.facilityId);
+                              if (fac == null) return;
+
+                              setState(() => _isSimulating = true);
+                              if (context.mounted) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(
+                                        content: Text(
+                                            'Simulating 30 days of usage data...')));
+                              }
+                              try {
+                                await ref
+                                    .read(simulationServiceProvider)
+                                    .runFullSimulation(
+                                        widget.facilityId, fac.type);
+                                if (context.mounted) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                      const SnackBar(
+                                          content: Text(
+                                              'Simulation complete! Analytics ready.')));
+                                }
+                              } catch (e) {
+                                if (context.mounted) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                      SnackBar(
+                                        content: Text(
+                                            'Simulation failed: ${e.toString()}'),
+                                        backgroundColor: MediColors.error,
+                                      ));
+                                }
+                              } finally {
+                                if (mounted) {
+                                  setState(() => _isSimulating = false);
+                                }
+                              }
+                            },
+                      icon: _isSimulating
+                          ? const SizedBox(
+                              width: 18,
+                              height: 18,
+                              child: CircularProgressIndicator(
+                                  strokeWidth: 2, color: MediColors.primary))
+                          : const Icon(Icons.analytics_outlined),
+                      label:
+                          Text(_isSimulating ? 'Running...' : 'Simulate Analytics'),
                       style: OutlinedButton.styleFrom(
                         foregroundColor: MediColors.primary,
                         side: const BorderSide(color: MediColors.primary),
@@ -318,8 +352,8 @@ class FacilityOverview extends ConsumerWidget {
                             stockHealthText,
                             Icons.health_and_safety_rounded,
                             stockHealthColor,
-                            stockHealthGradient, () {
-                          context.go('/facility/$facilityId/alerts');
+                            stockHealthGradient,                             () {
+                          context.go('/facility/${widget.facilityId}/alerts');
                         }),
                         _buildKpiCard(
                             'Expired',
@@ -329,7 +363,7 @@ class FacilityOverview extends ConsumerWidget {
                             const LinearGradient(
                                 colors: [Color(0xFF3D1519), Color(0xFF1E293B)]),
                             () {
-                          context.go('/facility/$facilityId/alerts');
+                          context.go('/facility/${widget.facilityId}/alerts');
                         }),
                         _buildKpiCard(
                             'Wastage Risk',
@@ -339,7 +373,7 @@ class FacilityOverview extends ConsumerWidget {
                             const LinearGradient(
                                 colors: [Color(0xFF3D2E0A), Color(0xFF1E293B)]),
                             () {
-                          context.go('/facility/$facilityId/alerts');
+                          context.go('/facility/${widget.facilityId}/alerts');
                         }),
                         _buildKpiCard(
                             'Low Stock',
@@ -349,7 +383,7 @@ class FacilityOverview extends ConsumerWidget {
                             const LinearGradient(
                                 colors: [Color(0xFF3D1519), Color(0xFF1E293B)]),
                             () {
-                          context.go('/facility/$facilityId/alerts');
+                          context.go('/facility/${widget.facilityId}/alerts');
                         }),
                       ],
                     );
@@ -370,7 +404,7 @@ class FacilityOverview extends ConsumerWidget {
       List<InventoryItem> inventory) async {
     try {
       final fac =
-          await ref.read(firebaseServiceProvider).getFacility(facilityId);
+          await ref.read(firebaseServiceProvider).getFacility(widget.facilityId);
       await CsvExportService.exportInventory(inventory,
           facilityName: fac?.name);
       if (context.mounted) {
