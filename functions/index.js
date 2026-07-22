@@ -1,4 +1,4 @@
-const { onCall, HttpsError } = require("firebase-functions/v2/https");
+const { onCall, onRequest, HttpsError } = require("firebase-functions/v2/https");
 const { onDocumentWritten, onDocumentUpdated } = require("firebase-functions/v2/firestore");
 const { onSchedule } = require("firebase-functions/v2/scheduler");
 const { defineSecret } = require("firebase-functions/params");
@@ -6,6 +6,7 @@ const logger = require("firebase-functions/logger");
 const admin = require("firebase-admin");
 const { GoogleGenerativeAI } = require("@google/generative-ai");
 const { BigQuery } = require("@google-cloud/bigquery");
+const { checkRateLimit, LIMITS } = require("./helpers/rateLimiter");
 
 admin.initializeApp();
 
@@ -245,6 +246,12 @@ exports.forecastDemand = onCall({ secrets: [GEMINI_API_KEY] }, async (request) =
     throw new HttpsError('permission-denied', 'Unauthorized facility access');
   }
 
+  await checkRateLimit(
+    request.auth.uid,
+    "forecastDemand",
+    LIMITS.AI
+  );
+
   // 1. Fetch facility details
   const facilityDoc = await db.collection("facilities").doc(facilityId).get();
   const facility = facilityDoc.data();
@@ -326,6 +333,12 @@ exports.logAIDecision = onCall(async (request) => {
   if (!authInfo.isAdmin && facilityId !== authInfo.userFacilityId) {
     throw new HttpsError("permission-denied", "Unauthorized facility access");
   }
+
+  await checkRateLimit(
+    request.auth.uid,
+    "logAIDecision",
+    LIMITS.GENERAL
+  );
 
   const decisionId = data.decisionId || `${Date.now()}_${Math.random().toString(36).slice(2)}`;
   await insertBigQuery("ai_decisions", {
@@ -576,32 +589,45 @@ exports.onIndentApproved = onDocumentUpdated('requests/{requestId}', async (even
       return;
     }
 
-    const sourceDoc = sourceStockQuery.docs[0];
-    const destDoc = destStockQuery.docs[0];
+    const sourceDoc = sourceStockQuery.docs[0].ref;
+    const destDoc = destStockQuery.docs[0].ref;
 
-    // 3. Execute atomic batch write
-    const batch = db.batch();
+    try{
+      await db.runTransaction(async (transaction) => {
+        const sourceData = await transaction.get(sourceDoc);
+        const qtyAvailable = sourceData.data()?.qtyRemaining || 0;
+      if(qtyAvailable < qtyRequested){
+        throw new Error(`Stocks insufficient!  available: ${qtyAvailable}, requested: ${qtyRequested}`);
+      }
+      // 3. Execute atomic transaction write
 
     // Decrement source
-    batch.update(sourceDoc.ref, {
+    transaction.update(sourceDoc, {
       qtyRemaining: admin.firestore.FieldValue.increment(-qtyRequested),
       updatedAt: admin.firestore.FieldValue.serverTimestamp()
     });
 
     // Increment destination
-    batch.update(destDoc.ref, {
+    transaction.update(destDoc, {
       qtyRemaining: admin.firestore.FieldValue.increment(qtyRequested),
       updatedAt: admin.firestore.FieldValue.serverTimestamp()
     });
 
     // Update request resolution
-    batch.update(event.data.after.ref, {
+    transaction.update(event.data.after.ref, {
       resolvedAt: admin.firestore.FieldValue.serverTimestamp()
     });
-
-    await batch.commit();
+  });
     logger.log(`Redistribution successful: ${qtyRequested} units of ${medicineName} from ${toFacilityId} to ${fromFacilityId}`);
-  }
+    }
+    catch(err){
+      logger.log(`Redistribution unsuccessful for request: ${event.params.requestId} : ${err.message}`);
+      await event.data.after.ref.update({
+        status: 'rejected',
+        rejectionReason: err.message
+      });
+    }
+    }
 });
 
 async function executeTool(name, args, authInfo) {
@@ -670,6 +696,12 @@ exports.getForecastSecure = onCall({ secrets: [GEMINI_API_KEY] }, async (request
   const db = admin.firestore();
   await getUserFacilityAndRole(request.auth, db);
 
+  await checkRateLimit(
+    request.auth.uid,
+    "getForecastSecure",
+    LIMITS.AI
+  );
+
   const { medicineName, logs, daysToForecast } = request.data;
   const logSummary = logs
     .map(l => `Date: ${l.date}, Used: ${l.used}`)
@@ -696,6 +728,12 @@ exports.generateSmartAlertsSecure = onCall({ secrets: [GEMINI_API_KEY] }, async 
   await getUserFacilityAndRole(request.auth, db);
 
   const { inventory } = request.data;
+  await checkRateLimit(
+    request.auth.uid,
+    "generateSmartAlertsSecure",
+    LIMITS.AI
+  );
+
   const payload = inventory
     .map(i => `${i.medicineName} (Batch: ${i.batchId}): ${i.remainingQuantity}/${i.initialQuantity} units left. Expiry: ${i.expiryDate}`)
     .join('\n');
@@ -725,6 +763,11 @@ exports.getChatResponseSecure = onCall({ secrets: [GEMINI_API_KEY] }, async (req
   if (!authInfo.isAdmin && clientContext && clientContext.current_facility_id && clientContext.current_facility_id !== authInfo.userFacilityId) {
     throw new HttpsError('permission-denied', 'Unauthorized facility access in chat context');
   }
+  await checkRateLimit(
+    request.auth.uid,
+    "getChatResponseSecure",
+    LIMITS.AI
+  );
 
   const contextStr = JSON.stringify(clientContext);
 
@@ -813,6 +856,12 @@ exports.callGeminiSecure = onCall({ secrets: [GEMINI_API_KEY] }, async (request)
   const db = admin.firestore();
   await getUserFacilityAndRole(request.auth, db);
 
+  await checkRateLimit(
+    request.auth.uid,
+    "callGeminiSecure",
+    LIMITS.AI
+  );
+
   const { prompt, imageBase64, imageMimeType } = request.data;
   try {
     const genAI = getGenAI();
@@ -839,4 +888,67 @@ exports.callGeminiSecure = onCall({ secrets: [GEMINI_API_KEY] }, async (request)
     logger.error("Gemini callGeminiSecure Error:", error);
     throw new HttpsError('internal', 'AI generation failed');
   }
+});
+
+const cspReportLastSeen = new Map();
+const CSP_REPORT_MAX_BODY_BYTES = 10 * 1024; // 10KB
+const CSP_REPORT_MIN_INTERVAL_MS = 5000; // 1 report per IP per 5s
+const CSP_REPORT_MAP_MAX_SIZE = 5000; // hard cap to bound memory
+
+function getClientIp(req) {
+  // Cloud Run / GFE APPENDS the real client IP as the LAST entry in
+  // X-Forwarded-For; every entry before that can be spoofed by the client.
+  const xff = req.headers["x-forwarded-for"];
+  if (xff) {
+    const parts = xff.split(",").map((p) => p.trim()).filter(Boolean);
+    if (parts.length > 0) return parts[parts.length - 1];
+  }
+  return req.ip || "unknown";
+}
+
+function pruneCspReportMap(now) {
+  // Periodic sweep: drop stale entries, and if we're still oversized
+  // (e.g. distinct-IP flood), drop the oldest entries outright.
+  for (const [ip, ts] of cspReportLastSeen) {
+    if (now - ts >= CSP_REPORT_MIN_INTERVAL_MS) {
+      cspReportLastSeen.delete(ip);
+    }
+  }
+  if (cspReportLastSeen.size > CSP_REPORT_MAP_MAX_SIZE) {
+    const excess = cspReportLastSeen.size - CSP_REPORT_MAP_MAX_SIZE;
+    const oldestKeys = Array.from(cspReportLastSeen.keys()).slice(0, excess);
+    for (const key of oldestKeys) {
+      cspReportLastSeen.delete(key);
+    }
+  }
+}
+
+exports.cspReport = onRequest(async (req, res) => {
+  if (req.method !== "POST") {
+    res.status(405).send("Method Not Allowed");
+    return;
+  }
+
+  const contentLength = Number(req.headers["content-length"] || 0);
+  if (contentLength > CSP_REPORT_MAX_BODY_BYTES) {
+    res.status(413).send("Payload Too Large");
+    return;
+  }
+
+  const ip = getClientIp(req);
+  const now = Date.now();
+
+  if (cspReportLastSeen.size > CSP_REPORT_MAP_MAX_SIZE) {
+    pruneCspReportMap(now);
+  }
+
+  const lastSeen = cspReportLastSeen.get(ip);
+  if (lastSeen && now - lastSeen < CSP_REPORT_MIN_INTERVAL_MS) {
+    res.status(429).send("Too Many Requests");
+    return;
+  }
+  cspReportLastSeen.set(ip, now);
+
+  logger.warn("CSP Violation Report", { report: req.body });
+  res.status(204).send();
 });
