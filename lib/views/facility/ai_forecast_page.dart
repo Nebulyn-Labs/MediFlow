@@ -22,12 +22,14 @@ class _AIForecastPageState extends ConsumerState<AIForecastPage> {
   bool _isForecasting = false;
   List<double> _historicalData = [];
   bool _isLoadingHistory = false;
+  String? _historyError;
 
   Future<void> _loadHistoricalData(String medicineName) async {
     setState(() {
       _isLoadingHistory = true;
       _historicalData = [];
       _forecastResult = null;
+      _historyError = null;
     });
     try {
       final logs = await ref
@@ -49,7 +51,12 @@ class _AIForecastPageState extends ConsumerState<AIForecastPage> {
         });
       }
     } catch (e) {
-      if (mounted) setState(() => _isLoadingHistory = false);
+      if (mounted) {
+        setState(() {
+          _isLoadingHistory = false;
+          _historyError = e.toString();
+        });
+      }
     }
   }
 
@@ -244,7 +251,18 @@ class _AIForecastPageState extends ConsumerState<AIForecastPage> {
                       Expanded(
                           child: _isLoadingHistory
                               ? const Center(child: CircularProgressIndicator())
-                              : _buildChart()),
+                              : _historyError != null
+                                  ? Center(
+                                      child: Padding(
+                                        padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                                        child: Text(
+                                          'Failed to load historical data.\n$_historyError',
+                                          textAlign: TextAlign.center,
+                                          style: const TextStyle(color: MediColors.error),
+                                        ),
+                                      ),
+                                    )
+                                  : _buildChart()),
                     ],
                   ),
                 ),
