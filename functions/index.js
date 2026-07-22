@@ -844,6 +844,35 @@ exports.callGeminiSecure = onCall({ secrets: [GEMINI_API_KEY] }, async (request)
 const cspReportLastSeen = new Map();
 const CSP_REPORT_MAX_BODY_BYTES = 10 * 1024; // 10KB
 const CSP_REPORT_MIN_INTERVAL_MS = 5000; // 1 report per IP per 5s
+const CSP_REPORT_MAP_MAX_SIZE = 5000; // hard cap to bound memory
+
+function getClientIp(req) {
+  // Cloud Run / GFE APPENDS the real client IP as the LAST entry in
+  // X-Forwarded-For; every entry before that can be spoofed by the client.
+  const xff = req.headers["x-forwarded-for"];
+  if (xff) {
+    const parts = xff.split(",").map((p) => p.trim()).filter(Boolean);
+    if (parts.length > 0) return parts[parts.length - 1];
+  }
+  return req.ip || "unknown";
+}
+
+function pruneCspReportMap(now) {
+  // Periodic sweep: drop stale entries, and if we're still oversized
+  // (e.g. distinct-IP flood), drop the oldest entries outright.
+  for (const [ip, ts] of cspReportLastSeen) {
+    if (now - ts >= CSP_REPORT_MIN_INTERVAL_MS) {
+      cspReportLastSeen.delete(ip);
+    }
+  }
+  if (cspReportLastSeen.size > CSP_REPORT_MAP_MAX_SIZE) {
+    const excess = cspReportLastSeen.size - CSP_REPORT_MAP_MAX_SIZE;
+    const oldestKeys = Array.from(cspReportLastSeen.keys()).slice(0, excess);
+    for (const key of oldestKeys) {
+      cspReportLastSeen.delete(key);
+    }
+  }
+}
 
 exports.cspReport = onRequest(async (req, res) => {
   if (req.method !== "POST") {
@@ -857,8 +886,13 @@ exports.cspReport = onRequest(async (req, res) => {
     return;
   }
 
-  const ip = (req.headers["x-forwarded-for"] || req.ip || "unknown").split(",")[0].trim();
+  const ip = getClientIp(req);
   const now = Date.now();
+
+  if (cspReportLastSeen.size > CSP_REPORT_MAP_MAX_SIZE) {
+    pruneCspReportMap(now);
+  }
+
   const lastSeen = cspReportLastSeen.get(ip);
   if (lastSeen && now - lastSeen < CSP_REPORT_MIN_INTERVAL_MS) {
     res.status(429).send("Too Many Requests");
