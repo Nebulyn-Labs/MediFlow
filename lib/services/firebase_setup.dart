@@ -44,7 +44,7 @@ Future<void> initializeFirebaseServices() async {
         androidProvider: androidProvider,
       );
       debugPrint(
-          "Firebase App Check activated (Android: \${kDebugMode ? 'Debug' : 'Play Integrity'})");
+          "Firebase App Check activated (Android: ${kDebugMode ? 'Debug' : 'Play Integrity'})");
     }
   } catch (e) {
     // Requirement: If App Check activation fails, log the error using debugPrint() and allow the application to continue running
