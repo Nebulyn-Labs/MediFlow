@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:vector_math/vector_math_64.dart' show Vector3;
 import '../../services/firebase_service.dart';
 import 'package:med_supply_prototype/constants/colors.dart';
 import 'dart:math' as math;
@@ -278,7 +279,7 @@ class _RoleSelectionScreenState extends State<RoleSelectionScreen>
           width: 420,
           padding: const EdgeInsets.all(24),
           transform:
-              Matrix4.translationValues(0.0, isHovering ? -4.0 : 0.0, 0.0),
+              Matrix4.translation(Vector3(0.0, isHovering ? -4.0 : 0.0, 0.0)),
           decoration: BoxDecoration(
             color: MediColors.surface,
             borderRadius: BorderRadius.circular(20),
