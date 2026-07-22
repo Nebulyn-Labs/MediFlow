@@ -70,7 +70,7 @@ class _RoleSelectionScreenState extends State<RoleSelectionScreen>
                               shape: BoxShape.circle,
                               gradient: RadialGradient(
                                 colors: [
-                                  MediColors.primary.withValues(alpha: 0.08),
+                                  MediColors.primarySubtle,
                                   Colors.transparent,
                                 ],
                               ),

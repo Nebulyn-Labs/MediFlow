@@ -562,7 +562,7 @@ class _DailyLoggingPageState extends ConsumerState<DailyLoggingPage>
           Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                  color: MediColors.success.withValues(alpha: 0.08),
+                  color: MediColors.successSubtle,
                   borderRadius: BorderRadius.circular(10)),
               child: Row(children: [
                 const Icon(Icons.check_circle_rounded,
@@ -820,10 +820,9 @@ class _DailyLoggingPageState extends ConsumerState<DailyLoggingPage>
               width: double.infinity,
               padding: const EdgeInsets.all(14),
               decoration: BoxDecoration(
-                  color: MediColors.success.withValues(alpha: 0.08),
+                  color: MediColors.successSubtle,
                   borderRadius: BorderRadius.circular(12),
-                  border: Border.all(
-                      color: MediColors.success.withValues(alpha: 0.2))),
+                  border: Border.all(color: MediColors.successBorder)),
               child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
