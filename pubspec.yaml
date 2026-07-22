@@ -43,7 +43,7 @@ dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^6.0.0
-  riverpod_generator: ^4.0.3
+  riverpod_generator: ^4.0.4
   build_runner: ^2.15.1
   fake_cloud_firestore: ^3.1.0
   mocktail: ^1.0.5
