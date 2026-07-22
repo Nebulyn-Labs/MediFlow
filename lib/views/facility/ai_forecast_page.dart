@@ -66,11 +66,9 @@ class _AIForecastPageState extends ConsumerState<AIForecastPage> {
       final logs = await ref
           .read(firebaseServiceProvider)
           .getRecentLogs(widget.facilityId);
-      final result = await ref
-          .read(aiServiceProvider)
-          .forecastDemand(
-              _selectedMed!, logs, _forecastDays,
-              facilityId: widget.facilityId);
+      final result = await ref.read(aiServiceProvider).forecastDemand(
+          _selectedMed!, logs, _forecastDays,
+          facilityId: widget.facilityId);
       if (mounted) {
         setState(() {
           _forecastResult = result;
@@ -203,10 +201,9 @@ class _AIForecastPageState extends ConsumerState<AIForecastPage> {
                     Container(
                       padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(
-                        color: MediColors.success.withValues(alpha: 0.08),
+                        color: MediColors.successSubtle,
                         borderRadius: BorderRadius.circular(10),
-                        border: Border.all(
-                            color: MediColors.success.withValues(alpha: 0.2)),
+                        border: Border.all(color: MediColors.successBorder),
                       ),
                       child: Row(children: [
                         const Icon(Icons.check_circle_rounded,
