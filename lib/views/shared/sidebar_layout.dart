@@ -200,8 +200,19 @@ class _SidebarLayoutState extends ConsumerState<SidebarLayout> {
                     _NavItem(Icons.logout_rounded, 'Logout'),
                     false,
                     () async {
-                      if (context.mounted) context.go('/');
-                      await FirebaseAuth.instance.signOut();
+                      try {
+                        await FirebaseAuth.instance.signOut();
+                        if (context.mounted) context.go('/');
+                      } catch (e) {
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text('Sign out failed: ${e.toString()}'),
+                              backgroundColor: MediColors.error,
+                            ),
+                          );
+                        }
+                      }
                     },
                     isLogout: true,
                   ),
