@@ -990,3 +990,59 @@ class _DailyLoggingPageState extends ConsumerState<DailyLoggingPage>
     );
   }
 }
+
+void showUploadSummaryDialog(BuildContext context, CsvUploadResult result) {
+  showDialog(
+    context: context,
+    builder: (ctx) => AlertDialog(
+      title: Text(
+        result.isFullySuccessful
+            ? 'Upload Completed Successfully'
+            : result.isPartialFailure
+                ? 'Partial Upload Success'
+                : 'Upload Failed',
+      ),
+      content: SizedBox(
+        width: 400,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Processed ${result.successfulRecords.length} of ${result.totalRows} records.'),
+            const SizedBox(height: 12),
+            if (result.failures.isNotEmpty) ...[
+              const Text(
+                'Failed Rows:',
+                style: TextStyle(fontWeight: FontWeight.bold, color: Colors.red),
+              ),
+              const SizedBox(height: 8),
+              SizedBox(
+                height: 150,
+                child: ListView.builder(
+                  shrinkWrap: true,
+                  itemCount: result.failures.length,
+                  itemBuilder: (context, idx) {
+                    final err = result.failures[idx];
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: 6.0),
+                      child: Text(
+                        'Line ${err.lineNumber}: ${err.reason}',
+                        style: const TextStyle(fontSize: 12, color: Colors.redAccent),
+                      ),
+                    );
+                  },
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(ctx),
+          child: const Text('Close'),
+        ),
+      ],
+    ),
+  );
+}

@@ -8,17 +8,133 @@ import 'package:intl/intl.dart';
 import '../models/inventory_item.dart';
 import '../models/daily_usage_log.dart';
 
-/// Handles converting MediFlow domain models into CSV files and letting the
-/// user save/download them. Works across web, desktop and mobile since it
-/// relies solely on [FilePicker.saveFile] with in-memory bytes rather than
-/// `dart:io`.
+/// Class representing a row-level failure in CSV import.
+class CsvRowError {
+  final int lineNumber;
+  final String rawData;
+  final String reason;
+
+  CsvRowError({
+    required this.lineNumber,
+    required this.rawData,
+    required this.reason,
+  });
+}
+
+/// Class holding the summary of a bulk CSV upload operation.
+class CsvUploadResult<T> {
+  final int totalRows;
+  final List<T> successfulRecords;
+  final List<CsvRowError> failures;
+
+  CsvUploadResult({
+    required this.totalRows,
+    required this.successfulRecords,
+    required this.failures,
+  });
+
+  bool get isFullySuccessful => failures.isEmpty && totalRows > 0;
+  bool get isPartialFailure => failures.isNotEmpty && successfulRecords.isNotEmpty;
+  bool get isTotalFailure => successfulRecords.isEmpty && totalRows > 0;
+}
+
+/// Handles converting MediFlow domain models into CSV files and parsing CSVs
+/// with robust error catching for bulk imports.
 class CsvExportService {
   static final DateFormat _dateFmt = DateFormat('yyyy-MM-dd');
   static final DateFormat _stampFmt = DateFormat('yyyyMMdd_HHmmss');
 
-  /// Exports the given inventory list as a CSV file and prompts the user to
-  /// save/download it. Returns the saved path (or null if the user
-  /// cancelled the save dialog).
+  /// Parses CSV raw content string into DailyUsageLog domain objects.
+  /// Handles partial failures by isolating malformed rows and returning a summary.
+  static CsvUploadResult<DailyUsageLog> parseUsageLogsCsv(
+    String csvContent, {
+    required String facilityId,
+  }) {
+    final fields = const CsvToListConverter(eol: '\n').convert(csvContent);
+    if (fields.isEmpty) {
+      return CsvUploadResult(
+        totalRows: 0,
+        successfulRecords: [],
+        failures: [],
+      );
+    }
+
+    // Skip header row if present
+    int startIndex = 0;
+    if (fields.first.isNotEmpty &&
+        fields.first[0].toString().toLowerCase().contains('date')) {
+      startIndex = 1;
+    }
+
+    final List<DailyUsageLog> successLogs = [];
+    final List<CsvRowError> failures = [];
+    final totalRows = fields.length - startIndex;
+
+    for (int i = startIndex; i < fields.length; i++) {
+      final lineNumber = i + 1;
+      final row = fields[i];
+
+      if (row.isEmpty || (row.length == 1 && row[0].toString().trim().isEmpty)) {
+        continue; // Skip blank lines
+      }
+
+      try {
+        if (row.length < 4) {
+          throw 'Insufficient columns. Expected 4 columns (Date, Medicine Name, Units, Patients).';
+        }
+
+        final dateStr = row[0].toString().trim();
+        final medicineName = row[1].toString().trim();
+        final unitsStr = row[2].toString().trim();
+        final patientsStr = row[3].toString().trim();
+
+        if (dateStr.isEmpty) throw 'Date field is required.';
+        if (medicineName.isEmpty) throw 'Medicine Name is required.';
+
+        final parsedDate = _dateFmt.parseStrict(dateStr);
+        final unitsDistributed = int.tryParse(unitsStr);
+        final totalPatients = int.tryParse(patientsStr);
+
+        if (unitsDistributed == null || unitsDistributed < 0) {
+          throw 'Invalid Units Distributed value: "$unitsStr". Must be a non-negative integer.';
+        }
+        if (totalPatients == null || totalPatients < 0) {
+          throw 'Invalid Total Patients value: "$patientsStr". Must be a non-negative integer.';
+        }
+
+        final log = DailyUsageLog(
+          id: '${facilityId}_${_dateFmt.format(parsedDate)}',
+          facilityId: facilityId,
+          date: parsedDate,
+          totalPatients: totalPatients,
+          medicines: [
+            MedicineUsage(
+              medicineName: medicineName,
+              unitsDistributed: unitsDistributed,
+            ),
+          ],
+        );
+
+        successLogs.add(log);
+      } catch (e) {
+        failures.add(
+          CsvRowError(
+            lineNumber: lineNumber,
+            rawData: row.join(','),
+            reason: e.toString().replaceAll('Exception: ', ''),
+          ),
+        );
+      }
+    }
+
+    return CsvUploadResult<DailyUsageLog>(
+      totalRows: totalRows,
+      successfulRecords: successLogs,
+      failures: failures,
+    );
+  }
+
+  /// Exports the given inventory list as a CSV file.
   static Future<String?> exportInventory(
     List<InventoryItem> inventory, {
     String? facilityName,
@@ -57,8 +173,7 @@ class CsvExportService {
     return _saveCsv(rows, fileName);
   }
 
-  /// Exports the given daily usage logs as a CSV file (one row per
-  /// medicine/day) and prompts the user to save/download it.
+  /// Exports the given daily usage logs as a CSV file.
   static Future<String?> exportUsageLogs(
     List<DailyUsageLog> logs, {
     String? facilityName,
