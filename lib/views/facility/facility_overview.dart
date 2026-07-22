@@ -101,13 +101,22 @@ class FacilityOverview extends ConsumerWidget {
                                   fontSize: 11, color: MediColors.textMuted)),
                           trailing: TextButton(
                             onPressed: () async {
-                              await ref
-                                  .read(firebaseServiceProvider)
-                                  .restock(facilityId, item.medicineName, 500);
-                              if (context.mounted) {
-                                ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-                                    content: Text(
-                                        'Restocked 500 units of ${item.medicineName}')));
+                              try {
+                                await ref
+                                    .read(firebaseServiceProvider)
+                                    .restock(facilityId, item.medicineName, 500);
+                                if (context.mounted) {
+                                  ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                                      content: Text(
+                                          'Restocked 500 units of ${item.medicineName}')));
+                                }
+                              } catch (e) {
+                                if (context.mounted) {
+                                  ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                                      content: Text(
+                                          'Failed to restock: Inventory record not found for ${item.medicineName}'),
+                                      backgroundColor: MediColors.error));
+                                }
                               }
                             },
                             child: const Text('Restock',

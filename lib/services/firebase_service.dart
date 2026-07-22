@@ -148,6 +148,8 @@ class FirebaseService {
           'remainingQuantity': current + quantity,
           'lastUpdated': Timestamp.now(),
         });
+      } else {
+        throw Exception('Inventory document not found for medicine: $medicineName');
       }
     });
   }

@@ -354,24 +354,24 @@ class _ActiveIndentsPageState extends ConsumerState<ActiveIndentsPage> {
       if (isExpired) {
         status = "EXPIRED";
         statusColor = MediColors.error;
-        statusBg = MediColors.error.withValues(alpha: 0.1);
+        statusBg = MediColors.errorOverlay;
         statusIcon = Icons.warning_rounded;
       } else if (forecast > available) {
         status = "LOW STOCK";
         statusColor = MediColors.error;
-        statusBg = MediColors.error.withValues(alpha: 0.1);
+        statusBg = MediColors.errorOverlay;
         statusIcon = Icons.trending_down_rounded;
       } else if (forecast > 0 &&
           ((available - forecast) > (forecast * 1.5) ||
               (available > forecast && expiringSoon))) {
         status = "SURPLUS";
         statusColor = MediColors.success;
-        statusBg = MediColors.success.withValues(alpha: 0.1);
+        statusBg = MediColors.successOverlay;
         statusIcon = Icons.arrow_upward_rounded;
       } else {
         status = "OK";
         statusColor = MediColors.primary;
-        statusBg = MediColors.primary.withValues(alpha: 0.1);
+        statusBg = MediColors.primaryOverlay;
         statusIcon = Icons.check;
       }
     }
@@ -597,8 +597,8 @@ class _ActiveIndentsPageState extends ConsumerState<ActiveIndentsPage> {
                           horizontal: 8, vertical: 4),
                       decoration: BoxDecoration(
                         color: draft.type == RequestType.surplus
-                            ? MediColors.success.withValues(alpha: 0.1)
-                            : MediColors.error.withValues(alpha: 0.1),
+                            ? MediColors.successOverlay
+                            : MediColors.errorOverlay,
                         borderRadius: BorderRadius.circular(6),
                       ),
                       child: Row(

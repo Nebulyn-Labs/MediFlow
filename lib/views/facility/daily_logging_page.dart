@@ -29,6 +29,7 @@ class _DailyLoggingPageState extends ConsumerState<DailyLoggingPage>
   bool _isSubmitting = false;
   List<String> _availableMedicines = [];
   bool _isLoadingInventory = true;
+  String? _inventoryError;
   List<Map<String, dynamic>> _csvItems = [];
   String? _csvStatus;
   bool _isSubmittingCsv = false;
@@ -63,6 +64,10 @@ class _DailyLoggingPageState extends ConsumerState<DailyLoggingPage>
   }
 
   Future<void> _fetchInventory() async {
+    setState(() {
+      _isLoadingInventory = true;
+      _inventoryError = null;
+    });
     try {
       final items = await ref
           .read(firebaseServiceProvider)
@@ -77,7 +82,12 @@ class _DailyLoggingPageState extends ConsumerState<DailyLoggingPage>
         });
       }
     } catch (e) {
-      if (mounted) setState(() => _isLoadingInventory = false);
+      if (mounted) {
+        setState(() {
+          _inventoryError = 'Failed to load inventory. Please try again.';
+          _isLoadingInventory = false;
+        });
+      }
     }
   }
 
@@ -452,6 +462,15 @@ class _DailyLoggingPageState extends ConsumerState<DailyLoggingPage>
                 const SizedBox(height: 16),
                 if (_isLoadingInventory)
                   const Center(child: CircularProgressIndicator())
+                else if (_inventoryError != null)
+                  Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                          color: MediColors.error.withValues(alpha: 0.08),
+                          borderRadius: BorderRadius.circular(10)),
+                      child: Text(_inventoryError!,
+                          style: const TextStyle(
+                              color: MediColors.error, fontSize: 13)))
                 else if (_availableMedicines.isEmpty)
                   Container(
                       padding: const EdgeInsets.all(12),
@@ -562,7 +581,7 @@ class _DailyLoggingPageState extends ConsumerState<DailyLoggingPage>
           Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                  color: MediColors.success.withValues(alpha: 0.08),
+                  color: MediColors.successSubtle,
                   borderRadius: BorderRadius.circular(10)),
               child: Row(children: [
                 const Icon(Icons.check_circle_rounded,
@@ -820,10 +839,9 @@ class _DailyLoggingPageState extends ConsumerState<DailyLoggingPage>
               width: double.infinity,
               padding: const EdgeInsets.all(14),
               decoration: BoxDecoration(
-                  color: MediColors.success.withValues(alpha: 0.08),
+                  color: MediColors.successSubtle,
                   borderRadius: BorderRadius.circular(12),
-                  border: Border.all(
-                      color: MediColors.success.withValues(alpha: 0.2))),
+                  border: Border.all(color: MediColors.successBorder)),
               child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
