@@ -5,7 +5,7 @@
   "main": "index.js",
   "scripts": {
     "lint": "eslint .",
-    "test": "echo \"All functions tests passed successfully\" && exit 0"
+    "test": "node --test test/*.test.js"
   },
   "keywords": [],
   "author": "",

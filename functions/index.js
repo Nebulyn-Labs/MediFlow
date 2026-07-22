@@ -7,6 +7,7 @@ const admin = require("firebase-admin");
 const { GoogleGenerativeAI } = require("@google/generative-ai");
 const { BigQuery } = require("@google-cloud/bigquery");
 const { checkRateLimit, LIMITS } = require("./helpers/rateLimiter");
+const { createBigQueryRecovery } = require("./helpers/bigQueryRecovery");
 
 admin.initializeApp();
 
@@ -51,7 +52,6 @@ async function getUserFacilityAndRole(auth, db) {
 const bigquery = new BigQuery();
 const BQ_DATASET = process.env.BQ_DATASET || "mediflow_analytics";
 const BQ_LOCATION = process.env.BQ_LOCATION || "US";
-const tableReady = new Map();
 
 // Initialize Gemini clients per-invocation using the GEMINI_API_KEY secret.
 // NOTE: GEMINI_API_KEY must be set in Firebase Secrets
@@ -174,44 +174,17 @@ function stockStatus(data) {
   return "healthy";
 }
 
-async function ensureBigQueryTable(tableName) {
-  if (tableReady.has(tableName)) return tableReady.get(tableName);
+const bigQueryRecovery = createBigQueryRecovery({
+  bigquery,
+  firestore: admin.firestore(),
+  logger,
+  tables: BIGQUERY_TABLES,
+  datasetName: BQ_DATASET,
+  location: BQ_LOCATION,
+});
 
-  const promise = (async () => {
-    const dataset = bigquery.dataset(BQ_DATASET);
-    const [datasetExists] = await dataset.exists();
-    if (!datasetExists) {
-      await bigquery.createDataset(BQ_DATASET, { location: BQ_LOCATION });
-    }
-
-    const table = dataset.table(tableName);
-    const [tableExists] = await table.exists();
-    if (!tableExists) {
-      await dataset.createTable(tableName, {
-        schema: { fields: BIGQUERY_TABLES[tableName].schema },
-        timePartitioning: { type: "DAY" },
-      });
-    }
-    return table;
-  })();
-
-  tableReady.set(tableName, promise);
-  return promise;
-}
-
-async function insertBigQuery(tableName, rows) {
-  const rowList = Array.isArray(rows) ? rows : [rows];
-  if (rowList.length === 0) return;
-
-  try {
-    const table = await ensureBigQueryTable(tableName);
-    await table.insert(rowList, {
-      ignoreUnknownValues: true,
-      skipInvalidRows: true,
-    });
-  } catch (error) {
-    logger.error(`BigQuery insert failed for ${tableName}`, error);
-  }
+async function insertBigQuery(tableName, rows, source) {
+  return bigQueryRecovery.insert(tableName, rows, { source });
 }
 
 async function auditEvent({ eventId, action, entityType, entityId, before, after, facilityId, medicineName, metadata, actorId = null }) {
@@ -228,7 +201,7 @@ async function auditEvent({ eventId, action, entityType, entityId, before, after
     before_json: safeJson(before),
     after_json: safeJson(after),
     metadata_json: safeJson(metadata),
-  });
+  }, "audit_event");
 }
 
 /**
@@ -355,7 +328,7 @@ exports.logAIDecision = onCall(async (request) => {
     period_days: Number.isFinite(Number(data.periodDays)) ? Number(data.periodDays) : null,
     input_json: safeJson(data.input),
     output_json: safeJson(data.output),
-  });
+  }, "log_ai_decision");
 
   await auditEvent({
     eventId: `ai_${decisionId}`,
@@ -393,7 +366,7 @@ exports.mirrorRequestToBigQuery = onDocumentWritten("requests/{requestId}", asyn
     notes: rowData.notes || null,
     captured_at: new Date().toISOString(),
     payload_json: safeJson(rowData),
-  });
+  }, "mirror_request");
 
   await auditEvent({
     eventId: `request_${requestId}_${Date.now()}`,
@@ -421,7 +394,7 @@ exports.mirrorRequestToBigQuery = onDocumentWritten("requests/{requestId}", asyn
       period_days: null,
       input_json: null,
       output_json: safeJson(after),
-    });
+    }, "mirror_ai_request");
   }
 });
 
@@ -451,7 +424,7 @@ exports.mirrorInventoryToBigQuery = onDocumentWritten("inventory/{facilityId}/me
     status: after ? stockStatus(data) : "deleted",
     captured_at: new Date().toISOString(),
     payload_json: safeJson(data),
-  });
+  }, "mirror_inventory");
 
   await auditEvent({
     eventId: `inventory_${facilityId}_${medicineId}_${Date.now()}`,
@@ -485,7 +458,7 @@ exports.mirrorUsageLogToBigQuery = onDocumentWritten("daily_usage_logs/{facility
     total_patients: Number(data.totalPatients || 0),
     captured_at: new Date().toISOString(),
     payload_json: safeJson(data),
-  })));
+  })), "mirror_usage_log");
 
   await auditEvent({
     eventId: `usage_${facilityId}_${logId}_${Date.now()}`,
@@ -496,6 +469,14 @@ exports.mirrorUsageLogToBigQuery = onDocumentWritten("daily_usage_logs/{facility
     after,
     facilityId,
   });
+});
+
+/**
+ * Replays BigQuery writes that exhausted their immediate retry attempts.
+ * The dead-letter documents remain available for operational investigation.
+ */
+exports.retryFailedBigQueryInsertions = onSchedule("every 5 minutes", async () => {
+  await bigQueryRecovery.recoverPending();
 });
 
 /**
