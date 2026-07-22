@@ -264,7 +264,7 @@ class _FacilityOverviewState extends ConsumerState<FacilityOverview> {
                                           content: Text(
                                               'Simulation complete! Analytics ready.')));
                                 }
-                              } catch (e) {
+                              } catch (_) {
                                 if (context.mounted) {
                                   ScaffoldMessenger.of(context).showSnackBar(
                                       const SnackBar(
