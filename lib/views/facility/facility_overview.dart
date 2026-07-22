@@ -218,21 +218,21 @@ class _FacilityOverviewState extends ConsumerState<FacilityOverview> {
             backgroundColor: MediColors.surface,
             strokeWidth: 2.5,
             displacement: 48,
-            child: SingleChildScrollView(
-            physics: const AlwaysScrollableScrollPhysics(),
-            padding: const EdgeInsets.all(28),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Greeting
-                Wrap(
-                  spacing: 16,
-                  runSpacing: 12,
-                  crossAxisAlignment: WrapCrossAlignment.start,
+              child: SingleChildScrollView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                padding: const EdgeInsets.all(28),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+                    // Greeting
+                    Wrap(
+                      spacing: 16,
+                      runSpacing: 12,
+                      crossAxisAlignment: WrapCrossAlignment.start,
                       children: [
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
                         Text('Facility Dashboard',
                             style: const TextStyle(
                                 fontSize: 26,
@@ -285,10 +285,9 @@ class _FacilityOverviewState extends ConsumerState<FacilityOverview> {
                                         backgroundColor: MediColors.error,
                                       ));
                                 }
-                              } finally {
-                                if (mounted) {
-                                  setState(() => _isSimulating = false);
-                                }
+                              }
+                              if (mounted) {
+                                setState(() => _isSimulating = false);
                               }
                             },
                       icon: _isSimulating
@@ -368,7 +367,7 @@ class _FacilityOverviewState extends ConsumerState<FacilityOverview> {
                             stockHealthText,
                             Icons.health_and_safety_rounded,
                             stockHealthColor,
-                            stockHealthGradient,                             () {
+                            stockHealthGradient, () {
                           context.go('/facility/${widget.facilityId}/alerts');
                         }),
                         _buildKpiCard(

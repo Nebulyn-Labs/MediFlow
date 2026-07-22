@@ -76,7 +76,7 @@ class _DailyLoggingPageState extends ConsumerState<DailyLoggingPage>
           _isLoadingInventory = false;
         });
       }
-    } catch (e) {
+    } catch (_) {
       if (mounted) setState(() => _isLoadingInventory = false);
     }
   }
@@ -465,7 +465,7 @@ class _DailyLoggingPageState extends ConsumerState<DailyLoggingPage>
                   DropdownButtonFormField<String>(
                     decoration: const InputDecoration(labelText: 'Medicine'),
                     dropdownColor: MediColors.surfaceLight,
-                    initialValue: _medName,
+                    value: _medName,
                     style: const TextStyle(color: MediColors.textPrimary),
                     items: _availableMedicines
                         .map((m) => DropdownMenuItem(value: m, child: Text(m)))

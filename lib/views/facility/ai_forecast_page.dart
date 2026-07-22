@@ -144,7 +144,7 @@ class _AIForecastPageState extends ConsumerState<AIForecastPage> {
                   DropdownButtonFormField<String>(
                     decoration: const InputDecoration(labelText: 'Medicine'),
                     dropdownColor: MediColors.surfaceLight,
-                    initialValue: _selectedMed,
+                    value: _selectedMed,
                     style: const TextStyle(color: MediColors.textPrimary),
                     items: medNames
                         .map((m) => DropdownMenuItem(value: m, child: Text(m)))
@@ -161,7 +161,7 @@ class _AIForecastPageState extends ConsumerState<AIForecastPage> {
                   DropdownButtonFormField<int>(
                     decoration: const InputDecoration(labelText: 'Duration'),
                     dropdownColor: MediColors.surfaceLight,
-                    initialValue: _forecastDays,
+                    value: _forecastDays,
                     style: const TextStyle(color: MediColors.textPrimary),
                     items: const [
                       DropdownMenuItem(
