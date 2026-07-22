@@ -58,14 +58,10 @@ MediFlow provides two types of roles:
 
 - Role -> Admin
 
-![Admin login page](docs/images/admin/admin_login.png)
-
 Here is a preview of Admin Dashboard
 ![Admin dashboard](docs/images/admin/admin_dashboard.png)
 
 - Role -> Facility
-
-![Facility login page](docs/images/facility/facility_login.png)
 
 Here is a preview of Facility manager Dashboard
 ![Facility dashboard](docs/images/facility/facility_dashboard.png)
@@ -75,7 +71,7 @@ It also provides following features:
 - AI analysis of supply
 ![facility supply ai analytics](docs/images/admin/admin_request_approval_ai_analysed.png)
 
-- Route optimization for delivery via AI
+- Route optimization for delivery via AI (Admin only)
 ![route optimization op](docs/images/admin/admin_route_optimisation_op.png)
 
 - Demand forecast
