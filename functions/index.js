@@ -18,33 +18,71 @@ async function getUserFacilityAndRole(auth, db) {
     throw new HttpsError("unauthenticated", "User must log in");
   }
 
-  const userEmail = auth.token.email.toLowerCase();
-  const isAdmin = userEmail === "admin@mediflow.com";
+  const uid = auth.uid;
+  const userDoc = await db.collection("users").doc(uid).get();
+  if (!userDoc.exists) {
+    // Backward compatibility / legacy fallback for users who are not yet in the 'users' collection
+    const userEmail = auth.token.email.toLowerCase();
+    const isAdmin = userEmail === "admin@mediflow.com";
+    let userFacilityId = null;
+
+    if (!isAdmin) {
+      const docId = userEmail.replace(/@/g, "_").replace(/\./g, "_");
+      const facilityDoc = await db.collection("facilities").doc(docId).get();
+      if (!facilityDoc.exists) {
+        const facilitiesSnapshot = await db.collection("facilities")
+          .where("email", "==", userEmail)
+          .limit(1)
+          .get();
+        if (facilitiesSnapshot.empty) {
+          throw new HttpsError("failed-precondition", "No facility assigned to this user");
+        }
+        userFacilityId = facilitiesSnapshot.docs[0].id;
+      } else {
+        userFacilityId = docId;
+      }
+    }
+
+    return {
+      userEmail,
+      userFacilityId,
+      isAdmin,
+      role: isAdmin ? "admin" : "facility_head",
+    };
+  }
+
+  const userData = userDoc.data();
+  const role = userData.role || "facility_head";
+  const isAdmin = role === "admin";
   let userFacilityId = null;
 
   if (!isAdmin) {
-    const docId = userEmail.replace(/@/g, "_").replace(/\./g, "_");
-    const facilityDoc = await db.collection("facilities").doc(docId).get();
-    if (!facilityDoc.exists) {
-      // Fallback query by email field
-      const facilitiesSnapshot = await db.collection("facilities")
-        .where("email", "==", userEmail)
-        .limit(1)
-        .get();
-      if (facilitiesSnapshot.empty) {
-        throw new HttpsError("failed-precondition", "No facility assigned to this user");
+    userFacilityId = userData.facilityId || null;
+    if (!userFacilityId) {
+      // Fallback email lookup if facilityId is not stored in user doc
+      const userEmail = auth.token.email.toLowerCase();
+      const docId = userEmail.replace(/@/g, "_").replace(/\./g, "_");
+      const facilityDoc = await db.collection("facilities").doc(docId).get();
+      if (!facilityDoc.exists) {
+        const facilitiesSnapshot = await db.collection("facilities")
+          .where("email", "==", userEmail)
+          .limit(1)
+          .get();
+        if (facilitiesSnapshot.empty) {
+          throw new HttpsError("failed-precondition", "No facility assigned to this user");
+        }
+        userFacilityId = facilitiesSnapshot.docs[0].id;
+      } else {
+        userFacilityId = docId;
       }
-      userFacilityId = facilitiesSnapshot.docs[0].id;
-    } else {
-      userFacilityId = docId;
     }
   }
 
   return {
-    userEmail,
+    userEmail: auth.token.email.toLowerCase(),
     userFacilityId,
     isAdmin,
-    role: isAdmin ? "admin" : "facility_head",
+    role,
   };
 }
 
@@ -395,6 +433,65 @@ exports.mirrorRequestToBigQuery = onDocumentWritten("requests/{requestId}", asyn
       input_json: null,
       output_json: safeJson(after),
     }, "mirror_ai_request");
+  }
+});
+
+async function syncAlertForMedicine(db, facilityId, medicineId, data) {
+  const alertId = `${facilityId}_${medicineId}`;
+  const alertRef = db.collection("alerts").doc(alertId);
+
+  if (!data) {
+    await alertRef.delete();
+    return;
+  }
+
+  const status = stockStatus(data);
+  if (status === "healthy") {
+    await alertRef.delete();
+  } else {
+    const facilityDoc = await db.collection("facilities").doc(facilityId).get();
+    const facilityName = facilityDoc.exists ? (facilityDoc.data().name || "") : "";
+
+    const alertDoc = await alertRef.get();
+    const alertData = {
+      facilityId,
+      facilityName,
+      stockId: medicineId,
+      medicineName: data.medicineName || "",
+      qtyRemaining: Number(data.remainingQuantity || 0),
+      initialQuantity: Number(data.initialQuantity || 0),
+      batchId: data.batchId || "",
+      unit: data.unit || "units",
+      expiryDate: data.expiryDate,
+      type: status,
+      isRead: false
+    };
+    if (!alertDoc.exists) {
+      alertData.createdAt = admin.firestore.FieldValue.serverTimestamp();
+    }
+    await alertRef.set(alertData, { merge: true });
+  }
+}
+
+exports.onUserWritten = onDocumentWritten("users/{userId}", async (event) => {
+  const change = event.data;
+  const before = change.before.exists ? change.before.data() : null;
+  const after = change.after.exists ? change.after.data() : null;
+  const userId = event.params.userId;
+
+  if (before?.role !== after?.role) {
+    await auditEvent({
+      eventId: `user_role_${userId}_${Date.now()}`,
+      action: "role_changed",
+      entityType: "user",
+      entityId: userId,
+      before,
+      after,
+      metadata: {
+        oldRole: before?.role || null,
+        newRole: after?.role || null
+      }
+    });
   }
 });
 

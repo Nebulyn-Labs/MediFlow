@@ -79,6 +79,17 @@ class FirebaseService {
         .doc(facilityId)
         .set(facility.toMap());
 
+    // Register role in the 'users' collection for RBAC
+    final String? uid = _auth.currentUser?.uid;
+    if (uid != null) {
+      await _firestore.collection('users').doc(uid).set({
+        'email': email,
+        'role': 'facility_head',
+        'facilityId': facilityId,
+        'createdAt': FieldValue.serverTimestamp(),
+      });
+    }
+
     // 5. Run Initial Simulation (30 days)
     await _simulation.runFullSimulation(facilityId, facility.type);
   }
@@ -404,6 +415,15 @@ class FirebaseService {
         } catch (loginError) {
           debugPrint('Admin login failed during seed: $loginError');
         }
+      }
+
+      final String? adminUid = _auth.currentUser?.uid;
+      if (adminUid != null) {
+        await _firestore.collection('users').doc(adminUid).set({
+          'email': 'admin@mediflow.com',
+          'role': 'admin',
+          'createdAt': FieldValue.serverTimestamp(),
+        });
       }
 
       // 2. Clear old data to avoid duplicates and schema conflicts
