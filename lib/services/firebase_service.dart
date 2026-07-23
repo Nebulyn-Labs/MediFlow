@@ -340,6 +340,14 @@ class FirebaseService {
     });
   }
 
+  Future<List<Map<String, dynamic>>> getAlertsOnce(String facilityId) async {
+    final snapshot = await _firestore
+        .collection('alerts')
+        .where('facilityId', isEqualTo: facilityId)
+        .get();
+    return snapshot.docs.map((doc) => doc.data()).toList();
+  }
+
   // --- CLEANUP & SEEDING ---
 
   Future<void> clearDatabase() async {
