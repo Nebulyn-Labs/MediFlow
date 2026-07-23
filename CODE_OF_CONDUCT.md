@@ -19,7 +19,6 @@ The following behavior is not acceptable:
 - Trolling or intentionally disruptive behavior.
 - Sharing private information without consent.
 
-
 Maintainers reserve the right to moderate discussions, reject contributions,
 or restrict participation if these guidelines are repeatedly violated.
 
@@ -31,6 +30,6 @@ will be handled confidentially.
 
 ---
 
-Let's build great software together while respecting one another. 🚀
+Let's build great software together while respecting one another.
 
 See also: [CONTRIBUTING.md](CONTRIBUTING.md) · [SECURITY.md](SECURITY.md)
