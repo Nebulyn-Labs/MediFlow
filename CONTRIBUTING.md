@@ -4,6 +4,10 @@ Thank you for your interest in contributing to MediFlow! We welcome
 contributions from developers of all skill levels to help engineer a smarter,
 healthier medical supply chain.
 
+> New here? Check out the [Project Overview](README.md#project-overview) and
+> [Tech Stack](README.md#tech-stack) in the README first to get familiar with
+> the codebase.
+
 Please read this document carefully before making changes. It outlines our
 development setup, branch naming conventions, coding standards, testing
 guidelines, and the pull request process.
@@ -42,9 +46,9 @@ By participating in this project, you agree to abide by our
    recommended).
 3. Verify your installation by running:
 
-   ```bash
+```bash
    flutter doctor
-   ```
+```
 
 ### Local Project Setup
 
@@ -54,32 +58,32 @@ By participating in this project, you agree to abide by our
 2. **Fork and Clone:**
    Fork the repository on GitHub and clone your fork locally:
 
-   ```bash
+```bash
    git clone https://github.com/your-username/MediFlow.git
    cd MediFlow
-   ```
+```
 
 3. **Add Upstream Remote:**
    Add the original repository as an upstream remote to keep your fork synced:
 
-   ```bash
+```bash
    git remote add upstream https://github.com/Nebulyn-Labs/MediFlow.git
-   ```
+```
 
 4. **Fetch Packages:**
 
-   ```bash
+```bash
    flutter pub get
-   ```
+```
 
 5. **Configure Environment Variables:**
    Create a `.env` file in the root of the project:
 
-   ```ini
+```ini
    GEMINI_API_KEY=your_gemini_api_key_here
    ORS_API_KEY=your_openroute_service_key_here
    FIREBASE_PROJECT_ID=mediflow-92e6f
-   ```
+```
 
    *Note: If you do not have API keys, you can use placeholder values like
    `dummy_key`. The application will still compile but some online features
@@ -91,16 +95,16 @@ If you plan to modify or deploy Cloud Functions or Firestore rules:
 
 1. Install the [Firebase CLI](https://firebase.google.com/docs/cli):
 
-   ```bash
+```bash
    npm install -g firebase-tools
-   ```
+```
 
 2. Log in and select the project:
 
-   ```bash
+```bash
    firebase login
    firebase use mediflow-92e6f
-   ```
+```
 
 ---
 
@@ -159,16 +163,16 @@ checks and static analysis.
 1. **Format Code:**
    Ensure all Dart files are formatted correctly using the standard formatter:
 
-   ```bash
+```bash
    dart format .
-   ```
+```
 
 2. **Run Static Analysis:**
    Ensure there are zero warnings or errors reported by the analyzer:
 
-   ```bash
+```bash
    flutter analyze
-   ```
+```
 
    *We enforce a zero-warning policy on all PRs. Code with analyzer warnings
    will not be merged.*
@@ -211,9 +215,9 @@ We expect bug fixes and features to be accompanied by tests where applicable.
 
 - Run existing tests locally:
 
-  ```bash
+```bash
   flutter test
-  ```
+```
 
 - Write clear unit, widget, or integration tests to verify your implementation.
 
@@ -225,11 +229,11 @@ We expect bug fixes and features to be accompanied by tests where applicable.
    Ensure the following commands run successfully with zero errors/warnings
    before pushing:
 
-   ```bash
+```bash
    dart format --output=none --set-exit-if-changed .
    flutter analyze
    flutter test
-   ```
+```
 
 2. **Push and Open PR:**
    Push your branch to your fork and open a Pull Request against the `main`
