@@ -539,76 +539,176 @@ exports.checkLowStock = onSchedule("every 24 hours", async () => {
  * 3. autoRedistribute(requestId)
  * Atomic stock transfer when a request is approved.
  */
-exports.onIndentApproved = onDocumentUpdated('requests/{requestId}', async (event) => {
-  const beforeStatus = event.data.before.data().status;
-  const after = event.data.after.data();
+exports.onIndentApproved = onDocumentUpdated("requests/{requestId}", async (event) => {
+  if (!event || !event.data || !event.data.after || !event.data.after.exists) return;
 
-  // Only fire if status changed to 'approved'
-  if (beforeStatus === 'pending' && after.status === 'approved') {
+  const beforeSnap = event.data.before;
+  const afterSnap = event.data.after;
+
+  const beforeData = beforeSnap && beforeSnap.exists ? beforeSnap.data() : null;
+  const afterData = afterSnap ? afterSnap.data() : null;
+
+  if (!afterData) return;
+
+  const beforeStatus = beforeData ? beforeData.status : null;
+  const afterStatus = afterData.status;
+
+  // Execute only when request transitions to 'approved' status
+  if (beforeStatus !== "approved" && afterStatus === "approved") {
     const db = admin.firestore();
+    const requestId = event.params.requestId;
 
-    const { fromFacilityId, toFacilityId, medicineName, qtyRequested } = after;
+    const {
+      facilityId,
+      fromFacilityId,
+      toFacilityId,
+      donorFacilityId,
+      recipientFacilityId,
+      medicineName,
+      quantity,
+      type,
+    } = afterData;
 
-    // 1. Find source stock (toFacilityId - the surplus provider)
-    const sourceStockQuery = await db.collection("facilities")
-      .doc(toFacilityId)
-      .collection("stocks")
-      .where("medicineName", "==", medicineName)
-      .limit(1)
-      .get();
+    const qty = Number(quantity || 0);
+    if (!medicineName || qty <= 0) return;
 
-    // 2. Find destination stock (fromFacilityId - the requester)
-    const destStockQuery = await db.collection("facilities")
-      .doc(fromFacilityId)
-      .collection("stocks")
-      .where("medicineName", "==", medicineName)
-      .limit(1)
-      .get();
+    const sourceFacility = fromFacilityId || donorFacilityId || null;
+    const destFacility = toFacilityId || recipientFacilityId || null;
 
-    if (sourceStockQuery.empty || destStockQuery.empty) {
-      logger.error("Stock documents not found for redistribution");
-      return;
-    }
+    // Case 1: Inter-facility redistribution transfer (both donor and recipient specified)
+    if (sourceFacility && destFacility) {
+      const sourceMedId = medicineName.toLowerCase().replaceAll(" ", "_");
+      const sourceRef = db
+        .collection("inventory")
+        .doc(sourceFacility)
+        .collection("medicines")
+        .doc(sourceMedId);
 
-    const sourceDoc = sourceStockQuery.docs[0].ref;
-    const destDoc = destStockQuery.docs[0].ref;
+      const destMedId = medicineName.toLowerCase().replaceAll(" ", "_");
+      const destRef = db
+        .collection("inventory")
+        .doc(destFacility)
+        .collection("medicines")
+        .doc(destMedId);
 
-    try{
-      await db.runTransaction(async (transaction) => {
-        const sourceData = await transaction.get(sourceDoc);
-        const qtyAvailable = sourceData.data()?.qtyRemaining || 0;
-      if(qtyAvailable < qtyRequested){
-        throw new Error(`Stocks insufficient!  available: ${qtyAvailable}, requested: ${qtyRequested}`);
+      try {
+        await db.runTransaction(async (transaction) => {
+          const sourceDoc = await transaction.get(sourceRef);
+          if (!sourceDoc.exists) {
+            throw new Error(
+              `Source stock for ${medicineName} at ${sourceFacility} not found`
+            );
+          }
+          const currentSourceQty = Number(sourceDoc.data()?.remainingQuantity || 0);
+          if (currentSourceQty < qty) {
+            throw new Error(
+              `Insufficient stock at donor ${sourceFacility}: available ${currentSourceQty}, requested ${qty}`
+            );
+          }
+
+          const destDoc = await transaction.get(destRef);
+
+          // Decrement donor stock
+          transaction.update(sourceRef, {
+            remainingQuantity: currentSourceQty - qty,
+            lastUpdated: admin.firestore.FieldValue.serverTimestamp(),
+          });
+
+          // Increment or initialize recipient stock
+          if (destDoc.exists) {
+            const currentDestQty = Number(destDoc.data()?.remainingQuantity || 0);
+            transaction.update(destRef, {
+              remainingQuantity: currentDestQty + qty,
+              lastUpdated: admin.firestore.FieldValue.serverTimestamp(),
+            });
+          } else {
+            transaction.set(destRef, {
+              medicineName: medicineName,
+              batchId: `B-${Math.floor(1000 + Math.random() * 9000)}`,
+              initialQuantity: qty,
+              remainingQuantity: qty,
+              unit: "units",
+              arrivalDate: admin.firestore.FieldValue.serverTimestamp(),
+              expiryDate: admin.firestore.Timestamp.fromDate(
+                new Date(Date.now() + 180 * 86400000)
+              ),
+              lastUpdated: admin.firestore.FieldValue.serverTimestamp(),
+            });
+          }
+
+          transaction.update(event.data.after.ref, {
+            resolvedAt: admin.firestore.FieldValue.serverTimestamp(),
+          });
+        });
+        logger.log(
+          `Redistribution successful: ${qty} units of ${medicineName} from ${sourceFacility} to ${destFacility}`
+        );
+      } catch (err) {
+        logger.error(`Redistribution failed for request ${requestId}:`, err);
+        await event.data.after.ref.update({
+          status: "rejected",
+          rejectionReason: err.message,
+        });
       }
-      // 3. Execute atomic transaction write
+    } else if (facilityId) {
+      // Case 2: Facility restock / shortage / surplus request (single target facility)
+      const medId = medicineName.toLowerCase().replaceAll(" ", "_");
+      const medRef = db
+        .collection("inventory")
+        .doc(facilityId)
+        .collection("medicines")
+        .doc(medId);
 
-    // Decrement source
-    transaction.update(sourceDoc, {
-      qtyRemaining: admin.firestore.FieldValue.increment(-qtyRequested),
-      updatedAt: admin.firestore.FieldValue.serverTimestamp()
-    });
+      try {
+        await db.runTransaction(async (transaction) => {
+          const medDoc = await transaction.get(medRef);
 
-    // Increment destination
-    transaction.update(destDoc, {
-      qtyRemaining: admin.firestore.FieldValue.increment(qtyRequested),
-      updatedAt: admin.firestore.FieldValue.serverTimestamp()
-    });
+          if (type === "surplus") {
+            // Surplus approved: deduct surplus from local active stock
+            if (medDoc.exists) {
+              const currentQty = Number(medDoc.data()?.remainingQuantity || 0);
+              const newQty = Math.max(0, currentQty - qty);
+              transaction.update(medRef, {
+                remainingQuantity: newQty,
+                lastUpdated: admin.firestore.FieldValue.serverTimestamp(),
+              });
+            }
+          } else {
+            // Indent / Shortage approved: add stock to facility
+            if (medDoc.exists) {
+              const currentQty = Number(medDoc.data()?.remainingQuantity || 0);
+              transaction.update(medRef, {
+                remainingQuantity: currentQty + qty,
+                lastUpdated: admin.firestore.FieldValue.serverTimestamp(),
+              });
+            } else {
+              transaction.set(medRef, {
+                medicineName: medicineName,
+                batchId: `B-${Math.floor(1000 + Math.random() * 9000)}`,
+                initialQuantity: qty,
+                remainingQuantity: qty,
+                unit: "units",
+                arrivalDate: admin.firestore.FieldValue.serverTimestamp(),
+                expiryDate: admin.firestore.Timestamp.fromDate(
+                  new Date(Date.now() + 180 * 86400000)
+                ),
+                lastUpdated: admin.firestore.FieldValue.serverTimestamp(),
+              });
+            }
+          }
 
-    // Update request resolution
-    transaction.update(event.data.after.ref, {
-      resolvedAt: admin.firestore.FieldValue.serverTimestamp()
-    });
-  });
-    logger.log(`Redistribution successful: ${qtyRequested} units of ${medicineName} from ${toFacilityId} to ${fromFacilityId}`);
+          transaction.update(event.data.after.ref, {
+            resolvedAt: admin.firestore.FieldValue.serverTimestamp(),
+          });
+        });
+        logger.log(
+          `Stock updated for request ${requestId} at ${facilityId}: ${type || "indent"} of ${qty} ${medicineName}`
+        );
+      } catch (err) {
+        logger.error(`Stock update failed for request ${requestId}:`, err);
+      }
     }
-    catch(err){
-      logger.log(`Redistribution unsuccessful for request: ${event.params.requestId} : ${err.message}`);
-      await event.data.after.ref.update({
-        status: 'rejected',
-        rejectionReason: err.message
-      });
-    }
-    }
+  }
 });
 
 async function executeTool(name, args, authInfo) {
