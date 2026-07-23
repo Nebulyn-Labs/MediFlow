@@ -78,7 +78,7 @@ class _AlertsPageState extends ConsumerState<AlertsPage> {
     final expiryText = daysLeft < 0
         ? 'expired ${daysLeft.abs()} days ago'
         : 'expires in $daysLeft days';
-    final lowStock = _isLowStock(item, pct);
+    final lowStock = item.isLowStock;
 
     if (daysLeft < 0) {
       yield _InventoryAlert(
@@ -132,10 +132,6 @@ class _AlertsPageState extends ConsumerState<AlertsPage> {
         icon: Icons.schedule_rounded,
       );
     }
-  }
-
-  bool _isLowStock(InventoryItem item, double pct) {
-    return pct <= 0.20 || item.remainingQuantity <= 500;
   }
 
   int _priority(_InventoryAlert alert) {
