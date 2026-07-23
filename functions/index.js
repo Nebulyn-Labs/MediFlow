@@ -398,6 +398,57 @@ exports.mirrorRequestToBigQuery = onDocumentWritten("requests/{requestId}", asyn
   }
 });
 
+async function createOrUpdateAlert(db, facilityId, facilityName, medicineId, data, status) {
+  const alertId = `${facilityId}_${medicineId}`;
+  const alertRef = db.collection("alerts").doc(alertId);
+
+  if (status === "healthy") {
+    const alertDoc = await alertRef.get();
+    const existed = alertDoc.exists;
+    if (existed) {
+      await alertRef.delete();
+    }
+    return { existed };
+  }
+
+  if (!facilityName) {
+    const facilityDoc = await db.collection("facilities").doc(facilityId).get();
+    facilityName = facilityDoc.exists ? (facilityDoc.data().name || "") : "";
+  }
+
+  const alertDoc = await alertRef.get();
+  const existed = alertDoc.exists;
+
+  let isRead = false;
+  if (existed) {
+    const oldData = alertDoc.data() || {};
+    if (oldData.type === status) {
+      isRead = oldData.isRead ?? false;
+    }
+  }
+
+  const alertData = {
+    facilityId,
+    facilityName,
+    stockId: medicineId,
+    medicineName: data.medicineName || "",
+    qtyRemaining: Number(data.remainingQuantity || 0),
+    initialQuantity: Number(data.initialQuantity || 0),
+    batchId: data.batchId || "",
+    unit: data.unit || "units",
+    expiryDate: data.expiryDate,
+    type: status,
+    isRead: isRead
+  };
+
+  if (!existed) {
+    alertData.createdAt = admin.firestore.FieldValue.serverTimestamp();
+  }
+
+  await alertRef.set(alertData, { merge: true });
+  return { existed };
+}
+
 async function syncAlertForMedicine(db, facilityId, medicineId, data) {
   const alertId = `${facilityId}_${medicineId}`;
   const alertRef = db.collection("alerts").doc(alertId);
@@ -408,31 +459,7 @@ async function syncAlertForMedicine(db, facilityId, medicineId, data) {
   }
 
   const status = stockStatus(data);
-  if (status === "healthy") {
-    await alertRef.delete();
-  } else {
-    const facilityDoc = await db.collection("facilities").doc(facilityId).get();
-    const facilityName = facilityDoc.exists ? (facilityDoc.data().name || "") : "";
-
-    const alertDoc = await alertRef.get();
-    const alertData = {
-      facilityId,
-      facilityName,
-      stockId: medicineId,
-      medicineName: data.medicineName || "",
-      qtyRemaining: Number(data.remainingQuantity || 0),
-      initialQuantity: Number(data.initialQuantity || 0),
-      batchId: data.batchId || "",
-      unit: data.unit || "units",
-      expiryDate: data.expiryDate,
-      type: status,
-      isRead: false
-    };
-    if (!alertDoc.exists) {
-      alertData.createdAt = admin.firestore.FieldValue.serverTimestamp();
-    }
-    await alertRef.set(alertData, { merge: true });
-  }
+  await createOrUpdateAlert(db, facilityId, null, medicineId, data, status);
 }
 
 exports.mirrorInventoryToBigQuery = onDocumentWritten("inventory/{facilityId}/medicines/{medicineId}", async (event) => {
@@ -536,50 +563,33 @@ exports.checkLowStock = onSchedule("every 24 hours", async () => {
     for (const medDoc of medicinesSnapshot.docs) {
       const data = medDoc.data();
       const status = stockStatus(data);
-      const alertId = `${facilityDoc.id}_${medDoc.id}`;
-      const alertRef = db.collection("alerts").doc(alertId);
+      const { existed } = await createOrUpdateAlert(
+        db,
+        facilityDoc.id,
+        facilityDoc.data().name || "",
+        medDoc.id,
+        data,
+        status
+      );
 
-      if (status === "healthy") {
-        await alertRef.delete();
-      } else {
-        const alertDoc = await alertRef.get();
-        const alertData = {
-          facilityId: facilityDoc.id,
-          facilityName: facilityDoc.data().name || "",
-          stockId: medDoc.id,
-          medicineName: data.medicineName || "",
-          qtyRemaining: Number(data.remainingQuantity || 0),
-          initialQuantity: Number(data.initialQuantity || 0),
-          batchId: data.batchId || "",
-          unit: data.unit || "units",
-          expiryDate: data.expiryDate,
-          type: status,
-          isRead: false
-        };
-        if (!alertDoc.exists) {
-          alertData.createdAt = admin.firestore.FieldValue.serverTimestamp();
-        }
-        await alertRef.set(alertData, { merge: true });
+      // Trigger FCM Notification for low stock if it's new
+      if (status === "low_stock" && !existed) {
+        const userQuery = await db.collection("users")
+          .where("facilityId", "==", facilityDoc.id)
+          .where("role", "==", "facility_head")
+          .limit(1)
+          .get();
 
-        // Trigger FCM Notification for low stock if it's new
-        if (status === "low_stock" && !alertDoc.exists) {
-          const userQuery = await db.collection("users")
-            .where("facilityId", "==", facilityDoc.id)
-            .where("role", "==", "facility_head")
-            .limit(1)
-            .get();
-
-          if (!userQuery.empty) {
-            const user = userQuery.docs[0].data();
-            if (user.fcmToken) {
-              await admin.messaging().send({
-                token: user.fcmToken,
-                notification: {
-                  title: "Low Stock Alert",
-                  body: `${data.medicineName} is below reorder level (${data.remainingQuantity} left).`
-                }
-              });
-            }
+        if (!userQuery.empty) {
+          const user = userQuery.docs[0].data();
+          if (user.fcmToken) {
+            await admin.messaging().send({
+              token: user.fcmToken,
+              notification: {
+                title: "Low Stock Alert",
+                body: `${data.medicineName} is below reorder level (${data.remainingQuantity} left).`
+              }
+            });
           }
         }
       }
