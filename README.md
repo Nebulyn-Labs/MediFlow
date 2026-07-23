@@ -2,13 +2,24 @@
 
 AI-powered medical logistics platform focused on smart resource allocation
 
+**[Explore the docs »](#project-overview)** · **[Report a Bug](https://github.com/Nebulyn-Labs/MediFlow/issues)** · **[Request a Feature](https://github.com/Nebulyn-Labs/MediFlow/issues)**
 ![Flutter](https://img.shields.io/badge/Flutter-%2302569B.svg?style=for-the-badge&logo=Flutter&logoColor=white)
 ![Firebase](https://img.shields.io/badge/Firebase-039BE5?style=for-the-badge&logo=Firebase&logoColor=white)
 ![Gemini AI](https://img.shields.io/badge/Gemini%20AI-8E75B2?style=for-the-badge&logo=google-gemini&logoColor=white)
 ![ORS](https://img.shields.io/badge/OpenRouteService-3E3E3E?style=for-the-badge&logo=openstreetmap&logoColor=white)
 
----
+[![License](https://img.shields.io/github/license/Nebulyn-Labs/MediFlow?style=for-the-badge)](LICENSE)
+[![Stars](https://img.shields.io/github/stars/Nebulyn-Labs/MediFlow?style=for-the-badge)](https://github.com/Nebulyn-Labs/MediFlow/stargazers)
+[![Forks](https://img.shields.io/github/forks/Nebulyn-Labs/MediFlow?style=for-the-badge)](https://github.com/Nebulyn-Labs/MediFlow/network/members)
+[![Issues](https://img.shields.io/github/issues/Nebulyn-Labs/MediFlow?style=for-the-badge)](https://github.com/Nebulyn-Labs/MediFlow/issues)
+[![Contributors](https://img.shields.io/github/contributors/Nebulyn-Labs/MediFlow?style=for-the-badge)](https://github.com/Nebulyn-Labs/MediFlow/graphs/contributors)
+[![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg?style=for-the-badge)](CONTRIBUTING.md)
 
+<p align="center">
+  <a href="https://discord.gg/B4Z8MKmzcz"><img src="https://img.shields.io/badge/Discord-Join%20Us-5865F2?style=for-the-badge&logo=discord&logoColor=white" alt="Discord"></a>
+</p>
+
+---
 ## Table of Contents
 
 - [Project Overview](#project-overview)
@@ -31,13 +42,12 @@ AI-powered medical logistics platform focused on smart resource allocation
 
 **MediFlow** is an enterprise-grade medical logistics platform engineered to
 solve the "Last Mile" medical supply crisis. By combining **Generative AI** for
-demand forecasting with **Heuristic Heuristics**, we optimize redistribution of
-medical supplies across a network of urban and rural healthcare facilities.
-
+demand forecasting with **Custom Optimization Heuristics**, we optimize
+redistribution of medical supplies across a network of urban and rural
+healthcare facilities.
 ---
 
-## The Problem | The Solution
-
+## The Problem & The Solution
 **The Crisis:** Rural clinics often face 30% higher stockout rates for essential
 antibiotics, while urban hospitals simultaneously dispose of expired stock due
 to over-purchasing. This inequality claims lives.
@@ -140,8 +150,22 @@ graph TD
 
 ---
 
-## Project Structure
+## Tech Stack
 
+| Layer | Technology |
+| :--- | :--- |
+| **Frontend** | Flutter (Web, Android, iOS) |
+| **State Management** | Riverpod |
+| **Backend** | Firebase Cloud Functions (Node.js) |
+| **Database** | Cloud Firestore |
+| **Authentication** | Firebase Auth |
+| **AI / ML** | Google Gemini 1.5 Flash |
+| **Routing** | OpenRouteService / OSRM |
+| **Analytics Archive** | Google Cloud BigQuery |
+
+---
+
+## Project Structure
 ```bash
 lib/
 ├── constants/

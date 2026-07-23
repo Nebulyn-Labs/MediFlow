@@ -13,6 +13,18 @@ discuss ideas, and connect with other contributors!
 
 ---
 
+## Table of Contents
+
+1. [Code of Conduct](#1-code-of-conduct)
+2. [Setting Up Your Local Environment](#2-setting-up-your-local-environment)
+3. [Claiming and Creating Issues](#3-claiming-and-creating-issues)
+4. [Branch Naming Conventions](#4-branch-naming-conventions)
+5. [Coding Standards & Conventions](#5-coding-standards--conventions)
+6. [Testing](#6-testing)
+7. [The Pull Request Process](#7-the-pull-request-process)
+
+---
+
 ## 1. Code of Conduct
 
 By participating in this project, you agree to abide by our

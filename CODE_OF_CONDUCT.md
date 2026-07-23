@@ -1,5 +1,7 @@
 # Code of Conduct
 
+[![Contributor Covenant](https://img.shields.io/badge/Contributor%20Covenant-inspired-blueviolet.svg?style=for-the-badge)](https://www.contributor-covenant.org)
+
 We strive to maintain a welcoming, respectful, and collaborative environment
 for everyone.
 
@@ -17,7 +19,18 @@ The following behavior is not acceptable:
 - Trolling or intentionally disruptive behavior.
 - Sharing private information without consent.
 
+
 Maintainers reserve the right to moderate discussions, reject contributions,
 or restrict participation if these guidelines are repeatedly violated.
 
-Let's build great software together while respecting one another.
+## Reporting an Issue
+
+If you experience or witness unacceptable behavior, please reach out to the
+maintainers via our [Discord server](https://discord.gg/B4Z8MKmzcz). Reports
+will be handled confidentially.
+
+---
+
+Let's build great software together while respecting one another. 🚀
+
+See also: [CONTRIBUTING.md](CONTRIBUTING.md) · [SECURITY.md](SECURITY.md)
