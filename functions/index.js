@@ -233,23 +233,23 @@ exports.forecastDemand = onCall({ secrets: [GEMINI_API_KEY] }, async (request) =
   const ninetyDaysAgo = new Date();
   ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 90);
 
-  const usageQuery = await db.collection("facilities")
+  const usageQuery = await db.collection("daily_usage_logs")
     .doc(facilityId)
-    .collection("usage_logs")
-    .where("loggedAt", ">=", admin.firestore.Timestamp.fromDate(ninetyDaysAgo))
+    .collection("logs")
+    .where("date", ">=", admin.firestore.Timestamp.fromDate(ninetyDaysAgo))
     .get();
 
   const usageHistory = usageQuery.docs.map(doc => doc.data());
 
   // 3. Fetch current stock levels
-  const stocksQuery = await db.collection("facilities")
+  const stocksQuery = await db.collection("inventory")
     .doc(facilityId)
-    .collection("stocks")
+    .collection("medicines")
     .get();
 
   const currentStocks = stocksQuery.docs.map(doc => ({
     medicineName: doc.data().medicineName,
-    qtyRemaining: doc.data().qtyRemaining
+    qtyRemaining: doc.data().remainingQuantity
   }));
 
   // 4. Construct Gemini Prompt
@@ -398,6 +398,43 @@ exports.mirrorRequestToBigQuery = onDocumentWritten("requests/{requestId}", asyn
   }
 });
 
+async function syncAlertForMedicine(db, facilityId, medicineId, data) {
+  const alertId = `${facilityId}_${medicineId}`;
+  const alertRef = db.collection("alerts").doc(alertId);
+
+  if (!data) {
+    await alertRef.delete();
+    return;
+  }
+
+  const status = stockStatus(data);
+  if (status === "healthy") {
+    await alertRef.delete();
+  } else {
+    const facilityDoc = await db.collection("facilities").doc(facilityId).get();
+    const facilityName = facilityDoc.exists ? (facilityDoc.data().name || "") : "";
+
+    const alertDoc = await alertRef.get();
+    const alertData = {
+      facilityId,
+      facilityName,
+      stockId: medicineId,
+      medicineName: data.medicineName || "",
+      qtyRemaining: Number(data.remainingQuantity || 0),
+      initialQuantity: Number(data.initialQuantity || 0),
+      batchId: data.batchId || "",
+      unit: data.unit || "units",
+      expiryDate: data.expiryDate,
+      type: status,
+      isRead: false
+    };
+    if (!alertDoc.exists) {
+      alertData.createdAt = admin.firestore.FieldValue.serverTimestamp();
+    }
+    await alertRef.set(alertData, { merge: true });
+  }
+}
+
 exports.mirrorInventoryToBigQuery = onDocumentWritten("inventory/{facilityId}/medicines/{medicineId}", async (event) => {
   const change = event.data;
   const before = change.before.exists ? change.before.data() : null;
@@ -408,6 +445,9 @@ exports.mirrorInventoryToBigQuery = onDocumentWritten("inventory/{facilityId}/me
   const initial = Number(data.initialQuantity || 0);
   const remaining = Number(data.remainingQuantity || 0);
   const action = !before && after ? "created" : before && after ? "updated" : "deleted";
+
+  const db = admin.firestore();
+  await syncAlertForMedicine(db, facilityId, medicineId, after);
 
   await insertBigQuery("inventory_snapshots", {
     snapshot_id: `${facilityId}_${medicineId}_${Date.now()}`,
@@ -481,52 +521,65 @@ exports.retryFailedBigQueryInsertions = onSchedule("every 5 minutes", async () =
 
 /**
  * 2. checkLowStock() - Scheduled daily CRON
- * Scans all facilities and creates alerts.
+ * Scans all facilities and creates/updates alerts.
  */
 exports.checkLowStock = onSchedule("every 24 hours", async () => {
   const db = admin.firestore();
   const facilities = await db.collection("facilities").get();
 
   for (const facilityDoc of facilities.docs) {
-    const stocks = await db.collection("facilities")
+    const medicinesSnapshot = await db.collection("inventory")
       .doc(facilityDoc.id)
-      .collection("stocks")
-      .where("qtyRemaining", "<=", "reorderLevel") // Note: Firestore doesn't support field-to-field comparison natively, so we fetch and filter
+      .collection("medicines")
       .get();
 
-    for (const stockDoc of stocks.docs) {
-      const stock = stockDoc.data();
-      if (stock.qtyRemaining <= stock.reorderLevel) {
-        // Create an alert document
-        await db.collection("alerts").add({
+    for (const medDoc of medicinesSnapshot.docs) {
+      const data = medDoc.data();
+      const status = stockStatus(data);
+      const alertId = `${facilityDoc.id}_${medDoc.id}`;
+      const alertRef = db.collection("alerts").doc(alertId);
+
+      if (status === "healthy") {
+        await alertRef.delete();
+      } else {
+        const alertDoc = await alertRef.get();
+        const alertData = {
           facilityId: facilityDoc.id,
-          facilityName: facilityDoc.data().name,
-          stockId: stockDoc.id,
-          medicineName: stock.medicineName,
-          qtyRemaining: stock.qtyRemaining,
-          reorderLevel: stock.reorderLevel,
-          type: "low_stock",
-          createdAt: admin.firestore.FieldValue.serverTimestamp(),
+          facilityName: facilityDoc.data().name || "",
+          stockId: medDoc.id,
+          medicineName: data.medicineName || "",
+          qtyRemaining: Number(data.remainingQuantity || 0),
+          initialQuantity: Number(data.initialQuantity || 0),
+          batchId: data.batchId || "",
+          unit: data.unit || "units",
+          expiryDate: data.expiryDate,
+          type: status,
           isRead: false
-        });
+        };
+        if (!alertDoc.exists) {
+          alertData.createdAt = admin.firestore.FieldValue.serverTimestamp();
+        }
+        await alertRef.set(alertData, { merge: true });
 
-        // Trigger FCM Notification (Assuming FCM token is stored in the facility's user doc)
-        const userQuery = await db.collection("users")
-          .where("facilityId", "==", facilityDoc.id)
-          .where("role", "==", "facility_head")
-          .limit(1)
-          .get();
+        // Trigger FCM Notification for low stock if it's new
+        if (status === "low_stock" && !alertDoc.exists) {
+          const userQuery = await db.collection("users")
+            .where("facilityId", "==", facilityDoc.id)
+            .where("role", "==", "facility_head")
+            .limit(1)
+            .get();
 
-        if (!userQuery.empty) {
-          const user = userQuery.docs[0].data();
-          if (user.fcmToken) {
-            await admin.messaging().send({
-              token: user.fcmToken,
-              notification: {
-                title: "Low Stock Alert",
-                body: `${stock.medicineName} is below reorder level (${stock.qtyRemaining} left).`
-              }
-            });
+          if (!userQuery.empty) {
+            const user = userQuery.docs[0].data();
+            if (user.fcmToken) {
+              await admin.messaging().send({
+                token: user.fcmToken,
+                notification: {
+                  title: "Low Stock Alert",
+                  body: `${data.medicineName} is below reorder level (${data.remainingQuantity} left).`
+                }
+              });
+            }
           }
         }
       }
