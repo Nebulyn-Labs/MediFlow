@@ -12,6 +12,9 @@ class RoutingService {
   static const String _orsBaseUrl =
       'https://api.openrouteservice.org/v2/directions/driving-car';
 
+  // Cache for storing previously fetched routes
+  final Map<String, List<LatLng>> _routeCache = {};
+
   /// Validates whether the latitude and longitude fall within
   /// valid geographic ranges.
   bool _isValidCoordinate(LatLng point) {
@@ -41,6 +44,14 @@ class RoutingService {
     return [start, end];
   }
 
+  String _generateCacheKey(LatLng start, LatLng end) {
+    String format(double value) => value.toStringAsFixed(6);
+
+    return '${format(start.latitude)},${format(start.longitude)}'
+        '_'
+        '${format(end.latitude)},${format(end.longitude)}';
+  }
+
   Future<List<LatLng>> getRoute(LatLng start, LatLng end) async {
     const String? orsKey = null;
 
@@ -51,6 +62,13 @@ class RoutingService {
         'Skipping external routing request.',
       );
       return _fallbackRoute(start, end);
+    }
+
+    final cacheKey = _generateCacheKey(start, end);
+
+    if (_routeCache.containsKey(cacheKey)) {
+      debugPrint('RoutingService: Returning cached route.');
+      return _routeCache[cacheKey]!;
     }
 
     // 1. Try OpenRouteService (ORS) if API key exists
@@ -75,9 +93,15 @@ class RoutingService {
               'RoutingService: ORS Success. ${coords.length} points found.',
             );
 
-            return coords
+            final route = coords
                 .map((c) => LatLng(c[1].toDouble(), c[0].toDouble()))
                 .toList();
+
+            _routeCache[cacheKey] = route;
+
+            debugPrint('RoutingService: Route cached (ORS).');
+
+            return route;
           }
         } else {
           debugPrint(
@@ -111,9 +135,15 @@ class RoutingService {
             'RoutingService: OSRM Success. ${coords.length} points found.',
           );
 
-          return coords
+          final route = coords
               .map((c) => LatLng(c[1].toDouble(), c[0].toDouble()))
               .toList();
+
+          _routeCache[cacheKey] = route;
+
+          debugPrint('RoutingService: Route cached (OSRM).');
+
+          return route;
         }
       } else {
         debugPrint(
@@ -127,7 +157,11 @@ class RoutingService {
 
     // Final fallback
     debugPrint('RoutingService: Falling back to straight-line route.');
-    return _fallbackRoute(start, end);
+    final route = _fallbackRoute(start, end);
+
+    _routeCache[cacheKey] = route;
+
+    return route;
   }
 
   Future<List<LatLng>> getMultiStopRoute(List<LatLng> stops) async {
