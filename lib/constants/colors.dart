@@ -42,9 +42,30 @@ class MediColors {
     end: Alignment.bottomRight,
   );
 
-  static const LinearGradient surfaceGradient = LinearGradient(
+static const LinearGradient surfaceGradient = LinearGradient(
     colors: [surface, surfaceLight],
     begin: Alignment.topLeft,
     end: Alignment.bottomRight,
   );
+}
+
+class MediColorsLight {
+  static const Color bg = Color(0xFFF8FAFC);
+  static const Color surface = Color(0xFFFFFFFF);
+  static const Color surfaceLight = Color(0xFFF1F5F9);
+  static const Color surfaceHover = Color(0xFFE2E8F0);
+  static const Color border = Color(0xFFE2E8F0);
+  static const Color borderLight = Color(0xFFCBD5E1);
+  static const Color textPrimary = Color(0xFF0F172A);
+  static const Color textSecondary = Color(0xFF475569);
+  static const Color textMuted = Color(0xFF94A3B8);
+  static const Color primary = Color(0xFF6366F1);
+  static const Color primaryLight = Color(0xFF818CF8);
+  static const Color violet = Color(0xFF8B5CF6);
+  static const Color cyan = Color(0xFF06B6D4);
+  static const Color teal = Color(0xFF14B8A6);
+  static const Color success = Color(0xFF10B981);
+  static const Color warning = Color(0xFFF59E0B);
+  static const Color error = Color(0xFFF43F5E);
+  static const Color info = Color(0xFF3B82F6);
 }

@@ -34,11 +34,11 @@ dependencies:
   http: ^1.6.0
   intl: ^0.20.3
   collection: ^1.19.1
-  file_picker: ^11.0.2
+file_picker: ^11.0.2
   csv: ^8.0.0
   firebase_app_check: ^0.3.2+10
   vector_math: ^2.2.0
-
+  shared_preferences: ^2.3.3
 dev_dependencies:
   flutter_test:
     sdk: flutter
