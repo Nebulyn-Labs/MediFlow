@@ -3,6 +3,7 @@
 AI-powered medical logistics platform focused on smart resource allocation
 
 **[Explore the docs »](#project-overview)** · **[Report a Bug](https://github.com/Nebulyn-Labs/MediFlow/issues)** · **[Request a Feature](https://github.com/Nebulyn-Labs/MediFlow/issues)**
+
 ![Flutter](https://img.shields.io/badge/Flutter-%2302569B.svg?style=for-the-badge&logo=Flutter&logoColor=white)
 ![Firebase](https://img.shields.io/badge/Firebase-039BE5?style=for-the-badge&logo=Firebase&logoColor=white)
 ![Gemini AI](https://img.shields.io/badge/Gemini%20AI-8E75B2?style=for-the-badge&logo=google-gemini&logoColor=white)
@@ -20,13 +21,15 @@ AI-powered medical logistics platform focused on smart resource allocation
 </p>
 
 ---
+
 ## Table of Contents
 
 - [Project Overview](#project-overview)
-- [The Problem & Solution](#the-problem--the-solution)
+- [The Problem & The Solution](#the-problem--the-solution)
 - [Screenshots & UI Preview](#screenshots--ui-preview)
 - [Core Feature Set](#core-feature-set)
 - [Technical Architecture](#technical-architecture)
+- [Tech Stack](#tech-stack)
 - [Project Structure](#project-structure)
 - [Data & Schema](#data--schema)
 - [Development & Setup Guide](#development--setup-guide)
@@ -45,9 +48,11 @@ solve the "Last Mile" medical supply crisis. By combining **Generative AI** for
 demand forecasting with **Custom Optimization Heuristics**, we optimize
 redistribution of medical supplies across a network of urban and rural
 healthcare facilities.
+
 ---
 
 ## The Problem & The Solution
+
 **The Crisis:** Rural clinics often face 30% higher stockout rates for essential
 antibiotics, while urban hospitals simultaneously dispose of expired stock due
 to over-purchasing. This inequality claims lives.
@@ -166,6 +171,7 @@ graph TD
 ---
 
 ## Project Structure
+
 ```bash
 lib/
 ├── constants/
@@ -266,43 +272,43 @@ high-concurrency performance:
 
 1. **Clone the Repository:**
 
-   ```bash
+```bash
    git clone https://github.com/Nebulyn-Labs/MediFlow.git
    cd MediFlow
-   ```
+```
 
 2. **Fetch Dependencies:**
 
-   ```bash
+```bash
    flutter pub get
-   ```
+```
 
 3. **Configure the Environment:**
 
    Create a `.env` file in the root of the project (and copy from
    `.env.example` if needed):
 
-   ```ini
+```ini
    GEMINI_API_KEY=your_gemini_api_key
    ORS_API_KEY=your_openroute_service_key
    FIREBASE_PROJECT_ID=mediflow-92e6f
-   ```
+```
 
 4. **Initialize Firebase CLI (if modifying functions):**
 
-   ```bash
+```bash
    npm install -g firebase-tools
    firebase login
    firebase use mediflow-92e6f
-   ```
+```
 
 5. **Run the Application:**
 
    For local web prototype development, run:
 
-   ```bash
+```bash
    flutter run -d chrome
-   ```
+```
 
 6. **Configure Firebase App Check (Important):**
 
@@ -315,10 +321,10 @@ high-concurrency performance:
    - **Web:** We use reCAPTCHA v3. Provide your site key during build or run
      time:
 
-     ```bash
+```bash
      flutter run -d chrome \
        --dart-define=RECAPTCHA_SITE_KEY=your_recaptcha_site_key
-     ```
+```
 
      *Note: If no key is provided, the app will continue to run, but App
      Check will remain inactive for web. If App Check enforcement is enabled
@@ -336,10 +342,10 @@ If compilation fails with an error indicating `.env` does not exist:
 - If you don't have API keys yet, you can create a placeholder `.env` with
   dummy values:
 
-  ```ini
+```ini
   GEMINI_API_KEY=dummy_key
   ORS_API_KEY=dummy_key
-  ```
+```
 
 ### 2. Web Map Fails to Render (CORS or Rendering mode)
 
@@ -358,9 +364,9 @@ If calling Gemini forecasts yields an authentication error:
 - Ensure you are logged in to the application.
 - Verify that you have deployed the Cloud Functions and configured secrets:
 
-  ```bash
+```bash
   firebase functions:secrets:set GEMINI_API_KEY="your_actual_key"
-  ```
+```
 
 ---
 
@@ -380,6 +386,9 @@ If calling Gemini forecasts yields an authentication error:
 We welcome contributions! Please review our [CONTRIBUTING.md](CONTRIBUTING.md)
 and [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md) before submitting pull requests.
 
+Found a security issue instead? Please follow our [SECURITY.md](SECURITY.md)
+policy rather than opening a public issue.
+
 ---
 
 ## License
@@ -398,5 +407,9 @@ Built with ❤️ by the MediFlow Team:
 - Sharvi Singhal
 
 ---
+
+<p align="center">
+  <a href="#top">⬆️ Back to Top</a>
+</p>
 
 © 2026 MediFlow Team. *Engineering a smarter, healthier supply chain.*
