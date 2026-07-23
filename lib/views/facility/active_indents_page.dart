@@ -726,6 +726,218 @@ class _ActiveIndentsPageState extends ConsumerState<ActiveIndentsPage> {
     );
   }
 
+  Widget _historyList() {
+    return StreamBuilder<List<MedRequest>>(
+      stream:
+          ref.read(firebaseServiceProvider).streamRequests(widget.facilityId),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const SizedBox.shrink();
+        }
+        if (snapshot.hasError || snapshot.data == null) {
+          return const SizedBox.shrink();
+        }
+        final history = snapshot.data!
+            .where((r) => r.status != RequestStatus.draft)
+            .toList()
+          ..sort((a, b) => b.requestDate.compareTo(a.requestDate));
+
+        if (history.isEmpty) {
+          return const SizedBox.shrink();
+        }
+
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const SizedBox(height: 32),
+            _sectionHeader('Request History'),
+            const SizedBox(height: 12),
+            ListView.builder(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              itemCount: history.length,
+              itemBuilder: (context, idx) {
+                final req = history[idx];
+                final isRejected = req.status == RequestStatus.rejected;
+                final hasResolution = req.resolvedAt != null;
+
+                final Color statusColor;
+                switch (req.status) {
+                  case RequestStatus.approved:
+                    statusColor = MediColors.success;
+                    break;
+                  case RequestStatus.rejected:
+                    statusColor = MediColors.error;
+                    break;
+                  case RequestStatus.pending:
+                    statusColor = MediColors.warning;
+                    break;
+                  case RequestStatus.fulfilled:
+                    statusColor = MediColors.info;
+                    break;
+                  default:
+                    statusColor = MediColors.textMuted;
+                }
+
+                String resolutionText = '';
+                if (hasResolution) {
+                  final resDate = req.resolvedAt!;
+                  resolutionText = 'Resolved: ${resDate.day}/${resDate.month}/${resDate.year} ${resDate.hour.toString().padLeft(2, '0')}:${resDate.minute.toString().padLeft(2, '0')}';
+                }
+
+                final requestInfo = Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(req.medicineName,
+                        style: const TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                            color: MediColors.textPrimary)),
+                    const SizedBox(height: 4),
+                    Text(
+                        'Submitted: ${req.requestDate.day}/${req.requestDate.month}/${req.requestDate.year}',
+                        style: const TextStyle(
+                            fontSize: 12, color: MediColors.textMuted)),
+                    if (hasResolution) ...[
+                      const SizedBox(height: 2),
+                      Text(resolutionText,
+                          style: const TextStyle(
+                              fontSize: 12,
+                              color: MediColors.textSecondary,
+                              fontWeight: FontWeight.w500)),
+                    ],
+                    if (isRejected && req.rejectionReason != null && req.rejectionReason!.isNotEmpty) ...[
+                      const SizedBox(height: 8),
+                      Container(
+                        padding: const EdgeInsets.all(10),
+                        width: double.infinity,
+                        decoration: BoxDecoration(
+                          color: MediColors.errorOverlay,
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: MediColors.error.withValues(alpha: 0.3)),
+                        ),
+                        child: Text(
+                          'Rejection Reason: ${req.rejectionReason}',
+                          style: const TextStyle(
+                              fontSize: 12,
+                              color: MediColors.error,
+                              fontWeight: FontWeight.w600),
+                        ),
+                      ),
+                    ],
+                    const SizedBox(height: 6),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: req.type == RequestType.surplus
+                            ? MediColors.successOverlay
+                            : MediColors.errorOverlay,
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            req.type == RequestType.surplus
+                                ? Icons.arrow_upward_rounded
+                                : Icons.trending_down_rounded,
+                            color: req.type == RequestType.surplus
+                                ? MediColors.success
+                                : MediColors.error,
+                            size: 12,
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            req.type == RequestType.surplus
+                                ? 'Offering Redistribution'
+                                : 'Requesting Restock',
+                            style: TextStyle(
+                                color: req.type == RequestType.surplus
+                                    ? MediColors.success
+                                    : MediColors.error,
+                                fontSize: 11,
+                                fontWeight: FontWeight.bold),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                );
+
+                final statusBadge = Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: statusColor.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: statusColor.withValues(alpha: 0.25)),
+                  ),
+                  child: Text(
+                    req.status.name.toUpperCase(),
+                    style: TextStyle(
+                        color: statusColor,
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold),
+                  ),
+                );
+
+                return Card(
+                  margin: const EdgeInsets.only(bottom: 16),
+                  child: Padding(
+                    padding: const EdgeInsets.all(20),
+                    child: LayoutBuilder(
+                      builder: (context, constraints) {
+                        final isNarrow = constraints.maxWidth < 560;
+                        if (isNarrow) {
+                          return Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              requestInfo,
+                              const SizedBox(height: 16),
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                children: [
+                                  Text(
+                                    'Quantity: ${req.quantity}',
+                                    style: const TextStyle(
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.bold,
+                                        color: MediColors.textPrimary),
+                                  ),
+                                  statusBadge,
+                                ],
+                              ),
+                            ],
+                          );
+                        }
+                        return Row(
+                          children: [
+                            Expanded(flex: 3, child: requestInfo),
+                            Expanded(
+                              flex: 2,
+                              child: Text(
+                                'Quantity: ${req.quantity}',
+                                style: const TextStyle(
+                                    fontSize: 15,
+                                    fontWeight: FontWeight.bold,
+                                    color: MediColors.textPrimary),
+                              ),
+                            ),
+                            statusBadge,
+                          ],
+                        );
+                      },
+                    ),
+                  ),
+                );
+              },
+            ),
+          ],
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -830,6 +1042,8 @@ class _ActiveIndentsPageState extends ConsumerState<ActiveIndentsPage> {
                   const SizedBox(height: 32),
                   // ----- Draft Requests -----
                   _draftsList(),
+                  // ----- Submitted Requests History -----
+                  _historyList(),
                 ],
               ),
             ),
