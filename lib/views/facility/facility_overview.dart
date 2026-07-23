@@ -7,6 +7,7 @@ import '../../services/firebase_service.dart';
 import '../../services/simulation_service.dart';
 import '../../services/csv_export_service.dart';
 import 'package:med_supply_prototype/constants/colors.dart';
+import '../shared/confirm_logout_dialog.dart';
 
 class FacilityOverview extends ConsumerWidget {
   final String facilityId;
@@ -185,26 +186,7 @@ class FacilityOverview extends ConsumerWidget {
                 ],
                 onSelected: (v) async {
                   if (v == 'out') {
-                    final confirmed = await showDialog<bool>(
-                      context: context,
-                      builder: (context) => AlertDialog(
-                        title: const Text('Log out'),
-                        content:
-                            const Text('Are you sure you want to log out?'),
-                        actions: [
-                          TextButton(
-                            onPressed: () => Navigator.of(context).pop(false),
-                            child: const Text('Cancel'),
-                          ),
-                          TextButton(
-                            onPressed: () => Navigator.of(context).pop(true),
-                            style: TextButton.styleFrom(
-                                foregroundColor: MediColors.error),
-                            child: const Text('Log out'),
-                          ),
-                        ],
-                      ),
-                    );
+                    final confirmed = await confirmLogout(context);
                     if (confirmed != true) return;
                     if (context.mounted) context.go('/');
                     await FirebaseAuth.instance.signOut();

@@ -254,11 +254,13 @@ class _AIForecastPageState extends ConsumerState<AIForecastPage> {
                               : _historyError != null
                                   ? Center(
                                       child: Padding(
-                                        padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                                        padding: const EdgeInsets.symmetric(
+                                            horizontal: 16.0),
                                         child: Text(
                                           'Failed to load historical data.\n$_historyError',
                                           textAlign: TextAlign.center,
-                                          style: const TextStyle(color: MediColors.error),
+                                          style: const TextStyle(
+                                              color: MediColors.error),
                                         ),
                                       ),
                                     )

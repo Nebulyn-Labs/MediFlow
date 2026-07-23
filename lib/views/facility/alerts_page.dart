@@ -88,7 +88,8 @@ class _AlertsPageState extends ConsumerState<AlertsPage> {
         if (typeStr == 'expired') {
           kind = _AlertKind.expired;
           title = 'Expired';
-          reason = '${item.medicineName} has passed its expiry date and should not be issued.';
+          reason =
+              '${item.medicineName} has passed its expiry date and should not be issued.';
           color = MediColors.error;
           icon = Icons.error_rounded;
         } else if (typeStr == 'low_stock') {
@@ -100,7 +101,8 @@ class _AlertsPageState extends ConsumerState<AlertsPage> {
         } else if (typeStr == 'wastage_risk') {
           kind = _AlertKind.wastageRisk;
           title = 'Wastage Risk';
-          reason = 'High remaining stock is close to expiry, so redistribution should be considered.';
+          reason =
+              'High remaining stock is close to expiry, so redistribution should be considered.';
           color = MediColors.warning;
           icon = Icons.warning_amber_rounded;
         } else {

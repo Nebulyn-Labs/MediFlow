@@ -5,7 +5,8 @@ import '../../services/firebase_service.dart';
 import '../../models/inventory_item.dart';
 import 'package:med_supply_prototype/constants/colors.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'scroll_to_top_button.dart';
+import 'confirm_logout_dialog.dart';
+
 class SidebarLayout extends ConsumerStatefulWidget {
   final Widget child;
   final String role;
@@ -23,15 +24,16 @@ class SidebarLayout extends ConsumerStatefulWidget {
 }
 
 class _SidebarLayoutState extends ConsumerState<SidebarLayout> {
-bool _isExpanded = false;
+  bool _isExpanded = false;
   final ScrollController _mainScrollController = ScrollController();
-@override
+  @override
   void dispose() {
     _mainScrollController.dispose();
     super.dispose();
   }
 
-  int _calculateSelectedIndex(BuildContext context) {    final location = GoRouterState.of(context).uri.toString();
+  int _calculateSelectedIndex(BuildContext context) {
+    final location = GoRouterState.of(context).uri.toString();
     if (widget.role == 'facility') {
       if (location.endsWith('/overview')) return 0;
       if (location.endsWith('/logging')) return 1;
@@ -205,7 +207,7 @@ bool _isExpanded = false;
                     _NavItem(Icons.logout_rounded, 'Logout'),
                     false,
                     () async {
-                      final confirmed = await _confirmLogout(context);
+                      final confirmed = await confirmLogout(context);
                       if (!confirmed) return;
                       if (context.mounted) context.go('/');
                       await FirebaseAuth.instance.signOut();
@@ -223,32 +225,6 @@ bool _isExpanded = false;
         ],
       ),
     );
-    return result ?? false;
-  }
-
-  /// Shows a confirmation dialog for logging out. Returns true if the user confirms, false otherwise.
-  Future<bool> _confirmLogout(BuildContext context) async {
-    final result = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Log out'),
-        content: const Text('Are you sure you want to log out?'),
-        actions: [
-          TextButton(
-            // Close the dialog and return false
-            onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('Cancel'),
-          ),
-          TextButton(
-            // Close the dialog and return true
-            onPressed: () => Navigator.of(context).pop(true),
-            style: TextButton.styleFrom(foregroundColor: MediColors.error),
-            child: const Text('Log out'),
-          ),
-        ],
-      ),
-    );
-    return result ?? false;
   }
 
   Widget _buildNavItem(_NavItem item, bool isSelected, VoidCallback onTap,
