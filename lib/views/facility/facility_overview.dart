@@ -7,6 +7,7 @@ import '../../services/firebase_service.dart';
 import '../../services/simulation_service.dart';
 import '../../services/csv_export_service.dart';
 import 'package:med_supply_prototype/constants/colors.dart';
+import '../shared/confirm_logout_dialog.dart';
 
 class FacilityOverview extends ConsumerWidget {
   final String facilityId;
@@ -185,19 +186,10 @@ class FacilityOverview extends ConsumerWidget {
                 ],
                 onSelected: (v) async {
                   if (v == 'out') {
-                    try {
-                      await FirebaseAuth.instance.signOut();
-                      if (context.mounted) context.go('/');
-                    } catch (e) {
-                      if (context.mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text('Sign out failed: ${e.toString()}'),
-                            backgroundColor: MediColors.error,
-                          ),
-                        );
-                      }
-                    }
+                    final confirmed = await confirmLogout(context);
+                    if (confirmed != true) return;
+                    if (context.mounted) context.go('/');
+                    await FirebaseAuth.instance.signOut();
                   }
                 },
               ),
