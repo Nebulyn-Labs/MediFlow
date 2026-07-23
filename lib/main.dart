@@ -149,6 +149,16 @@ final _router = GoRouter(
   ],
 );
 
+class AppScrollBehavior extends MaterialScrollBehavior {
+  @override
+  Set<PointerDeviceKind> get dragDevices => {
+        PointerDeviceKind.touch,
+        PointerDeviceKind.mouse,
+        PointerDeviceKind.stylus,
+        PointerDeviceKind.trackpad,
+      };
+}
+
 class MediFlowApp extends StatelessWidget {
   const MediFlowApp({super.key});
 
@@ -157,6 +167,7 @@ class MediFlowApp extends StatelessWidget {
     return MaterialApp.router(
       title: 'MediFlow',
       debugShowCheckedModeBanner: false,
+      scrollBehavior: AppScrollBehavior(),
       theme: ThemeData(
         useMaterial3: true,
         brightness: Brightness.dark,
