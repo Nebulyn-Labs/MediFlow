@@ -13,6 +13,7 @@ class TransferRecommendation {
   final int quantity;
   final double score;
   final String reasoning;
+  final bool requiresColdChain;
 
   TransferRecommendation({
     required this.donor,
@@ -21,6 +22,7 @@ class TransferRecommendation {
     required this.quantity,
     required this.score,
     required this.reasoning,
+    this.requiresColdChain = false,
   });
 }
 
@@ -173,6 +175,23 @@ class OptimizationService {
           if (donorFac.id == recipientFac.id) continue;
 
           final available = workingSurpluses[donorFac.id]?[medicine] ?? 0;
+          final donorItem = (inventories[donorFac.id] ?? []).firstWhere(
+            (item) => item.medicineName == medicine,
+            orElse: () => InventoryItem(
+              id: '',
+              medicineName: medicine,
+              batchId: '',
+              arrivalDate: DateTime.now(),
+              expiryDate: DateTime.now(),
+              initialQuantity: 0,
+              remainingQuantity: 0,
+              unit: '',
+              lastUpdated: DateTime.now(),
+            ),
+          );
+
+          final isColdChain = donorItem.requiresColdChain;
+
           if (available <= 0) continue;
 
           // Calculate Dynamic Score
@@ -185,6 +204,12 @@ class OptimizationService {
                   LatLng(recipientFac.latitude, recipientFac.longitude)) /
               1000;
           double distScore = (200 - distKm).clamp(0, 200);
+
+          if (isColdChain) {
+            distScore *= 2;
+            reasons.add('Cold Chain Priority');
+          }
+
           score += distScore;
           reasons.add('Proximity (${distKm.toStringAsFixed(1)}km)');
 
@@ -212,6 +237,7 @@ class OptimizationService {
               'qty': qtyToTake,
               'score': score,
               'reasoning': reasons.join(' + '),
+              'requiresColdChain': isColdChain,
             };
           }
         }
@@ -227,6 +253,7 @@ class OptimizationService {
             quantity: qtyTaken,
             score: bestDonorMatch['score'],
             reasoning: bestDonorMatch['reasoning'],
+            requiresColdChain: bestDonorMatch['requiresColdChain'] as bool,
           ));
 
           // Update state

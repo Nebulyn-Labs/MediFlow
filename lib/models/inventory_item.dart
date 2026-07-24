@@ -11,6 +11,7 @@ class InventoryItem {
   final String unit;
   final DateTime lastUpdated;
   final String? facilityId; // Added for global sync
+  final bool requiresColdChain;
 
   InventoryItem({
     required this.id,
@@ -23,6 +24,7 @@ class InventoryItem {
     required this.unit,
     required this.lastUpdated,
     this.facilityId,
+    this.requiresColdChain = false,
   });
 
   /// Fraction of stock remaining (0.0–1.0). Safe against divide-by-zero.
@@ -56,6 +58,7 @@ class InventoryItem {
           ? (map['lastUpdated'] as Timestamp).toDate()
           : DateTime.now(),
       facilityId: facilityId ?? map['facilityId'],
+      requiresColdChain: map['requiresColdChain'] ?? false,
     );
   }
 
@@ -70,6 +73,7 @@ class InventoryItem {
       'unit': unit,
       'lastUpdated': Timestamp.fromDate(lastUpdated),
       if (facilityId != null) 'facilityId': facilityId,
+      'requiresColdChain': requiresColdChain,
     };
   }
 }
