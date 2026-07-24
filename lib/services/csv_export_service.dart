@@ -8,7 +8,6 @@ import 'package:intl/intl.dart';
 import '../models/inventory_item.dart';
 import '../models/daily_usage_log.dart';
 import '../models/request.dart';
-import '../models/request.dart';
 
 /// Handles converting MediFlow domain models into CSV files and letting the
 /// user save/download them. Works across web, desktop and mobile since it
@@ -98,17 +97,18 @@ class CsvExportService {
 
   /// Exports transfer request history as CSV and prompts the user to
   /// save/download it.
-  static Future<String?> exportTransferRequests(
+  static Future<String?> exportTransferRequestHistory(
     List<MedRequest> requests, {
     String? facilityName,
   }) async {
-    final rows = buildTransferRequestRows(requests);
+    final rows = buildTransferRequestHistoryRows(requests);
     final fileName =
         'transfer_requests_${_slug(facilityName)}${_stampFmt.format(DateTime.now())}.csv';
     return _saveCsv(rows, fileName);
   }
 
-  static List<List<dynamic>> buildTransferRequestRows(List<MedRequest> requests) {
+  static List<List<dynamic>> buildTransferRequestHistoryRows(
+      List<MedRequest> requests) {
     final rows = <List<dynamic>>[
       [
         'Submitted Date',

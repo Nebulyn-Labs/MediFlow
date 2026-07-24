@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../services/firebase_service.dart';
 import '../../services/ai_service.dart';
+import '../../services/csv_export_service.dart';
 import '../../models/request.dart';
 import '../../models/inventory_item.dart';
 import 'package:med_supply_prototype/constants/colors.dart';
@@ -31,6 +32,7 @@ class _ActiveIndentsPageState extends ConsumerState<ActiveIndentsPage> {
   final Map<String, TextEditingController> _analysisControllers = {};
   bool _isLoading = true;
   bool _isSubmitting = false;
+  bool _isExportingHistoryCsv = false;
   int _selectedPeriod = 30;
 
   @override
@@ -253,6 +255,29 @@ class _ActiveIndentsPageState extends ConsumerState<ActiveIndentsPage> {
       }
     } finally {
       if (mounted) setState(() => _isDraftActionInProgress = false);
+    }
+  }
+
+  Future<void> _exportRequestHistoryCsv(List<MedRequest> history) async {
+    setState(() => _isExportingHistoryCsv = true);
+    try {
+      final firebase = ref.read(firebaseServiceProvider);
+      final facility = await firebase.getFacility(widget.facilityId);
+      await CsvExportService.exportTransferRequestHistory(
+        history,
+        facilityName: facility?.name,
+      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+            content: Text('Transfer requests CSV exported ✓')));
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('Export failed: $e')));
+      }
+    } finally {
+      if (mounted) setState(() => _isExportingHistoryCsv = false);
     }
   }
 
@@ -750,7 +775,33 @@ class _ActiveIndentsPageState extends ConsumerState<ActiveIndentsPage> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const SizedBox(height: 32),
-            _sectionHeader('Request History'),
+            Wrap(
+              spacing: 12,
+              runSpacing: 8,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              children: [
+                _sectionHeader('Request History'),
+                OutlinedButton.icon(
+                  onPressed: _isExportingHistoryCsv
+                      ? null
+                      : () => _exportRequestHistoryCsv(history),
+                  icon: _isExportingHistoryCsv
+                      ? const SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(Icons.file_download_outlined, size: 18),
+                  label: const Text('Export CSV'),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: MediColors.textSecondary,
+                    side: const BorderSide(color: MediColors.border),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10)),
+                  ),
+                ),
+              ],
+            ),
             const SizedBox(height: 12),
             ListView.builder(
               shrinkWrap: true,
