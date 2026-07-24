@@ -31,21 +31,14 @@ async function getUserFacilityAndRole(auth, db) {
   let userFacilityId = null;
 
   if (!isAdmin) {
-    const docId = userEmail.replace(/@/g, "_").replace(/\./g, "_");
-    const facilityDoc = await db.collection("facilities").doc(docId).get();
-    if (!facilityDoc.exists) {
-      // Fallback query by email field
-      const facilitiesSnapshot = await db.collection("facilities")
-        .where("email", "==", userEmail)
-        .limit(1)
-        .get();
-      if (facilitiesSnapshot.empty) {
-        throw new HttpsError("failed-precondition", "No facility assigned to this user");
-      }
-      userFacilityId = facilitiesSnapshot.docs[0].id;
-    } else {
-      userFacilityId = docId;
+    const facilitiesSnapshot = await db.collection("facilities")
+      .where("email", "==", userEmail)
+      .limit(1)
+      .get();
+    if (facilitiesSnapshot.empty) {
+      throw new HttpsError("failed-precondition", "No facility assigned to this user");
     }
+    userFacilityId = facilitiesSnapshot.docs[0].id;
   }
 
   return {
