@@ -92,6 +92,65 @@ If you plan to modify or deploy Cloud Functions or Firestore rules:
 
 ---
 
+## Firebase Emulator Setup
+
+### Prerequisites
+
+- Node.js
+- npm
+- Firebase CLI installation (`npm install -g firebase-tools`)
+
+### Repository setup
+
+- Install dependencies:
+  ```bash
+  cd functions
+  npm install
+  ```
+- Configure environment variables by creating a `.env` file in the root of the project:
+  ```ini
+  GEMINI_API_KEY=your_gemini_api_key_here
+  ORS_API_KEY=your_openroute_service_key_here
+  FIREBASE_PROJECT_ID=mediflow-92e6f
+  ```
+- Login:
+  ```bash
+  firebase login
+  firebase use mediflow-92e6f
+  ```
+
+### Starting emulators
+
+```bash
+firebase emulators:start
+```
+
+### Backend development
+
+- **Available emulator services**: Hosting, Firestore, and Functions.
+- **Backend startup**: Run the emulators from the root directory.
+
+### Running tests
+
+```bash
+cd functions
+npm run test
+```
+
+### Sample data
+
+No seed process currently exists.
+
+### Troubleshooting
+
+- **Cloud Functions Authentication Errors**:
+  If calling Gemini forecasts yields an authentication error, verify that you have configured secrets:
+  ```bash
+  firebase functions:secrets:set GEMINI_API_KEY="your_actual_key"
+  ```
+
+---
+
 ## 3. Claiming and Creating Issues
 
 Before working on any changes:
