@@ -22,12 +22,12 @@ class RouteOptimizationMap extends ConsumerStatefulWidget {
 class _RouteOptimizationMapState extends ConsumerState<RouteOptimizationMap> {
   final MapController _mapController = MapController();
   List<Facility> _facilities = [];
-  Map<String, List<InventoryItem>> _allInventories = {};
   bool _isLoading = true;
+  String? _errorMessage;
   bool _showRoutes = false;
   bool _isGenerating = false;
   String _aiSummary = '';
-  List<TransferRecommendation> _recommendations = [];
+  List<MultiStopRoute> _multiStopRoutes = [];
   Map<String, List<LatLng>> _roadRoutes = {};
 
   @override
@@ -37,53 +37,65 @@ class _RouteOptimizationMapState extends ConsumerState<RouteOptimizationMap> {
   }
 
   Future<void> _loadData() async {
-    final firebaseService = ref.read(firebaseServiceProvider);
-    final facs = await firebaseService.getFacilities();
+    if (_isLoading && _errorMessage == null && _facilities.isNotEmpty) return;
 
-    if (mounted) {
-      setState(() {
-        _facilities = facs;
-        _isLoading = false;
-      });
-    }
-  }
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
 
-  void _updateInventoriesFromStream(List<InventoryItem> allMeds) {
-    Map<String, List<InventoryItem>> newInventories = {};
-    for (var med in allMeds) {
-      if (med.facilityId != null) {
-        newInventories.putIfAbsent(med.facilityId!, () => []).add(med);
+    try {
+      final firebaseService = ref.read(firebaseServiceProvider);
+      final facs = await firebaseService.getFacilities();
+
+      if (mounted) {
+        setState(() {
+          _facilities = facs;
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      debugPrint('RouteOptimizationMap: Failed to load facilities: $e');
+      if (mounted) {
+        setState(() {
+          _errorMessage =
+              'Unable to load facilities. Please check your connection and try again.';
+          _isLoading = false;
+        });
       }
     }
-
-    if (mounted && newInventories.isNotEmpty) {
-      setState(() {
-        _allInventories = newInventories;
-      });
-    }
   }
 
-  Future<void> _generateOptimalRoutes(List<MedRequest> requests) async {
+  Future<void> _generateOptimalRoutes(
+      List<MedRequest> requests, List<InventoryItem> allMeds) async {
     setState(() => _isGenerating = true);
     try {
       final optimizer = ref.read(optimizationServiceProvider);
       final router = ref.read(routingServiceProvider);
       final ai = ref.read(aiServiceProvider);
 
-      // 1. Calculate optimal transfers
-      final recs = optimizer.calculateOptimalTransfers(
+      Map<String, List<InventoryItem>> inventories = {};
+      for (var med in allMeds) {
+        if (med.facilityId != null) {
+          inventories.putIfAbsent(med.facilityId!, () => []).add(med);
+        }
+      }
+
+      // 1. Calculate optimal transfers grouped into multi-stop routes
+      final multiRoutes = optimizer.calculateMultiStopRoutes(
         facilities: _facilities,
-        inventories: _allInventories,
+        inventories: inventories,
         requests: requests,
       );
 
-      // 2. Fetch road-accurate routes for each recommendation
+      // 2. Fetch road-accurate routes for each multi-stop route
       Map<String, List<LatLng>> routes = {};
-      for (var rec in recs) {
-        final start = LatLng(rec.donor.latitude, rec.donor.longitude);
-        final end = LatLng(rec.recipient.latitude, rec.recipient.longitude);
-        final path = await router.getRoute(start, end);
-        routes['${rec.donor.id}_${rec.recipient.id}'] = path;
+      for (var mr in multiRoutes) {
+        if (mr.stops.isEmpty) continue;
+        final stopsCoords =
+            mr.stops.map((f) => LatLng(f.latitude, f.longitude)).toList();
+        final path = await router.getMultiStopRoute(stopsCoords);
+        routes[mr.transfers.first.donor.id] = path;
       }
 
       // 3. Generate AI Summary
@@ -91,11 +103,11 @@ class _RouteOptimizationMapState extends ConsumerState<RouteOptimizationMap> {
           await ai.generateRedistributionPlan(requests, _facilities);
 
       debugPrint(
-          'RouteOptimizationMap: Generated ${recs.length} recommendations.');
+          'RouteOptimizationMap: Generated ${multiRoutes.length} multi-stop routes.');
       debugPrint('RouteOptimizationMap: Fetched ${routes.length} road routes.');
 
       setState(() {
-        _recommendations = recs;
+        _multiStopRoutes = multiRoutes;
         _roadRoutes = routes;
         _aiSummary = summary;
         _showRoutes = true;
@@ -115,6 +127,49 @@ class _RouteOptimizationMapState extends ConsumerState<RouteOptimizationMap> {
   Widget build(BuildContext context) {
     if (_isLoading) return const Center(child: CircularProgressIndicator());
 
+    if (_errorMessage != null) {
+      return Scaffold(
+        backgroundColor: MediColors.bg,
+        appBar: AppBar(title: const Text('Advanced Route Optimization')),
+        body: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(32),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Icon(Icons.error_outline_rounded,
+                    size: 64, color: MediColors.textMuted),
+                const SizedBox(height: 20),
+                Text(
+                  _errorMessage!,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                      fontSize: 16, color: MediColors.textSecondary),
+                ),
+                const SizedBox(height: 24),
+                SizedBox(
+                  height: 44,
+                  child: Container(
+                    decoration: BoxDecoration(
+                        gradient: MediColors.primaryGradient,
+                        borderRadius: BorderRadius.circular(12)),
+                    child: FilledButton.icon(
+                      style: FilledButton.styleFrom(
+                          backgroundColor: Colors.transparent,
+                          shadowColor: Colors.transparent),
+                      icon: const Icon(Icons.refresh_rounded, size: 18),
+                      label: const Text('Retry'),
+                      onPressed: _loadData,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+
     final mapCenter = _facilities.isNotEmpty
         ? LatLng(_facilities.first.latitude, _facilities.first.longitude)
         : const LatLng(28.6139, 77.2090);
@@ -125,9 +180,7 @@ class _RouteOptimizationMapState extends ConsumerState<RouteOptimizationMap> {
       body: StreamBuilder<List<InventoryItem>>(
         stream: ref.watch(firebaseServiceProvider).streamAllMedicines(),
         builder: (context, invSnapshot) {
-          if (invSnapshot.hasData) {
-            _updateInventoriesFromStream(invSnapshot.data!);
-          }
+          final allMeds = invSnapshot.data ?? [];
 
           return StreamBuilder<List<MedRequest>>(
             stream: ref.watch(firebaseServiceProvider).streamRequests(null),
@@ -203,8 +256,8 @@ class _RouteOptimizationMapState extends ConsumerState<RouteOptimizationMap> {
                                         : 'Generate Optimal Routes'),
                                     onPressed: _isGenerating
                                         ? null
-                                        : () =>
-                                            _generateOptimalRoutes(requests),
+                                        : () => _generateOptimalRoutes(
+                                            requests, allMeds),
                                   ),
                                 ),
                               ),
@@ -217,12 +270,20 @@ class _RouteOptimizationMapState extends ConsumerState<RouteOptimizationMap> {
                                       style: TextStyle(fontSize: 12)),
                                   onPressed: () async {
                                     setState(() => _isGenerating = true);
-                                    await ref
-                                        .read(firebaseServiceProvider)
-                                        .seedDemoData();
-                                    // RE-LOAD FACILITIES AFTER SEEDING
-                                    await _loadData();
-                                    setState(() => _isGenerating = false);
+                                    try {
+                                      await ref
+                                          .read(firebaseServiceProvider)
+                                          .seedDemoData();
+                                      // RE-LOAD FACILITIES AFTER SEEDING
+                                      await _loadData();
+                                    } catch (e) {
+                                      debugPrint(
+                                          'RouteOptimizationMap: Demo seed failed: $e');
+                                    } finally {
+                                      if (mounted) {
+                                        setState(() => _isGenerating = false);
+                                      }
+                                    }
                                     if (context.mounted) {
                                       ScaffoldMessenger.of(context)
                                           .showSnackBar(const SnackBar(
@@ -264,10 +325,10 @@ class _RouteOptimizationMapState extends ConsumerState<RouteOptimizationMap> {
                                 ))
                               : ListView.builder(
                                   padding: const EdgeInsets.all(24),
-                                  itemCount: _recommendations.length,
+                                  itemCount: _multiStopRoutes.length,
                                   itemBuilder: (context, index) {
-                                    final rec = _recommendations[index];
-                                    return _buildTransferCard(rec);
+                                    final mr = _multiStopRoutes[index];
+                                    return _buildMultiStopRouteCard(mr);
                                   },
                                 ),
                         ),
@@ -297,20 +358,18 @@ class _RouteOptimizationMapState extends ConsumerState<RouteOptimizationMap> {
                             ),
                             if (_showRoutes)
                               PolylineLayer(
-                                polylines:
-                                    _recommendations.map<Polyline>((rec) {
-                                  final key =
-                                      '${rec.donor.id}_${rec.recipient.id}';
-                                  final points = _roadRoutes[key] ??
-                                      [
-                                        LatLng(rec.donor.latitude,
-                                            rec.donor.longitude),
-                                        LatLng(rec.recipient.latitude,
-                                            rec.recipient.longitude)
-                                      ];
+                                polylines: _multiStopRoutes.map<Polyline>((mr) {
+                                  final donorId = mr.transfers.first.donor.id;
+                                  final points = _roadRoutes[donorId] ??
+                                      mr.stops
+                                          .map((s) =>
+                                              LatLng(s.latitude, s.longitude))
+                                          .toList();
+                                  bool hasRural = mr.stops.any((s) =>
+                                      s.type == 'rural' && s.id != donorId);
                                   return Polyline(
                                     points: points,
-                                    color: (rec.recipient.type == 'rural'
+                                    color: (hasRural
                                             ? Colors.blueAccent
                                             : MediColors.primary)
                                         .withValues(alpha: 0.8),
@@ -320,10 +379,10 @@ class _RouteOptimizationMapState extends ConsumerState<RouteOptimizationMap> {
                               ),
                             MarkerLayer(
                               markers: _facilities.map((f) {
-                                bool isDonor = _recommendations
-                                    .any((r) => r.donor.id == f.id);
-                                bool isRecipient = _recommendations
-                                    .any((r) => r.recipient.id == f.id);
+                                bool isDonor = _multiStopRoutes.any((mr) =>
+                                    mr.transfers.first.donor.id == f.id);
+                                bool isRecipient = _multiStopRoutes.any((mr) =>
+                                    mr.stops.skip(1).any((s) => s.id == f.id));
 
                                 Color markerColor = MediColors.textMuted;
                                 if (_showRoutes) {
@@ -498,7 +557,42 @@ class _RouteOptimizationMapState extends ConsumerState<RouteOptimizationMap> {
     );
   }
 
-  Widget _buildTransferCard(TransferRecommendation rec) {
+  Widget _buildMultiStopRouteCard(MultiStopRoute mr) {
+    if (mr.transfers.isEmpty) return const SizedBox.shrink();
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 16),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+          color: MediColors.surface,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: MediColors.border, width: 2)),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.local_shipping_outlined,
+                  color: MediColors.primary),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                    'Multi-Stop Route: ${mr.transfers.first.donor.name}',
+                    style: const TextStyle(
+                        fontWeight: FontWeight.w800,
+                        color: MediColors.textPrimary,
+                        fontSize: 16)),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          ...mr.transfers.map((rec) => _buildSingleTransferInfo(rec)),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSingleTransferInfo(TransferRecommendation rec) {
     final Distance distanceCalc = const Distance();
     final distKm = distanceCalc(LatLng(rec.donor.latitude, rec.donor.longitude),
             LatLng(rec.recipient.latitude, rec.recipient.longitude)) /
@@ -507,22 +601,24 @@ class _RouteOptimizationMapState extends ConsumerState<RouteOptimizationMap> {
     final timeMinutes = (timeHours * 60).toInt();
 
     return Container(
-      margin: const EdgeInsets.only(bottom: 16),
-      padding: const EdgeInsets.all(20),
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
           color: MediColors.surfaceLight,
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(12),
           border: Border.all(color: MediColors.border)),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          Wrap(
+            alignment: WrapAlignment.spaceBetween,
+            spacing: 8.0,
+            runSpacing: 4.0,
             children: [
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                 decoration: BoxDecoration(
-                    color: MediColors.primary.withValues(alpha: 0.1),
+                    color: MediColors.primaryOverlay,
                     borderRadius: BorderRadius.circular(6)),
                 child: Text('Score: ${rec.score.toInt()}',
                     style: const TextStyle(
@@ -584,8 +680,10 @@ class _RouteOptimizationMapState extends ConsumerState<RouteOptimizationMap> {
                   fontSize: 11,
                   fontStyle: FontStyle.italic)),
           const SizedBox(height: 16),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          Wrap(
+            alignment: WrapAlignment.spaceBetween,
+            spacing: 8.0,
+            runSpacing: 4.0,
             children: [
               Row(children: [
                 const Icon(Icons.route_rounded,

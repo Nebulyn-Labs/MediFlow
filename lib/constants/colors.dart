@@ -20,6 +20,16 @@ class MediColors {
   static const Color error = Color(0xFFF43F5E);
   static const Color info = Color(0xFF3B82F6);
 
+  // Semantic translucent overlays
+  static Color get primaryOverlay => primary.withValues(alpha: 0.1);
+  static Color get primarySubtle => primary.withValues(alpha: 0.08);
+
+  static Color get successOverlay => success.withValues(alpha: 0.1);
+  static Color get successSubtle => success.withValues(alpha: 0.08);
+  static Color get successBorder => success.withValues(alpha: 0.2);
+
+  static Color get errorOverlay => error.withValues(alpha: 0.1);
+  static Color get warningOverlay => warning.withValues(alpha: 0.1);
   static const LinearGradient primaryGradient = LinearGradient(
     colors: [primary, violet],
     begin: Alignment.topLeft,

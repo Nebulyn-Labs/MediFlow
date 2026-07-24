@@ -6,7 +6,42 @@
       "**/.*",
       "**/node_modules/**"
     ],
+    "headers": [
+      {
+        "source": "**",
+        "headers": [
+          {
+            "key": "X-Frame-Options",
+            "value": "DENY"
+          },
+          {
+            "key": "X-Content-Type-Options",
+            "value": "nosniff"
+          },
+          {
+            "key": "Referrer-Policy",
+            "value": "strict-origin-when-cross-origin"
+          },
+          {
+            "key": "Strict-Transport-Security",
+            "value": "max-age=31536000; includeSubDomains"
+          },
+          {
+            "key": "Content-Security-Policy-Report-Only",
+            "value": "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://www.gstatic.com https://www.googleapis.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: blob: https:; connect-src 'self' https://*.googleapis.com https://*.firebaseio.com https://*.firebasestorage.app https://securetoken.googleapis.com https://identitytoolkit.googleapis.com https://firestore.googleapis.com https://www.googleapis.com wss://*.firebaseio.com; worker-src 'self' blob:; child-src blob:; frame-ancestors 'none'; object-src 'none'; base-uri 'self'; report-uri /csp-report; report-to csp-endpoint"
+          },
+          {
+            "key": "Report-To",
+            "value": "{\"group\": \"csp-endpoint\", \"max_age\": 10886400, \"endpoints\": [{\"url\": \"/csp-report\"}]}"
+          }
+        ]
+      }
+    ],
     "rewrites": [
+      {
+        "source": "/csp-report",
+        "function": "cspReport"
+      },
       {
         "source": "**",
         "destination": "/index.html"
@@ -14,7 +49,8 @@
     ]
   },
   "firestore": {
-    "rules": "firestore.rules"
+    "rules": "firestore.rules",
+    "indexes": "firestore.indexes.json"
   },
   "functions": {
     "source": "functions"

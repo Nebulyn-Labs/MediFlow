@@ -24,7 +24,75 @@ class TransferRecommendation {
   });
 }
 
+class MultiStopRoute {
+  final List<TransferRecommendation> transfers;
+  final List<Facility> stops;
+
+  MultiStopRoute({
+    required this.transfers,
+    required this.stops,
+  });
+}
+
+abstract class RoutingStrategy {
+  List<Facility> buildRouteStops(
+      Facility startNode, List<TransferRecommendation> transfers);
+}
+
+class NearestNeighborRoutingStrategy implements RoutingStrategy {
+  const NearestNeighborRoutingStrategy();
+
+  @override
+  List<Facility> buildRouteStops(
+      Facility startNode, List<TransferRecommendation> transfers) {
+    final Distance distanceCalc = const Distance();
+
+    final unvisited = <Facility>[];
+    final seenRecipientIds = <String>{};
+    for (final transfer in transfers) {
+      if (seenRecipientIds.add(transfer.recipient.id)) {
+        unvisited.add(transfer.recipient);
+      }
+    }
+
+    List<Facility> orderedStops = [startNode];
+    Facility current = startNode;
+
+    while (unvisited.isNotEmpty) {
+      Facility? nearest;
+      double minDistance = double.infinity;
+
+      for (var candidate in unvisited) {
+        final dist = distanceCalc(
+          LatLng(current.latitude, current.longitude),
+          LatLng(candidate.latitude, candidate.longitude),
+        );
+        if (dist < minDistance) {
+          minDistance = dist;
+          nearest = candidate;
+        }
+      }
+
+      if (nearest != null) {
+        orderedStops.add(nearest);
+        unvisited.remove(nearest);
+        current = nearest;
+      } else {
+        break;
+      }
+    }
+
+    return orderedStops;
+  }
+}
+
 class OptimizationService {
+  final RoutingStrategy _strategy;
+
+  OptimizationService({
+    RoutingStrategy strategy = const NearestNeighborRoutingStrategy(),
+  }) : _strategy = strategy;
+
   List<TransferRecommendation> calculateOptimalTransfers({
     required List<Facility> facilities,
     required Map<String, List<InventoryItem>> inventories,
@@ -173,5 +241,41 @@ class OptimizationService {
     }
 
     return recommendations;
+  }
+
+  List<MultiStopRoute> calculateMultiStopRoutes({
+    required List<Facility> facilities,
+    required Map<String, List<InventoryItem>> inventories,
+    required List<MedRequest> requests,
+    RoutingStrategy? routingStrategy,
+  }) {
+    final strategy = routingStrategy ?? _strategy;
+
+    final recommendations = calculateOptimalTransfers(
+      facilities: facilities,
+      inventories: inventories,
+      requests: requests,
+    );
+
+    final Map<String, List<TransferRecommendation>> groupedByDonor = {};
+    for (var rec in recommendations) {
+      groupedByDonor.putIfAbsent(rec.donor.id, () => []).add(rec);
+    }
+
+    final List<MultiStopRoute> multiStopRoutes = [];
+    for (var entry in groupedByDonor.entries) {
+      final transfers = entry.value;
+      if (transfers.isEmpty) continue;
+
+      final donor = transfers.first.donor;
+      final stops = strategy.buildRouteStops(donor, transfers);
+
+      multiStopRoutes.add(MultiStopRoute(
+        transfers: transfers,
+        stops: stops,
+      ));
+    }
+
+    return multiStopRoutes;
   }
 }
