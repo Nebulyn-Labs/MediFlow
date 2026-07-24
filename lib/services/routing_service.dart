@@ -77,9 +77,10 @@ class RoutingService {
 
     final cacheKey = _generateCacheKey(start, end);
 
-    if (_routeCache.containsKey(cacheKey)) {
+   final cachedRoute = _routeCache[cacheKey];
+    if (cachedRoute != null) {
       debugPrint('RoutingService: Returning cached route.');
-      return _routeCache[cacheKey]!;
+      return cachedRoute;
     }
 
 
