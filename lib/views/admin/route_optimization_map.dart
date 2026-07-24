@@ -665,11 +665,50 @@ class _RouteOptimizationMapState extends ConsumerState<RouteOptimizationMap> {
                         color: MediColors.textPrimary))),
           ]),
           const Divider(height: 32),
-          Text(rec.medicine,
-              style: const TextStyle(
-                  fontWeight: FontWeight.w800,
-                  color: MediColors.textPrimary,
-                  fontSize: 15)),
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  rec.medicine,
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w800,
+                    color: MediColors.textPrimary,
+                    fontSize: 15,
+                  ),
+                ),
+              ),
+              if (rec.requiresColdChain)
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 4,
+                  ),
+                  decoration: BoxDecoration(
+                    color: Colors.lightBlue.withValues(alpha: 0.15),
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: const Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        Icons.ac_unit,
+                        size: 14,
+                        color: Colors.lightBlue,
+                      ),
+                      SizedBox(width: 4),
+                      Text(
+                        'Cold Chain',
+                        style: TextStyle(
+                          color: Colors.lightBlue,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 10,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+            ],
+          ),
           Text('${rec.quantity} Units requested',
               style:
                   const TextStyle(color: MediColors.textMuted, fontSize: 13)),
