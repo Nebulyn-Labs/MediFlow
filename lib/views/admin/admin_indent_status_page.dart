@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../services/firebase_service.dart';
+import '../../services/csv_export_service.dart';
 import '../../models/request.dart';
 import 'package:med_supply_prototype/constants/colors.dart';
 
@@ -14,6 +15,39 @@ class AdminIndentStatusPage extends ConsumerStatefulWidget {
 }
 
 class _AdminIndentStatusPageState extends ConsumerState<AdminIndentStatusPage> {
+  bool _isExportingCsv = false;
+
+  List<MedRequest> _buildVisibleRequests(List<MedRequest>? source) {
+    final requests =
+        source?.where((r) => r.status != RequestStatus.draft).toList() ?? [];
+    requests.sort((a, b) => b.requestDate.compareTo(a.requestDate));
+    return requests;
+  }
+
+  Future<void> _exportTransferRequestsCsv(List<MedRequest> requests) async {
+    if (requests.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('No transfer requests to export yet')));
+      return;
+    }
+
+    setState(() => _isExportingCsv = true);
+    try {
+      await CsvExportService.exportTransferRequests(requests);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Transfer requests CSV exported ✓')));
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('Export failed: $e')));
+      }
+    } finally {
+      if (mounted) setState(() => _isExportingCsv = false);
+    }
+  }
+
   Future<void> _updateStatus(String requestId, RequestStatus status) async {
     try {
       await ref
@@ -54,11 +88,7 @@ class _AdminIndentStatusPageState extends ConsumerState<AdminIndentStatusPage> {
             return const Center(child: CircularProgressIndicator());
           }
 
-          final requests = snapshot.data
-                  ?.where((r) => r.status != RequestStatus.draft)
-                  .toList() ??
-              [];
-          requests.sort((a, b) => b.requestDate.compareTo(a.requestDate));
+          final requests = _buildVisibleRequests(snapshot.data);
 
           if (requests.isEmpty) {
             return const Center(
@@ -68,22 +98,50 @@ class _AdminIndentStatusPageState extends ConsumerState<AdminIndentStatusPage> {
 
           return SingleChildScrollView(
             padding: const EdgeInsets.all(24),
-            child: Card(
-              child: Column(
-                children: [
-                  _buildTableHeader(),
-                  ListView.separated(
-                    shrinkWrap: true,
-                    physics: const NeverScrollableScrollPhysics(),
-                    itemCount: requests.length,
-                    separatorBuilder: (context, index) =>
-                        const Divider(height: 1),
-                    itemBuilder: (context, index) {
-                      final req = requests[index];
-                      return _buildTableRow(req);
-                    },
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: OutlinedButton.icon(
+                    onPressed: _isExportingCsv
+                        ? null
+                        : () => _exportTransferRequestsCsv(requests),
+                    icon: _isExportingCsv
+                        ? const SizedBox(
+                            width: 16,
+                            height: 16,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Icon(Icons.file_download_outlined, size: 18),
+                    label: const Text('Export CSV'),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: MediColors.textSecondary,
+                      side: const BorderSide(color: MediColors.border),
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10)),
+                    ),
                   ),
-                ],
+                ),
+                const SizedBox(height: 12),
+                Card(
+                  child: Column(
+                    children: [
+                      _buildTableHeader(),
+                      ListView.separated(
+                        shrinkWrap: true,
+                        physics: const NeverScrollableScrollPhysics(),
+                        itemCount: requests.length,
+                        separatorBuilder: (context, index) =>
+                            const Divider(height: 1),
+                        itemBuilder: (context, index) {
+                          final req = requests[index];
+                          return _buildTableRow(req);
+                        },
+                      ),
+                    ],
+                  ),
+                ),
               ),
             ),
           );
