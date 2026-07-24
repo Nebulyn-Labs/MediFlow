@@ -10,6 +10,7 @@ import '../../services/ai_service.dart';
 import '../../services/routing_service.dart';
 import '../../services/optimization_service.dart';
 import 'package:med_supply_prototype/constants/colors.dart';
+import '../shared/skeleton_loaders.dart';
 
 class RouteOptimizationMap extends ConsumerStatefulWidget {
   const RouteOptimizationMap({super.key});
@@ -125,7 +126,12 @@ class _RouteOptimizationMapState extends ConsumerState<RouteOptimizationMap> {
 
   @override
   Widget build(BuildContext context) {
-    if (_isLoading) return const Center(child: CircularProgressIndicator());
+    if (_isLoading) {
+      return const Scaffold(
+        backgroundColor: MediColors.bg,
+        body: RouteOptimizationMapSkeleton(),
+      );
+    }
 
     if (_errorMessage != null) {
       return Scaffold(

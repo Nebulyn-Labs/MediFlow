@@ -4,6 +4,7 @@ import '../../services/firebase_service.dart';
 import '../../services/ai_service.dart';
 import '../../models/request.dart';
 import 'package:med_supply_prototype/constants/colors.dart';
+import '../shared/skeleton_loaders.dart';
 
 class AdminIndentApprovalPage extends ConsumerStatefulWidget {
   const AdminIndentApprovalPage({super.key});
@@ -89,7 +90,7 @@ class _AdminIndentApprovalPageState
         stream: ref.read(firebaseServiceProvider).streamRequests(null),
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
+            return const AdminIndentApprovalSkeleton();
           }
 
           final pending = snapshot.data

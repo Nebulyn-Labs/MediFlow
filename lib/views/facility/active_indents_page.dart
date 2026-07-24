@@ -5,6 +5,7 @@ import '../../services/ai_service.dart';
 import '../../models/request.dart';
 import '../../models/inventory_item.dart';
 import 'package:med_supply_prototype/constants/colors.dart';
+import '../shared/skeleton_loaders.dart';
 
 class ActiveIndentsPage extends ConsumerStatefulWidget {
   final String facilityId;
@@ -506,7 +507,13 @@ class _ActiveIndentsPageState extends ConsumerState<ActiveIndentsPage> {
           ref.read(firebaseServiceProvider).streamRequests(widget.facilityId),
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Center(child: CircularProgressIndicator());
+          return const Column(
+            children: [
+              SkeletonCard(height: 140),
+              SizedBox(height: 12),
+              SkeletonCard(height: 140),
+            ],
+          );
         }
         if (snapshot.hasError) {
           return Center(
@@ -944,7 +951,7 @@ class _ActiveIndentsPageState extends ConsumerState<ActiveIndentsPage> {
       backgroundColor: MediColors.bg,
       appBar: AppBar(title: const Text('Requests')),
       body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
+          ? const ActiveIndentsSkeleton()
           : SingleChildScrollView(
               controller: _scrollController,
               padding: const EdgeInsets.all(24),
