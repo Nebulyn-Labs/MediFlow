@@ -50,9 +50,32 @@ surplus hospitals to deficit clinics using road-optimized routing.
 
 ## Screenshots & UI Preview
 
-Here is a preview of the MediFlow central command dashboard:
+Here is a preview of the MediFlow home page:
 
-![MediFlow Dashboard Mockup](docs/images/dashboard_preview.jpg)
+![MediFlow home page](docs/images/mediflow_main.png)
+
+MediFlow provides two types of roles:
+
+- Role -> Admin
+
+Here is a preview of Admin Dashboard
+![Admin dashboard](docs/images/admin/admin_dashboard.png)
+
+- Role -> Facility
+
+Here is a preview of Facility manager Dashboard
+![Facility dashboard](docs/images/facility/facility_dashboard.png)
+
+It also provides following features:
+
+- AI analysis of supply
+![facility supply ai analytics](docs/images/admin/admin_request_approval_ai_analysed.png)
+
+- Route optimization for delivery via AI (Admin only)
+![route optimization op](docs/images/admin/admin_route_optimisation_op.png)
+
+- Demand forecast
+![forecast of usage trend](docs/images/facility/facility_forecast.png)
 
 ---
 
@@ -256,6 +279,26 @@ high-concurrency performance:
    ```bash
    flutter run -d chrome
    ```
+
+6. **Configure Firebase App Check (Important):**
+
+   This project uses Firebase App Check to protect backend resources.
+
+   - **Android:** Play Integrity is used in release builds, and debug mode
+     uses a Debug token. You must register your app's SHA-256 certificate
+     in the Firebase Console under App Check.
+
+   - **Web:** We use reCAPTCHA v3. Provide your site key during build or run
+     time:
+
+     ```bash
+     flutter run -d chrome \
+       --dart-define=RECAPTCHA_SITE_KEY=your_recaptcha_site_key
+     ```
+
+     *Note: If no key is provided, the app will continue to run, but App
+     Check will remain inactive for web. If App Check enforcement is enabled
+     in the Firebase Console, requests may be rejected.*
 
 ---
 

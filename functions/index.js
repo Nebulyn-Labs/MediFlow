@@ -1,4 +1,4 @@
-const { onCall, HttpsError } = require("firebase-functions/v2/https");
+const { onCall, onRequest, HttpsError } = require("firebase-functions/v2/https");
 const { onDocumentWritten, onDocumentUpdated } = require("firebase-functions/v2/firestore");
 const { onSchedule } = require("firebase-functions/v2/scheduler");
 const { defineSecret } = require("firebase-functions/params");
@@ -6,6 +6,8 @@ const logger = require("firebase-functions/logger");
 const admin = require("firebase-admin");
 const { GoogleGenerativeAI } = require("@google/generative-ai");
 const { BigQuery } = require("@google-cloud/bigquery");
+const { checkRateLimit, LIMITS } = require("./helpers/rateLimiter");
+const { createBigQueryRecovery } = require("./helpers/bigQueryRecovery");
 
 admin.initializeApp();
 
@@ -50,7 +52,6 @@ async function getUserFacilityAndRole(auth, db) {
 const bigquery = new BigQuery();
 const BQ_DATASET = process.env.BQ_DATASET || "mediflow_analytics";
 const BQ_LOCATION = process.env.BQ_LOCATION || "US";
-const tableReady = new Map();
 
 // Initialize Gemini clients per-invocation using the GEMINI_API_KEY secret.
 // NOTE: GEMINI_API_KEY must be set in Firebase Secrets
@@ -173,44 +174,17 @@ function stockStatus(data) {
   return "healthy";
 }
 
-async function ensureBigQueryTable(tableName) {
-  if (tableReady.has(tableName)) return tableReady.get(tableName);
+const bigQueryRecovery = createBigQueryRecovery({
+  bigquery,
+  firestore: admin.firestore(),
+  logger,
+  tables: BIGQUERY_TABLES,
+  datasetName: BQ_DATASET,
+  location: BQ_LOCATION,
+});
 
-  const promise = (async () => {
-    const dataset = bigquery.dataset(BQ_DATASET);
-    const [datasetExists] = await dataset.exists();
-    if (!datasetExists) {
-      await bigquery.createDataset(BQ_DATASET, { location: BQ_LOCATION });
-    }
-
-    const table = dataset.table(tableName);
-    const [tableExists] = await table.exists();
-    if (!tableExists) {
-      await dataset.createTable(tableName, {
-        schema: { fields: BIGQUERY_TABLES[tableName].schema },
-        timePartitioning: { type: "DAY" },
-      });
-    }
-    return table;
-  })();
-
-  tableReady.set(tableName, promise);
-  return promise;
-}
-
-async function insertBigQuery(tableName, rows) {
-  const rowList = Array.isArray(rows) ? rows : [rows];
-  if (rowList.length === 0) return;
-
-  try {
-    const table = await ensureBigQueryTable(tableName);
-    await table.insert(rowList, {
-      ignoreUnknownValues: true,
-      skipInvalidRows: true,
-    });
-  } catch (error) {
-    logger.error(`BigQuery insert failed for ${tableName}`, error);
-  }
+async function insertBigQuery(tableName, rows, source) {
+  return bigQueryRecovery.insert(tableName, rows, { source });
 }
 
 async function auditEvent({ eventId, action, entityType, entityId, before, after, facilityId, medicineName, metadata, actorId = null }) {
@@ -227,7 +201,7 @@ async function auditEvent({ eventId, action, entityType, entityId, before, after
     before_json: safeJson(before),
     after_json: safeJson(after),
     metadata_json: safeJson(metadata),
-  });
+  }, "audit_event");
 }
 
 /**
@@ -245,6 +219,12 @@ exports.forecastDemand = onCall({ secrets: [GEMINI_API_KEY] }, async (request) =
     throw new HttpsError('permission-denied', 'Unauthorized facility access');
   }
 
+  await checkRateLimit(
+    request.auth.uid,
+    "forecastDemand",
+    LIMITS.AI
+  );
+
   // 1. Fetch facility details
   const facilityDoc = await db.collection("facilities").doc(facilityId).get();
   const facility = facilityDoc.data();
@@ -253,23 +233,23 @@ exports.forecastDemand = onCall({ secrets: [GEMINI_API_KEY] }, async (request) =
   const ninetyDaysAgo = new Date();
   ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 90);
 
-  const usageQuery = await db.collection("facilities")
+  const usageQuery = await db.collection("daily_usage_logs")
     .doc(facilityId)
-    .collection("usage_logs")
-    .where("loggedAt", ">=", admin.firestore.Timestamp.fromDate(ninetyDaysAgo))
+    .collection("logs")
+    .where("date", ">=", admin.firestore.Timestamp.fromDate(ninetyDaysAgo))
     .get();
 
   const usageHistory = usageQuery.docs.map(doc => doc.data());
 
   // 3. Fetch current stock levels
-  const stocksQuery = await db.collection("facilities")
+  const stocksQuery = await db.collection("inventory")
     .doc(facilityId)
-    .collection("stocks")
+    .collection("medicines")
     .get();
 
   const currentStocks = stocksQuery.docs.map(doc => ({
     medicineName: doc.data().medicineName,
-    qtyRemaining: doc.data().qtyRemaining
+    qtyRemaining: doc.data().remainingQuantity
   }));
 
   // 4. Construct Gemini Prompt
@@ -327,6 +307,12 @@ exports.logAIDecision = onCall(async (request) => {
     throw new HttpsError("permission-denied", "Unauthorized facility access");
   }
 
+  await checkRateLimit(
+    request.auth.uid,
+    "logAIDecision",
+    LIMITS.GENERAL
+  );
+
   const decisionId = data.decisionId || `${Date.now()}_${Math.random().toString(36).slice(2)}`;
   await insertBigQuery("ai_decisions", {
     decision_id: decisionId,
@@ -342,7 +328,7 @@ exports.logAIDecision = onCall(async (request) => {
     period_days: Number.isFinite(Number(data.periodDays)) ? Number(data.periodDays) : null,
     input_json: safeJson(data.input),
     output_json: safeJson(data.output),
-  });
+  }, "log_ai_decision");
 
   await auditEvent({
     eventId: `ai_${decisionId}`,
@@ -380,7 +366,7 @@ exports.mirrorRequestToBigQuery = onDocumentWritten("requests/{requestId}", asyn
     notes: rowData.notes || null,
     captured_at: new Date().toISOString(),
     payload_json: safeJson(rowData),
-  });
+  }, "mirror_request");
 
   await auditEvent({
     eventId: `request_${requestId}_${Date.now()}`,
@@ -408,9 +394,73 @@ exports.mirrorRequestToBigQuery = onDocumentWritten("requests/{requestId}", asyn
       period_days: null,
       input_json: null,
       output_json: safeJson(after),
-    });
+    }, "mirror_ai_request");
   }
 });
+
+async function createOrUpdateAlert(db, facilityId, facilityName, medicineId, data, status) {
+  const alertId = `${facilityId}_${medicineId}`;
+  const alertRef = db.collection("alerts").doc(alertId);
+
+  if (status === "healthy") {
+    const alertDoc = await alertRef.get();
+    const existed = alertDoc.exists;
+    if (existed) {
+      await alertRef.delete();
+    }
+    return { existed };
+  }
+
+  if (!facilityName) {
+    const facilityDoc = await db.collection("facilities").doc(facilityId).get();
+    facilityName = facilityDoc.exists ? (facilityDoc.data().name || "") : "";
+  }
+
+  const alertDoc = await alertRef.get();
+  const existed = alertDoc.exists;
+
+  let isRead = false;
+  if (existed) {
+    const oldData = alertDoc.data() || {};
+    if (oldData.type === status) {
+      isRead = oldData.isRead ?? false;
+    }
+  }
+
+  const alertData = {
+    facilityId,
+    facilityName,
+    stockId: medicineId,
+    medicineName: data.medicineName || "",
+    qtyRemaining: Number(data.remainingQuantity || 0),
+    initialQuantity: Number(data.initialQuantity || 0),
+    batchId: data.batchId || "",
+    unit: data.unit || "units",
+    expiryDate: data.expiryDate,
+    type: status,
+    isRead: isRead
+  };
+
+  if (!existed) {
+    alertData.createdAt = admin.firestore.FieldValue.serverTimestamp();
+  }
+
+  await alertRef.set(alertData, { merge: true });
+  return { existed };
+}
+
+async function syncAlertForMedicine(db, facilityId, medicineId, data) {
+  const alertId = `${facilityId}_${medicineId}`;
+  const alertRef = db.collection("alerts").doc(alertId);
+
+  if (!data) {
+    await alertRef.delete();
+    return;
+  }
+
+  const status = stockStatus(data);
+  await createOrUpdateAlert(db, facilityId, null, medicineId, data, status);
+}
 
 exports.mirrorInventoryToBigQuery = onDocumentWritten("inventory/{facilityId}/medicines/{medicineId}", async (event) => {
   const change = event.data;
@@ -422,6 +472,9 @@ exports.mirrorInventoryToBigQuery = onDocumentWritten("inventory/{facilityId}/me
   const initial = Number(data.initialQuantity || 0);
   const remaining = Number(data.remainingQuantity || 0);
   const action = !before && after ? "created" : before && after ? "updated" : "deleted";
+
+  const db = admin.firestore();
+  await syncAlertForMedicine(db, facilityId, medicineId, after);
 
   await insertBigQuery("inventory_snapshots", {
     snapshot_id: `${facilityId}_${medicineId}_${Date.now()}`,
@@ -438,7 +491,7 @@ exports.mirrorInventoryToBigQuery = onDocumentWritten("inventory/{facilityId}/me
     status: after ? stockStatus(data) : "deleted",
     captured_at: new Date().toISOString(),
     payload_json: safeJson(data),
-  });
+  }, "mirror_inventory");
 
   await auditEvent({
     eventId: `inventory_${facilityId}_${medicineId}_${Date.now()}`,
@@ -472,7 +525,7 @@ exports.mirrorUsageLogToBigQuery = onDocumentWritten("daily_usage_logs/{facility
     total_patients: Number(data.totalPatients || 0),
     captured_at: new Date().toISOString(),
     payload_json: safeJson(data),
-  })));
+  })), "mirror_usage_log");
 
   await auditEvent({
     eventId: `usage_${facilityId}_${logId}_${Date.now()}`,
@@ -486,37 +539,41 @@ exports.mirrorUsageLogToBigQuery = onDocumentWritten("daily_usage_logs/{facility
 });
 
 /**
+ * Replays BigQuery writes that exhausted their immediate retry attempts.
+ * The dead-letter documents remain available for operational investigation.
+ */
+exports.retryFailedBigQueryInsertions = onSchedule("every 5 minutes", async () => {
+  await bigQueryRecovery.recoverPending();
+});
+
+/**
  * 2. checkLowStock() - Scheduled daily CRON
- * Scans all facilities and creates alerts.
+ * Scans all facilities and creates/updates alerts.
  */
 exports.checkLowStock = onSchedule("every 24 hours", async () => {
   const db = admin.firestore();
   const facilities = await db.collection("facilities").get();
 
   for (const facilityDoc of facilities.docs) {
-    const stocks = await db.collection("facilities")
+    const medicinesSnapshot = await db.collection("inventory")
       .doc(facilityDoc.id)
-      .collection("stocks")
-      .where("qtyRemaining", "<=", "reorderLevel") // Note: Firestore doesn't support field-to-field comparison natively, so we fetch and filter
+      .collection("medicines")
       .get();
 
-    for (const stockDoc of stocks.docs) {
-      const stock = stockDoc.data();
-      if (stock.qtyRemaining <= stock.reorderLevel) {
-        // Create an alert document
-        await db.collection("alerts").add({
-          facilityId: facilityDoc.id,
-          facilityName: facilityDoc.data().name,
-          stockId: stockDoc.id,
-          medicineName: stock.medicineName,
-          qtyRemaining: stock.qtyRemaining,
-          reorderLevel: stock.reorderLevel,
-          type: "low_stock",
-          createdAt: admin.firestore.FieldValue.serverTimestamp(),
-          isRead: false
-        });
+    for (const medDoc of medicinesSnapshot.docs) {
+      const data = medDoc.data();
+      const status = stockStatus(data);
+      const { existed } = await createOrUpdateAlert(
+        db,
+        facilityDoc.id,
+        facilityDoc.data().name || "",
+        medDoc.id,
+        data,
+        status
+      );
 
-        // Trigger FCM Notification (Assuming FCM token is stored in the facility's user doc)
+      // Trigger FCM Notification for low stock if it's new
+      if (status === "low_stock" && !existed) {
         const userQuery = await db.collection("users")
           .where("facilityId", "==", facilityDoc.id)
           .where("role", "==", "facility_head")
@@ -530,7 +587,7 @@ exports.checkLowStock = onSchedule("every 24 hours", async () => {
               token: user.fcmToken,
               notification: {
                 title: "Low Stock Alert",
-                body: `${stock.medicineName} is below reorder level (${stock.qtyRemaining} left).`
+                body: `${data.medicineName} is below reorder level (${data.remainingQuantity} left).`
               }
             });
           }
@@ -545,62 +602,175 @@ exports.checkLowStock = onSchedule("every 24 hours", async () => {
  * 3. autoRedistribute(requestId)
  * Atomic stock transfer when a request is approved.
  */
-exports.onIndentApproved = onDocumentUpdated('requests/{requestId}', async (event) => {
-  const beforeStatus = event.data.before.data().status;
-  const after = event.data.after.data();
+exports.onIndentApproved = onDocumentUpdated("requests/{requestId}", async (event) => {
+  if (!event || !event.data || !event.data.after || !event.data.after.exists) return;
 
-  // Only fire if status changed to 'approved'
-  if (beforeStatus === 'pending' && after.status === 'approved') {
+  const beforeSnap = event.data.before;
+  const afterSnap = event.data.after;
+
+  const beforeData = beforeSnap && beforeSnap.exists ? beforeSnap.data() : null;
+  const afterData = afterSnap ? afterSnap.data() : null;
+
+  if (!afterData) return;
+
+  const beforeStatus = beforeData ? beforeData.status : null;
+  const afterStatus = afterData.status;
+
+  // Execute only when request transitions to 'approved' status
+  if (beforeStatus !== "approved" && afterStatus === "approved") {
     const db = admin.firestore();
+    const requestId = event.params.requestId;
 
-    const { fromFacilityId, toFacilityId, medicineName, qtyRequested } = after;
+    const {
+      facilityId,
+      fromFacilityId,
+      toFacilityId,
+      donorFacilityId,
+      recipientFacilityId,
+      medicineName,
+      quantity,
+      type,
+    } = afterData;
 
-    // 1. Find source stock (toFacilityId - the surplus provider)
-    const sourceStockQuery = await db.collection("facilities")
-      .doc(toFacilityId)
-      .collection("stocks")
-      .where("medicineName", "==", medicineName)
-      .limit(1)
-      .get();
+    const qty = Number(quantity || 0);
+    if (!medicineName || qty <= 0) return;
 
-    // 2. Find destination stock (fromFacilityId - the requester)
-    const destStockQuery = await db.collection("facilities")
-      .doc(fromFacilityId)
-      .collection("stocks")
-      .where("medicineName", "==", medicineName)
-      .limit(1)
-      .get();
+    const sourceFacility = fromFacilityId || donorFacilityId || null;
+    const destFacility = toFacilityId || recipientFacilityId || null;
 
-    if (sourceStockQuery.empty || destStockQuery.empty) {
-      logger.error("Stock documents not found for redistribution");
-      return;
+    // Case 1: Inter-facility redistribution transfer (both donor and recipient specified)
+    if (sourceFacility && destFacility) {
+      const sourceMedId = medicineName.toLowerCase().replaceAll(" ", "_");
+      const sourceRef = db
+        .collection("inventory")
+        .doc(sourceFacility)
+        .collection("medicines")
+        .doc(sourceMedId);
+
+      const destMedId = medicineName.toLowerCase().replaceAll(" ", "_");
+      const destRef = db
+        .collection("inventory")
+        .doc(destFacility)
+        .collection("medicines")
+        .doc(destMedId);
+
+      try {
+        await db.runTransaction(async (transaction) => {
+          const sourceDoc = await transaction.get(sourceRef);
+          if (!sourceDoc.exists) {
+            throw new Error(
+              `Source stock for ${medicineName} at ${sourceFacility} not found`
+            );
+          }
+          const currentSourceQty = Number(sourceDoc.data()?.remainingQuantity || 0);
+          if (currentSourceQty < qty) {
+            throw new Error(
+              `Insufficient stock at donor ${sourceFacility}: available ${currentSourceQty}, requested ${qty}`
+            );
+          }
+
+          const destDoc = await transaction.get(destRef);
+
+          // Decrement donor stock
+          transaction.update(sourceRef, {
+            remainingQuantity: currentSourceQty - qty,
+            lastUpdated: admin.firestore.FieldValue.serverTimestamp(),
+          });
+
+          // Increment or initialize recipient stock
+          if (destDoc.exists) {
+            const currentDestQty = Number(destDoc.data()?.remainingQuantity || 0);
+            transaction.update(destRef, {
+              remainingQuantity: currentDestQty + qty,
+              lastUpdated: admin.firestore.FieldValue.serverTimestamp(),
+            });
+          } else {
+            transaction.set(destRef, {
+              medicineName: medicineName,
+              batchId: `B-${Math.floor(1000 + Math.random() * 9000)}`,
+              initialQuantity: qty,
+              remainingQuantity: qty,
+              unit: "units",
+              arrivalDate: admin.firestore.FieldValue.serverTimestamp(),
+              expiryDate: admin.firestore.Timestamp.fromDate(
+                new Date(Date.now() + 180 * 86400000)
+              ),
+              lastUpdated: admin.firestore.FieldValue.serverTimestamp(),
+            });
+          }
+
+          transaction.update(event.data.after.ref, {
+            resolvedAt: admin.firestore.FieldValue.serverTimestamp(),
+          });
+        });
+        logger.log(
+          `Redistribution successful: ${qty} units of ${medicineName} from ${sourceFacility} to ${destFacility}`
+        );
+      } catch (err) {
+        logger.error(`Redistribution failed for request ${requestId}:`, err);
+        await event.data.after.ref.update({
+          status: "rejected",
+          rejectionReason: err.message,
+        });
+      }
+    } else if (facilityId) {
+      // Case 2: Facility restock / shortage / surplus request (single target facility)
+      const medId = medicineName.toLowerCase().replaceAll(" ", "_");
+      const medRef = db
+        .collection("inventory")
+        .doc(facilityId)
+        .collection("medicines")
+        .doc(medId);
+
+      try {
+        await db.runTransaction(async (transaction) => {
+          const medDoc = await transaction.get(medRef);
+
+          if (type === "surplus") {
+            // Surplus approved: deduct surplus from local active stock
+            if (medDoc.exists) {
+              const currentQty = Number(medDoc.data()?.remainingQuantity || 0);
+              const newQty = Math.max(0, currentQty - qty);
+              transaction.update(medRef, {
+                remainingQuantity: newQty,
+                lastUpdated: admin.firestore.FieldValue.serverTimestamp(),
+              });
+            }
+          } else {
+            // Indent / Shortage approved: add stock to facility
+            if (medDoc.exists) {
+              const currentQty = Number(medDoc.data()?.remainingQuantity || 0);
+              transaction.update(medRef, {
+                remainingQuantity: currentQty + qty,
+                lastUpdated: admin.firestore.FieldValue.serverTimestamp(),
+              });
+            } else {
+              transaction.set(medRef, {
+                medicineName: medicineName,
+                batchId: `B-${Math.floor(1000 + Math.random() * 9000)}`,
+                initialQuantity: qty,
+                remainingQuantity: qty,
+                unit: "units",
+                arrivalDate: admin.firestore.FieldValue.serverTimestamp(),
+                expiryDate: admin.firestore.Timestamp.fromDate(
+                  new Date(Date.now() + 180 * 86400000)
+                ),
+                lastUpdated: admin.firestore.FieldValue.serverTimestamp(),
+              });
+            }
+          }
+
+          transaction.update(event.data.after.ref, {
+            resolvedAt: admin.firestore.FieldValue.serverTimestamp(),
+          });
+        });
+        logger.log(
+          `Stock updated for request ${requestId} at ${facilityId}: ${type || "indent"} of ${qty} ${medicineName}`
+        );
+      } catch (err) {
+        logger.error(`Stock update failed for request ${requestId}:`, err);
+      }
     }
-
-    const sourceDoc = sourceStockQuery.docs[0];
-    const destDoc = destStockQuery.docs[0];
-
-    // 3. Execute atomic batch write
-    const batch = db.batch();
-
-    // Decrement source
-    batch.update(sourceDoc.ref, {
-      qtyRemaining: admin.firestore.FieldValue.increment(-qtyRequested),
-      updatedAt: admin.firestore.FieldValue.serverTimestamp()
-    });
-
-    // Increment destination
-    batch.update(destDoc.ref, {
-      qtyRemaining: admin.firestore.FieldValue.increment(qtyRequested),
-      updatedAt: admin.firestore.FieldValue.serverTimestamp()
-    });
-
-    // Update request resolution
-    batch.update(event.data.after.ref, {
-      resolvedAt: admin.firestore.FieldValue.serverTimestamp()
-    });
-
-    await batch.commit();
-    logger.log(`Redistribution successful: ${qtyRequested} units of ${medicineName} from ${toFacilityId} to ${fromFacilityId}`);
   }
 });
 
@@ -670,6 +840,12 @@ exports.getForecastSecure = onCall({ secrets: [GEMINI_API_KEY] }, async (request
   const db = admin.firestore();
   await getUserFacilityAndRole(request.auth, db);
 
+  await checkRateLimit(
+    request.auth.uid,
+    "getForecastSecure",
+    LIMITS.AI
+  );
+
   const { medicineName, logs, daysToForecast } = request.data;
   const logSummary = logs
     .map(l => `Date: ${l.date}, Used: ${l.used}`)
@@ -696,6 +872,12 @@ exports.generateSmartAlertsSecure = onCall({ secrets: [GEMINI_API_KEY] }, async 
   await getUserFacilityAndRole(request.auth, db);
 
   const { inventory } = request.data;
+  await checkRateLimit(
+    request.auth.uid,
+    "generateSmartAlertsSecure",
+    LIMITS.AI
+  );
+
   const payload = inventory
     .map(i => `${i.medicineName} (Batch: ${i.batchId}): ${i.remainingQuantity}/${i.initialQuantity} units left. Expiry: ${i.expiryDate}`)
     .join('\n');
@@ -725,6 +907,11 @@ exports.getChatResponseSecure = onCall({ secrets: [GEMINI_API_KEY] }, async (req
   if (!authInfo.isAdmin && clientContext && clientContext.current_facility_id && clientContext.current_facility_id !== authInfo.userFacilityId) {
     throw new HttpsError('permission-denied', 'Unauthorized facility access in chat context');
   }
+  await checkRateLimit(
+    request.auth.uid,
+    "getChatResponseSecure",
+    LIMITS.AI
+  );
 
   const contextStr = JSON.stringify(clientContext);
 
@@ -813,6 +1000,12 @@ exports.callGeminiSecure = onCall({ secrets: [GEMINI_API_KEY] }, async (request)
   const db = admin.firestore();
   await getUserFacilityAndRole(request.auth, db);
 
+  await checkRateLimit(
+    request.auth.uid,
+    "callGeminiSecure",
+    LIMITS.AI
+  );
+
   const { prompt, imageBase64, imageMimeType } = request.data;
   try {
     const genAI = getGenAI();
@@ -882,4 +1075,66 @@ exports.adminDeleteResource = onCall(async (request) => {
   await ref.delete();
 
   return { success: true };
+});
+const cspReportLastSeen = new Map();
+const CSP_REPORT_MAX_BODY_BYTES = 10 * 1024; // 10KB
+const CSP_REPORT_MIN_INTERVAL_MS = 5000; // 1 report per IP per 5s
+const CSP_REPORT_MAP_MAX_SIZE = 5000; // hard cap to bound memory
+
+function getClientIp(req) {
+  // Cloud Run / GFE APPENDS the real client IP as the LAST entry in
+  // X-Forwarded-For; every entry before that can be spoofed by the client.
+  const xff = req.headers["x-forwarded-for"];
+  if (xff) {
+    const parts = xff.split(",").map((p) => p.trim()).filter(Boolean);
+    if (parts.length > 0) return parts[parts.length - 1];
+  }
+  return req.ip || "unknown";
+}
+
+function pruneCspReportMap(now) {
+  // Periodic sweep: drop stale entries, and if we're still oversized
+  // (e.g. distinct-IP flood), drop the oldest entries outright.
+  for (const [ip, ts] of cspReportLastSeen) {
+    if (now - ts >= CSP_REPORT_MIN_INTERVAL_MS) {
+      cspReportLastSeen.delete(ip);
+    }
+  }
+  if (cspReportLastSeen.size > CSP_REPORT_MAP_MAX_SIZE) {
+    const excess = cspReportLastSeen.size - CSP_REPORT_MAP_MAX_SIZE;
+    const oldestKeys = Array.from(cspReportLastSeen.keys()).slice(0, excess);
+    for (const key of oldestKeys) {
+      cspReportLastSeen.delete(key);
+    }
+  }
+}
+
+exports.cspReport = onRequest(async (req, res) => {
+  if (req.method !== "POST") {
+    res.status(405).send("Method Not Allowed");
+    return;
+  }
+
+  const contentLength = Number(req.headers["content-length"] || 0);
+  if (contentLength > CSP_REPORT_MAX_BODY_BYTES) {
+    res.status(413).send("Payload Too Large");
+    return;
+  }
+
+  const ip = getClientIp(req);
+  const now = Date.now();
+
+  if (cspReportLastSeen.size > CSP_REPORT_MAP_MAX_SIZE) {
+    pruneCspReportMap(now);
+  }
+
+  const lastSeen = cspReportLastSeen.get(ip);
+  if (lastSeen && now - lastSeen < CSP_REPORT_MIN_INTERVAL_MS) {
+    res.status(429).send("Too Many Requests");
+    return;
+  }
+  cspReportLastSeen.set(ip, now);
+
+  logger.warn("CSP Violation Report", { report: req.body });
+  res.status(204).send();
 });

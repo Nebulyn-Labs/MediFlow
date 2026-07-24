@@ -67,5 +67,11 @@ service cloud.firestore {
       allow read: if isAdmin();
       allow write: if false;
     }
+
+    // Alerts collection
+    match /alerts/{alertId} {
+      allow read: if isAdmin() || (isAuthenticated() && resource != null && isFacilityUser(resource.data.facilityId));
+      allow write: if isAdmin();
+    }
   }
 }
