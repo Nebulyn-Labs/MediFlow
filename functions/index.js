@@ -1152,3 +1152,12 @@ exports.cspReport = onRequest(async (req, res) => {
   logger.warn("CSP Violation Report", { report: req.body });
   res.status(204).send();
 });
+
+// Exported for testability
+module.exports.stockStatus = stockStatus;
+module.exports.safeJson = safeJson;
+module.exports.toIsoTimestamp = toIsoTimestamp;
+module.exports.toBigQueryDate = toBigQueryDate;
+module.exports.getUserFacilityAndRole = getUserFacilityAndRole;
+module.exports.createOrUpdateAlert = createOrUpdateAlert;
+module.exports.executeTool = executeTool;
