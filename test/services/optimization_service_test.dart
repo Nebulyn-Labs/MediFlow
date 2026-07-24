@@ -1,44 +1,84 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:mediflow/models/facility.dart';
-import 'package:mediflow/models/request.dart';
-import 'package0mediflow/models/transfer_recommendation.dart'; // Adjust if model import uses request/indent
-import 'package:mediflow/services/optimization_service.dart';
+import 'package:med_supply_prototype/models/facility.dart';
+import 'package:med_supply_prototype/models/inventory_item.dart';
+import 'package:med_supply_prototype/models/request.dart';
+import 'package:med_supply_prototype/services/optimization_service.dart';
 
 void main() {
-  group('OptimizationService - Missing Facility Guard (#99)', () {
-    test('calculateOptimalTransfers gracefully skips requests referencing non-existent facilityId', () {
-      final activeFacility = Facility(
-        id: 'fac-1',
-        name: 'District Hospital',
-        district: 'Central',
+  group('OptimizationService', () {
+    test('skips requests that reference a missing facility', () {
+      final service = OptimizationService();
+      final now = DateTime.now();
+
+      final donorFacility = Facility(
+        id: 'facility-donor',
+        name: 'Urban District Hospital',
+        email: 'donor@mediflow.com',
+        type: 'urban',
+        region: 'UP',
+        latitude: 28.6149,
+        longitude: 77.2100,
+        createdAt: now,
+      );
+
+      final recipientFacility = Facility(
+        id: 'facility-recipient',
+        name: 'Rural PHC',
+        email: 'recipient@mediflow.com',
+        type: 'rural',
+        region: 'UP',
         latitude: 28.6139,
         longitude: 77.2090,
-        inventory: {'Paracetamol': 500},
+        createdAt: now,
       );
 
-      final validIndent = IndentRequest(
+      final validRequest = MedRequest(
         id: 'req-valid',
-        facilityId: 'fac-1',
+        facilityId: recipientFacility.id,
         medicineName: 'Paracetamol',
-        requestedQty: 50,
-        createdAt: DateTime.now(),
+        type: RequestType.regularIndent,
+        quantity: 100,
+        requestDate: now,
+        status: RequestStatus.pending,
       );
 
-      final orphanIndent = IndentRequest(
-        id: 'req-ghost',
-        facilityId: 'deleted-facility-999',
+      final orphanRequest = MedRequest(
+        id: 'req-orphan',
+        facilityId: 'missing-facility',
         medicineName: 'Paracetamol',
-        requestedQty: 100,
-        createdAt: DateTime.now(),
+        type: RequestType.regularIndent,
+        quantity: 75,
+        requestDate: now,
+        status: RequestStatus.pending,
       );
 
-      final transfers = OptimizationService.calculateOptimalTransfers(
-        facilities: [activeFacility],
-        pendingIndents: [validIndent, orphanIndent],
+      final surplusInventory = InventoryItem(
+        id: 'inv-donor-1',
+        medicineName: 'Paracetamol',
+        batchId: 'batch-001',
+        arrivalDate: now,
+        expiryDate: now.add(const Duration(days: 90)),
+        initialQuantity: 1000,
+        remainingQuantity: 700,
+        unit: 'tablets',
+        lastUpdated: now,
+        facilityId: donorFacility.id,
       );
 
-      expect(transfers, isA<List<dynamic>>());
-      expect(transfers.any((t) => t.indentId == 'req-ghost'), isFalse);
+      final recommendations = service.calculateOptimalTransfers(
+        facilities: [donorFacility, recipientFacility],
+        inventories: {
+          donorFacility.id: [surplusInventory],
+          recipientFacility.id: const [],
+        },
+        requests: [orphanRequest, validRequest],
+      );
+
+      expect(recommendations, hasLength(1));
+      expect(recommendations.first.donor.id, donorFacility.id);
+      expect(recommendations.first.recipient.id, recipientFacility.id);
+      expect(recommendations.first.quantity, 100);
+      expect(recommendations.first.medicine, 'Paracetamol');
     });
   });
 }
