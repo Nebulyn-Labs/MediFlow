@@ -8,7 +8,8 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 
 import 'package:med_supply_prototype/constants/colors.dart';
 import 'services/firebase_setup.dart';
-import 'services/theme_provider.dart';import 'views/auth/role_selection_screen.dart';
+import 'services/theme_provider.dart';
+import 'views/auth/role_selection_screen.dart';
 import 'views/auth/login_screen.dart';
 import 'views/shared/sidebar_layout.dart';
 import 'views/shared/help_page.dart';
@@ -171,129 +172,7 @@ class MediFlowApp extends ConsumerWidget {
       scrollBehavior: AppScrollBehavior(),
       themeMode: themeMode,
       theme: _buildTheme(Brightness.light),
-      darkTheme: ThemeData(
-        useMaterial3: true,
-        brightness: Brightness.dark,        scaffoldBackgroundColor: MediColors.bg,
-        colorScheme: ColorScheme.dark(
-          surface: MediColors.surface,
-          primary: MediColors.primary,
-          secondary: MediColors.cyan,
-          error: MediColors.error,
-          onSurface: MediColors.textPrimary,
-          onPrimary: Colors.white,
-          outline: MediColors.border,
-        ),
-        textTheme: GoogleFonts.interTextTheme(
-          ThemeData.dark().textTheme,
-        ),
-        cardTheme: CardThemeData(
-          color: MediColors.surface,
-          elevation: 0,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
-            side: BorderSide(color: MediColors.border),
-          ),
-        ),
-        appBarTheme: const AppBarTheme(
-          backgroundColor: Colors.transparent,
-          elevation: 0,
-          centerTitle: false,
-          titleTextStyle: TextStyle(
-            fontSize: 20,
-            fontWeight: FontWeight.w700,
-            color: MediColors.textPrimary,
-          ),
-          iconTheme: IconThemeData(color: MediColors.textSecondary),
-        ),
-        inputDecorationTheme: InputDecorationTheme(
-          filled: true,
-          fillColor: MediColors.surfaceLight,
-          border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12),
-            borderSide: BorderSide(color: MediColors.border),
-          ),
-          enabledBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12),
-            borderSide: BorderSide(color: MediColors.border),
-          ),
-          focusedBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12),
-            borderSide: const BorderSide(color: MediColors.primary, width: 2),
-          ),
-          labelStyle: const TextStyle(color: MediColors.textSecondary),
-          hintStyle: const TextStyle(color: MediColors.textMuted),
-        ),
-        filledButtonTheme: FilledButtonThemeData(
-          style: FilledButton.styleFrom(
-            backgroundColor: MediColors.primary,
-            foregroundColor: Colors.white,
-            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-            shape:
-                RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-            textStyle:
-                const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
-          ),
-        ),
-        outlinedButtonTheme: OutlinedButtonThemeData(
-          style: OutlinedButton.styleFrom(
-            foregroundColor: MediColors.primary,
-            side: const BorderSide(color: MediColors.border),
-            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-            shape:
-                RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-          ),
-        ),
-        dividerTheme:
-            const DividerThemeData(color: MediColors.border, thickness: 1),
-        snackBarTheme: SnackBarThemeData(
-          backgroundColor: MediColors.surfaceLight,
-          contentTextStyle: const TextStyle(color: MediColors.textPrimary),
-          shape:
-              RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-          behavior: SnackBarBehavior.floating,
-        ),
-        popupMenuTheme: PopupMenuThemeData(
-          color: MediColors.surfaceLight,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-            side: BorderSide(color: MediColors.border),
-          ),
-        ),
-        dialogTheme: DialogThemeData(
-          backgroundColor: MediColors.surface,
-          shape:
-              RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-          titleTextStyle: const TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.w700,
-              color: MediColors.textPrimary),
-        ),
-        tabBarTheme: TabBarThemeData(
-          labelColor: MediColors.primary,
-          unselectedLabelColor: MediColors.textMuted,
-          indicatorColor: MediColors.primary,
-          dividerColor: MediColors.border,
-        ),
-        dataTableTheme: DataTableThemeData(
-          headingTextStyle: const TextStyle(
-              fontWeight: FontWeight.w600,
-              color: MediColors.textSecondary,
-              fontSize: 13),
-          dataTextStyle:
-              const TextStyle(color: MediColors.textPrimary, fontSize: 13),
-          headingRowColor: WidgetStateProperty.all(MediColors.surfaceLight),
-          dataRowColor: WidgetStateProperty.resolveWith((states) {
-            if (states.contains(WidgetState.hovered)) {
-              return MediColors.surfaceHover;
-            }
-            return Colors.transparent;
-          }),
-          dividerThickness: 1,
-          decoration: const BoxDecoration(
-border: Border(
-                  bottom: BorderSide(color: MediColors.border, width: 0.5))),
-        ),
-      ),
+      darkTheme: _buildTheme(Brightness.dark),
       routerConfig: _router,
     );
   }
@@ -313,6 +192,8 @@ border: Border(
         isDark ? MediColors.textSecondary : MediColorsLight.textSecondary;
     final textMuted = isDark ? MediColors.textMuted : MediColorsLight.textMuted;
     final primary = isDark ? MediColors.primary : MediColorsLight.primary;
+    final secondary =
+        isDark ? MediColors.cyan : MediColorsLight.cyan;
     final error = isDark ? MediColors.error : MediColorsLight.error;
 
     return ThemeData(
@@ -323,7 +204,7 @@ border: Border(
           ? ColorScheme.dark(
               surface: surface,
               primary: primary,
-              secondary: MediColors.cyan,
+              secondary: secondary,
               error: error,
               onSurface: textPrimary,
               onPrimary: Colors.white,
@@ -332,7 +213,7 @@ border: Border(
           : ColorScheme.light(
               surface: surface,
               primary: primary,
-              secondary: MediColorsLight.cyan,
+              secondary: secondary,
               error: error,
               onSurface: textPrimary,
               onPrimary: Colors.white,
