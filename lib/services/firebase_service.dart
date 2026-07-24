@@ -148,6 +148,8 @@ class FirebaseService {
           'remainingQuantity': current + quantity,
           'lastUpdated': Timestamp.now(),
         });
+      } else {
+        throw Exception('Inventory document not found for medicine: $medicineName');
       }
     });
   }
@@ -241,14 +243,16 @@ class FirebaseService {
     await _firestore.runTransaction((transaction) async {
       // 1. Update Inventory
       final invDoc = await transaction.get(invRef);
-      if (invDoc.exists) {
-        int remaining = invDoc.data()?['remainingQuantity'] ?? 0;
-        int actualDeduction = min(quantity, remaining);
-        transaction.update(invRef, {
-          'remainingQuantity': remaining - actualDeduction,
-          'lastUpdated': Timestamp.now(),
-        });
+      if (!invDoc.exists) {
+        throw Exception('Inventory document not found for medicine: $medicineName');
       }
+
+      int remaining = invDoc.data()?['remainingQuantity'] ?? 0;
+      int actualDeduction = min(quantity, remaining);
+      transaction.update(invRef, {
+        'remainingQuantity': remaining - actualDeduction,
+        'lastUpdated': Timestamp.now(),
+      });
 
       // 2. Update Daily Log
       final logDoc = await transaction.get(logRef);
@@ -334,6 +338,14 @@ class FirebaseService {
         });
       }
     });
+  }
+
+  Future<List<Map<String, dynamic>>> getAlertsOnce(String facilityId) async {
+    final snapshot = await _firestore
+        .collection('alerts')
+        .where('facilityId', isEqualTo: facilityId)
+        .get();
+    return snapshot.docs.map((doc) => doc.data()).toList();
   }
 
   // --- CLEANUP & SEEDING ---
