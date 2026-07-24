@@ -232,94 +232,6 @@ async function auditEvent({ eventId, action, entityType, entityId, before, after
 }
 
 /**
- * 1. forecastDemand(facilityId, medicineNames[])
- * Calls Gemini to predict demand based on 90-day history.
- */
-exports.forecastDemand = onCall({ secrets: [GEMINI_API_KEY] }, async (request) => {
-  if (!request.auth) throw new HttpsError('unauthenticated', 'User must log in');
-
-  const { facilityId, medicineNames } = request.data;
-  const db = admin.firestore();
-
-  const authInfo = await getUserFacilityAndRole(request.auth, db);
-  if (!authInfo.isAdmin && facilityId !== authInfo.userFacilityId) {
-    throw new HttpsError('permission-denied', 'Unauthorized facility access');
-  }
-
-  await checkRateLimit(
-    request.auth.uid,
-    "forecastDemand",
-    LIMITS.AI
-  );
-
-  // 1. Fetch facility details
-  const facilityDoc = await db.collection("facilities").doc(facilityId).get();
-  const facility = facilityDoc.data();
-
-  // 2. Fetch last 90 days of usage_logs
-  const ninetyDaysAgo = new Date();
-  ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 90);
-
-  const usageQuery = await db.collection("facilities")
-    .doc(facilityId)
-    .collection("usage_logs")
-    .where("loggedAt", ">=", admin.firestore.Timestamp.fromDate(ninetyDaysAgo))
-    .get();
-
-  const usageHistory = usageQuery.docs.map(doc => doc.data());
-
-  // 3. Fetch current stock levels
-  const stocksQuery = await db.collection("facilities")
-    .doc(facilityId)
-    .collection("stocks")
-    .get();
-
-  const currentStocks = stocksQuery.docs.map(doc => ({
-    medicineName: doc.data().medicineName,
-    qtyRemaining: doc.data().qtyRemaining
-  }));
-
-  // 4. Construct Gemini Prompt
-  const genAI = getGenAI();
-  const model = genAI.getGenerativeModel({ model: "gemini-1.5-pro" });
-  const prompt = `
-    SYSTEM: You are a medical supply chain forecasting AI. Analyze the provided 90-day usage history for a healthcare facility and predict demand for the next 30 days per medicine. Be conservative. Account for seasonal spikes. Return ONLY valid JSON matching the schema.
-
-    USER: 
-    Facility: ${facility.name}. District: ${facility.district}.
-    Historical Usage Data (last 90 days): ${JSON.stringify(usageHistory)}
-    Current Stock Levels: ${JSON.stringify(currentStocks)}
-    Target Medicines: ${medicineNames.join(", ")}
-
-    JSON Schema response (enforce strictly):
-    {
-      "forecasts": [
-        {
-          "medicineName": "string",
-          "predictedQty30Days": "integer",
-          "reorderRecommended": "boolean",
-          "confidence": "low|medium|high",
-          "rationale": "string (max 30 words)"
-        }
-      ],
-      "overallRiskLevel": "low|medium|critical",
-      "summary": "string (max 50 words)"
-    }
-  `;
-
-  try {
-    const result = await model.generateContent(prompt);
-    const responseText = result.response.text();
-    // Use regex to extract JSON if Gemini wraps it in markdown blocks
-    const jsonMatch = responseText.match(/\{[\s\S]*\}/);
-    return JSON.parse(jsonMatch ? jsonMatch[0] : responseText);
-  } catch (error) {
-    logger.error("Gemini Error:", error);
-    throw new HttpsError('internal', 'AI forecasting failed');
-  }
-});
-
-/**
  * 1b. logAIDecision()
  * Explicit audit hook for client-side AI forecasts and stock-analysis decisions.
  */
@@ -689,37 +601,6 @@ async function executeTool(name, args, authInfo) {
   }
   throw new Error(`Unknown function call: ${name}`);
 }
-
-exports.getForecastSecure = onCall({ secrets: [GEMINI_API_KEY] }, async (request) => {
-  if (!request.auth) throw new HttpsError('unauthenticated', 'User must log in');
-
-  const db = admin.firestore();
-  await getUserFacilityAndRole(request.auth, db);
-
-  await checkRateLimit(
-    request.auth.uid,
-    "getForecastSecure",
-    LIMITS.AI
-  );
-
-  const { medicineName, logs, daysToForecast } = request.data;
-  const logSummary = logs
-    .map(l => `Date: ${l.date}, Used: ${l.used}`)
-    .join('\n');
-  const prompt = `Forecast ${daysToForecast} days for ${medicineName}. History:\n${logSummary}\nOutput JSON: {"prediction": int, "reasoning": "string"}`;
-
-  try {
-    const genAI = getGenAI();
-    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
-    const result = await model.generateContent(prompt);
-    const responseText = result.response.text();
-    const jsonMatch = responseText.match(/\{[\s\S]*\}/);
-    return JSON.parse(jsonMatch ? jsonMatch[0] : responseText);
-  } catch (error) {
-    logger.error("Gemini Error:", error);
-    throw new HttpsError('internal', 'AI forecasting failed');
-  }
-});
 
 exports.generateSmartAlertsSecure = onCall({ secrets: [GEMINI_API_KEY] }, async (request) => {
   if (!request.auth) throw new HttpsError('unauthenticated', 'User must log in');
