@@ -7,6 +7,7 @@ import 'package:intl/intl.dart';
 
 import '../models/inventory_item.dart';
 import '../models/daily_usage_log.dart';
+import '../models/request.dart';
 
 /// Handles converting MediFlow domain models into CSV files and letting the
 /// user save/download them. Works across web, desktop and mobile since it
@@ -14,6 +15,7 @@ import '../models/daily_usage_log.dart';
 /// `dart:io`.
 class CsvExportService {
   static final DateFormat _dateFmt = DateFormat('yyyy-MM-dd');
+  static final DateFormat _dateTimeFmt = DateFormat('yyyy-MM-dd HH:mm');
   static final DateFormat _stampFmt = DateFormat('yyyyMMdd_HHmmss');
 
   /// Exports the given inventory list as a CSV file and prompts the user to
@@ -90,6 +92,84 @@ class CsvExportService {
 
     final fileName =
         'usage_logs_${_slug(facilityName)}${_stampFmt.format(DateTime.now())}.csv';
+    return _saveCsv(rows, fileName);
+  }
+
+  /// Exports transfer request history as CSV and prompts the user to
+  /// save/download it.
+  static Future<String?> exportTransferRequestHistory(
+    List<MedRequest> requests, {
+    String? facilityName,
+  }) async {
+    final rows = buildTransferRequestHistoryRows(requests);
+    final fileName =
+        'transfer_requests_${_slug(facilityName)}${_stampFmt.format(DateTime.now())}.csv';
+    return _saveCsv(rows, fileName);
+  }
+
+  static List<List<dynamic>> buildTransferRequestHistoryRows(
+      List<MedRequest> requests) {
+    final rows = <List<dynamic>>[
+      [
+        'Submitted Date',
+        'Medicine Name',
+        'Request Type',
+        'Quantity',
+        'Status',
+        'Resolved At',
+        'Rejection Reason',
+      ],
+    ];
+
+    for (final req in requests) {
+      rows.add([
+        _dateFmt.format(req.requestDate),
+        req.medicineName,
+        req.type == RequestType.surplus
+            ? 'Offering Redistribution'
+            : 'Requesting Restock',
+        req.quantity,
+        req.status.name.toUpperCase(),
+        req.resolvedAt == null ? '' : _dateTimeFmt.format(req.resolvedAt!),
+        req.rejectionReason ?? '',
+      ]);
+    }
+
+    return rows;
+  }
+
+  /// Exports transfer request history as CSV with columns aligned to the
+  /// admin transfer request status table.
+  static Future<String?> exportTransferRequests(
+    List<MedRequest> requests,
+  ) async {
+    final rows = <List<dynamic>>[
+      [
+        'Date',
+        'Facility',
+        'Medicine',
+        'Quantity',
+        'Status',
+        'Global Optimization',
+      ],
+    ];
+
+    final sorted = [...requests]
+      ..sort((a, b) => b.requestDate.compareTo(a.requestDate));
+    for (final request in sorted) {
+      final facilityLabel =
+          request.facilityId.replaceAll('_', ' ').toUpperCase();
+      rows.add([
+        _dateFmt.format(request.requestDate),
+        facilityLabel,
+        request.medicineName,
+        request.quantity,
+        request.status.name.toUpperCase(),
+        request.status == RequestStatus.approved ? 'Optimize Routes' : '—',
+      ]);
+    }
+
+    final fileName = 'transfer_requests_${_stampFmt.format(DateTime.now())}.csv';
     return _saveCsv(rows, fileName);
   }
 
