@@ -38,6 +38,7 @@ dependencies:
   csv: ^8.0.0
   firebase_app_check: ^0.3.2+10
   vector_math: ^2.2.0
+  shared_preferences: ^2.3.3
 
 dev_dependencies:
   flutter_test:

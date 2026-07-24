@@ -5,7 +5,11 @@ import '../../services/firebase_service.dart';
 import '../../models/inventory_item.dart';
 import 'package:med_supply_prototype/constants/colors.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+import '../../services/theme_provider.dart';
+
 import 'scroll_to_top_button.dart';
+
 class SidebarLayout extends ConsumerStatefulWidget {
   final Widget child;
   final String role;
@@ -198,12 +202,30 @@ bool _isExpanded = false;
                     },
                   ),
 
-                  const Spacer(),
+const Spacer(),
+
+                  // Theme Toggle
+                  Consumer(
+                    builder: (context, ref, _) {
+                      final themeMode = ref.watch(themeProvider);
+                      final isDark = themeMode == ThemeMode.dark;
+                      return _buildNavItem(
+                        _NavItem(
+                          isDark
+                              ? Icons.light_mode_rounded
+                              : Icons.dark_mode_rounded,
+                          isDark ? 'Light Mode' : 'Dark Mode',
+                        ),
+                        false,
+                        () => ref.read(themeProvider.notifier).toggleTheme(),
+                      );
+                    },
+                  ),
+                  const SizedBox(height: 8),
 
                   // Logout
                   _buildNavItem(
-                    _NavItem(Icons.logout_rounded, 'Logout'),
-                    false,
+                    _NavItem(Icons.logout_rounded, 'Logout'),                    false,
                     () async {
                       try {
                         await FirebaseAuth.instance.signOut();
