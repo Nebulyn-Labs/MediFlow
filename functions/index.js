@@ -6,7 +6,7 @@ const logger = require("firebase-functions/logger");
 const admin = require("firebase-admin");
 const { GoogleGenerativeAI } = require("@google/generative-ai");
 const { BigQuery } = require("@google-cloud/bigquery");
-const { checkRateLimit, LIMITS } = require("./helpers/rateLimiter");
+const { checkRateLimit, cleanupExpiredRateLimits, LIMITS } = require("./helpers/rateLimiter");
 const { createBigQueryRecovery } = require("./helpers/bigQueryRecovery");
 const {
   sanitizeUserInput,
@@ -552,6 +552,17 @@ exports.mirrorUsageLogToBigQuery = onDocumentWritten("daily_usage_logs/{facility
  */
 exports.retryFailedBigQueryInsertions = onSchedule("every 5 minutes", async () => {
   await bigQueryRecovery.recoverPending();
+});
+
+/**
+ * 1d. cleanupExpiredRateLimits() - Scheduled hourly CRON
+ * Removes stale rate-limit documents to keep storage bounded.
+ */
+exports.cleanupExpiredRateLimits = onSchedule("every 1 hours", async () => {
+  const result = await cleanupExpiredRateLimits();
+  if (result.deletedCount > 0) {
+    logger.log(`Cleaned up ${result.deletedCount} expired rate-limit records`);
+  }
 });
 
 /**
