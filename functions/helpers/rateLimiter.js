@@ -12,11 +12,20 @@ const LIMITS = {
   },
 };
 
+const COLLECTION = "rate_limits";
+const CLEANUP_BATCH_SIZE = 100;
+
+function computeTtl(windowStartMs, windowMs) {
+  return admin.firestore.Timestamp.fromMillis(
+    windowStartMs + windowMs + 60 * 60 * 1000
+  );
+}
+
 async function checkRateLimit(uid, endpoint, config) {
   const db = admin.firestore();
 
   const docRef = db
-    .collection("rate_limits")
+    .collection(COLLECTION)
     .doc(`${uid}_${endpoint}`);
 
   await db.runTransaction(async (transaction) => {
@@ -24,11 +33,13 @@ async function checkRateLimit(uid, endpoint, config) {
 
     const now = admin.firestore.Timestamp.now();
     const nowMillis = now.toMillis();
+    const ttl = computeTtl(nowMillis, config.windowMs);
 
     if (!snapshot.exists) {
       transaction.set(docRef, {
         count: 1,
         windowStart: now,
+        ttl,
       });
       return;
     }
@@ -39,6 +50,7 @@ async function checkRateLimit(uid, endpoint, config) {
       transaction.set(docRef, {
         count: 1,
         windowStart: now,
+        ttl,
       });
       return;
     }
@@ -56,7 +68,41 @@ async function checkRateLimit(uid, endpoint, config) {
   });
 }
 
+async function cleanupExpiredRateLimits() {
+  const db = admin.firestore();
+
+  const now = admin.firestore.Timestamp.now();
+  const expiredQuery = db
+    .collection(COLLECTION)
+    .where("ttl", "<", now)
+    .limit(CLEANUP_BATCH_SIZE);
+
+  let totalDeleted = 0;
+  let hasMore = true;
+
+  while (hasMore) {
+    const snapshot = await expiredQuery.get();
+
+    if (snapshot.empty) {
+      hasMore = false;
+      break;
+    }
+
+    const batch = db.batch();
+    snapshot.docs.forEach((doc) => batch.delete(doc.ref));
+    await batch.commit();
+
+    totalDeleted += snapshot.size;
+    hasMore = snapshot.size === CLEANUP_BATCH_SIZE;
+  }
+
+  return { deletedCount: totalDeleted };
+}
+
 module.exports = {
   checkRateLimit,
+  cleanupExpiredRateLimits,
   LIMITS,
+  COLLECTION,
+  CLEANUP_BATCH_SIZE,
 };
