@@ -1034,6 +1034,48 @@ exports.callGeminiSecure = onCall({ secrets: [GEMINI_API_KEY] }, async (request)
   }
 });
 
+exports.adminDeleteResource = onCall(async (request) => {
+  if (!request.auth) throw new HttpsError("unauthenticated", "User must log in");
+  
+  const db = admin.firestore();
+  const authInfo = await getUserFacilityAndRole(request.auth, db);
+  
+  if (!authInfo.isAdmin) {
+    throw new HttpsError("permission-denied", "Only administrators can perform destructive actions");
+  }
+
+  const { resourceType, resourceId } = request.data;
+  
+  if (!["facilities", "requests"].includes(resourceType)) {
+    throw new HttpsError("invalid-argument", "Invalid resource type for deletion");
+  }
+
+  const ref = db.collection(resourceType).doc(resourceId);
+  const doc = await ref.get();
+  
+  if (!doc.exists) {
+    throw new HttpsError("not-found", "Resource not found");
+  }
+  
+  const data = doc.data();
+
+  // Create audit log in Firestore
+  const auditRef = db.collection("audit_logs").doc();
+  await auditRef.set({
+    adminId: request.auth.uid,
+    timestamp: admin.firestore.FieldValue.serverTimestamp(),
+    action: `delete_${resourceType.slice(0, -1)}`, // e.g. delete_facility, delete_request
+    resourceType: resourceType,
+    resourceId: resourceId,
+    metadata: data,
+    status: "success"
+  });
+
+  // Delete the resource
+  await ref.delete();
+
+  return { success: true };
+});
 const cspReportLastSeen = new Map();
 const CSP_REPORT_MAX_BODY_BYTES = 10 * 1024; // 10KB
 const CSP_REPORT_MIN_INTERVAL_MS = 5000; // 1 report per IP per 5s

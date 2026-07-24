@@ -28,7 +28,7 @@ service cloud.firestore {
       
       allow create: if isAdmin() || (isAuthenticated() && request.auth.token.email.lower() == request.resource.data.email.lower());
       allow update: if isAdmin() || (isAuthenticated() && request.auth.token.email.lower() == resource.data.email.lower() && request.auth.token.email.lower() == request.resource.data.email.lower());
-      allow delete: if isAdmin();
+      allow delete: if false; // Admin deletions must go through backend audit Callable Function
     }
 
     // Inventory collection
@@ -59,7 +59,13 @@ service cloud.firestore {
       allow read: if isAdmin() || (isAuthenticated() && resource != null && isFacilityUser(resource.data.facilityId));
       allow create: if isAdmin() || (isAuthenticated() && request.resource.data.facilityId != null && isFacilityUser(request.resource.data.facilityId));
       allow update: if isAdmin() || (isAuthenticated() && isFacilityUser(resource.data.facilityId) && request.resource.data.facilityId == resource.data.facilityId);
-      allow delete: if isAdmin() || (isAuthenticated() && isFacilityUser(resource.data.facilityId));
+      allow delete: if (isAuthenticated() && isFacilityUser(resource.data.facilityId)); // Admin deletions must go through backend audit Callable Function
+    }
+
+    // Audit Logs collection
+    match /audit_logs/{logId} {
+      allow read: if isAdmin();
+      allow write: if false;
     }
 
     // Alerts collection
