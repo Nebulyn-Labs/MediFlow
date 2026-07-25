@@ -23,6 +23,7 @@ class FakeFirebaseService implements FirebaseService {
   final List<Facility> facilities;
   final List<InventoryItem> inventory;
   final List<MedRequest> requests;
+  int getFacilitiesCallCount = 0;
 
   FakeFirebaseService({
     required this.facilities,
@@ -32,6 +33,7 @@ class FakeFirebaseService implements FirebaseService {
 
   @override
   Future<List<Facility>> getFacilities() async {
+    getFacilitiesCallCount++;
     return facilities;
   }
 
@@ -56,6 +58,65 @@ class FakeFirebaseService implements FirebaseService {
   @override
   Future<String?> seedDemoData() async {
     return null;
+  }
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
+}
+
+class FailingFirebaseService implements FirebaseService {
+  final Exception exception;
+  int callCount = 0;
+
+  FailingFirebaseService(this.exception);
+
+  @override
+  Future<List<Facility>> getFacilities() async {
+    callCount++;
+    throw exception;
+  }
+
+  @override
+  Stream<List<InventoryItem>> streamAllMedicines() {
+    return Stream.value([]);
+  }
+
+  @override
+  Stream<List<MedRequest>> streamRequests(String? facilityId) {
+    return Stream.value([]);
+  }
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
+}
+
+class RetryableFirebaseService implements FirebaseService {
+  final List<Facility> facilities;
+  final int failUntilAttempt;
+  int callCount = 0;
+
+  RetryableFirebaseService({
+    required this.facilities,
+    this.failUntilAttempt = 2,
+  });
+
+  @override
+  Future<List<Facility>> getFacilities() async {
+    callCount++;
+    if (callCount <= failUntilAttempt) {
+      throw Exception('Network unavailable');
+    }
+    return facilities;
+  }
+
+  @override
+  Stream<List<InventoryItem>> streamAllMedicines() {
+    return Stream.value([]);
+  }
+
+  @override
+  Stream<List<MedRequest>> streamRequests(String? facilityId) {
+    return Stream.value([]);
   }
 
   @override
@@ -197,15 +258,17 @@ void main() {
       );
     });
 
-    Widget createWidgetUnderTest(List<TransferRecommendation> recs) {
+    Widget createWidgetUnderTest(List<TransferRecommendation> recs,
+        {FirebaseService? firebaseService}) {
       return ProviderScope(
         overrides: [
           firebaseServiceProvider.overrideWithValue(
-            FakeFirebaseService(
-              facilities: [donor, recipient],
-              inventory: [inventory],
-              requests: [request],
-            ),
+            firebaseService ??
+                FakeFirebaseService(
+                  facilities: [donor, recipient],
+                  inventory: [inventory],
+                  requests: [request],
+                ),
           ),
           optimizationServiceProvider
               .overrideWithValue(FakeOptimizationService(recs)),
@@ -303,6 +366,254 @@ void main() {
       expect(find.text('Clear Map'), findsNothing);
       expect(find.text('Mock AI Summary: Transfer optimized.'), findsNothing);
       expect(find.byType(PolylineLayer), findsNothing);
+    });
+
+    testWidgets('failed initialization shows error message and retry button',
+        (WidgetTester tester) async {
+      tester.view.physicalSize = const Size(1920, 1080);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
+      final failingService = FailingFirebaseService(
+        Exception('Firebase connection failed'),
+      );
+
+      await tester.pumpWidget(
+        createWidgetUnderTest([], firebaseService: failingService),
+      );
+      await tester.pumpAndSettle();
+
+      // Error message should be displayed
+      expect(
+        find.text(
+            'Unable to load facilities. Please check your connection and try again.'),
+        findsOneWidget,
+      );
+
+      // Retry button should be visible
+      expect(find.text('Retry'), findsOneWidget);
+
+      // Error icon should be visible
+      expect(find.byIcon(Icons.error_outline_rounded), findsOneWidget);
+
+      // Loading spinner should NOT be visible
+      expect(find.byType(CircularProgressIndicator), findsNothing);
+
+      // Main content should NOT be visible
+      expect(find.text('Transfer Manifest'), findsNothing);
+      expect(find.text('Generate Optimal Routes'), findsNothing);
+    });
+
+    testWidgets('loading indicator always dismissed after failure',
+        (WidgetTester tester) async {
+      tester.view.physicalSize = const Size(1920, 1080);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
+      final failingService = FailingFirebaseService(
+        Exception('Timeout'),
+      );
+
+      await tester.pumpWidget(
+        createWidgetUnderTest([], firebaseService: failingService),
+      );
+      await tester.pumpAndSettle();
+
+      // Loading should be dismissed
+      expect(find.byType(CircularProgressIndicator), findsNothing);
+
+      // Error state should be shown
+      expect(find.text('Retry'), findsOneWidget);
+      expect(
+        find.text(
+            'Unable to load facilities. Please check your connection and try again.'),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('retry successfully reloads data after failure',
+        (WidgetTester tester) async {
+      tester.view.physicalSize = const Size(1920, 1080);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
+      final retryableService = RetryableFirebaseService(
+        facilities: [donor, recipient],
+        failUntilAttempt: 1,
+      );
+
+      await tester.pumpWidget(
+        createWidgetUnderTest([], firebaseService: retryableService),
+      );
+      await tester.pumpAndSettle();
+
+      // Should show error state initially
+      expect(find.text('Retry'), findsOneWidget);
+      expect(
+        find.text(
+            'Unable to load facilities. Please check your connection and try again.'),
+        findsOneWidget,
+      );
+
+      // Tap Retry
+      await tester.tap(find.text('Retry'));
+      await tester.pumpAndSettle();
+
+      // Should now show the main content
+      expect(find.text('Transfer Manifest'), findsOneWidget);
+      expect(find.text('Generate Optimal Routes'), findsOneWidget);
+
+      // Error should be gone
+      expect(find.text('Retry'), findsNothing);
+    });
+
+    testWidgets('retry after multiple failures eventually succeeds',
+        (WidgetTester tester) async {
+      tester.view.physicalSize = const Size(1920, 1080);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
+      final retryableService = RetryableFirebaseService(
+        facilities: [donor, recipient],
+        failUntilAttempt: 2,
+      );
+
+      await tester.pumpWidget(
+        createWidgetUnderTest([], firebaseService: retryableService),
+      );
+      await tester.pumpAndSettle();
+
+      // First attempt fails
+      expect(find.text('Retry'), findsOneWidget);
+
+      // First retry still fails
+      await tester.tap(find.text('Retry'));
+      await tester.pumpAndSettle();
+      expect(find.text('Retry'), findsOneWidget);
+
+      // Second retry succeeds
+      await tester.tap(find.text('Retry'));
+      await tester.pumpAndSettle();
+
+      // Should now show the main content
+      expect(find.text('Transfer Manifest'), findsOneWidget);
+      expect(find.text('Generate Optimal Routes'), findsOneWidget);
+      expect(find.text('Retry'), findsNothing);
+    });
+
+    testWidgets('empty facility list renders successfully',
+        (WidgetTester tester) async {
+      tester.view.physicalSize = const Size(1920, 1080);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
+      final emptyService = FakeFirebaseService(
+        facilities: [],
+        inventory: [],
+        requests: [],
+      );
+
+      await tester.pumpWidget(
+        createWidgetUnderTest([], firebaseService: emptyService),
+      );
+      await tester.pumpAndSettle();
+
+      // Should render the main content with no error
+      expect(find.text('Transfer Manifest'), findsOneWidget);
+      expect(find.text('Generate Optimal Routes'), findsOneWidget);
+      expect(find.byType(CircularProgressIndicator), findsNothing);
+      expect(find.text('Retry'), findsNothing);
+    });
+
+    testWidgets('successful initialization does not show error state',
+        (WidgetTester tester) async {
+      tester.view.physicalSize = const Size(1920, 1080);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
+      await tester.pumpWidget(createWidgetUnderTest([]));
+      await tester.pumpAndSettle();
+
+      // No error state
+      expect(find.text('Retry'), findsNothing);
+      expect(find.byIcon(Icons.error_outline_rounded), findsNothing);
+
+      // Main content visible
+      expect(find.text('Transfer Manifest'), findsOneWidget);
+      expect(find.text('Generate Optimal Routes'), findsOneWidget);
+    });
+
+    testWidgets('network unavailable shows user-friendly error',
+        (WidgetTester tester) async {
+      tester.view.physicalSize = const Size(1920, 1080);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
+      final networkErrorService = FailingFirebaseService(
+        SocketException('Network is unreachable'),
+      );
+
+      await tester.pumpWidget(
+        createWidgetUnderTest([], firebaseService: networkErrorService),
+      );
+      await tester.pumpAndSettle();
+
+      // Should show friendly error, not raw exception
+      expect(
+        find.text(
+            'Unable to load facilities. Please check your connection and try again.'),
+        findsOneWidget,
+      );
+      // Raw exception should NOT be visible
+      expect(find.textContaining('SocketException'), findsNothing);
+      expect(find.textContaining('Network is unreachable'), findsNothing);
+    });
+
+    testWidgets('retry button clears previous error before reloading',
+        (WidgetTester tester) async {
+      tester.view.physicalSize = const Size(1920, 1080);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
+      final retryableService = RetryableFirebaseService(
+        facilities: [donor, recipient],
+        failUntilAttempt: 1,
+      );
+
+      await tester.pumpWidget(
+        createWidgetUnderTest([], firebaseService: retryableService),
+      );
+      await tester.pumpAndSettle();
+
+      // Error visible
+      expect(find.text('Retry'), findsOneWidget);
+
+      // Tap retry - error should clear and loading should show briefly
+      await tester.tap(find.text('Retry'));
+
+      // Pump once to trigger the setState for loading
+      await tester.pump();
+
+      // Error message should be gone immediately after retry
+      expect(
+        find.text(
+            'Unable to load facilities. Please check your connection and try again.'),
+        findsNothing,
+      );
+
+      // Let it complete
+      await tester.pumpAndSettle();
+
+      // Should show success
+      expect(find.text('Transfer Manifest'), findsOneWidget);
     });
   });
 }

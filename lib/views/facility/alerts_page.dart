@@ -1,3 +1,4 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -49,11 +50,84 @@ class _AlertsPageState extends ConsumerState<AlertsPage> {
   Future<void> _loadAlerts() async {
     setState(() => _isLoading = true);
     try {
-      final inventory = await ref
+      final alertMaps = await ref
           .read(firebaseServiceProvider)
-          .getInventoryOnce(widget.facilityId);
-      final alerts = inventory.expand(_alertsForItem).toList()
+          .getAlertsOnce(widget.facilityId);
+
+      final List<_InventoryAlert> alerts = alertMaps.map((data) {
+        final item = InventoryItem(
+          id: data['stockId'] ?? '',
+          medicineName: data['medicineName'] ?? '',
+          batchId: data['batchId'] ?? '',
+          arrivalDate: DateTime.now(),
+          expiryDate: data['expiryDate'] != null
+              ? (data['expiryDate'] as Timestamp).toDate()
+              : DateTime.now(),
+          initialQuantity: data['initialQuantity']?.toInt() ?? 0,
+          remainingQuantity: data['qtyRemaining']?.toInt() ?? 0,
+          unit: data['unit'] ?? 'units',
+          lastUpdated: DateTime.now(),
+        );
+
+        final typeStr = data['type'] ?? '';
+        _AlertKind kind;
+        String title;
+        String reason;
+        Color color;
+        IconData icon;
+
+        final pct = item.initialQuantity > 0
+            ? item.remainingQuantity / item.initialQuantity
+            : 0.0;
+        final percentText = '${(pct * 100).round()}%';
+        final daysLeft = item.expiryDate.difference(DateTime.now()).inDays;
+        final expiryText = daysLeft < 0
+            ? 'expired ${daysLeft.abs()} days ago'
+            : 'expires in $daysLeft days';
+
+        if (typeStr == 'expired') {
+          kind = _AlertKind.expired;
+          title = 'Expired';
+          reason = '${item.medicineName} has passed its expiry date and should not be issued.';
+          color = MediColors.error;
+          icon = Icons.error_rounded;
+        } else if (typeStr == 'low_stock') {
+          kind = _AlertKind.lowStock;
+          title = 'Low Stock';
+          reason = '${item.medicineName} is below the low-stock threshold.';
+          color = MediColors.error;
+          icon = Icons.trending_down_rounded;
+        } else if (typeStr == 'wastage_risk') {
+          kind = _AlertKind.wastageRisk;
+          title = 'Wastage Risk';
+          reason = 'High remaining stock is close to expiry, so redistribution should be considered.';
+          color = MediColors.warning;
+          icon = Icons.warning_amber_rounded;
+        } else {
+          // expiring_soon
+          kind = _AlertKind.expiringSoon;
+          title = 'Expiring Soon';
+          reason = '${item.medicineName} is within the 30-day expiry window.';
+          color = MediColors.warning;
+          icon = Icons.schedule_rounded;
+        }
+
+        final detail = typeStr == 'expired'
+            ? '${item.remainingQuantity} ${item.unit} remaining; $expiryText.'
+            : '${item.remainingQuantity} / ${item.initialQuantity} ${item.unit} left ($percentText); $expiryText.';
+
+        return _InventoryAlert(
+          item: item,
+          kind: kind,
+          title: title,
+          reason: reason,
+          detail: detail,
+          color: color,
+          icon: icon,
+        );
+      }).toList()
         ..sort((a, b) => _priority(a).compareTo(_priority(b)));
+
       if (mounted) {
         setState(() {
           _alerts = alerts;
@@ -67,75 +141,6 @@ class _AlertsPageState extends ConsumerState<AlertsPage> {
             .showSnackBar(SnackBar(content: Text('Error loading alerts: $e')));
       }
     }
-  }
-
-  Iterable<_InventoryAlert> _alertsForItem(InventoryItem item) sync* {
-    final pct = item.initialQuantity > 0
-        ? item.remainingQuantity / item.initialQuantity
-        : 0.0;
-    final percentText = '${(pct * 100).round()}%';
-    final daysLeft = item.expiryDate.difference(DateTime.now()).inDays;
-    final expiryText = daysLeft < 0
-        ? 'expired ${daysLeft.abs()} days ago'
-        : 'expires in $daysLeft days';
-    final lowStock = _isLowStock(item, pct);
-
-    if (daysLeft < 0) {
-      yield _InventoryAlert(
-        item: item,
-        kind: _AlertKind.expired,
-        title: 'Expired',
-        reason:
-            '${item.medicineName} has passed its expiry date and should not be issued.',
-        detail:
-            '${item.remainingQuantity} ${item.unit} remaining; $expiryText.',
-        color: MediColors.error,
-        icon: Icons.error_rounded,
-      );
-      return;
-    }
-
-    if (lowStock) {
-      yield _InventoryAlert(
-        item: item,
-        kind: _AlertKind.lowStock,
-        title: 'Low Stock',
-        reason: '${item.medicineName} is below the low-stock threshold.',
-        detail:
-            '${item.remainingQuantity} / ${item.initialQuantity} ${item.unit} left ($percentText); $expiryText.',
-        color: MediColors.error,
-        icon: Icons.trending_down_rounded,
-      );
-    }
-
-    if (pct >= 0.70 && daysLeft <= 30) {
-      yield _InventoryAlert(
-        item: item,
-        kind: _AlertKind.wastageRisk,
-        title: 'Wastage Risk',
-        reason:
-            'High remaining stock is close to expiry, so redistribution should be considered.',
-        detail:
-            '${item.remainingQuantity} / ${item.initialQuantity} ${item.unit} left ($percentText); $expiryText.',
-        color: MediColors.warning,
-        icon: Icons.warning_amber_rounded,
-      );
-    } else if (daysLeft <= 30) {
-      yield _InventoryAlert(
-        item: item,
-        kind: _AlertKind.expiringSoon,
-        title: 'Expiring Soon',
-        reason: '${item.medicineName} is within the 30-day expiry window.',
-        detail:
-            '${item.remainingQuantity} / ${item.initialQuantity} ${item.unit} left ($percentText); $expiryText.',
-        color: MediColors.warning,
-        icon: Icons.schedule_rounded,
-      );
-    }
-  }
-
-  bool _isLowStock(InventoryItem item, double pct) {
-    return pct <= 0.20 || item.remainingQuantity <= 500;
   }
 
   int _priority(_InventoryAlert alert) {

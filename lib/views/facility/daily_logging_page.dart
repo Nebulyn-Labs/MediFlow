@@ -1,10 +1,13 @@
 import 'dart:convert';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:csv/csv.dart';
 import 'package:file_picker/file_picker.dart';
+import '../../models/daily_usage_log.dart';
 import '../../services/firebase_service.dart';
 import '../../services/csv_export_service.dart';
+import '../../services/ai_service.dart';
 import 'package:med_supply_prototype/constants/colors.dart';
 
 class DailyLoggingPage extends ConsumerStatefulWidget {
@@ -26,6 +29,7 @@ class _DailyLoggingPageState extends ConsumerState<DailyLoggingPage>
   bool _isSubmitting = false;
   List<String> _availableMedicines = [];
   bool _isLoadingInventory = true;
+  String? _inventoryError;
   List<Map<String, dynamic>> _csvItems = [];
   String? _csvStatus;
   bool _isSubmittingCsv = false;
@@ -33,12 +37,24 @@ class _DailyLoggingPageState extends ConsumerState<DailyLoggingPage>
   final List<Map<String, dynamic>> _scannedItems = [];
   bool _isSubmittingQr = false;
   bool _isExportingCsv = false;
+  bool _isParsingImage = false;
+  String? _imageParseResult;
+  String? _imageParseError;
+
+  // --- History tab state ---
+  List<DailyUsageLog> _historyLogs = [];
+  DocumentSnapshot? _lastHistoryDoc;
+  bool _historyHasMore = true;
+  bool _isLoadingHistory = true;
+  bool _isLoadingMoreHistory = false;
+  String? _historyError;
 
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 3, vsync: this);
+    _tabController = TabController(length: 5, vsync: this);
     _fetchInventory();
+    _fetchHistoryFirstPage();
   }
 
   @override
@@ -48,6 +64,10 @@ class _DailyLoggingPageState extends ConsumerState<DailyLoggingPage>
   }
 
   Future<void> _fetchInventory() async {
+    setState(() {
+      _isLoadingInventory = true;
+      _inventoryError = null;
+    });
     try {
       final items = await ref
           .read(firebaseServiceProvider)
@@ -62,7 +82,67 @@ class _DailyLoggingPageState extends ConsumerState<DailyLoggingPage>
         });
       }
     } catch (e) {
-      if (mounted) setState(() => _isLoadingInventory = false);
+      if (mounted) {
+        setState(() {
+          _inventoryError = 'Failed to load inventory. Please try again.';
+          _isLoadingInventory = false;
+        });
+      }
+    }
+  }
+
+  // --- History fetching ---
+
+  Future<void> _fetchHistoryFirstPage() async {
+    setState(() {
+      _isLoadingHistory = true;
+      _historyError = null;
+    });
+    try {
+      final result = await ref
+          .read(firebaseServiceProvider)
+          .getPaginatedLogs(widget.facilityId, pageSize: 15);
+      if (mounted) {
+        setState(() {
+          _historyLogs = result.logs;
+          _lastHistoryDoc = result.lastDocument;
+          _historyHasMore = result.hasMore;
+          _isLoadingHistory = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _historyError = e.toString();
+          _isLoadingHistory = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _fetchMoreHistory() async {
+    if (!_historyHasMore || _isLoadingMoreHistory) return;
+    setState(() => _isLoadingMoreHistory = true);
+    try {
+      final result = await ref.read(firebaseServiceProvider).getPaginatedLogs(
+            widget.facilityId,
+            pageSize: 15,
+            startAfter: _lastHistoryDoc,
+          );
+      if (mounted) {
+        setState(() {
+          _historyLogs = [..._historyLogs, ...result.logs];
+          _lastHistoryDoc = result.lastDocument ?? _lastHistoryDoc;
+          _historyHasMore = result.hasMore;
+          _isLoadingMoreHistory = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isLoadingMoreHistory = false);
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('Failed to load more: $e')));
+      }
     }
   }
 
@@ -81,6 +161,8 @@ class _DailyLoggingPageState extends ConsumerState<DailyLoggingPage>
         ScaffoldMessenger.of(context)
             .showSnackBar(const SnackBar(content: Text('Log saved ✓')));
         _formKey.currentState!.reset();
+        // Keep the History tab fresh with the newly saved log.
+        _fetchHistoryFirstPage();
       }
     } catch (e) {
       if (mounted) {
@@ -185,6 +267,7 @@ class _DailyLoggingPageState extends ConsumerState<DailyLoggingPage>
           _csvItems.clear();
           _csvStatus = null;
         });
+        _fetchHistoryFirstPage();
       }
     } catch (e) {
       if (mounted) {
@@ -229,6 +312,7 @@ class _DailyLoggingPageState extends ConsumerState<DailyLoggingPage>
         ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(content: Text('${_scannedItems.length} logs saved ✓')));
         setState(() => _scannedItems.clear());
+        _fetchHistoryFirstPage();
       }
     } catch (e) {
       if (mounted) {
@@ -237,6 +321,48 @@ class _DailyLoggingPageState extends ConsumerState<DailyLoggingPage>
       }
     } finally {
       if (mounted) setState(() => _isSubmittingQr = false);
+    }
+  }
+
+  Future<void> _parseImage() async {
+    try {
+      final result = await FilePicker.pickFiles(
+        type: FileType.image,
+        withData: true,
+      );
+      if (result == null || result.files.isEmpty) return;
+      final bytes = result.files.first.bytes;
+      if (bytes == null) return;
+      setState(() {
+        _isParsingImage = true;
+        _imageParseResult = null;
+        _imageParseError = null;
+      });
+      final parsed = await ref.read(aiServiceProvider).parseImageWithVision(
+          bytes,
+          'Extract all medicine names, quantities, and patient counts from this image. Output JSON: [{"medicine": "string", "quantity": int, "patients": int}]');
+      if (mounted) {
+        setState(() {
+          _imageParseResult = parsed;
+          _isParsingImage = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _imageParseError = e.toString();
+          _isParsingImage = false;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Image parsing failed: $e'),
+            action: SnackBarAction(
+              label: 'Retry',
+              onPressed: _parseImage,
+            ),
+          ),
+        );
+      }
     }
   }
 
@@ -261,16 +387,26 @@ class _DailyLoggingPageState extends ConsumerState<DailyLoggingPage>
         ],
         bottom: TabBar(
           controller: _tabController,
+          isScrollable: true,
           tabs: const [
             Tab(icon: Icon(Icons.edit_note_rounded), text: 'Manual'),
             Tab(icon: Icon(Icons.upload_file_rounded), text: 'CSV'),
             Tab(icon: Icon(Icons.qr_code_scanner_rounded), text: 'Scan'),
+            Tab(icon: Icon(Icons.image_rounded), text: 'Image'),
+            Tab(icon: Icon(Icons.history_rounded), text: 'History'),
           ],
         ),
       ),
       body: TabBarView(
-          controller: _tabController,
-          children: [_buildManualTab(), _buildCsvTab(), _buildQrTab()]),
+        controller: _tabController,
+        children: [
+          _buildManualTab(),
+          _buildCsvTab(),
+          _buildQrTab(),
+          _buildImageTab(),
+          _buildHistoryTab(),
+        ],
+      ),
     );
   }
 
@@ -326,6 +462,15 @@ class _DailyLoggingPageState extends ConsumerState<DailyLoggingPage>
                 const SizedBox(height: 16),
                 if (_isLoadingInventory)
                   const Center(child: CircularProgressIndicator())
+                else if (_inventoryError != null)
+                  Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                          color: MediColors.error.withValues(alpha: 0.08),
+                          borderRadius: BorderRadius.circular(10)),
+                      child: Text(_inventoryError!,
+                          style: const TextStyle(
+                              color: MediColors.error, fontSize: 13)))
                 else if (_availableMedicines.isEmpty)
                   Container(
                       padding: const EdgeInsets.all(12),
@@ -436,7 +581,7 @@ class _DailyLoggingPageState extends ConsumerState<DailyLoggingPage>
           Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                  color: MediColors.success.withValues(alpha: 0.08),
+                  color: MediColors.successSubtle,
                   borderRadius: BorderRadius.circular(10)),
               child: Row(children: [
                 const Icon(Icons.check_circle_rounded,
@@ -602,6 +747,264 @@ class _DailyLoggingPageState extends ConsumerState<DailyLoggingPage>
           ]),
         ],
       ]),
+    );
+  }
+
+  Widget _buildImageTab() {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(28),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(24),
+          decoration: BoxDecoration(
+              color: MediColors.violet.withValues(alpha: 0.06),
+              borderRadius: BorderRadius.circular(16),
+              border:
+                  Border.all(color: MediColors.violet.withValues(alpha: 0.2))),
+          child:
+              Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Row(children: [
+              Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                      color: MediColors.violet.withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(10)),
+                  child: const Icon(Icons.image_rounded,
+                      color: MediColors.violet, size: 22)),
+              const SizedBox(width: 12),
+              const Text('AI Image Parsing',
+                  style: TextStyle(
+                      fontWeight: FontWeight.w700,
+                      fontSize: 18,
+                      color: MediColors.violet)),
+            ]),
+            const SizedBox(height: 12),
+            const Text(
+                'Upload a photo of medicine records for AI-powered extraction',
+                style: TextStyle(color: MediColors.textMuted, fontSize: 13)),
+            const SizedBox(height: 16),
+            OutlinedButton.icon(
+                icon: _isParsingImage
+                    ? const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(
+                            strokeWidth: 2, color: MediColors.violet))
+                    : const Icon(Icons.photo_camera_rounded),
+                label: Text(_isParsingImage ? 'Parsing...' : 'Choose Image'),
+                onPressed: _isParsingImage ? null : _parseImage),
+          ]),
+        ),
+        if (_imageParseError != null) ...[
+          const SizedBox(height: 16),
+          Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                  color: MediColors.error.withValues(alpha: 0.08),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                      color: MediColors.error.withValues(alpha: 0.2))),
+              child: Row(children: [
+                const Icon(Icons.error_outline_rounded,
+                    color: MediColors.error, size: 20),
+                const SizedBox(width: 12),
+                Expanded(
+                    child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                      const Text('Parsing Failed',
+                          style: TextStyle(
+                              color: MediColors.error,
+                              fontWeight: FontWeight.w600,
+                              fontSize: 14)),
+                      const SizedBox(height: 4),
+                      Text(_imageParseError!,
+                          style: const TextStyle(
+                              color: MediColors.textMuted, fontSize: 12),
+                          maxLines: 3,
+                          overflow: TextOverflow.ellipsis),
+                    ])),
+                const SizedBox(width: 12),
+                TextButton.icon(
+                    icon: const Icon(Icons.refresh_rounded, size: 18),
+                    label: const Text('Retry'),
+                    onPressed: _parseImage),
+              ])),
+        ],
+        if (_imageParseResult != null) ...[
+          const SizedBox(height: 16),
+          Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                  color: MediColors.successSubtle,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: MediColors.successBorder)),
+              child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Row(children: [
+                      Icon(Icons.check_circle_rounded,
+                          color: MediColors.success, size: 18),
+                      SizedBox(width: 10),
+                      Text('AI Extraction Result',
+                          style: TextStyle(
+                              color: MediColors.success,
+                              fontWeight: FontWeight.w600,
+                              fontSize: 14)),
+                    ]),
+                    const SizedBox(height: 10),
+                    Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                            color: MediColors.surface,
+                            borderRadius: BorderRadius.circular(8)),
+                        child: Text(_imageParseResult!,
+                            style: const TextStyle(
+                                color: MediColors.textSecondary,
+                                fontSize: 13,
+                                fontFamily: 'monospace'))),
+                  ])),
+        ],
+      ]),
+    );
+  }
+
+  // --- History tab UI ---
+
+  Widget _buildHistoryTab() {
+    if (_isLoadingHistory) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
+    if (_historyError != null) {
+      return Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.error_outline_rounded,
+                color: MediColors.error, size: 40),
+            const SizedBox(height: 12),
+            Text('Failed to load history: $_historyError',
+                textAlign: TextAlign.center,
+                style: const TextStyle(color: MediColors.textMuted)),
+            const SizedBox(height: 16),
+            OutlinedButton.icon(
+              icon: const Icon(Icons.refresh_rounded),
+              label: const Text('Retry'),
+              onPressed: _fetchHistoryFirstPage,
+            ),
+          ],
+        ),
+      );
+    }
+
+    if (_historyLogs.isEmpty) {
+      return RefreshIndicator(
+        onRefresh: _fetchHistoryFirstPage,
+        child: ListView(
+          children: const [
+            SizedBox(height: 120),
+            Icon(Icons.history_rounded, size: 48, color: MediColors.textMuted),
+            SizedBox(height: 12),
+            Center(
+              child: Text('No usage logs yet',
+                  style: TextStyle(color: MediColors.textMuted)),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return RefreshIndicator(
+      onRefresh: _fetchHistoryFirstPage,
+      child: ListView.builder(
+        padding: const EdgeInsets.all(28),
+        itemCount: _historyLogs.length + 1,
+        itemBuilder: (context, index) {
+          if (index == _historyLogs.length) {
+            if (!_historyHasMore) {
+              return const Padding(
+                padding: EdgeInsets.symmetric(vertical: 20),
+                child: Center(
+                  child: Text('No more logs',
+                      style: TextStyle(color: MediColors.textMuted)),
+                ),
+              );
+            }
+            return Padding(
+              padding: const EdgeInsets.symmetric(vertical: 16),
+              child: Center(
+                child: OutlinedButton(
+                  onPressed: _isLoadingMoreHistory ? null : _fetchMoreHistory,
+                  child: _isLoadingMoreHistory
+                      ? const SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(strokeWidth: 2))
+                      : const Text('Load More'),
+                ),
+              ),
+            );
+          }
+
+          final log = _historyLogs[index];
+          return Container(
+            margin: const EdgeInsets.only(bottom: 12),
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: MediColors.surface,
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: MediColors.border),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      '${log.date.day}/${log.date.month}/${log.date.year}',
+                      style: const TextStyle(
+                          fontWeight: FontWeight.w700,
+                          fontSize: 15,
+                          color: MediColors.textPrimary),
+                    ),
+                    Text(
+                      '${log.totalPatients} patients',
+                      style: const TextStyle(
+                          color: MediColors.textMuted, fontSize: 12),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 10),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: log.medicines
+                      .map((m) => Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 10, vertical: 6),
+                            decoration: BoxDecoration(
+                              color: MediColors.teal.withValues(alpha: 0.08),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Text(
+                              '${m.medicineName} × ${m.unitsDistributed}',
+                              style: const TextStyle(
+                                  color: MediColors.teal, fontSize: 12),
+                            ),
+                          ))
+                      .toList(),
+                ),
+              ],
+            ),
+          );
+        },
+      ),
     );
   }
 }

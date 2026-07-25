@@ -56,3 +56,18 @@ class DailyUsageLog {
     };
   }
 }
+
+/// Holds one page of daily usage logs plus a cursor for fetching the next
+/// page, so the UI can paginate through history instead of loading
+/// everything at once.
+class PaginatedLogsResult {
+  final List<DailyUsageLog> logs;
+  final DocumentSnapshot? lastDocument;
+  final bool hasMore;
+
+  PaginatedLogsResult({
+    required this.logs,
+    required this.lastDocument,
+    required this.hasMore,
+  });
+}

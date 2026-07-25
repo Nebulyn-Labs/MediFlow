@@ -50,9 +50,32 @@ surplus hospitals to deficit clinics using road-optimized routing.
 
 ## Screenshots & UI Preview
 
-Here is a preview of the MediFlow central command dashboard:
+Here is a preview of the MediFlow home page:
 
-![MediFlow Dashboard Mockup](docs/images/dashboard_preview.jpg)
+![MediFlow home page](docs/images/mediflow_main.png)
+
+MediFlow provides two types of roles:
+
+- Role -> Admin
+
+Here is a preview of Admin Dashboard
+![Admin dashboard](docs/images/admin/admin_dashboard.png)
+
+- Role -> Facility
+
+Here is a preview of Facility manager Dashboard
+![Facility dashboard](docs/images/facility/facility_dashboard.png)
+
+It also provides following features:
+
+- AI analysis of supply
+![facility supply ai analytics](docs/images/admin/admin_request_approval_ai_analysed.png)
+
+- Route optimization for delivery via AI (Admin only)
+![route optimization op](docs/images/admin/admin_route_optimisation_op.png)
+
+- Demand forecast
+![forecast of usage trend](docs/images/facility/facility_forecast.png)
 
 ---
 

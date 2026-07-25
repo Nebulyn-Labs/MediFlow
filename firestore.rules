@@ -61,5 +61,11 @@ service cloud.firestore {
       allow update: if isAdmin() || (isAuthenticated() && isFacilityUser(resource.data.facilityId) && request.resource.data.facilityId == resource.data.facilityId);
       allow delete: if isAdmin() || (isAuthenticated() && isFacilityUser(resource.data.facilityId));
     }
+
+    // Alerts collection
+    match /alerts/{alertId} {
+      allow read: if isAdmin() || (isAuthenticated() && resource != null && isFacilityUser(resource.data.facilityId));
+      allow write: if isAdmin();
+    }
   }
 }

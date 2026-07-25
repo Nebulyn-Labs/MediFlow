@@ -139,10 +139,8 @@ class _AdminIndentApprovalPageState
                                         horizontal: 8, vertical: 4),
                                     decoration: BoxDecoration(
                                       color: isRedistribution
-                                          ? MediColors.success
-                                              .withValues(alpha: 0.1)
-                                          : MediColors.error
-                                              .withValues(alpha: 0.1),
+                                          ? MediColors.successOverlay
+                                          : MediColors.errorOverlay,
                                       borderRadius: BorderRadius.circular(6),
                                     ),
                                     child: Text(
@@ -203,8 +201,8 @@ class _AdminIndentApprovalPageState
                           margin: const EdgeInsets.only(bottom: 20),
                           decoration: BoxDecoration(
                             color: suggestion.contains('✅')
-                                ? MediColors.success.withValues(alpha: 0.1)
-                                : MediColors.warning.withValues(alpha: 0.1),
+                                ? MediColors.successOverlay
+                                : MediColors.warningOverlay,
                             borderRadius: BorderRadius.circular(12),
                             border: Border.all(
                                 color: suggestion.contains('✅')

@@ -237,8 +237,7 @@ class AIService {
   Future<List<Map<String, dynamic>>> generateSmartAlerts(
       List<InventoryItem> inventory) async {
     final local = inventory
-        .where((i) => (i.initialQuantity > 0 &&
-            i.remainingQuantity / i.initialQuantity < 0.35))
+        .where((i) => i.isLowStock)
         .map((i) => {
               "type": "low_stock",
               "severity": "red",
@@ -375,15 +374,9 @@ Output JSON only.
   // ─── MULTI-MODAL VISION ─────────────────────────────────────────
   Future<String> parseImageWithVision(
       Uint8List imageBytes, String prompt) async {
-    try {
-      final imageBase64 = base64Encode(imageBytes);
-      final responseText = await _callGeminiBackend(prompt,
-          imageBase64: imageBase64, imageMimeType: 'image/jpeg');
-      return responseText;
-    } catch (e) {
-      _handleQuotaError(e.toString());
-      return "Local Fallback: Image parsing is not available offline or quota exceeded.";
-    }
+    final imageBase64 = base64Encode(imageBytes);
+    return _callGeminiBackend(prompt,
+        imageBase64: imageBase64, imageMimeType: 'image/jpeg');
   }
 
   Map<String, dynamic> _localShipmentStrategy(
