@@ -143,7 +143,7 @@ class _AdminIndentStatusPageState extends ConsumerState<AdminIndentStatusPage> {
                     ],
                   ),
                 ),
-              ),
+              ],
             ),
           );
         },
