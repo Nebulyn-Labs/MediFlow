@@ -7,13 +7,20 @@ service cloud.firestore {
     }
 
     function isAdmin() {
-      return isAuthenticated() && request.auth.token.email == 'admin@mediflow.com';
+      return isAuthenticated() && 
+        exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
     }
 
     function isFacilityUser(facilityId) {
-      return isAuthenticated() && 
-        exists(/databases/$(database)/documents/facilities/$(facilityId)) &&
-        request.auth.token.email.lower() == get(/databases/$(database)/documents/facilities/$(facilityId)).data.email.lower();
+      return isAuthenticated() && (
+        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'facility_head' &&
+         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.facilityId == facilityId)
+        ||
+        (exists(/databases/$(database)/documents/facilities/$(facilityId)) &&
+         request.auth.token.email.lower() == get(/databases/$(database)/documents/facilities/$(facilityId)).data.email.lower())
+      );
     }
 
     // Deny by default
@@ -66,6 +73,14 @@ service cloud.firestore {
     match /alerts/{alertId} {
       allow read: if isAdmin() || (isAuthenticated() && resource != null && isFacilityUser(resource.data.facilityId));
       allow write: if isAdmin();
+    }
+
+    // Users collection (RBAC)
+    match /users/{userId} {
+      allow read: if isAdmin() || (isAuthenticated() && request.auth.uid == userId);
+      allow create: if isAdmin() || (isAuthenticated() && request.auth.uid == userId && request.resource.data.role == 'facility_head');
+      allow update: if isAdmin();
+      allow delete: if isAdmin();
     }
   }
 }
