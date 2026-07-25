@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:io';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -9,6 +10,7 @@ import 'package:flutter_map/flutter_map.dart';
 import 'package:med_supply_prototype/models/facility.dart';
 import 'package:med_supply_prototype/models/inventory_item.dart';
 import 'package:med_supply_prototype/models/request.dart';
+import 'package:med_supply_prototype/models/daily_usage_log.dart';
 import 'package:med_supply_prototype/services/firebase_service.dart';
 import 'package:med_supply_prototype/services/ai_service.dart';
 import 'package:med_supply_prototype/services/routing_service.dart';
@@ -37,13 +39,16 @@ class FakeFirebaseService implements FirebaseService {
     return facilities;
   }
 
-  late final Stream<List<InventoryItem>> _inventoryStream =
-      Stream.value(inventory);
   late final Stream<List<MedRequest>> _requestsStream = Stream.value(requests);
 
   @override
-  Stream<List<InventoryItem>> streamAllMedicines() {
-    return _inventoryStream;
+  Future<PaginatedMedicinesResult> getPaginatedMedicines(
+      {int pageSize = 20, DocumentSnapshot? startAfter}) async {
+    return PaginatedMedicinesResult(
+      medicines: inventory,
+      lastDocument: null,
+      hasMore: false,
+    );
   }
 
   @override
@@ -77,8 +82,13 @@ class FailingFirebaseService implements FirebaseService {
   }
 
   @override
-  Stream<List<InventoryItem>> streamAllMedicines() {
-    return Stream.value([]);
+  Future<PaginatedMedicinesResult> getPaginatedMedicines(
+      {int pageSize = 20, DocumentSnapshot? startAfter}) async {
+    return PaginatedMedicinesResult(
+      medicines: [],
+      lastDocument: null,
+      hasMore: false,
+    );
   }
 
   @override
@@ -110,8 +120,13 @@ class RetryableFirebaseService implements FirebaseService {
   }
 
   @override
-  Stream<List<InventoryItem>> streamAllMedicines() {
-    return Stream.value([]);
+  Future<PaginatedMedicinesResult> getPaginatedMedicines(
+      {int pageSize = 20, DocumentSnapshot? startAfter}) async {
+    return PaginatedMedicinesResult(
+      medicines: [],
+      lastDocument: null,
+      hasMore: false,
+    );
   }
 
   @override

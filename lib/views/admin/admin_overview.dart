@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -32,6 +33,12 @@ class _AdminOverviewState extends ConsumerState<AdminOverview> {
   List<String> _failedFacilities = [];
   StreamSubscription? _requestsSub;
 
+  // ---- medicines pagination state (Issue #209) ----
+  List<InventoryItem> _allMedicines = [];
+  bool _medicinesLoading = false;
+  bool _medicinesHasMore = true;
+  DocumentSnapshot? _medicinesLastDoc;
+
   // ---- search state (Sprint 3) ----
   String _searchQuery = '';
   final TextEditingController _searchController = TextEditingController();
@@ -61,11 +68,18 @@ class _AdminOverviewState extends ConsumerState<AdminOverview> {
   Future<void> _loadData() async {
     await _requestsSub?.cancel();
 
+    // Reset medicines pagination on full refresh
     if (mounted) {
       setState(() {
         _errorMessage = null;
+        _allMedicines = [];
+        _medicinesLastDoc = null;
+        _medicinesHasMore = true;
       });
     }
+
+    // Load the first page of medicines (non-blocking alongside facility load)
+    _loadMedicinePage();
 
     List<Facility> facs = [];
     try {
@@ -161,6 +175,30 @@ class _AdminOverviewState extends ConsumerState<AdminOverview> {
     }
   }
 
+  /// Loads the next page of medicines from Firestore using cursor-based
+  /// pagination, appending results to [_allMedicines]. Mirrors the
+  /// getPaginatedLogs pattern used elsewhere in the app.
+  Future<void> _loadMedicinePage() async {
+    if (_medicinesLoading || !_medicinesHasMore) return;
+    if (mounted) setState(() => _medicinesLoading = true);
+    try {
+      final result = await ref
+          .read(firebaseServiceProvider)
+          .getPaginatedMedicines(startAfter: _medicinesLastDoc);
+      if (mounted) {
+        setState(() {
+          _allMedicines.addAll(result.medicines);
+          _medicinesLastDoc = result.lastDocument;
+          _medicinesHasMore = result.hasMore;
+          _medicinesLoading = false;
+        });
+      }
+    } catch (e) {
+      debugPrint('Failed to load medicines page: $e');
+      if (mounted) setState(() => _medicinesLoading = false);
+    }
+  }
+
   // ---- status + filtering logic (Sprint 5) ----
   String _getStockStatus(InventoryItem item) {
     final daysToExpiry = item.expiryDate.difference(DateTime.now()).inDays;
@@ -183,56 +221,31 @@ class _AdminOverviewState extends ConsumerState<AdminOverview> {
     }).toList();
   }
 
-  // ---- medicine list widget (Sprint 6, overflow-fixed in 9c) ----
+  // ---- medicine list widget (paginated, Issue #209) ----
   Widget _buildMedicineList() {
-    return StreamBuilder<List<InventoryItem>>(
-      stream: ref.read(firebaseServiceProvider).streamAllMedicines(),
-      builder: (context, snapshot) {
-        if (snapshot.hasError) {
-          return Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: MediColors.surface,
-              borderRadius: BorderRadius.circular(8),
-              border:
-                  Border.all(color: MediColors.error.withValues(alpha: 0.3)),
-            ),
-            child: const Row(
-              children: [
-                Icon(Icons.error_outline_rounded,
-                    color: MediColors.error, size: 20),
-                SizedBox(width: 12),
-                Expanded(
-                  child: Text(
-                    'Unable to load medicine inventory.',
-                    style: TextStyle(color: MediColors.error, fontSize: 13),
-                  ),
-                ),
-              ],
-            ),
-          );
-        }
-        if (!snapshot.hasData) {
-          return const Column(
-            children: [
-              SkeletonTableRow(),
-              SkeletonTableRow(),
-              SkeletonTableRow(),
-            ],
-          );
-        }
+    final filtered = _applyFilters(_allMedicines);
 
-        final filtered = _applyFilters(snapshot.data!);
+    if (_medicinesLoading && _allMedicines.isEmpty) {
+      return const Column(
+        children: [
+          SkeletonTableRow(),
+          SkeletonTableRow(),
+          SkeletonTableRow(),
+        ],
+      );
+    }
 
-        if (filtered.isEmpty) {
-          return const Padding(
-            padding: EdgeInsets.symmetric(vertical: 24),
-            child: Text('No medicines match your search or filter.',
-                style: TextStyle(color: MediColors.textSecondary)),
-          );
-        }
+    if (filtered.isEmpty && !_medicinesLoading) {
+      return const Padding(
+        padding: EdgeInsets.symmetric(vertical: 24),
+        child: Text('No medicines match your search or filter.',
+            style: TextStyle(color: MediColors.textSecondary)),
+      );
+    }
 
-        return ListView.builder(
+    return Column(
+      children: [
+        ListView.builder(
           shrinkWrap: true,
           physics: const NeverScrollableScrollPhysics(),
           itemCount: filtered.length,
@@ -275,8 +288,24 @@ class _AdminOverviewState extends ConsumerState<AdminOverview> {
               ),
             );
           },
-        );
-      },
+        ),
+        if (_medicinesHasMore)
+          Padding(
+            padding: const EdgeInsets.only(top: 8),
+            child: _medicinesLoading
+                ? const Center(
+                    child: Padding(
+                      padding: EdgeInsets.all(12),
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    ),
+                  )
+                : TextButton.icon(
+                    onPressed: _loadMedicinePage,
+                    icon: const Icon(Icons.expand_more_rounded, size: 18),
+                    label: const Text('Load more'),
+                  ),
+          ),
+      ],
     );
   }
 

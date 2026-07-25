@@ -132,15 +132,40 @@ class FirebaseService {
         .toList();
   }
 
-  Stream<List<InventoryItem>> streamAllMedicines() {
-    return _firestore.collectionGroup('medicines').snapshots().map((snapshot) {
-      return snapshot.docs.map((doc) {
-        // Path is inventory/{facilityId}/medicines/{medicineId}
-        final pathSegments = doc.reference.path.split('/');
-        final facId = pathSegments.length >= 2 ? pathSegments[1] : '';
-        return InventoryItem.fromMap(doc.data(), doc.id, facilityId: facId);
-      }).toList();
-    });
+  /// Fetches one page of medicines from the global collectionGroup, ordered
+  /// by medicineName ascending, using startAfterDocument cursor pagination.
+  /// Pass the previous page's [lastDocument] as [startAfter] to get the next
+  /// page. Mirrors [getPaginatedLogs] in structure.
+  Future<PaginatedMedicinesResult> getPaginatedMedicines({
+    int pageSize = 20,
+    DocumentSnapshot? startAfter,
+  }) async {
+    Query query = _firestore
+        .collectionGroup('medicines')
+        .orderBy('medicineName')
+        .limit(pageSize);
+
+    if (startAfter != null) {
+      query = query.startAfterDocument(startAfter);
+    }
+
+    final snapshot = await query.get();
+    final medicines = snapshot.docs.map((doc) {
+      // Path is inventory/{facilityId}/medicines/{medicineId}
+      final pathSegments = doc.reference.path.split('/');
+      final facId = pathSegments.length >= 2 ? pathSegments[1] : '';
+      return InventoryItem.fromMap(
+        doc.data() as Map<String, dynamic>,
+        doc.id,
+        facilityId: facId,
+      );
+    }).toList();
+
+    return PaginatedMedicinesResult(
+      medicines: medicines,
+      lastDocument: snapshot.docs.isNotEmpty ? snapshot.docs.last : null,
+      hasMore: snapshot.docs.length == pageSize,
+    );
   }
 
   Future<void> restock(
