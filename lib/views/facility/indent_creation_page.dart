@@ -6,6 +6,7 @@ import '../../services/ai_service.dart';
 import '../../models/request.dart';
 import '../../models/inventory_item.dart';
 import 'package:med_supply_prototype/constants/colors.dart';
+import '../shared/skeleton_loaders.dart';
 
 class IndentCreationPage extends ConsumerStatefulWidget {
   final String facilityId;
@@ -216,7 +217,7 @@ class _IndentCreationPageState extends ConsumerState<IndentCreationPage> {
         ),
       ),
       body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
+          ? const IndentCreationSkeleton()
           : SingleChildScrollView(
               padding: const EdgeInsets.all(24),
               child: Column(
