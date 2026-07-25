@@ -6,6 +6,7 @@ import '../../services/ai_service.dart';
 import '../../models/request.dart';
 import '../../models/inventory_item.dart';
 import 'package:med_supply_prototype/constants/colors.dart';
+import '../shared/skeleton_loaders.dart';
 
 class IndentCreationPage extends ConsumerStatefulWidget {
   final String facilityId;
@@ -201,7 +202,7 @@ class _IndentCreationPageState extends ConsumerState<IndentCreationPage> {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
               decoration: BoxDecoration(
-                color: MediColors.primary.withValues(alpha: 0.1),
+                color: MediColors.primaryOverlay,
                 borderRadius: BorderRadius.circular(6),
               ),
               child: Text(
@@ -216,7 +217,7 @@ class _IndentCreationPageState extends ConsumerState<IndentCreationPage> {
         ),
       ),
       body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
+          ? const IndentCreationSkeleton()
           : SingleChildScrollView(
               padding: const EdgeInsets.all(24),
               child: Column(
@@ -412,24 +413,24 @@ class _IndentCreationPageState extends ConsumerState<IndentCreationPage> {
       if (isExpired) {
         status = "EXPIRED";
         statusColor = MediColors.error;
-        statusBg = MediColors.error.withValues(alpha: 0.1);
+        statusBg = MediColors.errorOverlay;
         statusIcon = Icons.warning_rounded;
       } else if (forecast > available) {
         status = "LOW STOCK";
         statusColor = MediColors.error;
-        statusBg = MediColors.error.withValues(alpha: 0.1);
+        statusBg = MediColors.errorOverlay;
         statusIcon = Icons.trending_down_rounded;
       } else if (forecast > 0 &&
           ((available - forecast) > (forecast * 1.5) ||
               (available > forecast && expiringSoon))) {
         status = "SURPLUS";
         statusColor = MediColors.success;
-        statusBg = MediColors.success.withValues(alpha: 0.1);
+        statusBg = MediColors.successOverlay;
         statusIcon = Icons.arrow_upward_rounded;
       } else {
         status = "OK";
         statusColor = MediColors.primary;
-        statusBg = MediColors.primary.withValues(alpha: 0.1);
+        statusBg = MediColors.primaryOverlay;
         statusIcon = Icons.check;
       }
     }

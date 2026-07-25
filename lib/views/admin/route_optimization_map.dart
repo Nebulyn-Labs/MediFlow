@@ -10,6 +10,7 @@ import '../../services/ai_service.dart';
 import '../../services/routing_service.dart';
 import '../../services/optimization_service.dart';
 import 'package:med_supply_prototype/constants/colors.dart';
+import '../shared/skeleton_loaders.dart';
 
 class RouteOptimizationMap extends ConsumerStatefulWidget {
   const RouteOptimizationMap({super.key});
@@ -58,7 +59,8 @@ class _RouteOptimizationMapState extends ConsumerState<RouteOptimizationMap> {
       debugPrint('RouteOptimizationMap: Failed to load facilities: $e');
       if (mounted) {
         setState(() {
-          _errorMessage = 'Unable to load facilities. Please check your connection and try again.';
+          _errorMessage =
+              'Unable to load facilities. Please check your connection and try again.';
           _isLoading = false;
         });
       }
@@ -124,7 +126,12 @@ class _RouteOptimizationMapState extends ConsumerState<RouteOptimizationMap> {
 
   @override
   Widget build(BuildContext context) {
-    if (_isLoading) return const Center(child: CircularProgressIndicator());
+    if (_isLoading) {
+      return const Scaffold(
+        backgroundColor: MediColors.bg,
+        body: RouteOptimizationMapSkeleton(),
+      );
+    }
 
     if (_errorMessage != null) {
       return Scaffold(
@@ -276,7 +283,8 @@ class _RouteOptimizationMapState extends ConsumerState<RouteOptimizationMap> {
                                       // RE-LOAD FACILITIES AFTER SEEDING
                                       await _loadData();
                                     } catch (e) {
-                                      debugPrint('RouteOptimizationMap: Demo seed failed: $e');
+                                      debugPrint(
+                                          'RouteOptimizationMap: Demo seed failed: $e');
                                     } finally {
                                       if (mounted) {
                                         setState(() => _isGenerating = false);
@@ -616,7 +624,7 @@ class _RouteOptimizationMapState extends ConsumerState<RouteOptimizationMap> {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                 decoration: BoxDecoration(
-                    color: MediColors.primary.withValues(alpha: 0.1),
+                    color: MediColors.primaryOverlay,
                     borderRadius: BorderRadius.circular(6)),
                 child: Text('Score: ${rec.score.toInt()}',
                     style: const TextStyle(

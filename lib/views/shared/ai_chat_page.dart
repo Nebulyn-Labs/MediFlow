@@ -228,7 +228,7 @@ class _AIChatPageState extends ConsumerState<AIChatPage> {
               Container(
                 padding: const EdgeInsets.all(24),
                 decoration: BoxDecoration(
-                  color: MediColors.primary.withValues(alpha: 0.08),
+                  color: MediColors.primarySubtle,
                   borderRadius: BorderRadius.circular(24),
                 ),
                 child: Icon(Icons.smart_toy_rounded,

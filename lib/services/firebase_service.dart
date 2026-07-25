@@ -79,6 +79,17 @@ class FirebaseService {
         .doc(facilityId)
         .set(facility.toMap());
 
+    // Register role in the 'users' collection for RBAC
+    final String? uid = _auth.currentUser?.uid;
+    if (uid != null) {
+      await _firestore.collection('users').doc(uid).set({
+        'email': email,
+        'role': 'facility_head',
+        'facilityId': facilityId,
+        'createdAt': FieldValue.serverTimestamp(),
+      });
+    }
+
     // 5. Run Initial Simulation (30 days)
     await _simulation.runFullSimulation(facilityId, facility.type);
   }
@@ -148,6 +159,8 @@ class FirebaseService {
           'remainingQuantity': current + quantity,
           'lastUpdated': Timestamp.now(),
         });
+      } else {
+        throw Exception('Inventory document not found for medicine: $medicineName');
       }
     });
   }
@@ -241,14 +254,16 @@ class FirebaseService {
     await _firestore.runTransaction((transaction) async {
       // 1. Update Inventory
       final invDoc = await transaction.get(invRef);
-      if (invDoc.exists) {
-        int remaining = invDoc.data()?['remainingQuantity'] ?? 0;
-        int actualDeduction = min(quantity, remaining);
-        transaction.update(invRef, {
-          'remainingQuantity': remaining - actualDeduction,
-          'lastUpdated': Timestamp.now(),
-        });
+      if (!invDoc.exists) {
+        throw Exception('Inventory document not found for medicine: $medicineName');
       }
+
+      int remaining = invDoc.data()?['remainingQuantity'] ?? 0;
+      int actualDeduction = min(quantity, remaining);
+      transaction.update(invRef, {
+        'remainingQuantity': remaining - actualDeduction,
+        'lastUpdated': Timestamp.now(),
+      });
 
       // 2. Update Daily Log
       final logDoc = await transaction.get(logRef);
@@ -336,6 +351,14 @@ class FirebaseService {
     });
   }
 
+  Future<List<Map<String, dynamic>>> getAlertsOnce(String facilityId) async {
+    final snapshot = await _firestore
+        .collection('alerts')
+        .where('facilityId', isEqualTo: facilityId)
+        .get();
+    return snapshot.docs.map((doc) => doc.data()).toList();
+  }
+
   // --- CLEANUP & SEEDING ---
 
   Future<void> clearDatabase() async {
@@ -400,6 +423,15 @@ class FirebaseService {
         } catch (loginError) {
           debugPrint('Admin login failed during seed: $loginError');
         }
+      }
+
+      final String? adminUid = _auth.currentUser?.uid;
+      if (adminUid != null) {
+        await _firestore.collection('users').doc(adminUid).set({
+          'email': 'admin@mediflow.com',
+          'role': 'admin',
+          'createdAt': FieldValue.serverTimestamp(),
+        });
       }
 
       // 2. Clear old data to avoid duplicates and schema conflicts

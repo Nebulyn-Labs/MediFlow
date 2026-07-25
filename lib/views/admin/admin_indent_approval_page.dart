@@ -4,6 +4,7 @@ import '../../services/firebase_service.dart';
 import '../../services/ai_service.dart';
 import '../../models/request.dart';
 import 'package:med_supply_prototype/constants/colors.dart';
+import '../shared/skeleton_loaders.dart';
 
 class AdminIndentApprovalPage extends ConsumerStatefulWidget {
   const AdminIndentApprovalPage({super.key});
@@ -89,7 +90,7 @@ class _AdminIndentApprovalPageState
         stream: ref.read(firebaseServiceProvider).streamRequests(null),
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
+            return const AdminIndentApprovalSkeleton();
           }
 
           final pending = snapshot.data
@@ -139,10 +140,8 @@ class _AdminIndentApprovalPageState
                                         horizontal: 8, vertical: 4),
                                     decoration: BoxDecoration(
                                       color: isRedistribution
-                                          ? MediColors.success
-                                              .withValues(alpha: 0.1)
-                                          : MediColors.error
-                                              .withValues(alpha: 0.1),
+                                          ? MediColors.successOverlay
+                                          : MediColors.errorOverlay,
                                       borderRadius: BorderRadius.circular(6),
                                     ),
                                     child: Text(
@@ -203,8 +202,8 @@ class _AdminIndentApprovalPageState
                           margin: const EdgeInsets.only(bottom: 20),
                           decoration: BoxDecoration(
                             color: suggestion.contains('✅')
-                                ? MediColors.success.withValues(alpha: 0.1)
-                                : MediColors.warning.withValues(alpha: 0.1),
+                                ? MediColors.successOverlay
+                                : MediColors.warningOverlay,
                             borderRadius: BorderRadius.circular(12),
                             border: Border.all(
                                 color: suggestion.contains('✅')
