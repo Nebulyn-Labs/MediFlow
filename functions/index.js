@@ -1059,20 +1059,20 @@ exports.adminDeleteResource = onCall(async (request) => {
   
   const data = doc.data();
 
-  // Create audit log in Firestore
+  // Create audit log and delete resource atomically using a batch
+  const batch = db.batch();
   const auditRef = db.collection("audit_logs").doc();
-  await auditRef.set({
+  batch.set(auditRef, {
     adminId: request.auth.uid,
     timestamp: admin.firestore.FieldValue.serverTimestamp(),
-    action: `delete_${resourceType.slice(0, -1)}`, // e.g. delete_facility, delete_request
+    action: `delete_${resourceType.slice(0, -1)}`,
     resourceType: resourceType,
     resourceId: resourceId,
     metadata: data,
     status: "success"
   });
-
-  // Delete the resource
-  await ref.delete();
+  batch.delete(ref);
+  await batch.commit();
 
   return { success: true };
 });

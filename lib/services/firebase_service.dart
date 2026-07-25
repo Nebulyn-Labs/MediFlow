@@ -319,11 +319,7 @@ class FirebaseService {
   }
 
   Future<void> deleteRequest(String requestId) async {
-    final HttpsCallable callable = FirebaseFunctions.instance.httpsCallable('adminDeleteResource');
-    await callable.call({
-      'resourceType': 'requests',
-      'resourceId': requestId,
-    });
+    await _firestore.collection('requests').doc(requestId).delete();
   }
 
   Future<void> disposeInventory(String facilityId, String medicineName) async {
