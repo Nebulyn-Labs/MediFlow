@@ -6,6 +6,7 @@ import '../../services/firebase_service.dart';
 import '../../models/inventory_item.dart';
 import 'package:med_supply_prototype/constants/colors.dart';
 import '../shared/ai_chat_page.dart';
+import '../shared/skeleton_loaders.dart';
 
 enum _AlertKind { expired, wastageRisk, expiringSoon, lowStock }
 
@@ -236,7 +237,7 @@ class _AlertsPageState extends ConsumerState<AlertsPage> {
         child: const Icon(Icons.auto_awesome, color: Colors.white),
       ),
       body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
+          ? const AlertsSkeleton()
           : SingleChildScrollView(
               padding: const EdgeInsets.all(28),
               child: Column(
