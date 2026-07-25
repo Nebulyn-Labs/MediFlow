@@ -18,33 +18,71 @@ async function getUserFacilityAndRole(auth, db) {
     throw new HttpsError("unauthenticated", "User must log in");
   }
 
-  const userEmail = auth.token.email.toLowerCase();
-  const isAdmin = userEmail === "admin@mediflow.com";
+  const uid = auth.uid;
+  const userDoc = await db.collection("users").doc(uid).get();
+  if (!userDoc.exists) {
+    // Backward compatibility / legacy fallback for users who are not yet in the 'users' collection
+    const userEmail = auth.token.email.toLowerCase();
+    const isAdmin = userEmail === "admin@mediflow.com";
+    let userFacilityId = null;
+
+    if (!isAdmin) {
+      const docId = userEmail.replace(/@/g, "_").replace(/\./g, "_");
+      const facilityDoc = await db.collection("facilities").doc(docId).get();
+      if (!facilityDoc.exists) {
+        const facilitiesSnapshot = await db.collection("facilities")
+          .where("email", "==", userEmail)
+          .limit(1)
+          .get();
+        if (facilitiesSnapshot.empty) {
+          throw new HttpsError("failed-precondition", "No facility assigned to this user");
+        }
+        userFacilityId = facilitiesSnapshot.docs[0].id;
+      } else {
+        userFacilityId = docId;
+      }
+    }
+
+    return {
+      userEmail,
+      userFacilityId,
+      isAdmin,
+      role: isAdmin ? "admin" : "facility_head",
+    };
+  }
+
+  const userData = userDoc.data();
+  const role = userData.role || "facility_head";
+  const isAdmin = role === "admin";
   let userFacilityId = null;
 
   if (!isAdmin) {
-    const docId = userEmail.replace(/@/g, "_").replace(/\./g, "_");
-    const facilityDoc = await db.collection("facilities").doc(docId).get();
-    if (!facilityDoc.exists) {
-      // Fallback query by email field
-      const facilitiesSnapshot = await db.collection("facilities")
-        .where("email", "==", userEmail)
-        .limit(1)
-        .get();
-      if (facilitiesSnapshot.empty) {
-        throw new HttpsError("failed-precondition", "No facility assigned to this user");
+    userFacilityId = userData.facilityId || null;
+    if (!userFacilityId) {
+      // Fallback email lookup if facilityId is not stored in user doc
+      const userEmail = auth.token.email.toLowerCase();
+      const docId = userEmail.replace(/@/g, "_").replace(/\./g, "_");
+      const facilityDoc = await db.collection("facilities").doc(docId).get();
+      if (!facilityDoc.exists) {
+        const facilitiesSnapshot = await db.collection("facilities")
+          .where("email", "==", userEmail)
+          .limit(1)
+          .get();
+        if (facilitiesSnapshot.empty) {
+          throw new HttpsError("failed-precondition", "No facility assigned to this user");
+        }
+        userFacilityId = facilitiesSnapshot.docs[0].id;
+      } else {
+        userFacilityId = docId;
       }
-      userFacilityId = facilitiesSnapshot.docs[0].id;
-    } else {
-      userFacilityId = docId;
     }
   }
 
   return {
-    userEmail,
+    userEmail: auth.token.email.toLowerCase(),
     userFacilityId,
     isAdmin,
-    role: isAdmin ? "admin" : "facility_head",
+    role,
   };
 }
 
@@ -398,57 +436,6 @@ exports.mirrorRequestToBigQuery = onDocumentWritten("requests/{requestId}", asyn
   }
 });
 
-async function createOrUpdateAlert(db, facilityId, facilityName, medicineId, data, status) {
-  const alertId = `${facilityId}_${medicineId}`;
-  const alertRef = db.collection("alerts").doc(alertId);
-
-  if (status === "healthy") {
-    const alertDoc = await alertRef.get();
-    const existed = alertDoc.exists;
-    if (existed) {
-      await alertRef.delete();
-    }
-    return { existed };
-  }
-
-  if (!facilityName) {
-    const facilityDoc = await db.collection("facilities").doc(facilityId).get();
-    facilityName = facilityDoc.exists ? (facilityDoc.data().name || "") : "";
-  }
-
-  const alertDoc = await alertRef.get();
-  const existed = alertDoc.exists;
-
-  let isRead = false;
-  if (existed) {
-    const oldData = alertDoc.data() || {};
-    if (oldData.type === status) {
-      isRead = oldData.isRead ?? false;
-    }
-  }
-
-  const alertData = {
-    facilityId,
-    facilityName,
-    stockId: medicineId,
-    medicineName: data.medicineName || "",
-    qtyRemaining: Number(data.remainingQuantity || 0),
-    initialQuantity: Number(data.initialQuantity || 0),
-    batchId: data.batchId || "",
-    unit: data.unit || "units",
-    expiryDate: data.expiryDate,
-    type: status,
-    isRead: isRead
-  };
-
-  if (!existed) {
-    alertData.createdAt = admin.firestore.FieldValue.serverTimestamp();
-  }
-
-  await alertRef.set(alertData, { merge: true });
-  return { existed };
-}
-
 async function syncAlertForMedicine(db, facilityId, medicineId, data) {
   const alertId = `${facilityId}_${medicineId}`;
   const alertRef = db.collection("alerts").doc(alertId);
@@ -459,8 +446,54 @@ async function syncAlertForMedicine(db, facilityId, medicineId, data) {
   }
 
   const status = stockStatus(data);
-  await createOrUpdateAlert(db, facilityId, null, medicineId, data, status);
+  if (status === "healthy") {
+    await alertRef.delete();
+  } else {
+    const facilityDoc = await db.collection("facilities").doc(facilityId).get();
+    const facilityName = facilityDoc.exists ? (facilityDoc.data().name || "") : "";
+
+    const alertDoc = await alertRef.get();
+    const alertData = {
+      facilityId,
+      facilityName,
+      stockId: medicineId,
+      medicineName: data.medicineName || "",
+      qtyRemaining: Number(data.remainingQuantity || 0),
+      initialQuantity: Number(data.initialQuantity || 0),
+      batchId: data.batchId || "",
+      unit: data.unit || "units",
+      expiryDate: data.expiryDate,
+      type: status,
+      isRead: false
+    };
+    if (!alertDoc.exists) {
+      alertData.createdAt = admin.firestore.FieldValue.serverTimestamp();
+    }
+    await alertRef.set(alertData, { merge: true });
+  }
 }
+
+exports.onUserWritten = onDocumentWritten("users/{userId}", async (event) => {
+  const change = event.data;
+  const before = change.before.exists ? change.before.data() : null;
+  const after = change.after.exists ? change.after.data() : null;
+  const userId = event.params.userId;
+
+  if (before?.role !== after?.role) {
+    await auditEvent({
+      eventId: `user_role_${userId}_${Date.now()}`,
+      action: "role_changed",
+      entityType: "user",
+      entityId: userId,
+      before,
+      after,
+      metadata: {
+        oldRole: before?.role || null,
+        newRole: after?.role || null
+      }
+    });
+  }
+});
 
 exports.mirrorInventoryToBigQuery = onDocumentWritten("inventory/{facilityId}/medicines/{medicineId}", async (event) => {
   const change = event.data;
@@ -834,37 +867,6 @@ async function executeTool(name, args, authInfo) {
   throw new Error(`Unknown function call: ${name}`);
 }
 
-exports.getForecastSecure = onCall({ secrets: [GEMINI_API_KEY] }, async (request) => {
-  if (!request.auth) throw new HttpsError('unauthenticated', 'User must log in');
-
-  const db = admin.firestore();
-  await getUserFacilityAndRole(request.auth, db);
-
-  await checkRateLimit(
-    request.auth.uid,
-    "getForecastSecure",
-    LIMITS.AI
-  );
-
-  const { medicineName, logs, daysToForecast } = request.data;
-  const logSummary = logs
-    .map(l => `Date: ${l.date}, Used: ${l.used}`)
-    .join('\n');
-  const prompt = `Forecast ${daysToForecast} days for ${medicineName}. History:\n${logSummary}\nOutput JSON: {"prediction": int, "reasoning": "string"}`;
-
-  try {
-    const genAI = getGenAI();
-    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
-    const result = await model.generateContent(prompt);
-    const responseText = result.response.text();
-    const jsonMatch = responseText.match(/\{[\s\S]*\}/);
-    return JSON.parse(jsonMatch ? jsonMatch[0] : responseText);
-  } catch (error) {
-    logger.error("Gemini Error:", error);
-    throw new HttpsError('internal', 'AI forecasting failed');
-  }
-});
-
 exports.generateSmartAlertsSecure = onCall({ secrets: [GEMINI_API_KEY] }, async (request) => {
   if (!request.auth) throw new HttpsError('unauthenticated', 'User must log in');
 
@@ -1034,6 +1036,48 @@ exports.callGeminiSecure = onCall({ secrets: [GEMINI_API_KEY] }, async (request)
   }
 });
 
+exports.adminDeleteResource = onCall(async (request) => {
+  if (!request.auth) throw new HttpsError("unauthenticated", "User must log in");
+  
+  const db = admin.firestore();
+  const authInfo = await getUserFacilityAndRole(request.auth, db);
+  
+  if (!authInfo.isAdmin) {
+    throw new HttpsError("permission-denied", "Only administrators can perform destructive actions");
+  }
+
+  const { resourceType, resourceId } = request.data;
+  
+  if (!["facilities", "requests"].includes(resourceType)) {
+    throw new HttpsError("invalid-argument", "Invalid resource type for deletion");
+  }
+
+  const ref = db.collection(resourceType).doc(resourceId);
+  const doc = await ref.get();
+  
+  if (!doc.exists) {
+    throw new HttpsError("not-found", "Resource not found");
+  }
+  
+  const data = doc.data();
+
+  // Create audit log and delete resource atomically using a batch
+  const batch = db.batch();
+  const auditRef = db.collection("audit_logs").doc();
+  batch.set(auditRef, {
+    adminId: request.auth.uid,
+    timestamp: admin.firestore.FieldValue.serverTimestamp(),
+    action: `delete_${resourceType.slice(0, -1)}`,
+    resourceType: resourceType,
+    resourceId: resourceId,
+    metadata: data,
+    status: "success"
+  });
+  batch.delete(ref);
+  await batch.commit();
+
+  return { success: true };
+});
 const cspReportLastSeen = new Map();
 const CSP_REPORT_MAX_BODY_BYTES = 10 * 1024; // 10KB
 const CSP_REPORT_MIN_INTERVAL_MS = 5000; // 1 report per IP per 5s

@@ -5,6 +5,7 @@ import '../../services/firebase_service.dart';
 import '../../services/csv_export_service.dart';
 import '../../models/request.dart';
 import 'package:med_supply_prototype/constants/colors.dart';
+import '../shared/skeleton_loaders.dart';
 
 class AdminIndentStatusPage extends ConsumerStatefulWidget {
   const AdminIndentStatusPage({super.key});
@@ -85,7 +86,7 @@ class _AdminIndentStatusPageState extends ConsumerState<AdminIndentStatusPage> {
         stream: ref.read(firebaseServiceProvider).streamRequests(null),
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
+            return const AdminIndentStatusSkeleton();
           }
 
           final requests = _buildVisibleRequests(snapshot.data);
