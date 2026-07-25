@@ -52,6 +52,27 @@ class AIService {
     return response.data['text'] as String? ?? '';
   }
 
+  // ─── CENTRALIZED FALLBACK HELPER ─────────────────────────────
+  Future<T> _withAIFallback<T>({
+    required Future<T> Function() aiCall,
+    required Future<T> Function([Object? error]) fallbackCall,
+    void Function(Object)? onCatch,
+  }) async {
+    if (_shouldUseLocal) {
+      return await fallbackCall();
+    }
+    
+    try {
+      return await aiCall();
+    } catch (e) {
+      if (onCatch != null) {
+        onCatch(e); 
+      }
+      _handleQuotaError(e.toString());
+      return await fallbackCall(e);
+    }
+  }
+
   // ─── FORECASTING ───────────────────────────────────────────────
   Future<Map<String, dynamic>> forecastDemand(
       String medicineName, List<DailyUsageLog> logs, int daysToForecast,
@@ -64,43 +85,36 @@ class AIService {
       return {'date': l.date.toIso8601String(), 'used': usage.unitsDistributed};
     }).toList();
 
-    if (_shouldUseLocal) {
-      final result = _localForecast(medLogs, daysToForecast, medicineName);
-      await _logAIDecision(
-        facilityId: facilityId,
-        medicineName: medicineName,
-        daysToForecast: daysToForecast,
-        result: result,
-        model: 'local_fallback',
-        input: {'logs': medLogs.take(30).toList()},
-      );
-      return result;
-    }
+    return _withAIFallback<Map<String, dynamic>>(
+      aiCall: () async {
+        final logSummary = medLogs
+            .take(30)
+            .map((l) => 'Date: ${l['date']}, Used: ${l['used']}')
+            .join('\n');
+        final prompt =
+            'Forecast $daysToForecast days for $medicineName. History:\n$logSummary\nOutput JSON: {"prediction": int, "reasoning": "string"}';
 
-    try {
-      final logSummary = medLogs
-          .take(30)
-          .map((l) => 'Date: ${l['date']}, Used: ${l['used']}')
-          .join('\n');
-      final prompt =
-          'Forecast $daysToForecast days for $medicineName. History:\n$logSummary\nOutput JSON: {"prediction": int, "reasoning": "string"}';
-
-      final responseText = await _callGeminiBackend(prompt);
-      final raw = responseText.trim();
-      var decoded = jsonDecode(
-          raw.replaceAll('```json', '').replaceAll('```', '').trim());
-      if (decoded is Map) {
-        final result = Map<String, dynamic>.from(decoded);
-        await _logAIDecision(
-          facilityId: facilityId,
-          medicineName: medicineName,
-          daysToForecast: daysToForecast,
-          result: result,
-          model: 'gemini-1.5-flash-backend',
-          input: {'prompt': prompt, 'logs': medLogs.take(30).toList()},
-        );
-        return result;
-      } else {
+        final responseText = await _callGeminiBackend(prompt);
+        final raw = responseText.trim();
+        var decoded = jsonDecode(
+            raw.replaceAll('```json', '').replaceAll('```', '').trim());
+            
+        if (decoded is Map) {
+          final result = Map<String, dynamic>.from(decoded);
+          await _logAIDecision(
+            facilityId: facilityId,
+            medicineName: medicineName,
+            daysToForecast: daysToForecast,
+            result: result,
+            model: 'gemini-1.5-flash-backend',
+            input: {'prompt': prompt, 'logs': medLogs.take(30).toList()},
+          );
+          return result;
+        } else {
+          throw Exception("Invalid JSON format from AI");
+        }
+      },
+      fallbackCall: ([error]) async {
         final result = _localForecast(medLogs, daysToForecast, medicineName);
         await _logAIDecision(
           facilityId: facilityId,
@@ -108,23 +122,13 @@ class AIService {
           daysToForecast: daysToForecast,
           result: result,
           model: 'local_fallback',
-          input: {'logs': medLogs.take(30).toList()},
+          input: error != null 
+              ? {'error': error.toString(), 'logs': medLogs.take(30).toList()}
+              : {'logs': medLogs.take(30).toList()},
         );
         return result;
-      }
-    } catch (e) {
-      _handleQuotaError(e.toString());
-      final result = _localForecast(medLogs, daysToForecast, medicineName);
-      await _logAIDecision(
-        facilityId: facilityId,
-        medicineName: medicineName,
-        daysToForecast: daysToForecast,
-        result: result,
-        model: 'local_fallback',
-        input: {'error': e.toString(), 'logs': medLogs.take(30).toList()},
-      );
-      return result;
-    }
+      },
+    );
   }
 
   Future<void> _logAIDecision({
@@ -188,22 +192,21 @@ class AIService {
     required String role,
     List<Map<String, String>> history = const [],
   }) async {
-    if (_shouldUseLocal) return _localSystemResponse(query, context, role);
-    try {
-      final callable =
-          FirebaseFunctions.instance.httpsCallable('getChatResponseSecure');
-      final response = await callable.call({
-        'query': query,
-        'context': context,
-        'role': role,
-        'history': history,
-      });
-      return response.data as String? ?? 'Unavailable.';
-    } catch (e) {
-      debugPrint('Gemini Exception: $e');
-      _handleQuotaError(e.toString());
-      return _localSystemResponse(query, context, role);
-    }
+    return _withAIFallback<String>(
+      aiCall: () async {
+        final callable =
+            FirebaseFunctions.instance.httpsCallable('getChatResponseSecure');
+        final response = await callable.call({
+          'query': query,
+          'context': context,
+          'role': role,
+          'history': history,
+        });
+        return response.data as String? ?? 'Unavailable.';
+      },
+      fallbackCall: ([error]) async => _localSystemResponse(query, context, role),
+      onCatch: (e) => debugPrint('Gemini Exception: $e'),
+    );
   }
 
   String _localSystemResponse(
@@ -267,13 +270,15 @@ class AIService {
       }
     }
 
-    if (_shouldUseLocal || inventory.isEmpty) return local;
-    try {
-      final payload = inventory
-          .map((i) =>
-              "${i.medicineName} (Batch: ${i.batchId}): ${i.remainingQuantity}/${i.initialQuantity} units left. Expiry: ${i.expiryDate.toIso8601String()}")
-          .join('\n');
-      final prompt = '''
+    if (inventory.isEmpty) return local;
+
+    return _withAIFallback<List<Map<String, dynamic>>>(
+      aiCall: () async {
+        final payload = inventory
+            .map((i) =>
+                "${i.medicineName} (Batch: ${i.batchId}): ${i.remainingQuantity}/${i.initialQuantity} units left. Expiry: ${i.expiryDate.toIso8601String()}")
+            .join('\n');
+        final prompt = '''
 Identify risks in the following inventory:
 $payload
 
@@ -296,17 +301,16 @@ If type is "low_stock", include:
 
 Output raw JSON array only.
 ''';
-      final responseText = await _callGeminiBackend(prompt);
-      var decoded = jsonDecode(
-          responseText.replaceAll('```json', '').replaceAll('```', '').trim());
-      if (decoded is List) {
-        return decoded.map((e) => Map<String, dynamic>.from(e as Map)).toList();
-      }
-      return local;
-    } catch (e) {
-      _handleQuotaError(e.toString());
-      return local;
-    }
+        final responseText = await _callGeminiBackend(prompt);
+        var decoded = jsonDecode(
+            responseText.replaceAll('```json', '').replaceAll('```', '').trim());
+        if (decoded is List) {
+          return decoded.map((e) => Map<String, dynamic>.from(e as Map)).toList();
+        }
+        throw Exception("Invalid JSON array returned from AI");
+      },
+      fallbackCall: ([error]) async => local,
+    );
   }
 
   // ─── REDISTRIBUTION ────────────────────────────────────────────
@@ -319,8 +323,9 @@ Output raw JSON array only.
         .toList();
     if (indents.isEmpty) return "No active indents found to optimize.";
 
-    try {
-      final prompt = '''
+    return _withAIFallback<String>(
+      aiCall: () async {
+        final prompt = '''
 Analyze these ${indents.length} pending indents across ${facilities.length} health facilities.
 The logistics engine has prioritized routes based on:
 1. Rural Facility Priority (+150 score)
@@ -333,12 +338,12 @@ ${indents.map((r) => "- ${r.facilityId}: ${r.medicineName} (${r.quantity} units)
 Provide a 2-sentence executive summary explaining the strategy. Mention if any rural facilities were prioritized.
 Output plain text only.
 ''';
-      final responseText = await _callGeminiBackend(prompt);
-      return responseText.trim();
-    } catch (e) {
-      _handleQuotaError(e.toString());
-      return "Optimizing ${indents.length} requests across ${facilities.length} sites by matching local surpluses.";
-    }
+        final responseText = await _callGeminiBackend(prompt);
+        return responseText.trim();
+      },
+      fallbackCall: ([error]) async => 
+          "Optimizing ${indents.length} requests across ${facilities.length} sites by matching local surpluses.",
+    );
   }
 
   // ─── SHIPMENT STRATEGY (SEASONAL AI) ─────────────────────────
@@ -349,8 +354,9 @@ Output plain text only.
     String externalContext =
         "Current Season: Approaching Monsoon (High Risk for Malaria/Dengue)",
   }) async {
-    try {
-      final prompt = '''
+    return _withAIFallback<Map<String, dynamic>>(
+      aiCall: () async {
+        final prompt = '''
 Scenario: MediFlow shipment split (Target: $targetMonths months active).
 External Context: $externalContext
 Inventory: ${items.map((i) => '${i.medicineName}: ${i.remainingQuantity}').join(", ")}
@@ -359,31 +365,31 @@ Task: Provide a JSON split (active/coldStorage/reasoning) for each medicine. Be 
 Output JSON only.
 ''';
 
-      final responseText = await _callGeminiBackend(prompt);
-      var decoded = jsonDecode(
-          responseText.replaceAll('```json', '').replaceAll('```', '').trim());
-      if (decoded is Map) {
-        return Map<String, dynamic>.from(decoded);
-      }
-      return _localShipmentStrategy(items, logs, targetMonths);
-    } catch (e) {
-      _handleQuotaError(e.toString());
-      return _localShipmentStrategy(items, logs, targetMonths);
-    }
+        final responseText = await _callGeminiBackend(prompt);
+        var decoded = jsonDecode(
+            responseText.replaceAll('```json', '').replaceAll('```', '').trim());
+        if (decoded is Map) {
+          return Map<String, dynamic>.from(decoded);
+        }
+        throw Exception("Invalid JSON format from AI");
+      },
+      fallbackCall: ([error]) async => _localShipmentStrategy(items, logs, targetMonths),
+    );
   }
 
   // ─── MULTI-MODAL VISION ─────────────────────────────────────────
   Future<String> parseImageWithVision(
       Uint8List imageBytes, String prompt) async {
-    try {
-      final imageBase64 = base64Encode(imageBytes);
-      final responseText = await _callGeminiBackend(prompt,
-          imageBase64: imageBase64, imageMimeType: 'image/jpeg');
-      return responseText;
-    } catch (e) {
-      _handleQuotaError(e.toString());
-      return "Local Fallback: Image parsing is not available offline or quota exceeded.";
-    }
+    return _withAIFallback<String>(
+      aiCall: () async {
+        final imageBase64 = base64Encode(imageBytes);
+        final responseText = await _callGeminiBackend(prompt,
+            imageBase64: imageBase64, imageMimeType: 'image/jpeg');
+        return responseText;
+      },
+      fallbackCall: ([error]) async => 
+          "Local Fallback: Image parsing is not available offline or quota exceeded.",
+    );
   }
 
   Map<String, dynamic> _localShipmentStrategy(
