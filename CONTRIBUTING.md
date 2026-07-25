@@ -262,8 +262,10 @@ We expect bug fixes and features to be accompanied by tests where applicable.
 
 - Write clear unit, widget, or integration tests to verify your implementation.
 
-- We also enforce a minimum test coverage baseline in CI - see
-[COVERAGE.md](COVERAGE.md) for how it works and how to check your coverage locally before opening a PR.
+- We also enforce a minimum test coverage baseline in CI. 
+See [COVERAGE.md](COVERAGE.md) for instructions on checking your coverage locally before opening a PR.
+
+
 ---
 
 ## 7. The Pull Request Process

@@ -10,7 +10,7 @@ if [ ! -f "$LCOV_FILE" ]; then
     exit 1
 fi
 
-if [! -f "$BASELINE_FILE" ]; then
+if [ ! -f "$BASELINE_FILE" ]; then
     echo "Baseline file not found at $BASELINE_FILE."
     exit 1
 fi
@@ -37,7 +37,7 @@ echo "Baseline coverage: ${BASELINE}%"
 
 PASS=$(awk -v cur="$CURRENT" -v base="$BASELINE" -v tol="$TOLERANCE" \
     'BEGIN {print (cur >= (base - tol)) ? "1" : "0"}')
-if ["$PASS" -eq 0]; then
+if [ "$PASS" -eq 0 ]; then
     echo ""
     echo "Coverage regression detected: ${CURRENT}% is below the baseline of ${BASELINE}%."
     echo  "Add tests to restore coverage, or if the drop is intentional and justified,"
@@ -46,7 +46,7 @@ if ["$PASS" -eq 0]; then
 fi
 echo "Coverage check passed."
 
-if awk -v cur="$CURRENT" -v base="BASELINE" 'BEGIN {exit !(cur>base)}'; then
+if awk -v cur="$CURRENT" -v base="$BASELINE" 'BEGIN {exit !(cur>base)}'; then
    echo "Coverage improved (${CURRENT}% > ${BASELINE}%)."
    echo "Consider bumping coverage_baseline.txt to lock in the gain."
 fi
