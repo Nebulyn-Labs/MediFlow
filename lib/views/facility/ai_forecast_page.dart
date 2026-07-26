@@ -301,18 +301,18 @@ class _AIForecastPageState extends ConsumerState<AIForecastPage> {
                         if (_forecastResult == null)
                           const Text(
                               'Run the forecaster to see AI-powered demand predictions.',
-                              style: TextStyle(color: MediColors.textSecondary))
+                              style: TextStyle(color: MediColors.textPrimary))
                         else ...[
                           Text(
                               'Predicted: ${_forecastResult!['prediction']} units over $_forecastDays days',
                               style: const TextStyle(
                                   fontSize: 20,
                                   fontWeight: FontWeight.w800,
-                                  color: MediColors.primary)),
+                                  color: MediColors.primaryLight)),
                           const SizedBox(height: 8),
                           Text('${_forecastResult!['reasoning']}',
                               style: const TextStyle(
-                                  color: MediColors.textSecondary,
+                                  color: MediColors.textPrimary,
                                   height: 1.6)),
                         ],
                       ]),
