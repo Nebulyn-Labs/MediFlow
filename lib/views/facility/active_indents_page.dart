@@ -840,7 +840,8 @@ class _ActiveIndentsPageState extends ConsumerState<ActiveIndentsPage> {
                 String resolutionText = '';
                 if (hasResolution) {
                   final resDate = req.resolvedAt!;
-                  resolutionText = 'Resolved: ${resDate.day}/${resDate.month}/${resDate.year} ${resDate.hour.toString().padLeft(2, '0')}:${resDate.minute.toString().padLeft(2, '0')}';
+                  resolutionText =
+                      'Resolved: ${resDate.day}/${resDate.month}/${resDate.year} ${resDate.hour.toString().padLeft(2, '0')}:${resDate.minute.toString().padLeft(2, '0')}';
                 }
 
                 final requestInfo = Column(
@@ -864,7 +865,9 @@ class _ActiveIndentsPageState extends ConsumerState<ActiveIndentsPage> {
                               color: MediColors.textSecondary,
                               fontWeight: FontWeight.w500)),
                     ],
-                    if (isRejected && req.rejectionReason != null && req.rejectionReason!.isNotEmpty) ...[
+                    if (isRejected &&
+                        req.rejectionReason != null &&
+                        req.rejectionReason!.isNotEmpty) ...[
                       const SizedBox(height: 8),
                       Container(
                         padding: const EdgeInsets.all(10),
@@ -872,7 +875,8 @@ class _ActiveIndentsPageState extends ConsumerState<ActiveIndentsPage> {
                         decoration: BoxDecoration(
                           color: MediColors.errorOverlay,
                           borderRadius: BorderRadius.circular(8),
-                          border: Border.all(color: MediColors.error.withValues(alpha: 0.3)),
+                          border: Border.all(
+                              color: MediColors.error.withValues(alpha: 0.3)),
                         ),
                         child: Text(
                           'Rejection Reason: ${req.rejectionReason}',
@@ -924,11 +928,13 @@ class _ActiveIndentsPageState extends ConsumerState<ActiveIndentsPage> {
                 );
 
                 final statusBadge = Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                   decoration: BoxDecoration(
                     color: statusColor.withValues(alpha: 0.12),
                     borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: statusColor.withValues(alpha: 0.25)),
+                    border:
+                        Border.all(color: statusColor.withValues(alpha: 0.25)),
                   ),
                   child: Text(
                     req.status.name.toUpperCase(),
@@ -953,7 +959,8 @@ class _ActiveIndentsPageState extends ConsumerState<ActiveIndentsPage> {
                               requestInfo,
                               const SizedBox(height: 16),
                               Row(
-                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                mainAxisAlignment:
+                                    MainAxisAlignment.spaceBetween,
                                 children: [
                                   Text(
                                     'Quantity: ${req.quantity}',

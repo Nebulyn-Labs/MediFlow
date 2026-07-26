@@ -161,7 +161,8 @@ class FirebaseService {
           'lastUpdated': Timestamp.now(),
         });
       } else {
-        throw Exception('Inventory document not found for medicine: $medicineName');
+        throw Exception(
+            'Inventory document not found for medicine: $medicineName');
       }
     });
   }
@@ -256,7 +257,8 @@ class FirebaseService {
       // 1. Update Inventory
       final invDoc = await transaction.get(invRef);
       if (!invDoc.exists) {
-        throw Exception('Inventory document not found for medicine: $medicineName');
+        throw Exception(
+            'Inventory document not found for medicine: $medicineName');
       }
 
       int remaining = invDoc.data()?['remainingQuantity'] ?? 0;
