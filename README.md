@@ -138,6 +138,11 @@ graph TD
    **OSRM/OpenRouteService**, our routing engine decodes complex polylines to
    provide precise, road-accurate delivery paths.
 
+For a detailed walkthrough of how the AI chat assistant flows from the
+client to Gemini and on to backend actions, including authorization checks,
+see [AI Tool-Calling Architecture](docs/ai-tool-calling.md). For the
+BigQuery data pipeline, see [BigQuery Integration](docs/bigquery.md).
+
 ---
 
 ## Project Structure
