@@ -86,6 +86,51 @@ class NearestNeighborRoutingStrategy implements RoutingStrategy {
   }
 }
 
+/// Redistribution matching and route-building for MediFlow's logistics
+/// engine.
+///
+/// This service answers two questions:
+///
+/// 1. Which donor facility should fulfil which pending request, and how
+///    much of a medicine should move ([calculateOptimalTransfers])?
+/// 2. Given a set of transfers from the same donor, in what order should
+///    that donor visit its recipients ([calculateMultiStopRoutes])?
+///
+/// ### Inputs
+/// - `facilities`: every facility in the network, used for location, type
+///   (`rural`/`urban`), and identity.
+/// - `inventories`: current stock per facility, keyed by facility id.
+/// - `requests`: pending/approved [MedRequest]s. Only `regularIndent` and
+///   `shortage` requests represent deficits; `surplus` requests are explicit
+///   donor offers, layered on top of implicit surplus derived from
+///   inventory (see below).
+///
+/// ### Outputs
+/// - [TransferRecommendation]: a single donor -> recipient -> medicine ->
+///   quantity match, with a `score` and human-readable `reasoning`.
+/// - [MultiStopRoute]: transfers grouped by donor, with `stops` ordered by
+///   the configured [RoutingStrategy].
+///
+/// ### Algorithm assumptions
+/// - **Implicit surplus:** any facility holding more than 30% of a
+///   medicine's `initialQuantity` is treated as having that excess (above
+///   the 30% floor) available to donate, even without an explicit surplus
+///   request. Explicit surplus offers override this figure when larger.
+/// - **Indent ordering:** deficits are processed rural-facilities-first,
+///   then by descending quantity, so that larger and more vulnerable needs
+///   are matched before smaller/urban ones exhaust the available surplus.
+/// - **Scoring (Optimal Transfer Score):** for each candidate donor of a
+///   given medicine, a score is computed from proximity (closer is worth
+///   more, capped at 200km), a flat +150 bonus when the recipient is rural,
+///   and a fulfillment bonus (+50 full, +25 partial). The highest-scoring
+///   donor is chosen per iteration; this repeats until the deficit is met
+///   or no donor has stock left, allowing a single indent to be split
+///   across multiple donors.
+/// - **Routing** ([NearestNeighborRoutingStrategy]): stops for a donor are
+///   ordered with a simple greedy nearest-neighbor heuristic starting from
+///   the donor's own location. This is not a shortest-path/TSP solver — it
+///   is a fast approximation intended to produce a reasonable multi-stop
+///   delivery order, not a mathematically optimal one.
 class OptimizationService {
   final RoutingStrategy _strategy;
 

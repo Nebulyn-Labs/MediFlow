@@ -138,6 +138,10 @@ graph TD
    **OSRM/OpenRouteService**, our routing engine decodes complex polylines to
    provide precise, road-accurate delivery paths.
 
+For a developer-oriented breakdown of the redistribution matching, routing,
+and demo data algorithms, see
+[Optimization, Routing & Simulation Algorithms](docs/optimization-simulation-algorithms.md).
+
 ---
 
 ## Project Structure
