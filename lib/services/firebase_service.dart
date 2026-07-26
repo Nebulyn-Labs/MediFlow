@@ -1,5 +1,6 @@
 import 'dart:math';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_auth/firebase_auth.dart' as auth;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter/foundation.dart';
@@ -78,6 +79,17 @@ class FirebaseService {
         .collection('facilities')
         .doc(facilityId)
         .set(facility.toMap());
+
+    // Register role in the 'users' collection for RBAC
+    final String? uid = _auth.currentUser?.uid;
+    if (uid != null) {
+      await _firestore.collection('users').doc(uid).set({
+        'email': email,
+        'role': 'facility_head',
+        'facilityId': facilityId,
+        'createdAt': FieldValue.serverTimestamp(),
+      });
+    }
 
     // 5. Run Initial Simulation (30 days)
     await _simulation.runFullSimulation(facilityId, facility.type);
@@ -388,7 +400,15 @@ class FirebaseService {
             deleteFutures.add(l.reference.delete());
           }
         }
-        deleteFutures.add(doc.reference.delete());
+        if (collection == 'facilities' || collection == 'requests') {
+          final callable = FirebaseFunctions.instance.httpsCallable('adminDeleteResource');
+          deleteFutures.add(callable.call({
+            'resourceType': collection,
+            'resourceId': doc.id,
+          }));
+        } else {
+          deleteFutures.add(doc.reference.delete());
+        }
 
         if (deleteFutures.length >= 50) {
           await Future.wait(deleteFutures);
@@ -412,6 +432,15 @@ class FirebaseService {
         } catch (loginError) {
           debugPrint('Admin login failed during seed: $loginError');
         }
+      }
+
+      final String? adminUid = _auth.currentUser?.uid;
+      if (adminUid != null) {
+        await _firestore.collection('users').doc(adminUid).set({
+          'email': 'admin@mediflow.com',
+          'role': 'admin',
+          'createdAt': FieldValue.serverTimestamp(),
+        });
       }
 
       // 2. Clear old data to avoid duplicates and schema conflicts
