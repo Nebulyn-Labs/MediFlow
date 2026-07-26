@@ -5,7 +5,9 @@ import '../../services/firebase_service.dart';
 import '../../models/inventory_item.dart';
 import 'package:med_supply_prototype/constants/colors.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'confirm_logout_dialog.dart';
 import 'scroll_to_top_button.dart';
+
 class SidebarLayout extends ConsumerStatefulWidget {
   final Widget child;
   final String role;
@@ -23,15 +25,16 @@ class SidebarLayout extends ConsumerStatefulWidget {
 }
 
 class _SidebarLayoutState extends ConsumerState<SidebarLayout> {
-bool _isExpanded = false;
+  bool _isExpanded = false;
   final ScrollController _mainScrollController = ScrollController();
-@override
+  @override
   void dispose() {
     _mainScrollController.dispose();
     super.dispose();
   }
 
-  int _calculateSelectedIndex(BuildContext context) {    final location = GoRouterState.of(context).uri.toString();
+  int _calculateSelectedIndex(BuildContext context) {
+    final location = GoRouterState.of(context).uri.toString();
     if (widget.role == 'facility') {
       if (location.endsWith('/overview')) return 0;
       if (location.endsWith('/logging')) return 1;
@@ -205,6 +208,8 @@ bool _isExpanded = false;
                     _NavItem(Icons.logout_rounded, 'Logout'),
                     false,
                     () async {
+                      final confirmed = await confirmLogout(context);
+                      if (!confirmed) return;
                       try {
                         await FirebaseAuth.instance.signOut();
                         if (context.mounted) context.go('/');
@@ -227,7 +232,7 @@ bool _isExpanded = false;
             ),
           ),
 
-// ── Main Content ──
+          // ── Main Content ──
           Expanded(
             child: PrimaryScrollController(
               controller: _mainScrollController,
@@ -242,7 +247,8 @@ bool _isExpanded = false;
                 ],
               ),
             ),
-          ),        ],
+          ),
+        ],
       ),
     );
   }
