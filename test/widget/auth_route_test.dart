@@ -2,9 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:mocktail/mocktail.dart';
 
+import 'package:med_supply_prototype/models/facility.dart';
 import 'package:med_supply_prototype/services/firebase_service.dart';
 import 'package:med_supply_prototype/views/auth/login_screen.dart';
 
@@ -94,13 +94,12 @@ void main() {
         ProviderScope(child: MaterialApp.router(routerConfig: router)),
       );
 
-      // Attempting to navigate to a protected route while unauthenticated
-      // (FirebaseAuth.instance.currentUser is null without Firebase init)
-      // should trigger the redirect and land on '/'.
+      // FirebaseAuth.instance.currentUser is null without Firebase init,
+      // so navigating to a protected route must redirect to '/'.
       router.go('/facility/any/overview');
       await tester.pump();
 
-      expect(router.location, '/');
+      expect(find.text('Home'), findsOneWidget);
     });
 
     testWidgets(
@@ -118,7 +117,7 @@ void main() {
       router.go('/admin/overview');
       await tester.pump();
 
-      expect(router.location, '/');
+      expect(find.text('Home'), findsOneWidget);
     });
   });
 
@@ -159,7 +158,7 @@ void main() {
       await tester.tap(find.text('Sign In'));
       await tester.pumpAndSettle();
 
-      expect(router.location, '/facility/$facilityId/overview');
+      expect(find.text('Facility Overview'), findsOneWidget);
     });
 
     testWidgets('admin login navigates to /admin/overview', (tester) async {
@@ -191,7 +190,7 @@ void main() {
       await tester.tap(find.text('Sign In'));
       await tester.pumpAndSettle();
 
-      expect(router.location, '/admin/overview');
+      expect(find.text('Admin Overview'), findsOneWidget);
     });
 
     testWidgets('login failure shows error and does not navigate',
@@ -227,7 +226,8 @@ void main() {
       await tester.tap(find.text('Sign In'));
       await tester.pumpAndSettle();
 
-      expect(router.location, '/login/facility');
+      // Should still be on the login screen — no navigation occurred.
+      expect(find.text('Sign In'), findsOneWidget);
       expect(find.text('Login failed: No user found'), findsOneWidget);
     });
   });
