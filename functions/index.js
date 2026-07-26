@@ -8,8 +8,14 @@ const { GoogleGenerativeAI } = require("@google/generative-ai");
 const { BigQuery } = require("@google-cloud/bigquery");
 const { checkRateLimit, LIMITS } = require("./helpers/rateLimiter");
 const { createBigQueryRecovery } = require("./helpers/bigQueryRecovery");
+const { createLowStockService } = require("./helpers/lowStock");
 
 admin.initializeApp();
+
+const lowStockService = createLowStockService({
+  serverTimestamp: () => admin.firestore.FieldValue.serverTimestamp(),
+});
+const { stockStatus } = lowStockService;
 
 const GEMINI_API_KEY = defineSecret("GEMINI_API_KEY");
 
@@ -196,20 +202,6 @@ function toIsoTimestamp(value) {
 function toBigQueryDate(value) {
   const iso = toIsoTimestamp(value);
   return iso ? iso.substring(0, 10) : null;
-}
-
-function stockStatus(data) {
-  const initial = Number(data.initialQuantity || 0);
-  const remaining = Number(data.remainingQuantity || 0);
-  const pct = initial > 0 ? remaining / initial : 0;
-  const expiry = toIsoTimestamp(data.expiryDate);
-  const daysLeft = expiry ? Math.ceil((new Date(expiry).getTime() - Date.now()) / 86400000) : null;
-
-  if (daysLeft !== null && daysLeft < 0) return "expired";
-  if (pct >= 0.7 && daysLeft !== null && daysLeft <= 30) return "wastage_risk";
-  if (pct <= 0.2 || remaining <= 500) return "low_stock";
-  if (daysLeft !== null && daysLeft <= 30) return "expiring_soon";
-  return "healthy";
 }
 
 const bigQueryRecovery = createBigQueryRecovery({
@@ -436,43 +428,6 @@ exports.mirrorRequestToBigQuery = onDocumentWritten("requests/{requestId}", asyn
   }
 });
 
-async function syncAlertForMedicine(db, facilityId, medicineId, data) {
-  const alertId = `${facilityId}_${medicineId}`;
-  const alertRef = db.collection("alerts").doc(alertId);
-
-  if (!data) {
-    await alertRef.delete();
-    return;
-  }
-
-  const status = stockStatus(data);
-  if (status === "healthy") {
-    await alertRef.delete();
-  } else {
-    const facilityDoc = await db.collection("facilities").doc(facilityId).get();
-    const facilityName = facilityDoc.exists ? (facilityDoc.data().name || "") : "";
-
-    const alertDoc = await alertRef.get();
-    const alertData = {
-      facilityId,
-      facilityName,
-      stockId: medicineId,
-      medicineName: data.medicineName || "",
-      qtyRemaining: Number(data.remainingQuantity || 0),
-      initialQuantity: Number(data.initialQuantity || 0),
-      batchId: data.batchId || "",
-      unit: data.unit || "units",
-      expiryDate: data.expiryDate,
-      type: status,
-      isRead: false
-    };
-    if (!alertDoc.exists) {
-      alertData.createdAt = admin.firestore.FieldValue.serverTimestamp();
-    }
-    await alertRef.set(alertData, { merge: true });
-  }
-}
-
 exports.onUserWritten = onDocumentWritten("users/{userId}", async (event) => {
   const change = event.data;
   const before = change.before.exists ? change.before.data() : null;
@@ -507,7 +462,7 @@ exports.mirrorInventoryToBigQuery = onDocumentWritten("inventory/{facilityId}/me
   const action = !before && after ? "created" : before && after ? "updated" : "deleted";
 
   const db = admin.firestore();
-  await syncAlertForMedicine(db, facilityId, medicineId, after);
+  await lowStockService.syncAlertForMedicine(db, facilityId, medicineId, after);
 
   await insertBigQuery("inventory_snapshots", {
     snapshot_id: `${facilityId}_${medicineId}_${Date.now()}`,
@@ -585,50 +540,12 @@ exports.retryFailedBigQueryInsertions = onSchedule("every 5 minutes", async () =
  */
 exports.checkLowStock = onSchedule("every 24 hours", async () => {
   const db = admin.firestore();
-  const facilities = await db.collection("facilities").get();
-
-  for (const facilityDoc of facilities.docs) {
-    const medicinesSnapshot = await db.collection("inventory")
-      .doc(facilityDoc.id)
-      .collection("medicines")
-      .get();
-
-    for (const medDoc of medicinesSnapshot.docs) {
-      const data = medDoc.data();
-      const status = stockStatus(data);
-      const { existed } = await createOrUpdateAlert(
-        db,
-        facilityDoc.id,
-        facilityDoc.data().name || "",
-        medDoc.id,
-        data,
-        status
-      );
-
-      // Trigger FCM Notification for low stock if it's new
-      if (status === "low_stock" && !existed) {
-        const userQuery = await db.collection("users")
-          .where("facilityId", "==", facilityDoc.id)
-          .where("role", "==", "facility_head")
-          .limit(1)
-          .get();
-
-        if (!userQuery.empty) {
-          const user = userQuery.docs[0].data();
-          if (user.fcmToken) {
-            await admin.messaging().send({
-              token: user.fcmToken,
-              notification: {
-                title: "Low Stock Alert",
-                body: `${data.medicineName} is below reorder level (${data.remainingQuantity} left).`
-              }
-            });
-          }
-        }
-      }
-    }
-  }
-  return null;
+  return lowStockService.runLowStockSweep({
+    db,
+    sendNotification: async (token, notification) => {
+      await admin.messaging().send({ token, notification });
+    },
+  });
 });
 
 /**
