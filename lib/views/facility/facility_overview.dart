@@ -188,8 +188,19 @@ class FacilityOverview extends ConsumerWidget {
                   if (v == 'out') {
                     final confirmed = await confirmLogout(context);
                     if (confirmed != true) return;
-                    if (context.mounted) context.go('/');
-                    await FirebaseAuth.instance.signOut();
+                    try {
+                      await FirebaseAuth.instance.signOut();
+                      if (context.mounted) context.go('/');
+                    } catch (e) {
+                      if (context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text('Sign out failed: ${e.toString()}'),
+                            backgroundColor: MediColors.error,
+                          ),
+                        );
+                      }
+                    }
                   }
                 },
               ),

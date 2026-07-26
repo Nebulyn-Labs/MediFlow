@@ -6,6 +6,7 @@ import '../../models/inventory_item.dart';
 import 'package:med_supply_prototype/constants/colors.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'confirm_logout_dialog.dart';
+import 'scroll_to_top_button.dart';
 
 class SidebarLayout extends ConsumerStatefulWidget {
   final Widget child;
@@ -209,8 +210,19 @@ class _SidebarLayoutState extends ConsumerState<SidebarLayout> {
                     () async {
                       final confirmed = await confirmLogout(context);
                       if (!confirmed) return;
-                      if (context.mounted) context.go('/');
-                      await FirebaseAuth.instance.signOut();
+                      try {
+                        await FirebaseAuth.instance.signOut();
+                        if (context.mounted) context.go('/');
+                      } catch (e) {
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text('Sign out failed: ${e.toString()}'),
+                              backgroundColor: MediColors.error,
+                            ),
+                          );
+                        }
+                      }
                     },
                     isLogout: true,
                   ),
@@ -221,7 +233,21 @@ class _SidebarLayoutState extends ConsumerState<SidebarLayout> {
           ),
 
           // ── Main Content ──
-          Expanded(child: widget.child),
+          Expanded(
+            child: PrimaryScrollController(
+              controller: _mainScrollController,
+              child: Stack(
+                children: [
+                  widget.child,
+                  Positioned(
+                    bottom: 24,
+                    right: 24,
+                    child: ScrollToTopButton(controller: _mainScrollController),
+                  ),
+                ],
+              ),
+            ),
+          ),
         ],
       ),
     );
