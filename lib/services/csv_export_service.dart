@@ -25,6 +25,13 @@ class CsvExportService {
     List<InventoryItem> inventory, {
     String? facilityName,
   }) async {
+    final rows = buildInventoryRows(inventory);
+    final fileName =
+        'inventory_${_slug(facilityName)}${_stampFmt.format(DateTime.now())}.csv';
+    return _saveCsv(rows, fileName);
+  }
+
+  static List<List<dynamic>> buildInventoryRows(List<InventoryItem> inventory) {
     final rows = <List<dynamic>>[
       [
         'Medicine Name',
@@ -53,10 +60,7 @@ class CsvExportService {
         _dateFmt.format(item.lastUpdated),
       ]);
     }
-
-    final fileName =
-        'inventory_${_slug(facilityName)}${_stampFmt.format(DateTime.now())}.csv';
-    return _saveCsv(rows, fileName);
+    return rows;
   }
 
   /// Exports the given daily usage logs as a CSV file (one row per
@@ -65,6 +69,13 @@ class CsvExportService {
     List<DailyUsageLog> logs, {
     String? facilityName,
   }) async {
+    final rows = buildUsageLogRows(logs);
+    final fileName =
+        'usage_logs_${_slug(facilityName)}${_stampFmt.format(DateTime.now())}.csv';
+    return _saveCsv(rows, fileName);
+  }
+
+  static List<List<dynamic>> buildUsageLogRows(List<DailyUsageLog> logs) {
     final rows = <List<dynamic>>[
       [
         'Date',
@@ -89,10 +100,7 @@ class CsvExportService {
         ]);
       }
     }
-
-    final fileName =
-        'usage_logs_${_slug(facilityName)}${_stampFmt.format(DateTime.now())}.csv';
-    return _saveCsv(rows, fileName);
+    return rows;
   }
 
   /// Exports transfer request history as CSV and prompts the user to
@@ -143,6 +151,12 @@ class CsvExportService {
   static Future<String?> exportTransferRequests(
     List<MedRequest> requests,
   ) async {
+    final rows = buildTransferRequestsRows(requests);
+    final fileName = 'transfer_requests_${_stampFmt.format(DateTime.now())}.csv';
+    return _saveCsv(rows, fileName);
+  }
+
+  static List<List<dynamic>> buildTransferRequestsRows(List<MedRequest> requests) {
     final rows = <List<dynamic>>[
       [
         'Date',
@@ -168,9 +182,7 @@ class CsvExportService {
         request.status == RequestStatus.approved ? 'Optimize Routes' : '—',
       ]);
     }
-
-    final fileName = 'transfer_requests_${_stampFmt.format(DateTime.now())}.csv';
-    return _saveCsv(rows, fileName);
+    return rows;
   }
 
   static String _slug(String? name) {
