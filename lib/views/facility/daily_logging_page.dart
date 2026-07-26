@@ -147,6 +147,16 @@ class _DailyLoggingPageState extends ConsumerState<DailyLoggingPage>
     }
   }
 
+  String _readableError(Object e) {
+    try {
+      final dynamic boxed = e;
+      if (boxed.error != null) {
+        return boxed.error.toString().replaceAll('Exception: ', '');
+      }
+    } catch (_) {}
+    return e.toString().replaceAll('Exception: ', '');
+  }
+
   Future<void> _submitLog() async {
     if (!_formKey.currentState!.validate() || _medName == null) return;
     _formKey.currentState!.save();
@@ -168,7 +178,7 @@ class _DailyLoggingPageState extends ConsumerState<DailyLoggingPage>
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text('Error: $e')));
+            .showSnackBar(SnackBar(content: Text('Error: ${_readableError(e)}')));
       }
     } finally {
       if (mounted) setState(() => _isSubmitting = false);
@@ -196,7 +206,7 @@ class _DailyLoggingPageState extends ConsumerState<DailyLoggingPage>
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text('Export failed: $e')));
+            .showSnackBar(SnackBar(content: Text('Export failed: ${_readableError(e)}')));
       }
     } finally {
       if (mounted) setState(() => _isExportingCsv = false);
@@ -244,7 +254,7 @@ class _DailyLoggingPageState extends ConsumerState<DailyLoggingPage>
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text('CSV Error: $e')));
+            .showSnackBar(SnackBar(content: Text('CSV Error: ${_readableError(e)}')));
       }
     }
   }
@@ -253,14 +263,10 @@ class _DailyLoggingPageState extends ConsumerState<DailyLoggingPage>
     if (_csvItems.isEmpty) return;
     setState(() => _isSubmittingCsv = true);
     try {
-      for (var item in _csvItems) {
-        await ref.read(firebaseServiceProvider).logUsage(
-            facilityId: widget.facilityId,
-            date: _selectedDate,
-            medicineName: item['medicine'],
-            quantity: item['quantity'],
-            patients: item['patients']);
-      }
+      await ref.read(firebaseServiceProvider).logUsageBatch(
+          facilityId: widget.facilityId,
+          date: _selectedDate,
+          items: _csvItems);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(content: Text('${_csvItems.length} logs saved ✓')));
@@ -273,7 +279,7 @@ class _DailyLoggingPageState extends ConsumerState<DailyLoggingPage>
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text('Error: $e')));
+            .showSnackBar(SnackBar(content: Text('Error: ${_readableError(e)}')));
       }
     } finally {
       if (mounted) setState(() => _isSubmittingCsv = false);
@@ -301,14 +307,10 @@ class _DailyLoggingPageState extends ConsumerState<DailyLoggingPage>
     if (_scannedItems.isEmpty) return;
     setState(() => _isSubmittingQr = true);
     try {
-      for (var item in _scannedItems) {
-        await ref.read(firebaseServiceProvider).logUsage(
-            facilityId: widget.facilityId,
-            date: _selectedDate,
-            medicineName: item['medicine'],
-            quantity: item['quantity'],
-            patients: item['patients']);
-      }
+      await ref.read(firebaseServiceProvider).logUsageBatch(
+          facilityId: widget.facilityId,
+          date: _selectedDate,
+          items: _scannedItems);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(content: Text('${_scannedItems.length} logs saved ✓')));
@@ -318,7 +320,7 @@ class _DailyLoggingPageState extends ConsumerState<DailyLoggingPage>
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text('Error: $e')));
+            .showSnackBar(SnackBar(content: Text('Error: ${_readableError(e)}')));
       }
     } finally {
       if (mounted) setState(() => _isSubmittingQr = false);
@@ -351,12 +353,12 @@ class _DailyLoggingPageState extends ConsumerState<DailyLoggingPage>
     } catch (e) {
       if (mounted) {
         setState(() {
-          _imageParseError = e.toString();
+          _imageParseError = _readableError(e);
           _isParsingImage = false;
         });
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Image parsing failed: $e'),
+            content: Text('Image parsing failed: ${_readableError(e)}'),
             action: SnackBarAction(
               label: 'Retry',
               onPressed: _parseImage,
@@ -411,6 +413,48 @@ class _DailyLoggingPageState extends ConsumerState<DailyLoggingPage>
     );
   }
 
+  Widget _buildDateSelector({String title = 'Effective Log Date', bool inCard = true}) {
+    final tile = ListTile(
+      contentPadding: inCard
+          ? const EdgeInsets.symmetric(horizontal: 20, vertical: 4)
+          : EdgeInsets.zero,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(inCard ? 14 : 0),
+      ),
+      title: Text(title,
+          style: const TextStyle(
+              color: MediColors.textSecondary, fontSize: 13)),
+      subtitle: Text(
+          '${_selectedDate.day}/${_selectedDate.month}/${_selectedDate.year}',
+          style: const TextStyle(
+              color: MediColors.textPrimary,
+              fontSize: 16,
+              fontWeight: FontWeight.w600)),
+      trailing: const Icon(Icons.calendar_today_rounded,
+          color: MediColors.textMuted),
+      onTap: () async {
+        final date = await showDatePicker(
+            context: context,
+            initialDate: _selectedDate,
+            firstDate: DateTime(2020),
+            lastDate: DateTime.now());
+        if (date != null) setState(() => _selectedDate = date);
+      },
+    );
+
+    if (!inCard) return tile;
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 20),
+      decoration: BoxDecoration(
+        color: MediColors.surface,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: MediColors.border),
+      ),
+      child: tile,
+    );
+  }
+
   Widget _buildManualTab() {
     return Center(
       child: Container(
@@ -438,28 +482,7 @@ class _DailyLoggingPageState extends ConsumerState<DailyLoggingPage>
                     style:
                         TextStyle(color: MediColors.textMuted, fontSize: 13)),
                 const SizedBox(height: 28),
-                ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  title: const Text('Date',
-                      style: TextStyle(
-                          color: MediColors.textSecondary, fontSize: 13)),
-                  subtitle: Text(
-                      '${_selectedDate.day}/${_selectedDate.month}/${_selectedDate.year}',
-                      style: const TextStyle(
-                          color: MediColors.textPrimary,
-                          fontSize: 16,
-                          fontWeight: FontWeight.w600)),
-                  trailing: const Icon(Icons.calendar_today_rounded,
-                      color: MediColors.textMuted),
-                  onTap: () async {
-                    final date = await showDatePicker(
-                        context: context,
-                        initialDate: _selectedDate,
-                        firstDate: DateTime(2020),
-                        lastDate: DateTime.now());
-                    if (date != null) setState(() => _selectedDate = date);
-                  },
-                ),
+                _buildDateSelector(title: 'Date', inCard: false),
                 const SizedBox(height: 16),
                 if (_isLoadingInventory)
                   const Column(
@@ -547,6 +570,7 @@ class _DailyLoggingPageState extends ConsumerState<DailyLoggingPage>
     return SingleChildScrollView(
       padding: const EdgeInsets.all(28),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        _buildDateSelector(title: 'Effective Log Date', inCard: true),
         Container(
           width: double.infinity,
           padding: const EdgeInsets.all(24),
@@ -654,6 +678,7 @@ class _DailyLoggingPageState extends ConsumerState<DailyLoggingPage>
     return SingleChildScrollView(
       padding: const EdgeInsets.all(28),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        _buildDateSelector(title: 'Effective Log Date', inCard: true),
         Container(
           width: double.infinity,
           height: 260,
@@ -761,6 +786,7 @@ class _DailyLoggingPageState extends ConsumerState<DailyLoggingPage>
     return SingleChildScrollView(
       padding: const EdgeInsets.all(28),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        _buildDateSelector(title: 'Effective Log Date', inCard: true),
         Container(
           width: double.infinity,
           padding: const EdgeInsets.all(24),
