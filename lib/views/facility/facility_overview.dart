@@ -9,14 +9,28 @@ import '../../services/csv_export_service.dart';
 import 'package:med_supply_prototype/constants/colors.dart';
 import '../shared/skeleton_loaders.dart';
 
-class FacilityOverview extends ConsumerWidget {
+class FacilityOverview extends ConsumerStatefulWidget {
   final String facilityId;
   const FacilityOverview({super.key, required this.facilityId});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<FacilityOverview> createState() => _FacilityOverviewState();
+}
+
+class _FacilityOverviewState extends ConsumerState<FacilityOverview> {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      ref.read(firebaseServiceProvider).registerFcmToken(widget.facilityId);
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final inventoryStream =
-        ref.watch(firebaseServiceProvider).streamInventory(facilityId);
+        ref.watch(firebaseServiceProvider).streamInventory(widget.facilityId);
+
 
     return StreamBuilder<List<InventoryItem>>(
       stream: inventoryStream,

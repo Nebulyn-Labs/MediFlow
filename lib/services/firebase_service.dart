@@ -2,6 +2,7 @@ import 'dart:math';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_auth/firebase_auth.dart' as auth;
+import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter/foundation.dart';
 import '../models/facility.dart';
@@ -29,6 +30,30 @@ class FirebaseService {
   Future<auth.UserCredential> login(String email, String password) async {
     return await _auth.signInWithEmailAndPassword(
         email: email, password: password);
+  }
+
+  Future<void> registerFcmToken(String facilityId) async {
+    if (kIsWeb) return; // FCM token logic might need web setup, skip for now if web
+    try {
+      final messaging = FirebaseMessaging.instance;
+      final settings = await messaging.requestPermission(
+        alert: true,
+        badge: true,
+        sound: true,
+      );
+
+      if (settings.authorizationStatus == AuthorizationStatus.authorized) {
+        String? token = await messaging.getToken();
+        if (token != null) {
+          await _firestore.collection('facilities').doc(facilityId).update({
+            'fcmTokens': FieldValue.arrayUnion([token])
+          });
+          debugPrint('FCM token registered for facility $facilityId');
+        }
+      }
+    } catch (e) {
+      debugPrint('FCM Token registration failed: $e');
+    }
   }
 
   Future<void> signUpFacility({
