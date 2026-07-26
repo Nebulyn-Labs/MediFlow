@@ -156,7 +156,7 @@ void main() {
       await tester.enterText(find.byType(TextField).at(1), password);
       await tester.pump();
 
-      await tester.tap(find.text('Sign In'));
+      await tester.tap(find.byType(FilledButton));
       await tester.pumpAndSettle();
 
       expect(find.text('Facility Overview'), findsOneWidget);
@@ -188,7 +188,7 @@ void main() {
       await tester.enterText(find.byType(TextField).at(1), password);
       await tester.pump();
 
-      await tester.tap(find.text('Sign In'));
+      await tester.tap(find.byType(FilledButton));
       await tester.pumpAndSettle();
 
       expect(find.text('Admin Overview'), findsOneWidget);
@@ -224,11 +224,11 @@ void main() {
       await tester.enterText(find.byType(TextField).at(1), password);
       await tester.pump();
 
-      await tester.tap(find.text('Sign In'));
+      await tester.tap(find.byType(FilledButton));
       await tester.pumpAndSettle();
 
       // Should still be on the login screen — no navigation occurred.
-      expect(find.text('Sign In'), findsOneWidget);
+      expect(find.byType(TextField), findsAtLeast(2));
       expect(find.text('Login failed: No user found'), findsOneWidget);
     });
   });
