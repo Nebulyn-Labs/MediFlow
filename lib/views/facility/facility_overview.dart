@@ -7,6 +7,7 @@ import '../../services/firebase_service.dart';
 import '../../services/simulation_service.dart';
 import '../../services/csv_export_service.dart';
 import 'package:med_supply_prototype/constants/colors.dart';
+import '../shared/confirm_logout_dialog.dart';
 import '../shared/skeleton_loaders.dart';
 
 class FacilityOverview extends ConsumerWidget {
@@ -189,6 +190,8 @@ class FacilityOverview extends ConsumerWidget {
                 ],
                 onSelected: (v) async {
                   if (v == 'out') {
+                    final confirmed = await confirmLogout(context);
+                    if (confirmed != true) return;
                     try {
                       await FirebaseAuth.instance.signOut();
                       if (context.mounted) context.go('/');

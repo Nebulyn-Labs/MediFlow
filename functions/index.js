@@ -9,6 +9,7 @@ const { BigQuery } = require("@google-cloud/bigquery");
 const { checkRateLimit, LIMITS } = require("./helpers/rateLimiter");
 const { createBigQueryRecovery } = require("./helpers/bigQueryRecovery");
 const { createLowStockService } = require("./helpers/lowStock");
+const { handleCspReport } = require("./helpers/cspReport");
 
 admin.initializeApp();
 
@@ -255,9 +256,17 @@ exports.forecastDemand = onCall({ secrets: [GEMINI_API_KEY] }, async (request) =
     LIMITS.AI
   );
 
+  if (!medicineNames || !Array.isArray(medicineNames)) {
+    throw new HttpsError('invalid-argument', 'medicineNames must be an array');
+  }
+
   // 1. Fetch facility details
   const facilityDoc = await db.collection("facilities").doc(facilityId).get();
   const facility = facilityDoc.data();
+
+  if (!facility || typeof facility.name !== 'string') {
+    throw new HttpsError('invalid-argument', 'facility must have a valid name property');
+  }
 
   // 2. Fetch last 90 days of usage_logs
   const ninetyDaysAgo = new Date();
@@ -797,6 +806,10 @@ exports.generateSmartAlertsSecure = onCall({ secrets: [GEMINI_API_KEY] }, async 
     LIMITS.AI
   );
 
+  if (!inventory || !Array.isArray(inventory)) {
+    throw new HttpsError('invalid-argument', 'inventory must be an array');
+  }
+
   const payload = inventory
     .map(i => `${i.medicineName} (Batch: ${i.batchId}): ${i.remainingQuantity}/${i.initialQuantity} units left. Expiry: ${i.expiryDate}`)
     .join('\n');
@@ -831,6 +844,10 @@ exports.getChatResponseSecure = onCall({ secrets: [GEMINI_API_KEY] }, async (req
     "getChatResponseSecure",
     LIMITS.AI
   );
+
+  if (!history || !Array.isArray(history)) {
+    throw new HttpsError('invalid-argument', 'history must be an array');
+  }
 
   const contextStr = JSON.stringify(clientContext);
 
@@ -996,56 +1013,29 @@ exports.adminDeleteResource = onCall(async (request) => {
   return { success: true };
 });
 const cspReportLastSeen = new Map();
-const CSP_REPORT_MAX_BODY_BYTES = 10 * 1024; // 10KB
-const CSP_REPORT_MIN_INTERVAL_MS = 5000; // 1 report per IP per 5s
-const CSP_REPORT_MAP_MAX_SIZE = 5000; // hard cap to bound memory
 
-function getClientIp(req) {
-  // Cloud Run / GFE APPENDS the real client IP as the LAST entry in
-  // X-Forwarded-For; every entry before that can be spoofed by the client.
-  const xff = req.headers["x-forwarded-for"];
-  if (xff) {
-    const parts = xff.split(",").map((p) => p.trim()).filter(Boolean);
-    if (parts.length > 0) return parts[parts.length - 1];
-  }
-  return req.ip || "unknown";
-}
-
-function pruneCspReportMap(now) {
-  // Periodic sweep: drop stale entries, and if we're still oversized
-  // (e.g. distinct-IP flood), drop the oldest entries outright.
-  for (const [ip, ts] of cspReportLastSeen) {
-    if (now - ts >= CSP_REPORT_MIN_INTERVAL_MS) {
-      cspReportLastSeen.delete(ip);
-    }
-  }
-  if (cspReportLastSeen.size > CSP_REPORT_MAP_MAX_SIZE) {
-    const excess = cspReportLastSeen.size - CSP_REPORT_MAP_MAX_SIZE;
-    const oldestKeys = Array.from(cspReportLastSeen.keys()).slice(0, excess);
-    for (const key of oldestKeys) {
-      cspReportLastSeen.delete(key);
-    }
-  }
-}
-
+/**
+ * Public HTTP endpoint for receiving Content Security Policy (CSP) violation reports.
+ *
+ * Requirements & Constraints:
+ * - Method: POST
+ * - Content-Type: application/csp-report, application/reports+json, application/json
+ * - Payload Size Limit: Max 10 KB (10,240 bytes)
+ * - Rate Limit: 1 report per IP per 5 seconds
+ * - Payload Schema: Must contain valid CSP report directive properties
+ *
+ * HTTP Responses:
+ * - 204 No Content: Report successfully received and logged
+ * - 400 Bad Request: Missing, malformed, or invalid CSP report payload
+ * - 405 Method Not Allowed: Non-POST HTTP methods
+ * - 413 Payload Too Large: Content-Length or body byte size exceeds 10 KB limit
+ * - 415 Unsupported Media Type: Invalid or missing Content-Type header
+ * - 429 Too Many Requests: Rate limit exceeded for client IP
+ */
 exports.cspReport = onRequest(async (req, res) => {
-  if (req.method !== "POST") {
-    res.status(405).send("Method Not Allowed");
-    return;
-  }
+  await handleCspReport(req, res, logger, cspReportLastSeen);
+});
 
-  const contentLength = Number(req.headers["content-length"] || 0);
-  if (contentLength > CSP_REPORT_MAX_BODY_BYTES) {
-    res.status(413).send("Payload Too Large");
-    return;
-  }
-
-  const ip = getClientIp(req);
-  const now = Date.now();
-
-  if (cspReportLastSeen.size > CSP_REPORT_MAP_MAX_SIZE) {
-    pruneCspReportMap(now);
-  }
 
   const lastSeen = cspReportLastSeen.get(ip);
   if (lastSeen && now - lastSeen < CSP_REPORT_MIN_INTERVAL_MS) {

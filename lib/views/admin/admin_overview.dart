@@ -371,19 +371,16 @@ class _AdminOverviewState extends ConsumerState<AdminOverview> {
                           runSpacing: 20,
                           children: [
                             _buildKpiCard('TOTAL FACILITIES',
-                                '${_facilities.length}', Icons.business_rounded,
-                                onTap: () {}),
+                                '${_facilities.length}', Icons.business_rounded),
                             _buildKpiCard(
                                 'OPEN SHORTAGE REQUESTS',
                                 '$_openShortageRequests',
                                 Icons.warning_amber_rounded,
-                                isAlert: true,
-                                onTap: () {}),
+                                isAlert: true),
                             _buildKpiCard('SURPLUS / EXPIRY OFFERS',
                                 '$_surplusOffers', Icons.swap_horiz_rounded,
                                 isAlert: false,
-                                iconColor: MediColors.warning,
-                                onTap: () {}),
+                                iconColor: MediColors.warning),
                             _buildKpiCard(
                                 'PENDING INDENT APPROVALS',
                                 '$_pendingIndents',
