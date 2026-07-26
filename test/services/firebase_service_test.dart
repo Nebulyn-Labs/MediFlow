@@ -39,7 +39,8 @@ void main() {
           isA<Exception>().having(
             (e) => e.toString(),
             'message',
-            contains('Inventory document not found for medicine: $medicineName'),
+            contains(
+                'Inventory document not found for medicine: $medicineName'),
           ),
         ),
       );
