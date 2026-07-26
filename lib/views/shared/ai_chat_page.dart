@@ -132,8 +132,10 @@ class _AIChatPageState extends ConsumerState<AIChatPage> {
                         fontSize: 16,
                         fontWeight: FontWeight.w700,
                         color: MediColors.textPrimary)),
-                const Text(
-                  'gemini-flash-lite-latest',
+                Text(
+                  ref.read(aiServiceProvider).isUsingLocalFallback
+                      ? 'Gemini (Local)'
+                      : 'Gemini 1.5 Flash',
                   style: TextStyle(fontSize: 11, color: MediColors.textMuted),
                 ),
               ],

@@ -18,6 +18,8 @@ class AIService {
 
   AIService(this.ref);
 
+  bool get isUsingLocalFallback => _shouldUseLocal;
+
   bool get _shouldUseLocal {
     if (!_quotaExhausted) return false;
     if (_quotaResetTime != null && DateTime.now().isAfter(_quotaResetTime!)) {
