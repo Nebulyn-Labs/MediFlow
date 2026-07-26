@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:latlong2/latlong.dart';
 import '../models/facility.dart';
@@ -100,23 +101,46 @@ class OptimizationService {
   }) {
     List<TransferRecommendation> recommendations = [];
     final Distance distanceCalc = const Distance();
+    final facilityById = {for (final facility in facilities) facility.id: facility};
 
     // 1. Group needs (shortage or regular indent) by medicine
-    final pendingIndents = requests
-        .where((r) =>
-            (r.status == RequestStatus.pending ||
-                r.status == RequestStatus.approved) &&
-            (r.type == RequestType.regularIndent ||
-                r.type == RequestType.shortage))
-        .toList();
+    final pendingIndents = <MedRequest>[];
+    for (final request in requests) {
+      if (!((request.status == RequestStatus.pending ||
+              request.status == RequestStatus.approved) &&
+          (request.type == RequestType.regularIndent ||
+              request.type == RequestType.shortage))) {
+        continue;
+      }
+
+      if (!facilityById.containsKey(request.facilityId)) {
+        debugPrint(
+          'OptimizationService: Skipping request ${request.id} because facility ${request.facilityId} is not in the active facility list.',
+        );
+        continue;
+      }
+
+      pendingIndents.add(request);
+    }
 
     // 2. Group explicit surplus offers
-    final surplusOffers = requests
-        .where((r) =>
-            (r.status == RequestStatus.pending ||
-                r.status == RequestStatus.approved) &&
-            r.type == RequestType.surplus)
-        .toList();
+    final surplusOffers = <MedRequest>[];
+    for (final request in requests) {
+      if (!((request.status == RequestStatus.pending ||
+              request.status == RequestStatus.approved) &&
+          request.type == RequestType.surplus)) {
+        continue;
+      }
+
+      if (!facilityById.containsKey(request.facilityId)) {
+        debugPrint(
+          'OptimizationService: Skipping surplus request ${request.id} because facility ${request.facilityId} is not in the active facility list.',
+        );
+        continue;
+      }
+
+      surplusOffers.add(request);
+    }
 
     // Track working surpluses to allow multi-fulfillment
     Map<String, Map<String, int>> workingSurpluses =
@@ -151,16 +175,37 @@ class OptimizationService {
     // Sort indents: Rural first, then by quantity (larger first)
     final sortedIndents = List<MedRequest>.from(pendingIndents)
       ..sort((a, b) {
-        final facA = facilities.firstWhere((f) => f.id == a.facilityId);
-        final facB = facilities.firstWhere((f) => f.id == b.facilityId);
-        if (facA.type == 'rural' && facB.type != 'rural') return -1;
-        if (facB.type == 'rural' && facA.type != 'rural') return 1;
+        final facA = facilityById[a.facilityId];
+        final facB = facilityById[b.facilityId];
+
+        if (facA == null && facB == null) {
+          return b.quantity.compareTo(a.quantity);
+        }
+        if (facA == null) {
+          return 1;
+        }
+        if (facB == null) {
+          return -1;
+        }
+
+        if (facA.type == 'rural' && facB.type != 'rural') {
+          return -1;
+        }
+        if (facB.type == 'rural' && facA.type != 'rural') {
+          return 1;
+        }
         return b.quantity.compareTo(a.quantity);
       });
 
     for (var indent in sortedIndents) {
-      final recipientFac =
-          facilities.firstWhere((f) => f.id == indent.facilityId);
+      final recipientFac = facilityById[indent.facilityId];
+      if (recipientFac == null) {
+        debugPrint(
+          'OptimizationService: Skipping request ${indent.id} because facility ${indent.facilityId} disappeared during optimization.',
+        );
+        continue;
+      }
+
       final medicine = indent.medicineName;
       int remainingDeficit = indent.quantity;
 
