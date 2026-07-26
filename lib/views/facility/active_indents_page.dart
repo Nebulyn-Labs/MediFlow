@@ -239,6 +239,24 @@ class _ActiveIndentsPageState extends ConsumerState<ActiveIndentsPage> {
     }
   }
 
+  Future<void> _withdrawRequest(String requestId) async {
+    setState(() => _isDraftActionInProgress = true);
+    try {
+      await ref.read(firebaseServiceProvider).deleteRequest(requestId);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Request withdrawn successfully')));
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('Withdraw failed: $e')));
+      }
+    } finally {
+      if (mounted) setState(() => _isDraftActionInProgress = false);
+    }
+  }
+
   Future<void> _finalSubmit(String requestId) async {
     setState(() => _isDraftActionInProgress = true);
     try {
@@ -962,7 +980,24 @@ class _ActiveIndentsPageState extends ConsumerState<ActiveIndentsPage> {
                                         fontWeight: FontWeight.bold,
                                         color: MediColors.textPrimary),
                                   ),
-                                  statusBadge,
+                                  Row(
+                                    children: [
+                                      if (req.status == RequestStatus.pending)
+                                        Padding(
+                                          padding: const EdgeInsets.only(right: 8.0),
+                                          child: TextButton.icon(
+                                            onPressed: _isDraftActionInProgress
+                                                ? null
+                                                : () => _withdrawRequest(req.id),
+                                            icon: const Icon(Icons.cancel_outlined, size: 16),
+                                            label: const Text('Withdraw'),
+                                            style: TextButton.styleFrom(
+                                                foregroundColor: MediColors.error),
+                                          ),
+                                        ),
+                                      statusBadge,
+                                    ],
+                                  ),
                                 ],
                               ),
                             ],
@@ -981,6 +1016,19 @@ class _ActiveIndentsPageState extends ConsumerState<ActiveIndentsPage> {
                                     color: MediColors.textPrimary),
                               ),
                             ),
+                            if (req.status == RequestStatus.pending)
+                              Padding(
+                                padding: const EdgeInsets.only(right: 12.0),
+                                child: TextButton.icon(
+                                  onPressed: _isDraftActionInProgress
+                                      ? null
+                                      : () => _withdrawRequest(req.id),
+                                  icon: const Icon(Icons.cancel_outlined, size: 16),
+                                  label: const Text('Withdraw'),
+                                  style: TextButton.styleFrom(
+                                      foregroundColor: MediColors.error),
+                                ),
+                              ),
                             statusBadge,
                           ],
                         );
