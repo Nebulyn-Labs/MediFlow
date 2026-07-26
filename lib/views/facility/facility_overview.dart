@@ -8,6 +8,7 @@ import '../../services/simulation_service.dart';
 import '../../services/csv_export_service.dart';
 import 'package:med_supply_prototype/constants/colors.dart';
 import '../shared/confirm_logout_dialog.dart';
+import '../shared/skeleton_loaders.dart';
 
 class FacilityOverview extends ConsumerWidget {
   final String facilityId;
@@ -22,7 +23,10 @@ class FacilityOverview extends ConsumerWidget {
       stream: inventoryStream,
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Center(child: CircularProgressIndicator());
+          return const Scaffold(
+            backgroundColor: MediColors.bg,
+            body: FacilityOverviewSkeleton(),
+          );
         }
         final inventory = snapshot.data ?? [];
         final expiringSoon = inventory

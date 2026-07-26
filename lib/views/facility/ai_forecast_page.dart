@@ -6,6 +6,7 @@ import '../../models/daily_usage_log.dart';
 import '../../services/firebase_service.dart';
 import '../../services/ai_service.dart';
 import 'package:med_supply_prototype/constants/colors.dart';
+import '../shared/skeleton_loaders.dart';
 
 class AIForecastPage extends ConsumerStatefulWidget {
   final String facilityId;
@@ -100,7 +101,7 @@ class _AIForecastPageState extends ConsumerState<AIForecastPage> {
         stream: inventoryStream,
         builder: (context, snapshot) {
           if (!snapshot.hasData) {
-            return const Center(child: CircularProgressIndicator());
+            return const AIForecastSkeleton();
           }
           final inventory = snapshot.data ?? [];
           final medNames =
@@ -250,7 +251,7 @@ class _AIForecastPageState extends ConsumerState<AIForecastPage> {
                       const SizedBox(height: 20),
                       Expanded(
                           child: _isLoadingHistory
-                              ? const Center(child: CircularProgressIndicator())
+                              ? const SkeletonCard(height: 200)
                               : _historyError != null
                                   ? Center(
                                       child: Padding(
