@@ -7,6 +7,7 @@ import '../../models/request.dart';
 import '../../models/inventory_item.dart';
 import 'package:med_supply_prototype/constants/colors.dart';
 import '../shared/skeleton_loaders.dart';
+import '../../utils/retry_snackbar.dart';
 
 class IndentCreationPage extends ConsumerStatefulWidget {
   final String facilityId;
@@ -182,8 +183,8 @@ class _IndentCreationPageState extends ConsumerState<IndentCreationPage> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text('Submission failed: $e')));
+        showRetrySnackBar(context,
+            message: 'Submission failed: $e', onRetry: _submitIndent);
       }
     } finally {
       if (mounted) setState(() => _isSubmitting = false);
