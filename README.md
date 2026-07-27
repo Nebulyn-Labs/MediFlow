@@ -5,7 +5,6 @@ AI-powered medical logistics platform focused on smart resource allocation
 ![Flutter](https://img.shields.io/badge/Flutter-%2302569B.svg?style=for-the-badge&logo=Flutter&logoColor=white)
 ![Firebase](https://img.shields.io/badge/Firebase-039BE5?style=for-the-badge&logo=Firebase&logoColor=white)
 ![Gemini AI](https://img.shields.io/badge/Gemini%20AI-8E75B2?style=for-the-badge&logo=google-gemini&logoColor=white)
-![ORS](https://img.shields.io/badge/OpenRouteService-3E3E3E?style=for-the-badge&logo=openstreetmap&logoColor=white)
 
 ---
 
@@ -31,7 +30,7 @@ AI-powered medical logistics platform focused on smart resource allocation
 
 **MediFlow** is an enterprise-grade medical logistics platform engineered to
 solve the "Last Mile" medical supply crisis. By combining **Generative AI** for
-demand forecasting with **Heuristic Heuristics**, we optimize redistribution of
+demand forecasting with **heuristic optimization**, we optimize redistribution of
 medical supplies across a network of urban and rural healthcare facilities.
 
 ---
@@ -137,6 +136,14 @@ graph TD
 3. **Geospatial Routing System:** Integrated with **flutter_map** and
    **OSRM/OpenRouteService**, our routing engine decodes complex polylines to
    provide precise, road-accurate delivery paths.
+
+For a developer-oriented breakdown of the redistribution matching, routing,
+and demo data algorithms, see
+[Optimization, Routing & Simulation Algorithms](docs/optimization-simulation-algorithms.md).
+For a detailed walkthrough of how the AI chat assistant flows from the
+client to Gemini and on to backend actions, including authorization checks,
+see [AI Tool-Calling Architecture](docs/ai-tool-calling.md). For the
+BigQuery data pipeline, see [BigQuery Integration](docs/bigquery.md).
 
 ---
 

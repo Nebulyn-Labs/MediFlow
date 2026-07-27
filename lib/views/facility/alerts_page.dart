@@ -89,7 +89,8 @@ class _AlertsPageState extends ConsumerState<AlertsPage> {
         if (typeStr == 'expired') {
           kind = _AlertKind.expired;
           title = 'Expired';
-          reason = '${item.medicineName} has passed its expiry date and should not be issued.';
+          reason =
+              '${item.medicineName} has passed its expiry date and should not be issued.';
           color = MediColors.error;
           icon = Icons.error_rounded;
         } else if (typeStr == 'low_stock') {
@@ -101,7 +102,8 @@ class _AlertsPageState extends ConsumerState<AlertsPage> {
         } else if (typeStr == 'wastage_risk') {
           kind = _AlertKind.wastageRisk;
           title = 'Wastage Risk';
-          reason = 'High remaining stock is close to expiry, so redistribution should be considered.';
+          reason =
+              'High remaining stock is close to expiry, so redistribution should be considered.';
           color = MediColors.warning;
           icon = Icons.warning_amber_rounded;
         } else {
@@ -234,6 +236,7 @@ class _AlertsPageState extends ConsumerState<AlertsPage> {
                   builder: (_) => const AIChatPage(role: "Facility Manager")));
         },
         backgroundColor: const Color(0xFF1E3A8A),
+        tooltip: 'Open MediFlow AI Assistant',
         child: const Icon(Icons.auto_awesome, color: Colors.white),
       ),
       body: _isLoading
@@ -266,10 +269,12 @@ class _AlertsPageState extends ConsumerState<AlertsPage> {
                         padding: const EdgeInsets.only(top: 96),
                         child: Column(
                           children: [
-                            Icon(Icons.check_circle_rounded,
-                                size: 64,
-                                color:
-                                    MediColors.success.withValues(alpha: 0.8)),
+                            ExcludeSemantics(
+                              child: Icon(Icons.check_circle_rounded,
+                                  size: 64,
+                                  color: MediColors.success
+                                      .withValues(alpha: 0.8)),
+                            ),
                             const SizedBox(height: 16),
                             const Text('No active alerts detected.',
                                 style: TextStyle(
@@ -296,75 +301,81 @@ class _AlertsPageState extends ConsumerState<AlertsPage> {
   Widget _buildAlertCard(_InventoryAlert alert) {
     final isExpired = alert.kind == _AlertKind.expired;
 
-    return Container(
-      margin: const EdgeInsets.only(bottom: 14),
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: MediColors.surfaceLight,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: alert.color.withValues(alpha: 0.35)),
-        boxShadow: [
-          BoxShadow(
-            color: alert.color.withValues(alpha: 0.05),
-            blurRadius: 10,
-            spreadRadius: 1,
-          )
-        ],
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: alert.color.withValues(alpha: 0.15),
-              shape: BoxShape.circle,
-            ),
-            child: Icon(alert.icon, color: alert.color, size: 24),
+    return Semantics(
+      label:
+          '${alert.title} alert for ${alert.item.medicineName}, batch ${alert.item.batchId}. ${alert.reason} ${alert.detail}',
+      child: ExcludeSemantics(
+        child: Container(
+          margin: const EdgeInsets.only(bottom: 14),
+          padding: const EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            color: MediColors.surfaceLight,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: alert.color.withValues(alpha: 0.35)),
+            boxShadow: [
+              BoxShadow(
+                color: alert.color.withValues(alpha: 0.05),
+                blurRadius: 10,
+                spreadRadius: 1,
+              )
+            ],
           ),
-          const SizedBox(width: 16),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Wrap(
-                  crossAxisAlignment: WrapCrossAlignment.center,
-                  spacing: 8,
-                  runSpacing: 6,
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: alert.color.withValues(alpha: 0.15),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(alert.icon, color: alert.color, size: 24),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(alert.item.medicineName,
+                    Wrap(
+                      crossAxisAlignment: WrapCrossAlignment.center,
+                      spacing: 8,
+                      runSpacing: 6,
+                      children: [
+                        Text(alert.item.medicineName,
+                            style: const TextStyle(
+                                fontWeight: FontWeight.w800,
+                                fontSize: 17,
+                                color: MediColors.textPrimary)),
+                        Text(alert.item.batchId,
+                            style: const TextStyle(
+                                fontSize: 12,
+                                color: MediColors.textMuted,
+                                fontWeight: FontWeight.w600)),
+                        _statusBadge(alert),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    Text(alert.reason,
                         style: const TextStyle(
-                            fontWeight: FontWeight.w800,
-                            fontSize: 17,
-                            color: MediColors.textPrimary)),
-                    Text(alert.item.batchId,
-                        style: const TextStyle(
-                            fontSize: 12,
-                            color: MediColors.textMuted,
+                            color: MediColors.textPrimary,
+                            fontSize: 14,
                             fontWeight: FontWeight.w600)),
-                    _statusBadge(alert),
+                    const SizedBox(height: 4),
+                    Text(alert.detail,
+                        style: const TextStyle(
+                            color: MediColors.textSecondary, fontSize: 14)),
+                    const SizedBox(height: 16),
+                    isExpired
+                        ? _buildActionButton('Mark for Disposal', alert.color,
+                            () => _handleDisposal(alert))
+                        : _buildActionButton('Run Smart AI Stock Analysis',
+                            MediColors.primary, _openSmartAnalysis),
                   ],
                 ),
-                const SizedBox(height: 8),
-                Text(alert.reason,
-                    style: const TextStyle(
-                        color: MediColors.textPrimary,
-                        fontSize: 14,
-                        fontWeight: FontWeight.w600)),
-                const SizedBox(height: 4),
-                Text(alert.detail,
-                    style: const TextStyle(
-                        color: MediColors.textSecondary, fontSize: 14)),
-                const SizedBox(height: 16),
-                isExpired
-                    ? _buildActionButton('Mark for Disposal', alert.color,
-                        () => _handleDisposal(alert))
-                    : _buildActionButton('Run Smart AI Stock Analysis',
-                        MediColors.primary, _openSmartAnalysis),
-              ],
-            ),
+              ),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }

@@ -212,10 +212,8 @@ class _AdminIndentApprovalPageState
                                         .withValues(alpha: 0.3)),
                           ),
                           child: Text(suggestion,
-                              style: TextStyle(
-                                  color: suggestion.contains('✅')
-                                      ? MediColors.success
-                                      : MediColors.warning,
+                              style: const TextStyle(
+                                  color: MediColors.textPrimary,
                                   fontWeight: FontWeight.w500)),
                         ),
 
