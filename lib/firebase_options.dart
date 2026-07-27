@@ -3,7 +3,6 @@
 import 'package:firebase_core/firebase_core.dart' show FirebaseOptions;
 import 'package:flutter/foundation.dart'
     show defaultTargetPlatform, kIsWeb, TargetPlatform;
-import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 /// Default [FirebaseOptions] for use with your Firebase apps.
 class DefaultFirebaseOptions {
@@ -39,12 +38,12 @@ class DefaultFirebaseOptions {
     }
   }
 
-  static FirebaseOptions get web => FirebaseOptions(
-    apiKey: dotenv.env['FIREBASE_API_KEY'] ?? '',
-    authDomain: dotenv.env['FIREBASE_AUTH_DOMAIN'] ?? '',
-    projectId: dotenv.env['FIREBASE_PROJECT_ID'] ?? '',
-    storageBucket: dotenv.env['FIREBASE_STORAGE_BUCKET'] ?? '',
-    messagingSenderId: dotenv.env['FIREBASE_MESSAGING_SENDER_ID'] ?? '',
-    appId: dotenv.env['FIREBASE_APP_ID'] ?? '',
+  static const FirebaseOptions web = FirebaseOptions(
+    apiKey: 'AIzaSyCRZrAmF34TIcwIMZ8wqf70JUTkXUt8Mh0',
+    authDomain: 'mediflow-92e6f.firebaseapp.com',
+    projectId: 'mediflow-92e6f',
+    storageBucket: 'mediflow-92e6f.firebasestorage.app',
+    messagingSenderId: '71200393927',
+    appId: '1:71200393927:web:346d720af6b9cf11898ce2',
   );
 }

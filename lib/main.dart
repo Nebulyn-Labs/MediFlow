@@ -5,7 +5,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 import 'package:med_supply_prototype/constants/colors.dart';
 import 'services/firebase_setup.dart';
@@ -37,7 +36,6 @@ final GlobalKey<NavigatorState> _adminShellNavigatorKey =
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await dotenv.load(fileName: ".env");
 
   // Initialize Firebase and App Check securely
   await initializeFirebaseServices();
