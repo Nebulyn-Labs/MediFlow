@@ -308,7 +308,7 @@ class _AIForecastPageState extends ConsumerState<AIForecastPage> {
                               style: const TextStyle(
                                   fontSize: 20,
                                   fontWeight: FontWeight.w800,
-                                  color: MediColors.primaryLight)),
+                                  color: MediColors.primary)),
                           const SizedBox(height: 8),
                           Text('${_forecastResult!['reasoning']}',
                               style: const TextStyle(

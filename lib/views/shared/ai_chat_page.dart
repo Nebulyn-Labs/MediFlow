@@ -273,7 +273,7 @@ class _AIChatPageState extends ConsumerState<AIChatPage> {
         _sendMessage();
       },
       style: OutlinedButton.styleFrom(
-        foregroundColor: MediColors.primaryLight,
+        foregroundColor: MediColors.primary,
         side: BorderSide(color: MediColors.border),
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
