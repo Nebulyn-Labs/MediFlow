@@ -14,6 +14,9 @@ routes.
 **Inputs:** the full list of `Facility` records, current inventory per
 facility, and pending/approved `MedRequest`s.
 
+`Facility.type` is modeled as a `FacilityType` enum in the app and mapped
+to/from a lowercase Firestore string at the persistence boundary.
+
 **Outputs:** `TransferRecommendation`s (donor, recipient, medicine,
 quantity, score, reasoning) and `MultiStopRoute`s (transfers grouped by
 donor, with an ordered list of stops).
@@ -68,6 +71,10 @@ so new facilities have realistic-looking data without manual seeding.
 
 **Inputs:** an optional facility `type` for profile generation, or a
 `facilityId` and `facilityType` for a full simulation run.
+
+The app uses `FacilityType` internally; simulation helpers accept and
+return the typed value, while Firestore writes still persist the lowercase
+string form.
 
 **Outputs:** `generateRealisticProfile` returns a facility field map;
 `runFullSimulation` writes inventory and daily usage logs directly to

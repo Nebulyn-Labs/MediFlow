@@ -205,7 +205,8 @@ lib/
 MediFlow utilizes a hierarchical Firestore schema designed for
 high-concurrency performance:
 
-- **`/facilities`**: Metadata, type (urban/rural), and geospatial coordinates.
+- **`/facilities`**: Metadata, `FacilityType` (`rural` / `urban` in code,
+  stored as a lowercase string in Firestore), and geospatial coordinates.
 - **`/inventory/{fac_id}/medicines`**: Sub-collection tracking individual
   batches and live stock levels.
 - **`/requests`**: Global collection for tracking movement, status
