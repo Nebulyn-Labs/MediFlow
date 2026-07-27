@@ -9,6 +9,8 @@ import '../../services/firebase_service.dart';
 import '../../services/csv_export_service.dart';
 import '../../services/ai_service.dart';
 import 'package:med_supply_prototype/constants/colors.dart';
+import '../shared/skeleton_loaders.dart';
+import '../../utils/retry_snackbar.dart';
 
 class DailyLoggingPage extends ConsumerStatefulWidget {
   final String facilityId;
@@ -166,8 +168,8 @@ class _DailyLoggingPageState extends ConsumerState<DailyLoggingPage>
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text('Error: $e')));
+        showRetrySnackBar(context,
+            message: 'Failed to save log: $e', onRetry: _submitLog);
       }
     } finally {
       if (mounted) setState(() => _isSubmitting = false);
@@ -461,7 +463,13 @@ class _DailyLoggingPageState extends ConsumerState<DailyLoggingPage>
                 ),
                 const SizedBox(height: 16),
                 if (_isLoadingInventory)
-                  const Center(child: CircularProgressIndicator())
+                  const Column(
+                    children: [
+                      SkeletonTableRow(),
+                      SkeletonTableRow(),
+                      SkeletonTableRow(),
+                    ],
+                  )
                 else if (_inventoryError != null)
                   Container(
                       padding: const EdgeInsets.all(12),
@@ -877,7 +885,7 @@ class _DailyLoggingPageState extends ConsumerState<DailyLoggingPage>
 
   Widget _buildHistoryTab() {
     if (_isLoadingHistory) {
-      return const Center(child: CircularProgressIndicator());
+      return const DailyLoggingSkeleton();
     }
 
     if (_historyError != null) {
