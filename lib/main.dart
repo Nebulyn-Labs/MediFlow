@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 import 'package:med_supply_prototype/constants/colors.dart';
 import 'services/firebase_setup.dart';
@@ -25,6 +26,7 @@ import 'views/admin/admin_overview.dart';
 import 'views/admin/admin_indent_approval_page.dart';
 import 'views/admin/admin_indent_status_page.dart';
 import 'views/admin/route_optimization_map.dart';
+import 'views/admin/audit_trail_page.dart';
 import 'views/shared/ai_chat_page.dart';
 
 final GlobalKey<NavigatorState> _rootNavigatorKey = GlobalKey<NavigatorState>();
@@ -35,6 +37,7 @@ final GlobalKey<NavigatorState> _adminShellNavigatorKey =
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await dotenv.load(fileName: ".env");
 
   // Initialize Firebase and App Check securely
   await initializeFirebaseServices();
@@ -141,6 +144,9 @@ final _router = GoRouter(
         GoRoute(
             path: '/admin/chat',
             builder: (context, state) => const AIChatPage(role: 'admin')),
+        GoRoute(
+            path: '/admin/audit',
+            builder: (context, state) => const AuditTrailPage()),
         GoRoute(
             path: '/admin/help',
             builder: (context, state) => const HelpPage(role: 'admin')),

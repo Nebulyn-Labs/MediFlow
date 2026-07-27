@@ -16,10 +16,9 @@ dependencies:
   firebase_auth: ^5.4.1
   cloud_functions: ^5.1.1
   firebase_storage: ^12.4.10
-
-  # State Management
-  flutter_riverpod: ^3.3.1
-  riverpod_annotation: ^4.0.2
+  flutter_riverpod: any
+  riverpod_annotation: any
+  flutter_dotenv: ^5.1.0
 
   # Navigation
   go_router: ^17.3.0
@@ -43,10 +42,12 @@ dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^6.0.0
-  riverpod_generator: ^4.0.3
-  build_runner: ^2.15.1
+  riverpod_generator: any
+  build_runner: any
   fake_cloud_firestore: ^3.1.0
   mocktail: ^1.0.5
 
 flutter:
   uses-material-design: true
+  assets:
+    - .env

@@ -1,6 +1,5 @@
 import 'dart:math';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_auth/firebase_auth.dart' as auth;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter/foundation.dart';
@@ -8,6 +7,7 @@ import '../models/facility.dart';
 import '../models/inventory_item.dart';
 import '../models/daily_usage_log.dart';
 import '../models/request.dart';
+import '../models/audit_log.dart';
 import 'simulation_service.dart';
 
 final firebaseServiceProvider = Provider<FirebaseService>((ref) {
@@ -402,15 +402,7 @@ class FirebaseService {
             deleteFutures.add(l.reference.delete());
           }
         }
-        if (collection == 'facilities' || collection == 'requests') {
-          final callable = FirebaseFunctions.instance.httpsCallable('adminDeleteResource');
-          deleteFutures.add(callable.call({
-            'resourceType': collection,
-            'resourceId': doc.id,
-          }));
-        } else {
-          deleteFutures.add(doc.reference.delete());
-        }
+        deleteFutures.add(doc.reference.delete());
 
         if (deleteFutures.length >= 50) {
           await Future.wait(deleteFutures);
@@ -626,9 +618,103 @@ class FirebaseService {
         status: RequestStatus.pending,
       ));
 
+      // 5. Seed some dummy audit logs directly
+      final now = DateTime.now();
+      final auditEntries = [
+        {
+          'adminId': adminUid ?? 'admin_super',
+          'timestamp': Timestamp.fromDate(now.subtract(const Duration(minutes: 15))),
+          'action': 'delete_request',
+          'resourceType': 'requests',
+          'resourceId': 'req_78291',
+          'metadata': {'reason': 'Duplicate request', 'medicine': 'Paracetamol'},
+          'status': 'success',
+        },
+        {
+          'adminId': adminUid ?? 'admin_super',
+          'timestamp': Timestamp.fromDate(now.subtract(const Duration(hours: 2))),
+          'action': 'delete_request',
+          'resourceType': 'requests',
+          'resourceId': 'req_98122',
+          'metadata': {'reason': 'Expired batch', 'medicine': 'Antibiotic'},
+          'status': 'success',
+        },
+        {
+          'adminId': adminUid ?? 'admin_super',
+          'timestamp': Timestamp.fromDate(now.subtract(const Duration(days: 1, hours: 4))),
+          'action': 'delete_facility',
+          'resourceType': 'facilities',
+          'resourceId': 'fac_west_clinic',
+          'metadata': {'name': 'West Clinic', 'reason': 'Decommissioned'},
+          'status': 'success',
+        },
+        {
+          'adminId': adminUid ?? 'admin_super',
+          'timestamp': Timestamp.fromDate(now.subtract(const Duration(days: 2))),
+          'action': 'delete_request',
+          'resourceType': 'requests',
+          'resourceId': 'req_55010',
+          'metadata': {'reason': 'Data entry error', 'medicine': 'ORS'},
+          'status': 'success',
+        },
+        {
+          'adminId': adminUid ?? 'admin_super',
+          'timestamp': Timestamp.fromDate(now.subtract(const Duration(days: 5))),
+          'action': 'delete_facility',
+          'resourceType': 'facilities',
+          'resourceId': 'fac_north_phc',
+          'metadata': {'name': 'North PHC', 'reason': 'Merged with District Hospital'},
+          'status': 'success',
+        },
+      ];
+
+      for (var entry in auditEntries) {
+        await _firestore.collection('audit_logs').add(entry);
+      }
+      debugPrint('Seeded ${auditEntries.length} audit log entries.');
+
       return null; // Success
     } catch (e) {
       return 'Critical error: $e';
+    }
+  }
+
+  // --- AUDIT LOGS ---
+
+  Future<PaginatedAuditLogsResult> getPaginatedAuditLogs({
+    int pageSize = 20,
+    DocumentSnapshot? startAfter,
+    String? actionFilter,
+  }) async {
+    try {
+      Query query = _firestore.collection('audit_logs');
+      // Removed orderBy and where to avoid requiring a composite index.
+
+      final snapshot = await query.get();
+      var logs = snapshot.docs
+          .map((doc) =>
+              AuditLog.fromMap(doc.data() as Map<String, dynamic>, doc.id))
+          .toList();
+
+      // Sort by timestamp descending
+      logs.sort((a, b) => b.timestamp.compareTo(a.timestamp));
+
+      // Filter locally
+      if (actionFilter != null && actionFilter.isNotEmpty && actionFilter != 'All') {
+        logs = logs.where((log) => log.action == actionFilter).toList();
+      }
+
+      // Simple local pagination
+      final hasMore = false; // Disable infinite scroll logic for this fallback
+      final lastDocument = snapshot.docs.isNotEmpty ? snapshot.docs.last : null;
+
+      return PaginatedAuditLogsResult(
+        logs: logs,
+        lastDocument: lastDocument,
+        hasMore: hasMore,
+      );
+    } catch (e) {
+      throw Exception('Error fetching audit logs: $e');
     }
   }
 }

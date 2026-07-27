@@ -59,6 +59,10 @@ class _AdminOverviewState extends ConsumerState<AdminOverview> {
   }
 
   Future<void> _loadData() async {
+    final firebaseService = ref.read(firebaseServiceProvider);
+    final aiService = ref.read(aiServiceProvider);
+
+    if (!mounted) return;
     await _requestsSub?.cancel();
 
     if (mounted) {
@@ -99,7 +103,7 @@ class _AdminOverviewState extends ConsumerState<AdminOverview> {
       facs.map((f) async {
         try {
           final inv =
-              await ref.read(firebaseServiceProvider).getInventoryOnce(f.id);
+              await firebaseService.getInventoryOnce(f.id);
 
           double totalInitial = 0;
           double totalRemaining = 0;
@@ -114,7 +118,7 @@ class _AdminOverviewState extends ConsumerState<AdminOverview> {
               totalInitial == 0 ? 100.0 : (totalRemaining / totalInitial) * 100;
 
           final fAlerts =
-              await ref.read(aiServiceProvider).generateSmartAlerts(inv);
+              await aiService.generateSmartAlerts(inv);
           alerts[f.id] = fAlerts.length;
         } catch (e) {
           debugPrint(
@@ -125,7 +129,7 @@ class _AdminOverviewState extends ConsumerState<AdminOverview> {
     );
 
     _requestsSub =
-        ref.read(firebaseServiceProvider).streamRequests(null).listen(
+        firebaseService.streamRequests(null).listen(
       (reqs) {
         if (!mounted) return;
         int shortage = 0;
