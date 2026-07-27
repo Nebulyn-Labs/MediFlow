@@ -1,5 +1,6 @@
 import 'dart:math';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_auth/firebase_auth.dart' as auth;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter/foundation.dart';
@@ -160,7 +161,8 @@ class FirebaseService {
           'lastUpdated': Timestamp.now(),
         });
       } else {
-        throw Exception('Inventory document not found for medicine: $medicineName');
+        throw Exception(
+            'Inventory document not found for medicine: $medicineName');
       }
     });
   }
@@ -255,7 +257,8 @@ class FirebaseService {
       // 1. Update Inventory
       final invDoc = await transaction.get(invRef);
       if (!invDoc.exists) {
-        throw Exception('Inventory document not found for medicine: $medicineName');
+        throw Exception(
+            'Inventory document not found for medicine: $medicineName');
       }
 
       int remaining = invDoc.data()?['remainingQuantity'] ?? 0;
@@ -399,7 +402,15 @@ class FirebaseService {
             deleteFutures.add(l.reference.delete());
           }
         }
-        deleteFutures.add(doc.reference.delete());
+        if (collection == 'facilities' || collection == 'requests') {
+          final callable = FirebaseFunctions.instance.httpsCallable('adminDeleteResource');
+          deleteFutures.add(callable.call({
+            'resourceType': collection,
+            'resourceId': doc.id,
+          }));
+        } else {
+          deleteFutures.add(doc.reference.delete());
+        }
 
         if (deleteFutures.length >= 50) {
           await Future.wait(deleteFutures);
