@@ -36,7 +36,7 @@ class FirebaseService {
     required String name,
     required String email,
     required String password,
-    String? type,
+    FacilityType? type,
     double? fixedLat,
     double? fixedLng,
     String? fixedRegion,
@@ -69,7 +69,7 @@ class FirebaseService {
       id: facilityId,
       name: name,
       email: email,
-      type: type ?? profile['type'],
+      type: type ?? profile['type'] as FacilityType,
       region: fixedRegion ?? profile['region'],
       latitude: fixedLat ?? profile['latitude'],
       longitude: fixedLng ?? profile['longitude'],
@@ -453,7 +453,7 @@ class FirebaseService {
       final List<Map<String, dynamic>> demoFacilities = [
         {
           'name': 'PHC Rampur',
-          'type': 'rural',
+          'type': FacilityType.rural,
           'email': 'rampur@mediflow.com',
           'password': 'password123',
           'region': 'North District',
@@ -462,7 +462,7 @@ class FirebaseService {
         },
         {
           'name': 'CHC Modinagar',
-          'type': 'urban',
+          'type': FacilityType.urban,
           'email': 'modinagar@mediflow.com',
           'password': 'password123',
           'region': 'East Zone',
@@ -471,7 +471,7 @@ class FirebaseService {
         },
         {
           'name': 'PHC Loni',
-          'type': 'urban',
+          'type': FacilityType.urban,
           'email': 'loni@mediflow.com',
           'password': 'password123',
           'region': 'North District',
@@ -480,7 +480,7 @@ class FirebaseService {
         },
         {
           'name': 'DH Ghaziabad',
-          'type': 'urban',
+          'type': FacilityType.urban,
           'email': 'ghaziabad@mediflow.com',
           'password': 'password123',
           'region': 'Central Hub',
@@ -489,7 +489,7 @@ class FirebaseService {
         },
         {
           'name': 'PHC Bhojpur',
-          'type': 'rural',
+          'type': FacilityType.rural,
           'email': 'bhojpur@mediflow.com',
           'password': 'password123',
           'region': 'West Sector',
@@ -498,7 +498,7 @@ class FirebaseService {
         },
         {
           'name': 'CHC Hapur',
-          'type': 'urban',
+          'type': FacilityType.urban,
           'email': 'hapur@mediflow.com',
           'password': 'password123',
           'region': 'East Zone',
@@ -507,7 +507,7 @@ class FirebaseService {
         },
         {
           'name': 'PHC Dasna',
-          'type': 'rural',
+          'type': FacilityType.rural,
           'email': 'dasna@mediflow.com',
           'password': 'password123',
           'region': 'Central Hub',
@@ -516,7 +516,7 @@ class FirebaseService {
         },
         {
           'name': 'SubCentre Pilkhuwa',
-          'type': 'rural',
+          'type': FacilityType.rural,
           'email': 'pilkhuwa@mediflow.com',
           'password': 'password123',
           'region': 'West Sector',

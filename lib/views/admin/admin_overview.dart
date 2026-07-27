@@ -584,7 +584,7 @@ class _AdminOverviewState extends ConsumerState<AdminOverview> {
                 decoration: BoxDecoration(
                     color: MediColors.surfaceLight,
                     borderRadius: BorderRadius.circular(20)),
-                child: Text(facility.type,
+                child: Text(facility.type.label,
                     style: const TextStyle(
                         fontSize: 10,
                         color: MediColors.textSecondary,

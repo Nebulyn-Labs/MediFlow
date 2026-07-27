@@ -1,10 +1,31 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
+enum FacilityType { rural, urban }
+
+FacilityType facilityTypeFromString(String? value) {
+  switch (value?.toLowerCase()) {
+    case 'rural':
+      return FacilityType.rural;
+    case 'urban':
+    default:
+      return FacilityType.urban;
+  }
+}
+
+extension FacilityTypeX on FacilityType {
+  String get apiValue => name;
+
+  String get label => switch (this) {
+        FacilityType.rural => 'Rural',
+        FacilityType.urban => 'Urban',
+      };
+}
+
 class Facility {
   final String id;
   final String name;
   final String email;
-  final String type; // 'rural' or 'urban'
+  final FacilityType type;
   final String region;
   final double latitude;
   final double longitude;
@@ -26,7 +47,7 @@ class Facility {
       id: id,
       name: map['name'] ?? '',
       email: map['email'] ?? '',
-      type: map['type'] ?? 'urban',
+      type: facilityTypeFromString(map['type']),
       region: map['region'] ?? '',
       latitude: map['latitude']?.toDouble() ?? 0.0,
       longitude: map['longitude']?.toDouble() ?? 0.0,
@@ -40,7 +61,7 @@ class Facility {
     return {
       'name': name,
       'email': email,
-      'type': type,
+      'type': type.apiValue,
       'region': region,
       'latitude': latitude,
       'longitude': longitude,

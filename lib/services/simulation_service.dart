@@ -1,6 +1,7 @@
 import 'dart:math';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../models/facility.dart';
 import '../models/daily_usage_log.dart';
 
 final simulationServiceProvider =
@@ -11,10 +12,10 @@ final simulationServiceProvider =
 /// requiring real operational data.
 ///
 /// ### Inputs
-/// - [generateRealisticProfile]: an optional facility `type`
-///   (`urban`/`rural`); randomly assigned if omitted.
-/// - [runFullSimulation]: a `facilityId` and `facilityType`
-///   (`urban`/`rural`), used to seed inventory and 31 days
+/// - [generateRealisticProfile]: an optional [FacilityType]; randomly
+///   assigned if omitted.
+/// - [runFullSimulation]: a `facilityId` and `facilityType`, used to seed
+///   inventory and 31 days
 ///   (`i = 30 ... 0`) of usage history for that facility.
 ///
 /// ### Outputs
@@ -53,7 +54,7 @@ class SimulationService {
 
   // --- LOCATION & PROFILE SIMULATION ---
 
-  Map<String, dynamic> generateRealisticProfile({String? type}) {
+  Map<String, dynamic> generateRealisticProfile({FacilityType? type}) {
     // Center point: Delhi NCR (28.6139, 77.2090)
     final double centerLat = 28.61;
     final double centerLng = 77.20;
@@ -62,8 +63,8 @@ class SimulationService {
     final double latOffset = (_random.nextDouble() - 0.5) * 0.4;
     final double lngOffset = (_random.nextDouble() - 0.5) * 0.4;
 
-    final String assignedType =
-        type ?? (_random.nextBool() ? 'urban' : 'rural');
+    final FacilityType assignedType = type ??
+      (_random.nextBool() ? FacilityType.urban : FacilityType.rural);
 
     final List<String> regions = [
       'North District',
@@ -85,7 +86,8 @@ class SimulationService {
 
   // --- DAILY USAGE SIMULATION ---
 
-  Future<void> runFullSimulation(String facilityId, String facilityType) async {
+  Future<void> runFullSimulation(
+      String facilityId, FacilityType facilityType) async {
     // 1. Initialize Inventory if not exists
     await _seedInventory(facilityId);
 
@@ -236,10 +238,10 @@ class SimulationService {
     }
   }
 
-  void _addSimulateDayToBatch(
-      WriteBatch batch, String facilityId, String facilityType, DateTime date) {
+  void _addSimulateDayToBatch(WriteBatch batch, String facilityId,
+      FacilityType facilityType, DateTime date) {
     // 1. Determine patient count
-    int basePatients = facilityType == 'urban' ? 150 : 35;
+    int basePatients = facilityType == FacilityType.urban ? 150 : 35;
     double variation = 0.8 + (_random.nextDouble() * 0.4); // 80% to 120%
     int totalPatients = (basePatients * variation).round();
 

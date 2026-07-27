@@ -98,8 +98,8 @@ class NearestNeighborRoutingStrategy implements RoutingStrategy {
 ///    that donor visit its recipients ([calculateMultiStopRoutes])?
 ///
 /// ### Inputs
-/// - `facilities`: every facility in the network, used for location, type
-///   (`rural`/`urban`), and identity.
+/// - `facilities`: every facility in the network, used for location,
+///   [FacilityType], and identity.
 /// - `inventories`: current stock per facility, keyed by facility id.
 /// - `requests`: pending/approved [MedRequest]s. Only `regularIndent` and
 ///   `shortage` requests represent deficits; `surplus` requests are explicit
@@ -233,10 +233,12 @@ class OptimizationService {
           return -1;
         }
 
-        if (facA.type == 'rural' && facB.type != 'rural') {
+        if (facA.type == FacilityType.rural &&
+            facB.type != FacilityType.rural) {
           return -1;
         }
-        if (facB.type == 'rural' && facA.type != 'rural') {
+        if (facB.type == FacilityType.rural &&
+            facA.type != FacilityType.rural) {
           return 1;
         }
         return b.quantity.compareTo(a.quantity);
@@ -279,7 +281,7 @@ class OptimizationService {
           reasons.add('Proximity (${distKm.toStringAsFixed(1)}km)');
 
           // B. Rural Priority
-          if (recipientFac.type == 'rural') {
+          if (recipientFac.type == FacilityType.rural) {
             score += 150;
             reasons.add('Rural Priority');
           }
