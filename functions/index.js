@@ -1035,15 +1035,3 @@ const cspReportLastSeen = new Map();
 exports.cspReport = onRequest(async (req, res) => {
   await handleCspReport(req, res, logger, cspReportLastSeen);
 });
-
-
-  const lastSeen = cspReportLastSeen.get(ip);
-  if (lastSeen && now - lastSeen < CSP_REPORT_MIN_INTERVAL_MS) {
-    res.status(429).send("Too Many Requests");
-    return;
-  }
-  cspReportLastSeen.set(ip, now);
-
-  logger.warn("CSP Violation Report", { report: req.body });
-  res.status(204).send();
-});
