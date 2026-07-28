@@ -5,7 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../models/facility.dart';
 import '../../models/request.dart';
 import '../../models/inventory_item.dart';
-import '../../models/daily_usage_log.dart';
+
 import '../../services/firebase_service.dart';
 import '../../services/ai_service.dart';
 import '../../services/routing_service.dart';
@@ -184,12 +184,10 @@ class _RouteOptimizationMapState extends ConsumerState<RouteOptimizationMap> {
     return Scaffold(
       backgroundColor: MediColors.bg,
       appBar: AppBar(title: const Text('Advanced Route Optimization')),
-      body: FutureBuilder<PaginatedMedicinesResult>(
-        future: ref
-            .read(firebaseServiceProvider)
-            .getPaginatedMedicines(pageSize: 500),
+      body: StreamBuilder<List<InventoryItem>>(
+        stream: ref.watch(firebaseServiceProvider).streamAllMedicines(),
         builder: (context, invSnapshot) {
-          final allMeds = invSnapshot.data?.medicines ?? [];
+          final allMeds = invSnapshot.data ?? [];
 
           return StreamBuilder<List<MedRequest>>(
             stream: ref.watch(firebaseServiceProvider).streamRequests(null),

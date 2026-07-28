@@ -239,21 +239,24 @@ class _AdminOverviewState extends ConsumerState<AdminOverview> {
       );
     }
 
-    if (filtered.isEmpty && !_medicinesLoading) {
-      return const Padding(
-        padding: EdgeInsets.symmetric(vertical: 24),
-        child: Text('No medicines match your search or filter.',
-            style: TextStyle(color: MediColors.textSecondary)),
-      );
-    }
-
     return Column(
       children: [
-        ListView.builder(
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          itemCount: filtered.length,
-          itemBuilder: (context, index) {
+        if (filtered.isEmpty && !_medicinesLoading)
+          const Padding(
+            padding: EdgeInsets.symmetric(vertical: 24),
+            // Note: Intentional scalability trade-off - filtering only searches
+            // currently loaded pages to avoid excessive reads or complex
+            // composite indexes on the large global medicines collection.
+            child: Text('No medicines match in currently loaded data. Load more to continue searching.',
+                textAlign: TextAlign.center,
+                style: TextStyle(color: MediColors.textSecondary)),
+          )
+        else
+          ListView.builder(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            itemCount: filtered.length,
+            itemBuilder: (context, index) {
             final item = filtered[index];
             final status = _getStockStatus(item);
             return Container(

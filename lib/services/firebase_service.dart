@@ -144,6 +144,23 @@ class FirebaseService {
         .toList();
   }
 
+  /// Streams the entire collectionGroup of medicines across all facilities.
+  /// Used for map overlays where live updates of all facilities are needed.
+  Stream<List<InventoryItem>> streamAllMedicines() {
+    return _firestore
+        .collectionGroup('medicines')
+        .snapshots()
+        .map((snapshot) => snapshot.docs.map((doc) {
+              final pathSegments = doc.reference.path.split('/');
+              final facId = pathSegments.length >= 2 ? pathSegments[1] : '';
+              return InventoryItem.fromMap(
+                doc.data() as Map<String, dynamic>,
+                doc.id,
+                facilityId: facId,
+              );
+            }).toList());
+  }
+
   /// Fetches one page of medicines from the global collectionGroup, ordered
   /// by medicineName ascending, using startAfterDocument cursor pagination.
   /// Pass the previous page's [lastDocument] as [startAfter] to get the next
@@ -152,6 +169,9 @@ class FirebaseService {
     int pageSize = 20,
     DocumentSnapshot? startAfter,
   }) async {
+    // Note: Firestore orderBy() automatically excludes documents missing the 'medicineName' field.
+    // In our schema, 'medicineName' is a required field for all inventory items,
+    // so this is intentional and safe. Documents without medicineName represent malformed data.
     Query query = _firestore
         .collectionGroup('medicines')
         .orderBy('medicineName')

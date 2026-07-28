@@ -52,6 +52,11 @@ class FakeFirebaseService implements FirebaseService {
   }
 
   @override
+  Stream<List<InventoryItem>> streamAllMedicines() {
+    return Stream.value(inventory);
+  }
+
+  @override
   Stream<List<MedRequest>> streamRequests(String? facilityId) {
     if (facilityId != null) {
       return Stream.value(
@@ -92,6 +97,11 @@ class FailingFirebaseService implements FirebaseService {
   }
 
   @override
+  Stream<List<InventoryItem>> streamAllMedicines() {
+    return Stream.value([]);
+  }
+
+  @override
   Stream<List<MedRequest>> streamRequests(String? facilityId) {
     return Stream.value([]);
   }
@@ -127,6 +137,11 @@ class RetryableFirebaseService implements FirebaseService {
       lastDocument: null,
       hasMore: false,
     );
+  }
+
+  @override
+  Stream<List<InventoryItem>> streamAllMedicines() {
+    return Stream.value([]);
   }
 
   @override
