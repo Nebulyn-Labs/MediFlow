@@ -31,14 +31,24 @@ class _FacilityProfilePageState extends ConsumerState<FacilityProfilePage> {
   }
 
   Future<void> _loadFacility() async {
-    final facility = await ref.read(firebaseServiceProvider).getFacility(widget.facilityId);
-    if (facility != null) {
-      setState(() {
-        _facility = facility;
-        _nameController.text = facility.name;
-        _regionController.text = facility.region;
-        _isLoading = false;
-      });
+    try {
+      final facility = await ref.read(firebaseServiceProvider).getFacility(widget.facilityId);
+      if (!mounted) return;
+      if (facility != null) {
+        setState(() {
+          _facility = facility;
+          _nameController.text = facility.name;
+          _regionController.text = facility.region;
+        });
+      }
+    } catch (e) {
+      // Handle or log error if needed
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
     }
   }
 
@@ -97,9 +107,10 @@ class _FacilityProfilePageState extends ConsumerState<FacilityProfilePage> {
       return const Center(child: Text('Facility not found'));
     }
 
-    return Padding(
-      padding: const EdgeInsets.all(32.0),
-      child: Column(
+    return SingleChildScrollView(
+      child: Padding(
+        padding: const EdgeInsets.all(32.0),
+        child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const Text(
