@@ -11,7 +11,8 @@ class FacilityProfilePage extends ConsumerStatefulWidget {
   const FacilityProfilePage({super.key, required this.facilityId});
 
   @override
-  ConsumerState<FacilityProfilePage> createState() => _FacilityProfilePageState();
+  ConsumerState<FacilityProfilePage> createState() =>
+      _FacilityProfilePageState();
 }
 
 class _FacilityProfilePageState extends ConsumerState<FacilityProfilePage> {
@@ -32,7 +33,9 @@ class _FacilityProfilePageState extends ConsumerState<FacilityProfilePage> {
 
   Future<void> _loadFacility() async {
     try {
-      final facility = await ref.read(firebaseServiceProvider).getFacility(widget.facilityId);
+      final facility = await ref
+          .read(firebaseServiceProvider)
+          .getFacility(widget.facilityId);
       if (!mounted) return;
       if (facility != null) {
         setState(() {
@@ -61,9 +64,9 @@ class _FacilityProfilePageState extends ConsumerState<FacilityProfilePage> {
 
   Future<void> _saveChanges() async {
     if (!_formKey.currentState!.validate()) return;
-    
+
     setState(() => _isSaving = true);
-    
+
     try {
       await ref.read(firebaseServiceProvider).updateFacility(
         widget.facilityId,
@@ -72,7 +75,7 @@ class _FacilityProfilePageState extends ConsumerState<FacilityProfilePage> {
           'region': _regionController.text.trim(),
         },
       );
-      
+
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -111,100 +114,104 @@ class _FacilityProfilePageState extends ConsumerState<FacilityProfilePage> {
       child: Padding(
         padding: const EdgeInsets.all(32.0),
         child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text(
-            'Profile & Settings',
-            style: TextStyle(
-              fontSize: 28,
-              fontWeight: FontWeight.bold,
-              color: MediColors.textPrimary,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Profile & Settings',
+              style: TextStyle(
+                fontSize: 28,
+                fontWeight: FontWeight.bold,
+                color: MediColors.textPrimary,
+              ),
             ),
-          ),
-          const SizedBox(height: 32),
-          Center(
-            child: Container(
-              constraints: const BoxConstraints(maxWidth: 600),
-              child: Card(
-                child: Padding(
-                  padding: const EdgeInsets.all(32.0),
-                  child: Form(
-                    key: _formKey,
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text(
-                          'Edit Profile Details',
-                          style: TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
+            const SizedBox(height: 32),
+            Center(
+              child: Container(
+                constraints: const BoxConstraints(maxWidth: 600),
+                child: Card(
+                  child: Padding(
+                    padding: const EdgeInsets.all(32.0),
+                    child: Form(
+                      key: _formKey,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            'Edit Profile Details',
+                            style: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                            ),
                           ),
-                        ),
-                        const SizedBox(height: 24),
-                        TextFormField(
-                          controller: _nameController,
-                          decoration: const InputDecoration(
-                            labelText: 'Facility Name',
-                            prefixIcon: Icon(Icons.business_rounded),
+                          const SizedBox(height: 24),
+                          TextFormField(
+                            controller: _nameController,
+                            decoration: const InputDecoration(
+                              labelText: 'Facility Name',
+                              prefixIcon: Icon(Icons.business_rounded),
+                            ),
+                            validator: (value) =>
+                                value == null || value.trim().isEmpty
+                                    ? 'Name is required'
+                                    : null,
                           ),
-                          validator: (value) =>
-                              value == null || value.trim().isEmpty
-                                  ? 'Name is required'
-                                  : null,
-                        ),
-                        const SizedBox(height: 16),
-                        TextFormField(
-                          controller: _regionController,
-                          decoration: const InputDecoration(
-                            labelText: 'Region',
-                            prefixIcon: Icon(Icons.map_rounded),
+                          const SizedBox(height: 16),
+                          TextFormField(
+                            controller: _regionController,
+                            decoration: const InputDecoration(
+                              labelText: 'Region',
+                              prefixIcon: Icon(Icons.map_rounded),
+                            ),
+                            validator: (value) =>
+                                value == null || value.trim().isEmpty
+                                    ? 'Region is required'
+                                    : null,
                           ),
-                          validator: (value) =>
-                              value == null || value.trim().isEmpty
-                                  ? 'Region is required'
-                                  : null,
-                        ),
-                        const SizedBox(height: 32),
-                        const Text(
-                          'System Information',
-                          style: TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
+                          const SizedBox(height: 32),
+                          const Text(
+                            'System Information',
+                            style: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                            ),
                           ),
-                        ),
-                        const SizedBox(height: 16),
-                        _buildReadOnlyField('Email', _facility!.email),
-                        const SizedBox(height: 12),
-                        _buildReadOnlyField('Facility Type', _facility!.type.toUpperCase()),
-                        const SizedBox(height: 12),
-                        _buildReadOnlyField('Coordinates', '${_facility!.latitude.toStringAsFixed(4)}, ${_facility!.longitude.toStringAsFixed(4)}'),
-                        const SizedBox(height: 12),
-                        _buildReadOnlyField('Created At', DateFormat('yMMMd').format(_facility!.createdAt)),
-                        const SizedBox(height: 32),
-                        SizedBox(
-                          width: double.infinity,
-                          child: FilledButton(
-                            onPressed: _isSaving ? null : _saveChanges,
-                            child: _isSaving
-                                ? const SizedBox(
-                                    height: 20,
-                                    width: 20,
-                                    child: CircularProgressIndicator(
-                                      strokeWidth: 2,
-                                      color: Colors.white,
-                                    ),
-                                  )
-                                : const Text('Save Changes'),
+                          const SizedBox(height: 16),
+                          _buildReadOnlyField('Email', _facility!.email),
+                          const SizedBox(height: 12),
+                          _buildReadOnlyField(
+                              'Facility Type', _facility!.type.toUpperCase()),
+                          const SizedBox(height: 12),
+                          _buildReadOnlyField('Coordinates',
+                              '${_facility!.latitude.toStringAsFixed(4)}, ${_facility!.longitude.toStringAsFixed(4)}'),
+                          const SizedBox(height: 12),
+                          _buildReadOnlyField('Created At',
+                              DateFormat('yMMMd').format(_facility!.createdAt)),
+                          const SizedBox(height: 32),
+                          SizedBox(
+                            width: double.infinity,
+                            child: FilledButton(
+                              onPressed: _isSaving ? null : _saveChanges,
+                              child: _isSaving
+                                  ? const SizedBox(
+                                      height: 20,
+                                      width: 20,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                        color: Colors.white,
+                                      ),
+                                    )
+                                  : const Text('Save Changes'),
+                            ),
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
                   ),
                 ),
               ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
