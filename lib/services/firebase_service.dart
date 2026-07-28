@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart' show kDebugMode;
 import 'dart:math';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:cloud_functions/cloud_functions.dart';
@@ -424,7 +425,13 @@ class FirebaseService {
 
   Future<String?> seedDemoData() async {
     try {
-      // 1. Seed/Login Admin first to ensure authorization for database clearing/seeding
+        Future<void> seedDemoData() async {
+    // Safety check: Production me data wipe nahi hoga
+    if (!kDebugMode) {
+      throw Exception('Database seeding is strictly disabled in production builds.');
+    }
+    
+    // ... uske neeche jo pehle se code hai (clearDatabase() waghera) wo waisa hi rehne dein ...// 1. Seed/Login Admin first to ensure authorization for database clearing/seeding
       try {
         await _auth.createUserWithEmailAndPassword(
             email: 'admin@mediflow.com', password: 'password123');

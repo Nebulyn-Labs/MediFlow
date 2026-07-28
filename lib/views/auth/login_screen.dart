@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart' show kDebugMode;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -44,6 +45,35 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
+  }
+
+  // NAYA FUNCTION: Confirmation Dialog ke liye
+  void _showSeedConfirmation(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('Confirm Database Wipe'),
+          content: const Text(
+            'WARNING: This action will delete all existing data and repopulate demo data. This cannot be undone. Are you sure?',
+          ),
+          actions: <Widget>[
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('Cancel'),
+            ),
+            TextButton(
+              onPressed: () {
+                Navigator.of(context).pop(); // Dialog band karein
+                _seedDatabase(); // Asal seeding function call karein
+              },
+              style: TextButton.styleFrom(foregroundColor: Colors.red),
+              child: const Text('Yes, Wipe & Seed'),
+            ),
+          ],
+        );
+      },
+    );
   }
 
   Future<void> _login() async {
@@ -263,14 +293,17 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        TextButton.icon(
-                          onPressed: _isLoading ? null : _seedDatabase,
-                          icon: const Icon(Icons.dataset_rounded, size: 16),
-                          label: const Text('Seed DB'),
-                          style: TextButton.styleFrom(
-                              foregroundColor: MediColors.textMuted),
-                        ),
-                        const SizedBox(width: 8),
+                        // CHANGE: kDebugMode check aur confirmation dialog call
+                        if (kDebugMode) ...[
+                          TextButton.icon(
+                            onPressed: _isLoading ? null : () => _showSeedConfirmation(context),
+                            icon: const Icon(Icons.dataset_rounded, size: 16),
+                            label: const Text('Seed DB'),
+                            style: TextButton.styleFrom(
+                                foregroundColor: MediColors.textMuted),
+                          ),
+                          const SizedBox(width: 8),
+                        ],
                         TextButton.icon(
                           onPressed: () => context.go('/'),
                           icon: const Icon(Icons.arrow_back_rounded, size: 16),
