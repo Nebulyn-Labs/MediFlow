@@ -12,6 +12,7 @@ import 'views/auth/role_selection_screen.dart';
 import 'views/auth/login_screen.dart';
 import 'views/shared/sidebar_layout.dart';
 import 'views/shared/help_page.dart';
+import 'views/auth/forgot_password_page.dart';
 
 // Facility Pages
 import 'views/facility/facility_overview.dart';
@@ -19,12 +20,14 @@ import 'views/facility/ai_forecast_page.dart';
 import 'views/facility/active_indents_page.dart';
 import 'views/facility/daily_logging_page.dart';
 import 'views/facility/alerts_page.dart';
+import 'views/facility/wastage_report_page.dart';
 
 // Admin Pages
 import 'views/admin/admin_overview.dart';
 import 'views/admin/admin_indent_approval_page.dart';
 import 'views/admin/admin_indent_status_page.dart';
 import 'views/admin/route_optimization_map.dart';
+import 'views/admin/audit_trail_page.dart';
 import 'views/shared/ai_chat_page.dart';
 
 final GlobalKey<NavigatorState> _rootNavigatorKey = GlobalKey<NavigatorState>();
@@ -63,7 +66,8 @@ final _router = GoRouter(
   redirect: (context, state) {
     final isLoggedIn = FirebaseAuth.instance.currentUser != null;
     final isAuthRoute = state.uri.toString() == '/' ||
-        state.uri.toString().startsWith('/login');
+        state.uri.toString().startsWith('/login') ||
+        state.uri.toString().startsWith('/forgot-password');
     if (!isLoggedIn && !isAuthRoute) return '/';
     return null;
   },
@@ -78,6 +82,10 @@ final _router = GoRouter(
         final role = state.pathParameters['role']!;
         return LoginScreen(role: role);
       },
+    ),
+    GoRoute(
+      path: '/forgot-password',
+      builder: (context, state) => const ForgotPasswordPage(),
     ),
     ShellRoute(
       navigatorKey: _facilityShellNavigatorKey,
@@ -112,6 +120,10 @@ final _router = GoRouter(
             builder: (context, state) =>
                 AlertsPage(facilityId: state.pathParameters['id']!)),
         GoRoute(
+            path: '/facility/:id/wastage',
+            builder: (context, state) =>
+                WastageReportPage(facilityId: state.pathParameters['id']!)),
+        GoRoute(
             path: '/facility/:id/chat',
             builder: (context, state) => AIChatPage(
                 facilityId: state.pathParameters['id']!, role: 'facility')),
@@ -141,6 +153,9 @@ final _router = GoRouter(
         GoRoute(
             path: '/admin/chat',
             builder: (context, state) => const AIChatPage(role: 'admin')),
+        GoRoute(
+            path: '/admin/audit',
+            builder: (context, state) => const AuditTrailPage()),
         GoRoute(
             path: '/admin/help',
             builder: (context, state) => const HelpPage(role: 'admin')),

@@ -8,6 +8,7 @@ import '../models/facility.dart';
 import '../models/inventory_item.dart';
 import '../models/daily_usage_log.dart';
 import '../models/request.dart';
+import '../models/audit_log.dart';
 import 'simulation_service.dart';
 
 final firebaseServiceProvider = Provider<FirebaseService>((ref) {
@@ -29,6 +30,17 @@ class FirebaseService {
   Future<auth.UserCredential> login(String email, String password) async {
     return await _auth.signInWithEmailAndPassword(
         email: email, password: password);
+  }
+
+  Future<void> sendPasswordReset(String email) async {
+    await _auth.sendPasswordResetEmail(email: email);
+    try {
+      final callable =
+          FirebaseFunctions.instance.httpsCallable('logPasswordResetRequest');
+      await callable.call({'email': email});
+    } catch (e) {
+      debugPrint('Failed to log password reset request: $e');
+    }
   }
 
   Future<void> signUpFacility({
@@ -186,7 +198,8 @@ class FirebaseService {
           'lastUpdated': Timestamp.now(),
         });
       } else {
-        throw Exception('Inventory document not found for medicine: $medicineName');
+        throw Exception(
+            'Inventory document not found for medicine: $medicineName');
       }
     });
   }
@@ -281,7 +294,8 @@ class FirebaseService {
       // 1. Update Inventory
       final invDoc = await transaction.get(invRef);
       if (!invDoc.exists) {
-        throw Exception('Inventory document not found for medicine: $medicineName');
+        throw Exception(
+            'Inventory document not found for medicine: $medicineName');
       }
 
       int remaining = invDoc.data()?['remainingQuantity'] ?? 0;
@@ -652,6 +666,45 @@ class FirebaseService {
       return null; // Success
     } catch (e) {
       return 'Critical error: $e';
+    }
+  }
+
+  // --- AUDIT LOGS ---
+
+  Future<PaginatedAuditLogsResult> getPaginatedAuditLogs({
+    int pageSize = 20,
+    DocumentSnapshot? startAfter,
+    String? actionFilter,
+  }) async {
+    try {
+      Query query = _firestore.collection('audit_logs');
+      
+      if (actionFilter != null && actionFilter.isNotEmpty && actionFilter != 'All') {
+        query = query.where('action', isEqualTo: actionFilter);
+      }
+      
+      query = query.orderBy('timestamp', descending: true).limit(pageSize);
+
+      if (startAfter != null) {
+        query = query.startAfterDocument(startAfter);
+      }
+
+      final snapshot = await query.get();
+      final logs = snapshot.docs
+          .map((doc) =>
+              AuditLog.fromMap(doc.data() as Map<String, dynamic>, doc.id))
+          .toList();
+
+      final hasMore = snapshot.docs.length == pageSize;
+      final lastDocument = snapshot.docs.isNotEmpty ? snapshot.docs.last : null;
+
+      return PaginatedAuditLogsResult(
+        logs: logs,
+        lastDocument: lastDocument,
+        hasMore: hasMore,
+      );
+    } catch (e) {
+      throw Exception('Error fetching audit logs: $e');
     }
   }
 }

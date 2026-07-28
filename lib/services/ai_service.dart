@@ -400,4 +400,32 @@ Output JSON only.
     }
     return results;
   }
+
+  // ─── WASTAGE REPORT ─────────────────────────────────────────────
+  Future<String> getWastageRecommendations(
+      List<Map<String, dynamic>> wastageData) async {
+    if (_shouldUseLocal || wastageData.isEmpty) {
+      return "Local analysis suggests prioritizing stock redistribution before expiry and optimizing future indent quantities to match actual burn rates.";
+    }
+
+    try {
+      final payload = wastageData
+          .map((w) =>
+              "${w['medicineName']}: ${w['expiredUnits']} expired, ${w['nearExpiryUnits']} expiring soon. Est. cost impact: \$${w['estimatedCost']}")
+          .join('\n');
+          
+      final prompt = '''
+Analyze the following wastage report for a healthcare facility:
+$payload
+
+Provide 3 actionable recommendations to prevent future wastage and minimize financial impact. Keep it concise, practical, and formatted as a numbered list.
+''';
+
+      final responseText = await _callGeminiBackend(prompt);
+      return responseText.trim();
+    } catch (e) {
+      _handleQuotaError(e.toString());
+      return "Local analysis suggests prioritizing stock redistribution before expiry and optimizing future indent quantities to match actual burn rates.";
+    }
+  }
 }
