@@ -13,6 +13,8 @@ class MedRequest {
   final DateTime requestDate;
   final RequestStatus status;
   final String? notes;
+  final String? rejectionReason;
+  final DateTime? resolvedAt;
 
   MedRequest({
     required this.id,
@@ -23,6 +25,8 @@ class MedRequest {
     required this.requestDate,
     required this.status,
     this.notes,
+    this.rejectionReason,
+    this.resolvedAt,
   });
 
   factory MedRequest.fromMap(Map<String, dynamic> map, String id) {
@@ -37,6 +41,10 @@ class MedRequest {
       status: RequestStatus.values.firstWhere((e) => e.name == map['status'],
           orElse: () => RequestStatus.pending),
       notes: map['notes'],
+      rejectionReason: map['rejectionReason'],
+      resolvedAt: map['resolvedAt'] != null
+          ? (map['resolvedAt'] as Timestamp).toDate()
+          : null,
     );
   }
 
@@ -49,6 +57,8 @@ class MedRequest {
       'requestDate': Timestamp.fromDate(requestDate),
       'status': status.name,
       'notes': notes,
+      if (rejectionReason != null) 'rejectionReason': rejectionReason,
+      if (resolvedAt != null) 'resolvedAt': Timestamp.fromDate(resolvedAt!),
     };
   }
 }

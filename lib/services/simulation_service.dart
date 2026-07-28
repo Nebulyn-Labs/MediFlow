@@ -6,6 +6,45 @@ import '../models/daily_usage_log.dart';
 final simulationServiceProvider =
     Provider((ref) => SimulationService(FirebaseFirestore.instance));
 
+/// Generates realistic demo data so a freshly created facility has
+/// plausible inventory, usage history, and stock-health variety without
+/// requiring real operational data.
+///
+/// ### Inputs
+/// - [generateRealisticProfile]: an optional facility `type`
+///   (`urban`/`rural`); randomly assigned if omitted.
+/// - [runFullSimulation]: a `facilityId` and `facilityType`
+///   (`urban`/`rural`), used to seed inventory and 31 days
+///   (`i = 30 ... 0`) of usage history for that facility.
+///
+/// ### Outputs
+/// - [generateRealisticProfile]: a map of facility fields (`type`,
+///   `latitude`, `longitude`, `region`, `createdAt`) suitable for writing
+///   to the `facilities` collection.
+/// - [runFullSimulation]: no return value; it writes directly to
+///   Firestore (`inventory/{facilityId}/medicines` and
+///   `daily_usage_logs/{facilityId}/logs`) via batched writes.
+///
+/// ### Algorithm assumptions
+/// - **Geography:** simulated facilities are clustered around Delhi NCR
+///   (28.61, 77.20) with a random offset of up to ~0.2 degrees
+///   (~20km) in each direction, purely for demo map visuals.
+/// - **Usage volume:** urban facilities simulate a base of 150
+///   patients/day, rural facilities 35/day, each with +/-20% daily
+///   variation.
+/// - **Seasonality:** cough syrup and paracetamol usage is multiplied
+///   2.5x in winter months (Nov-Feb); ORS usage is multiplied 3x in
+///   summer months (May-Aug), mirroring the seasonal patterns referenced
+///   elsewhere in the AI forecasting logic.
+/// - **Batching:** Firestore's per-batch write limit is 500; this service
+///   commits every 400 writes to stay safely under that limit while
+///   simulating up to 31 days of logs per facility.
+/// - **Stock "personas":** after generating history, `_resetInventoryLevels`
+///   assigns each facility a random health persona (critical/low stock,
+///   surplus, or normal) so demo dashboards show varied, realistic stock
+///   states rather than uniform inventory. The facility `rampur_mediflow_com`
+///   is hardcoded with a fixed, deliberately varied set of stock levels
+///   (including an expired batch) for demo-script consistency.
 class SimulationService {
   final FirebaseFirestore _firestore;
   final Random _random = Random();
