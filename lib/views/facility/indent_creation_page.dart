@@ -97,11 +97,13 @@ class _IndentCreationPageState extends ConsumerState<IndentCreationPage> {
           _reasoning[item.id] =
               reasonRaw?.toString() ?? "Calculated based on demand.";
 
-          int available = item.remainingQuantity;
-          bool isExpired =
-              item.expiryDate.difference(DateTime.now()).inDays < 0;
-          bool expiringSoon =
-              item.expiryDate.difference(DateTime.now()).inDays <= 30;
+          // Use centralized ItemStatus to avoid inline threshold duplication.
+          final itemStatus = item.status;
+          final int available = item.remainingQuantity;
+          final bool isExpired = itemStatus == ItemStatus.expired;
+          // expiringSoon must NOT include already-expired items.
+          final bool expiringSoon = itemStatus == ItemStatus.expiringSoon ||
+              itemStatus == ItemStatus.wastageRisk;
           int suggestedQty = 0;
 
           if (isExpired) {
@@ -155,10 +157,13 @@ class _IndentCreationPageState extends ConsumerState<IndentCreationPage> {
         final qty = int.tryParse(_controllers[item.id]?.text ?? '0') ?? 0;
 
         final forecast = _forecasts[item.id];
-        int available = item.remainingQuantity;
-        bool isExpired = item.expiryDate.difference(DateTime.now()).inDays < 0;
-        bool expiringSoon =
-            item.expiryDate.difference(DateTime.now()).inDays <= 30;
+        final int available = item.remainingQuantity;
+        // Use centralized ItemStatus to avoid inline threshold duplication
+        // and to prevent expired items being counted as expiring-soon.
+        final itemStatus = item.status;
+        final bool isExpired = itemStatus == ItemStatus.expired;
+        final bool expiringSoon = itemStatus == ItemStatus.expiringSoon ||
+            itemStatus == ItemStatus.wastageRisk;
 
         final RequestType reqType = _determineRequestType(
             item, forecast, available, isExpired, expiringSoon);
@@ -401,9 +406,13 @@ class _IndentCreationPageState extends ConsumerState<IndentCreationPage> {
     final forecast = _forecasts[item.id];
     final reasoning = _reasoning[item.id];
 
-    int available = item.remainingQuantity;
-    bool isExpired = item.expiryDate.difference(DateTime.now()).inDays < 0;
-    bool expiringSoon = item.expiryDate.difference(DateTime.now()).inDays <= 30;
+    final int available = item.remainingQuantity;
+    // Use centralized ItemStatus; prevents expired items being labelled
+    // as expiring-soon in row status display.
+    final itemStatus = item.status;
+    final bool isExpired = itemStatus == ItemStatus.expired;
+    final bool expiringSoon = itemStatus == ItemStatus.expiringSoon ||
+        itemStatus == ItemStatus.wastageRisk;
 
     String status = "—";
     Color statusColor = MediColors.textMuted;

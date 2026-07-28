@@ -29,10 +29,14 @@ class FacilityOverview extends ConsumerWidget {
           );
         }
         final inventory = snapshot.data ?? [];
+        // Use centralized ItemStatus; expired items are intentionally excluded
+        // from the expiringSoon count so they are not double-counted.
         final expiringSoon = inventory
-            .where((i) => i.expiryDate.difference(DateTime.now()).inDays <= 30)
+            .where((i) => i.status == ItemStatus.expiringSoon)
             .length;
-        final lowStock = inventory.where((i) => i.isLowStock).length;
+        final lowStock = inventory
+            .where((i) => i.status == ItemStatus.lowStock)
+            .length;
 
         return Scaffold(
           backgroundColor: MediColors.bg,
@@ -77,11 +81,16 @@ class FacilityOverview extends ConsumerWidget {
                                 color: MediColors.textPrimary))),
                     const PopupMenuDivider(),
                   ];
-                  final lowItems =
-                      inventory.where((i) => i.isLowStock).toList();
+                  final lowItems = inventory
+                      .where((i) => i.status == ItemStatus.lowStock)
+                      .toList();
+                  // Expiring-soon popup: only items that are truly expiring
+                  // soon, NOT already expired (those are listed separately).
                   final expiringItems = inventory
                       .where((i) =>
-                          i.expiryDate.difference(DateTime.now()).inDays <= 30)
+                          i.status == ItemStatus.expiringSoon ||
+                          i.status == ItemStatus.wastageRisk ||
+                          i.status == ItemStatus.expired)
                       .toList();
                   for (var item in lowItems) {
                     alerts.add(PopupMenuItem<String>(
@@ -283,30 +292,17 @@ class FacilityOverview extends ConsumerWidget {
                   // KPI Cards
                   Builder(
                     builder: (context) {
+                      // All counts now derived from the centralized
+                      // ItemStatus getter — no inline threshold duplication.
                       final expired = inventory
-                          .where((i) =>
-                              i.expiryDate.difference(DateTime.now()).inDays <
-                              0)
+                          .where((i) => i.status == ItemStatus.expired)
                           .length;
-                      final wastageRisk = inventory.where((i) {
-                        final pct = i.initialQuantity > 0
-                            ? (i.remainingQuantity / i.initialQuantity)
-                            : 1.0;
-                        return pct >= 0.70 &&
-                            i.expiryDate.difference(DateTime.now()).inDays <=
-                                30;
-                      }).length;
-                      final unhealthy = inventory.where((i) {
-                        final pct = i.initialQuantity > 0
-                            ? i.remainingQuantity / i.initialQuantity
-                            : 0.0;
-                        final daysLeft =
-                            i.expiryDate.difference(DateTime.now()).inDays;
-                        return daysLeft < 0 ||
-                            daysLeft <= 30 ||
-                            pct >= 0.70 && daysLeft <= 30 ||
-                            i.isLowStock;
-                      }).length;
+                      final wastageRisk = inventory
+                          .where((i) => i.status == ItemStatus.wastageRisk)
+                          .length;
+                      final unhealthy = inventory
+                          .where((i) => i.hasAlert)
+                          .length;
                       final healthy = (inventory.length - unhealthy)
                           .clamp(0, inventory.length);
                       final stockHealthText = inventory.isEmpty
@@ -506,28 +502,30 @@ class FacilityOverview extends ConsumerWidget {
                       DataColumn(label: Text('Status')),
                       DataColumn(label: Text('Expiry Date')),
                       DataColumn(label: Text('Time Left')),
-                    ],
-                    rows: inventory.map((item) {
-                      final pct = item.initialQuantity > 0
-                          ? (item.remainingQuantity / item.initialQuantity)
-                          : 1.0;
+                    ],                     rows: inventory.map((item) {
+                      final pct = item.remainingPercentage;
                       final daysToExpiry =
                           item.expiryDate.difference(DateTime.now()).inDays;
+                      // Use centralized status — single source of truth.
                       Color statusColor;
                       String statusText;
-                      if (daysToExpiry < 0) {
-                        statusColor = MediColors.error;
-                        statusText = 'Expired';
-                      } else if (pct >= 0.70 && daysToExpiry <= 30) {
-                        statusColor = const Color(0xFFF59E0B); // Amber
-                        statusText = 'Wastage Risk';
-                      } else if (item.isLowStock) {
-                        statusColor = MediColors.error;
-                        statusText = 'Low Stock';
-                      } else {
-                        statusColor = MediColors.success;
-                        statusText = 'Healthy';
-                      }
+                      switch (item.status) {
+                        case ItemStatus.expired:
+                          statusColor = MediColors.error;
+                          statusText = 'Expired';
+                        case ItemStatus.wastageRisk:
+                          statusColor = const Color(0xFFF59E0B);
+                          statusText = 'Wastage Risk';
+                        case ItemStatus.lowStock:
+                          statusColor = MediColors.error;
+                          statusText = 'Low Stock';
+                        case ItemStatus.expiringSoon:
+                          statusColor = MediColors.warning;
+                          statusText = 'Expiring Soon';
+                        case ItemStatus.healthy:
+                          statusColor = MediColors.success;
+                          statusText = 'Healthy';
+                      } }
 
                       return DataRow(cells: [
                         DataCell(Row(children: [
