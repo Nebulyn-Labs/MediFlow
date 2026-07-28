@@ -170,11 +170,8 @@ class RoutingService {
 
     // Final fallback
     debugPrint('RoutingService: Falling back to straight-line route.');
-    final route = _fallbackRoute(start, end);
 
-    _cacheRoute(cacheKey, route);
-
-    return route;
+    return _fallbackRoute(start, end);
   }
 
   Future<List<LatLng>> getMultiStopRoute(List<LatLng> stops) async {
