@@ -12,6 +12,16 @@ import 'package:med_supply_prototype/constants/colors.dart';
 import '../shared/skeleton_loaders.dart';
 import '../../utils/retry_snackbar.dart';
 
+int _parseNumber(dynamic val) {
+  if (val == null) return 0;
+  final str = val.toString().trim();
+  final intVal = int.tryParse(str);
+  if (intVal != null) return intVal;
+  final doubleVal = double.tryParse(str);
+  if (doubleVal != null) return doubleVal.round();
+  return 0;
+}
+
 List<Map<String, dynamic>> parseVisionJson(String text) {
   try {
     int start = text.indexOf('[');
@@ -24,10 +34,8 @@ List<Map<String, dynamic>> parseVisionJson(String text) {
           if (item is Map) {
             return {
               'medicine': item['medicine']?.toString().trim() ?? '',
-              'quantity':
-                  int.tryParse(item['quantity']?.toString().trim() ?? '') ?? 0,
-              'patients':
-                  int.tryParse(item['patients']?.toString().trim() ?? '') ?? 0,
+              'quantity': _parseNumber(item['quantity']),
+              'patients': _parseNumber(item['patients']),
             };
           }
           return {'medicine': '', 'quantity': 0, 'patients': 0};
@@ -975,7 +983,9 @@ class _DailyLoggingPageState extends ConsumerState<DailyLoggingPage>
                           dropdownItems.add(currentMed);
                         }
 
-                        return DataRow(cells: [
+                        return DataRow(
+                            key: ObjectKey(item),
+                            cells: [
                           DataCell(Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [

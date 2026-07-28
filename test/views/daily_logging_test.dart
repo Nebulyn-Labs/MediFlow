@@ -48,6 +48,22 @@ Hope this helps!
       expect(items[0]['patients'], 5);
     });
 
+    test('parseVisionJson handles decimal numeric values from vision models',
+        () {
+      const rawText =
+          '[{"medicine": "Paracetamol", "quantity": 100.0, "patients": "25.0"}, {"medicine": "ORS", "quantity": "50.5", "patients": 10.2}]';
+      final items = parseVisionJson(rawText);
+
+      expect(items.length, 2);
+      expect(items[0]['medicine'], 'Paracetamol');
+      expect(items[0]['quantity'], 100);
+      expect(items[0]['patients'], 25);
+
+      expect(items[1]['medicine'], 'ORS');
+      expect(items[1]['quantity'], 51); // 50.5 rounded to 51
+      expect(items[1]['patients'], 10);
+    });
+
     test('parseVisionJson returns empty list for invalid JSON or no array', () {
       expect(parseVisionJson('No JSON data here'), isEmpty);
       expect(parseVisionJson('{"medicine": "Paracetamol"}'), isEmpty);
