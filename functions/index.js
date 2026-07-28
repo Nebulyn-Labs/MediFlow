@@ -799,6 +799,43 @@ async function executeTool(name, args, authInfo) {
   throw new Error(`Unknown function call: ${name}`);
 }
 
+/**
+ * 4. logPasswordResetRequest(email)
+ * Explicit audit hook for password reset requests.
+ */
+exports.logPasswordResetRequest = onCall(async (request) => {
+  const { email } = request.data;
+  if (!email) throw new HttpsError("invalid-argument", "Email is required");
+
+  const eventId = `pwd_reset_${Date.now()}`;
+  await insertBigQuery("audit_events", {
+    event_id: eventId,
+    occurred_at: new Date().toISOString(),
+    actor_id: "system",
+    source: "auth",
+    entity_type: "user",
+    entity_id: email,
+    action: "password_reset_requested",
+    facility_id: null,
+    medicine_name: null,
+    before_json: null,
+    after_json: null,
+    metadata_json: safeJson({ email }),
+  }, "password_reset");
+
+  await auditEvent({
+    eventId,
+    action: "password_reset_requested",
+    entityType: "user",
+    entityId: email,
+    actorId: "system",
+    metadata: { email }
+  });
+
+  return { ok: true };
+});
+
+
 exports.generateSmartAlertsSecure = onCall({ secrets: [GEMINI_API_KEY] }, async (request) => {
   if (!request.auth) throw new HttpsError('unauthenticated', 'User must log in');
 
