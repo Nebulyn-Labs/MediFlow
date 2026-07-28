@@ -29,7 +29,9 @@ class _RouteOptimizationMapState extends ConsumerState<RouteOptimizationMap> {
   bool _isGenerating = false;
   String _aiSummary = '';
   List<MultiStopRoute> _multiStopRoutes = [];
-  Map<String, List<LatLng>> _roadRoutes = {};
+  // Stores the full RouteResult (polyline + road distance/duration) for each
+  // multi-stop route, keyed by the donor facility id.
+  Map<String, RouteResult> _roadRoutes = {};
 
   @override
   void initState() {
@@ -90,13 +92,13 @@ class _RouteOptimizationMapState extends ConsumerState<RouteOptimizationMap> {
       );
 
       // 2. Fetch road-accurate routes for each multi-stop route
-      Map<String, List<LatLng>> routes = {};
+      Map<String, RouteResult> routes = {};
       for (var mr in multiRoutes) {
         if (mr.stops.isEmpty) continue;
         final stopsCoords =
             mr.stops.map((f) => LatLng(f.latitude, f.longitude)).toList();
-        final path = await router.getMultiStopRoute(stopsCoords);
-        routes[mr.transfers.first.donor.id] = path;
+        final result = await router.getMultiStopRoute(stopsCoords);
+        routes[mr.transfers.first.donor.id] = result;
       }
 
       // 3. Generate AI Summary
@@ -366,7 +368,8 @@ class _RouteOptimizationMapState extends ConsumerState<RouteOptimizationMap> {
                               PolylineLayer(
                                 polylines: _multiStopRoutes.map<Polyline>((mr) {
                                   final donorId = mr.transfers.first.donor.id;
-                                  final points = _roadRoutes[donorId] ??
+                                  final routeResult = _roadRoutes[donorId];
+                                  final points = routeResult?.points ??
                                       mr.stops
                                           .map((s) =>
                                               LatLng(s.latitude, s.longitude))
@@ -599,12 +602,36 @@ class _RouteOptimizationMapState extends ConsumerState<RouteOptimizationMap> {
   }
 
   Widget _buildSingleTransferInfo(TransferRecommendation rec) {
+    /// Fallback assumed average speed when no road-routing data is available.
+    /// Named here as a constant so it is easy to find and change (#252).
+    const double kFallbackSpeedKmh = 40.0;
+
+    // Prefer road distance/duration from the routing API response if present.
+    final donorId = rec.donor.id;
+    final routeResult = _roadRoutes[donorId];
+
+    // Road distance and duration from the API (null when straight-line
+    // fallback was used or the donor's route has not been fetched yet).
+    final double? roadDistKm = routeResult?.distanceKm;
+    final double? roadDurationSeconds = routeResult?.durationSeconds;
+
+    // Straight-line haversine distance — used only as a fallback.
     final Distance distanceCalc = const Distance();
-    final distKm = distanceCalc(LatLng(rec.donor.latitude, rec.donor.longitude),
-            LatLng(rec.recipient.latitude, rec.recipient.longitude)) /
-        1000;
-    final timeHours = (distKm / 40);
-    final timeMinutes = (timeHours * 60).toInt();
+    final double straightLineDistKm =
+        distanceCalc(LatLng(rec.donor.latitude, rec.donor.longitude),
+                LatLng(rec.recipient.latitude, rec.recipient.longitude)) /
+            1000;
+
+    // Resolved display values: prefer road data, fall back to straight-line.
+    final bool usingRoadData = roadDistKm != null && roadDurationSeconds != null;
+    final double displayDistKm = usingRoadData ? roadDistKm : straightLineDistKm;
+    final int displayTimeMinutes = usingRoadData
+        ? (roadDurationSeconds / 60).round()
+        : (straightLineDistKm / kFallbackSpeedKmh * 60).round();
+
+    // Label shown next to the ETA so users know what it's based on.
+    final String etaLabel =
+        usingRoadData ? 'est.' : 'est. (straight-line @ ${kFallbackSpeedKmh.toInt()} km/h)';
 
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
@@ -695,7 +722,7 @@ class _RouteOptimizationMapState extends ConsumerState<RouteOptimizationMap> {
                 const Icon(Icons.route_rounded,
                     size: 14, color: MediColors.textMuted),
                 const SizedBox(width: 4),
-                Text('${distKm.toStringAsFixed(1)} km',
+                Text('${displayDistKm.toStringAsFixed(1)} km',
                     style: const TextStyle(
                         color: MediColors.textMuted, fontSize: 12))
               ]),
@@ -703,7 +730,7 @@ class _RouteOptimizationMapState extends ConsumerState<RouteOptimizationMap> {
                 const Icon(Icons.schedule_rounded,
                     size: 14, color: MediColors.textMuted),
                 const SizedBox(width: 4),
-                Text('${timeMinutes}m est.',
+                Text('${displayTimeMinutes}m $etaLabel',
                     style: const TextStyle(
                         color: MediColors.textMuted, fontSize: 12))
               ]),

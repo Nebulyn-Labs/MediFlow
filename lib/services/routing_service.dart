@@ -6,6 +6,31 @@ import 'package:latlong2/latlong.dart';
 
 final routingServiceProvider = Provider((ref) => RoutingService());
 
+/// The result of a routing call: an ordered list of road-accurate [points]
+/// plus optional route metadata when a real routing API was used.
+class RouteResult {
+  /// Road-accurate polyline coordinates (or a straight-line fallback).
+  final List<LatLng> points;
+
+  /// Road distance in kilometres, or `null` when only the straight-line
+  /// fallback was available and no API distance was returned.
+  final double? distanceKm;
+
+  /// Estimated travel duration in seconds, or `null` when the API did not
+  /// provide duration data (straight-line fallback case).
+  final double? durationSeconds;
+
+  const RouteResult({
+    required this.points,
+    this.distanceKm,
+    this.durationSeconds,
+  });
+
+  /// Convenience: whether this result carries real road-routing metadata
+  /// (as opposed to a straight-line fallback with no distance/duration).
+  bool get hasRoadData => distanceKm != null && durationSeconds != null;
+}
+
 /// Converts a sequence of stop coordinates into a road-accurate polyline.
 ///
 /// ### Inputs
@@ -14,17 +39,19 @@ final routingServiceProvider = Provider((ref) => RoutingService());
 ///   produced by `OptimizationService.calculateMultiStopRoutes`).
 ///
 /// ### Outputs
-/// - A list of [LatLng] points describing the road path. For
-///   [getMultiStopRoute], consecutive per-segment routes are concatenated,
-///   de-duplicating a shared boundary point where one segment's last point
-///   equals the next segment's first point.
+/// - A [RouteResult] containing a list of [LatLng] points describing the
+///   road path. For [getMultiStopRoute], consecutive per-segment routes are
+///   concatenated, de-duplicating a shared boundary point where one
+///   segment's last point equals the next segment's first point.
+///   `distanceKm` and `durationSeconds` are the summed totals across all
+///   segments when road data is available.
 ///
 /// ### Algorithm assumptions
 /// - **Provider order:** OpenRouteService (ORS) is preferred when an API
 ///   key is configured (`orsKey`, currently hardcoded to `null` and
 ///   therefore always skipped at runtime), falling back to the public
 ///   OSRM demo server, and finally to a straight-line fallback route
-///   (`[start, end]`) if both external services fail or time out (5s each).
+///   (`[start, end]`) if both external services fail or time out (5 s each).
 /// - **Coordinate validation:** requests are only sent to ORS/OSRM when
 ///   both points are within valid latitude/longitude bounds and are not
 ///   known placeholder coordinates (`(0, 0)` or `(-1, -1)`, used
@@ -64,12 +91,12 @@ class RoutingService {
         !_isPlaceholderCoordinate(end);
   }
 
-  /// Returns a simple straight-line fallback route.
-  List<LatLng> _fallbackRoute(LatLng start, LatLng end) {
-    return [start, end];
+  /// Returns a simple straight-line fallback [RouteResult] with no road data.
+  RouteResult _fallbackRoute(LatLng start, LatLng end) {
+    return RouteResult(points: [start, end]);
   }
 
-  Future<List<LatLng>> getRoute(LatLng start, LatLng end) async {
+  Future<RouteResult> getRoute(LatLng start, LatLng end) async {
     const String? orsKey = null;
 
     // Validate coordinates before making external API requests.
@@ -96,16 +123,27 @@ class RoutingService {
           final data = jsonDecode(response.body);
 
           if (data['features'] != null && data['features'].isNotEmpty) {
-            final List<dynamic> coords =
-                data['features'][0]['geometry']['coordinates'];
+            final feature = data['features'][0];
+            final List<dynamic> coords = feature['geometry']['coordinates'];
+            final props = feature['properties'];
+            final summary = props?['summary'];
 
             debugPrint(
               'RoutingService: ORS Success. ${coords.length} points found.',
             );
 
-            return coords
-                .map((c) => LatLng(c[1].toDouble(), c[0].toDouble()))
-                .toList();
+            return RouteResult(
+              points: coords
+                  .map((c) => LatLng(c[1].toDouble(), c[0].toDouble()))
+                  .toList(),
+              // ORS returns distance in metres and duration in seconds.
+              distanceKm: summary != null
+                  ? (summary['distance'] as num).toDouble() / 1000.0
+                  : null,
+              durationSeconds: summary != null
+                  ? (summary['duration'] as num).toDouble()
+                  : null,
+            );
           }
         } else {
           debugPrint(
@@ -132,16 +170,25 @@ class RoutingService {
         final data = jsonDecode(response.body);
 
         if (data['routes'] != null && data['routes'].isNotEmpty) {
-          final List<dynamic> coords =
-              data['routes'][0]['geometry']['coordinates'];
+          final route = data['routes'][0];
+          final List<dynamic> coords = route['geometry']['coordinates'];
 
           debugPrint(
             'RoutingService: OSRM Success. ${coords.length} points found.',
           );
 
-          return coords
-              .map((c) => LatLng(c[1].toDouble(), c[0].toDouble()))
-              .toList();
+          return RouteResult(
+            points: coords
+                .map((c) => LatLng(c[1].toDouble(), c[0].toDouble()))
+                .toList(),
+            // OSRM returns distance in metres and duration in seconds.
+            distanceKm: route['distance'] != null
+                ? (route['distance'] as num).toDouble() / 1000.0
+                : null,
+            durationSeconds: route['duration'] != null
+                ? (route['duration'] as num).toDouble()
+                : null,
+          );
         }
       } else {
         debugPrint(
@@ -158,21 +205,40 @@ class RoutingService {
     return _fallbackRoute(start, end);
   }
 
-  Future<List<LatLng>> getMultiStopRoute(List<LatLng> stops) async {
-    if (stops.isEmpty) return [];
-    if (stops.length == 1) return stops;
+  Future<RouteResult> getMultiStopRoute(List<LatLng> stops) async {
+    if (stops.isEmpty) return const RouteResult(points: []);
+    if (stops.length == 1) return RouteResult(points: stops);
 
     List<LatLng> fullRoute = [];
+    double? totalDistanceKm;
+    double? totalDurationSeconds;
+
     for (int i = 0; i < stops.length - 1; i++) {
-      final segment = await getRoute(stops[i], stops[i + 1]);
-      if (segment.isNotEmpty) {
-        if (fullRoute.isNotEmpty && fullRoute.last == segment.first) {
-          fullRoute.addAll(segment.skip(1));
+      final segResult = await getRoute(stops[i], stops[i + 1]);
+      if (segResult.points.isNotEmpty) {
+        if (fullRoute.isNotEmpty && fullRoute.last == segResult.points.first) {
+          fullRoute.addAll(segResult.points.skip(1));
         } else {
-          fullRoute.addAll(segment);
+          fullRoute.addAll(segResult.points);
         }
       }
+      // Accumulate road metadata only when every segment has it.
+      if (segResult.hasRoadData) {
+        totalDistanceKm = (totalDistanceKm ?? 0) + segResult.distanceKm!;
+        totalDurationSeconds =
+            (totalDurationSeconds ?? 0) + segResult.durationSeconds!;
+      } else {
+        // At least one segment fell back to straight-line: discard metadata
+        // so callers know the totals are unreliable.
+        totalDistanceKm = null;
+        totalDurationSeconds = null;
+      }
     }
-    return fullRoute;
+
+    return RouteResult(
+      points: fullRoute,
+      distanceKm: totalDistanceKm,
+      durationSeconds: totalDurationSeconds,
+    );
   }
 }
