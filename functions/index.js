@@ -799,6 +799,47 @@ async function executeTool(name, args, authInfo) {
   throw new Error(`Unknown function call: ${name}`);
 }
 
+/**
+ * 4. logPasswordResetRequest(email)
+ * Explicit audit hook for password reset requests.
+ */
+exports.logPasswordResetRequest = onCall(async (request) => {
+  const { email } = request.data;
+  if (!email) throw new HttpsError("invalid-argument", "Email is required");
+
+  await checkRateLimit(
+    email,
+    "logPasswordResetRequest",
+    LIMITS.GENERAL
+  );
+
+  const eventId = `pwd_reset_${Date.now()}`;
+
+  // Log to admin dashboard via audit_logs
+  const db = admin.firestore();
+  await db.collection("audit_logs").add({
+    adminId: "system",
+    timestamp: admin.firestore.FieldValue.serverTimestamp(),
+    action: "password_reset_requested",
+    resourceType: "user",
+    resourceId: email,
+    metadata: { email },
+    status: "success"
+  });
+
+  await auditEvent({
+    eventId,
+    action: "password_reset_requested",
+    entityType: "user",
+    entityId: email,
+    actorId: "system",
+    metadata: { email }
+  });
+
+  return { ok: true };
+});
+
+
 exports.generateSmartAlertsSecure = onCall({ secrets: [GEMINI_API_KEY] }, async (request) => {
   if (!request.auth) throw new HttpsError('unauthenticated', 'User must log in');
 
