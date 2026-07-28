@@ -5,6 +5,8 @@ import '../../services/firebase_service.dart';
 import '../../models/inventory_item.dart';
 import 'package:med_supply_prototype/constants/colors.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'confirm_logout_dialog.dart';
+import 'scroll_to_top_button.dart';
 
 class SidebarLayout extends ConsumerStatefulWidget {
   final Widget child;
@@ -24,6 +26,12 @@ class SidebarLayout extends ConsumerStatefulWidget {
 
 class _SidebarLayoutState extends ConsumerState<SidebarLayout> {
   bool _isExpanded = false;
+  final ScrollController _mainScrollController = ScrollController();
+  @override
+  void dispose() {
+    _mainScrollController.dispose();
+    super.dispose();
+  }
 
   int _calculateSelectedIndex(BuildContext context) {
     final location = GoRouterState.of(context).uri.toString();
@@ -43,7 +51,8 @@ class _SidebarLayoutState extends ConsumerState<SidebarLayout> {
       if (location.endsWith('/supply-status')) return 2;
       if (location.endsWith('/routing')) return 3;
       if (location.endsWith('/chat')) return 4;
-      if (location.endsWith('/help')) return 5;
+      if (location.endsWith('/audit')) return 5;
+      if (location.endsWith('/help')) return 6;
       return 0;
     }
   }
@@ -91,6 +100,9 @@ class _SidebarLayoutState extends ConsumerState<SidebarLayout> {
           context.go('/admin/chat');
           break;
         case 5:
+          context.go('/admin/audit');
+          break;
+        case 6:
           context.go('/admin/help');
           break;
       }
@@ -113,6 +125,7 @@ class _SidebarLayoutState extends ConsumerState<SidebarLayout> {
           _NavItem(Icons.history_rounded, 'Supply Status'),
           _NavItem(Icons.map_rounded, 'Route Opt.'),
           _NavItem(Icons.smart_toy_rounded, 'AI Chat'),
+          _NavItem(Icons.security_rounded, 'Audit Trail'),
           _NavItem(Icons.help_outline_rounded, 'Help'),
         ];
 
@@ -200,6 +213,8 @@ class _SidebarLayoutState extends ConsumerState<SidebarLayout> {
                     _NavItem(Icons.logout_rounded, 'Logout'),
                     false,
                     () async {
+                      final confirmed = await confirmLogout(context);
+                      if (!confirmed) return;
                       try {
                         await FirebaseAuth.instance.signOut();
                         if (context.mounted) context.go('/');
@@ -223,7 +238,21 @@ class _SidebarLayoutState extends ConsumerState<SidebarLayout> {
           ),
 
           // ── Main Content ──
-          Expanded(child: widget.child),
+          Expanded(
+            child: PrimaryScrollController(
+              controller: _mainScrollController,
+              child: Stack(
+                children: [
+                  widget.child,
+                  Positioned(
+                    bottom: 24,
+                    right: 24,
+                    child: ScrollToTopButton(controller: _mainScrollController),
+                  ),
+                ],
+              ),
+            ),
+          ),
         ],
       ),
     );

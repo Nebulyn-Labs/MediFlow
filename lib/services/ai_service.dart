@@ -237,8 +237,7 @@ class AIService {
   Future<List<Map<String, dynamic>>> generateSmartAlerts(
       List<InventoryItem> inventory) async {
     final local = inventory
-        .where((i) => (i.initialQuantity > 0 &&
-            i.remainingQuantity / i.initialQuantity < 0.35))
+        .where((i) => i.isLowStock)
         .map((i) => {
               "type": "low_stock",
               "severity": "red",

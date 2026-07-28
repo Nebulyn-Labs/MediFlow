@@ -25,6 +25,18 @@ class InventoryItem {
     this.facilityId,
   });
 
+  /// Fraction of stock remaining (0.0–1.0). Safe against divide-by-zero.
+  double get remainingPercentage =>
+      initialQuantity > 0 ? remainingQuantity / initialQuantity : 0.0;
+
+  /// Single source of truth for low-stock detection across the whole app.
+  /// An item is low stock if either:
+  ///  - it has dropped to 20% or less of its initial quantity, or
+  ///  - fewer than 500 units remain in absolute terms (safety floor for
+  ///    small initial batches where the percentage check alone is too loose).
+  bool get isLowStock =>
+      remainingPercentage <= 0.20 || remainingQuantity <= 500;
+
   factory InventoryItem.fromMap(Map<String, dynamic> map, String id,
       {String? facilityId}) {
     return InventoryItem(

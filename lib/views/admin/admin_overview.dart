@@ -8,6 +8,7 @@ import '../../models/facility.dart';
 import '../../models/request.dart';
 import '../../models/inventory_item.dart';
 import 'package:med_supply_prototype/constants/colors.dart';
+import '../shared/skeleton_loaders.dart';
 
 class AdminOverview extends ConsumerStatefulWidget {
   const AdminOverview({super.key});
@@ -58,6 +59,10 @@ class _AdminOverviewState extends ConsumerState<AdminOverview> {
   }
 
   Future<void> _loadData() async {
+    final firebaseService = ref.read(firebaseServiceProvider);
+    final aiService = ref.read(aiServiceProvider);
+
+    if (!mounted) return;
     await _requestsSub?.cancel();
 
     if (mounted) {
@@ -98,7 +103,7 @@ class _AdminOverviewState extends ConsumerState<AdminOverview> {
       facs.map((f) async {
         try {
           final inv =
-              await ref.read(firebaseServiceProvider).getInventoryOnce(f.id);
+              await firebaseService.getInventoryOnce(f.id);
 
           double totalInitial = 0;
           double totalRemaining = 0;
@@ -106,17 +111,14 @@ class _AdminOverviewState extends ConsumerState<AdminOverview> {
             totalInitial += item.initialQuantity;
             totalRemaining += item.remainingQuantity;
 
-            topMeds[item.medicineName] =
-                (topMeds[item.medicineName] ?? 0) +
-                    item.remainingQuantity.toInt();
+            topMeds[item.medicineName] = (topMeds[item.medicineName] ?? 0) +
+                item.remainingQuantity.toInt();
           }
           health[f.id] =
-              totalInitial == 0
-                  ? 100.0
-                  : (totalRemaining / totalInitial) * 100;
+              totalInitial == 0 ? 100.0 : (totalRemaining / totalInitial) * 100;
 
           final fAlerts =
-              await ref.read(aiServiceProvider).generateSmartAlerts(inv);
+              await aiService.generateSmartAlerts(inv);
           alerts[f.id] = fAlerts.length;
         } catch (e) {
           debugPrint(
@@ -127,29 +129,29 @@ class _AdminOverviewState extends ConsumerState<AdminOverview> {
     );
 
     _requestsSub =
-        ref.read(firebaseServiceProvider).streamRequests(null).listen(
-          (reqs) {
-            if (!mounted) return;
-            int shortage = 0;
-            int surplus = 0;
-            int pending = 0;
-            for (var r in reqs) {
-              if (r.status == RequestStatus.pending) {
-                if (r.type == RequestType.shortage) shortage++;
-                if (r.type == RequestType.surplus) surplus++;
-                if (r.type == RequestType.regularIndent) pending++;
-              }
-            }
-            setState(() {
-              _openShortageRequests = shortage;
-              _surplusOffers = surplus;
-              _pendingIndents = pending;
-            });
-          },
-          onError: (e) {
-            debugPrint('Failed to stream facility requests: $e');
-          },
-        );
+        firebaseService.streamRequests(null).listen(
+      (reqs) {
+        if (!mounted) return;
+        int shortage = 0;
+        int surplus = 0;
+        int pending = 0;
+        for (var r in reqs) {
+          if (r.status == RequestStatus.pending) {
+            if (r.type == RequestType.shortage) shortage++;
+            if (r.type == RequestType.surplus) surplus++;
+            if (r.type == RequestType.regularIndent) pending++;
+          }
+        }
+        setState(() {
+          _openShortageRequests = shortage;
+          _surplusOffers = surplus;
+          _pendingIndents = pending;
+        });
+      },
+      onError: (e) {
+        debugPrint('Failed to stream facility requests: $e');
+      },
+    );
 
     if (mounted) {
       setState(() {
@@ -196,8 +198,8 @@ class _AdminOverviewState extends ConsumerState<AdminOverview> {
             decoration: BoxDecoration(
               color: MediColors.surface,
               borderRadius: BorderRadius.circular(8),
-              border: Border.all(
-                  color: MediColors.error.withValues(alpha: 0.3)),
+              border:
+                  Border.all(color: MediColors.error.withValues(alpha: 0.3)),
             ),
             child: const Row(
               children: [
@@ -215,7 +217,13 @@ class _AdminOverviewState extends ConsumerState<AdminOverview> {
           );
         }
         if (!snapshot.hasData) {
-          return const Center(child: CircularProgressIndicator());
+          return const Column(
+            children: [
+              SkeletonTableRow(),
+              SkeletonTableRow(),
+              SkeletonTableRow(),
+            ],
+          );
         }
 
         final filtered = _applyFilters(snapshot.data!);
@@ -296,8 +304,7 @@ class _AdminOverviewState extends ConsumerState<AdminOverview> {
               backgroundColor: MediColors.surface,
               selectedColor: MediColors.info.withValues(alpha: 0.2),
               labelStyle: TextStyle(
-                color:
-                    isSelected ? MediColors.info : MediColors.textSecondary,
+                color: isSelected ? MediColors.info : MediColors.textSecondary,
                 fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
               ),
               side: BorderSide(
@@ -316,10 +323,9 @@ class _AdminOverviewState extends ConsumerState<AdminOverview> {
       margin: const EdgeInsets.only(bottom: 16),
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: MediColors.warning.withValues(alpha: 0.1),
+        color: MediColors.warningOverlay,
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(
-            color: MediColors.warning.withValues(alpha: 0.3)),
+        border: Border.all(color: MediColors.warning.withValues(alpha: 0.3)),
       ),
       child: Row(
         children: [
@@ -347,7 +353,7 @@ class _AdminOverviewState extends ConsumerState<AdminOverview> {
       backgroundColor: MediColors.bg,
       appBar: AppBar(title: const Text('Admin Dashboard')),
       body: _isInitialLoading
-          ? const Center(child: CircularProgressIndicator())
+          ? const AdminOverviewSkeleton()
           : _errorMessage != null
               ? _buildErrorView()
               : RefreshIndicator(
@@ -368,31 +374,23 @@ class _AdminOverviewState extends ConsumerState<AdminOverview> {
                           spacing: 20,
                           runSpacing: 20,
                           children: [
-                            _buildKpiCard(
-                                'TOTAL FACILITIES',
-                                '${_facilities.length}',
-                                Icons.business_rounded,
-                                onTap: () {}),
+                            _buildKpiCard('TOTAL FACILITIES',
+                                '${_facilities.length}', Icons.business_rounded),
                             _buildKpiCard(
                                 'OPEN SHORTAGE REQUESTS',
                                 '$_openShortageRequests',
                                 Icons.warning_amber_rounded,
-                                isAlert: true,
-                                onTap: () {}),
-                            _buildKpiCard(
-                                'SURPLUS / EXPIRY OFFERS',
-                                '$_surplusOffers',
-                                Icons.swap_horiz_rounded,
+                                isAlert: true),
+                            _buildKpiCard('SURPLUS / EXPIRY OFFERS',
+                                '$_surplusOffers', Icons.swap_horiz_rounded,
                                 isAlert: false,
-                                iconColor: MediColors.warning,
-                                onTap: () {}),
+                                iconColor: MediColors.warning),
                             _buildKpiCard(
                                 'PENDING INDENT APPROVALS',
                                 '$_pendingIndents',
                                 Icons.assignment_turned_in_rounded,
                                 iconColor: MediColors.info,
-                                onTap: () =>
-                                    context.go('/admin/approvals')),
+                                onTap: () => context.go('/admin/approvals')),
                           ],
                         ),
                         const SizedBox(height: 36),
@@ -410,8 +408,7 @@ class _AdminOverviewState extends ConsumerState<AdminOverview> {
                             fillColor: MediColors.surface,
                             border: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(8),
-                              borderSide:
-                                  BorderSide(color: MediColors.border),
+                              borderSide: BorderSide(color: MediColors.border),
                             ),
                           ),
                         ),
@@ -583,8 +580,7 @@ class _AdminOverviewState extends ConsumerState<AdminOverview> {
                           color: MediColors.textPrimary),
                       overflow: TextOverflow.ellipsis)),
               Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                 decoration: BoxDecoration(
                     color: MediColors.surfaceLight,
                     borderRadius: BorderRadius.circular(20)),
@@ -601,8 +597,8 @@ class _AdminOverviewState extends ConsumerState<AdminOverview> {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               const Text('Stock Health',
-                  style: TextStyle(
-                      fontSize: 12, color: MediColors.textSecondary)),
+                  style:
+                      TextStyle(fontSize: 12, color: MediColors.textSecondary)),
               Text('${health.round()}%',
                   style: TextStyle(
                       fontSize: 14,
@@ -677,8 +673,7 @@ class _AdminOverviewState extends ConsumerState<AdminOverview> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
-              'Top Medicines by Total Units Across All Facilities',
+          const Text('Top Medicines by Total Units Across All Facilities',
               style: TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.w700,
@@ -690,8 +685,7 @@ class _AdminOverviewState extends ConsumerState<AdminOverview> {
               crossAxisAlignment: CrossAxisAlignment.end,
               mainAxisAlignment: MainAxisAlignment.spaceAround,
               children: topEntries.map((e) {
-                final heightFactor =
-                    maxQty == 0 ? 0.0 : e.value / maxQty;
+                final heightFactor = maxQty == 0 ? 0.0 : e.value / maxQty;
                 return Expanded(
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.end,
@@ -701,16 +695,15 @@ class _AdminOverviewState extends ConsumerState<AdminOverview> {
                         height: 150 * heightFactor,
                         decoration: const BoxDecoration(
                           color: MediColors.info,
-                          borderRadius: BorderRadius.vertical(
-                              top: Radius.circular(4)),
+                          borderRadius:
+                              BorderRadius.vertical(top: Radius.circular(4)),
                         ),
                       ),
                       const SizedBox(height: 12),
                       Text(
                         e.key,
                         style: const TextStyle(
-                            fontSize: 10,
-                            color: MediColors.textSecondary),
+                            fontSize: 10, color: MediColors.textSecondary),
                         textAlign: TextAlign.center,
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
