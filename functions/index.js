@@ -102,7 +102,8 @@ const BQ_LOCATION = process.env.BQ_LOCATION || "US";
 // NOTE: GEMINI_API_KEY must be set in Firebase Secrets
 // Use: firebase functions:secrets:set GEMINI_API_KEY
 function getGenAI() {
-  return new GoogleGenerativeAI(GEMINI_API_KEY.value());
+  const key = process.env.GEMINI_API_KEY || (typeof GEMINI_API_KEY !== "undefined" && GEMINI_API_KEY.value ? GEMINI_API_KEY.value() : "");
+  return new GoogleGenerativeAI(key);
 }
 
 const BIGQUERY_TABLES = {
@@ -1013,7 +1014,7 @@ exports.callGeminiSecure = onCall({ secrets: [GEMINI_API_KEY] }, async (request)
     return { text: result.response.text() };
   } catch (error) {
     logger.error("Gemini callGeminiSecure Error:", error);
-    throw new HttpsError('internal', 'AI generation failed');
+    throw new HttpsError('internal', `AI generation failed: ${error.message || error}`);
   }
 });
 
