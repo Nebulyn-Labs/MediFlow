@@ -492,7 +492,7 @@ class _DailyLoggingPageState extends ConsumerState<DailyLoggingPage>
                   DropdownButtonFormField<String>(
                     decoration: const InputDecoration(labelText: 'Medicine'),
                     dropdownColor: MediColors.surfaceLight,
-                    value: _medName,
+                    initialValue: _medName,
                     style: const TextStyle(color: MediColors.textPrimary),
                     items: _availableMedicines
                         .map((m) => DropdownMenuItem(value: m, child: Text(m)))
