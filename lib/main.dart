@@ -12,6 +12,7 @@ import 'views/auth/role_selection_screen.dart';
 import 'views/auth/login_screen.dart';
 import 'views/shared/sidebar_layout.dart';
 import 'views/shared/help_page.dart';
+import 'views/auth/forgot_password_page.dart';
 
 // Facility Pages
 import 'views/facility/facility_overview.dart';
@@ -65,7 +66,8 @@ final _router = GoRouter(
   redirect: (context, state) {
     final isLoggedIn = FirebaseAuth.instance.currentUser != null;
     final isAuthRoute = state.uri.toString() == '/' ||
-        state.uri.toString().startsWith('/login');
+        state.uri.toString().startsWith('/login') ||
+        state.uri.toString().startsWith('/forgot-password');
     if (!isLoggedIn && !isAuthRoute) return '/';
     return null;
   },
@@ -80,6 +82,10 @@ final _router = GoRouter(
         final role = state.pathParameters['role']!;
         return LoginScreen(role: role);
       },
+    ),
+    GoRoute(
+      path: '/forgot-password',
+      builder: (context, state) => const ForgotPasswordPage(),
     ),
     ShellRoute(
       navigatorKey: _facilityShellNavigatorKey,
