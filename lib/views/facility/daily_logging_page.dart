@@ -1076,8 +1076,7 @@ class _DailyLoggingPageState extends ConsumerState<DailyLoggingPage>
                                     borderRadius: BorderRadius.circular(6)),
                               ),
                               onChanged: (val) {
-                                item['quantity'] =
-                                    int.tryParse(val.trim()) ?? 0;
+                                item['quantity'] = _parseNumber(val);
                                 setState(() {});
                               },
                             ),
@@ -1095,8 +1094,7 @@ class _DailyLoggingPageState extends ConsumerState<DailyLoggingPage>
                                     borderRadius: BorderRadius.circular(6)),
                               ),
                               onChanged: (val) {
-                                item['patients'] =
-                                    int.tryParse(val.trim()) ?? 0;
+                                item['patients'] = _parseNumber(val);
                                 setState(() {});
                               },
                             ),
