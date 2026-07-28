@@ -120,6 +120,10 @@ class FirebaseService {
     return Facility.fromMap(doc.data()!, doc.id);
   }
 
+  Future<void> updateFacility(String id, Map<String, dynamic> data) async {
+    await _firestore.collection('facilities').doc(id).update(data);
+  }
+
   // --- INVENTORY ---
 
   Stream<List<InventoryItem>> streamInventory(String facilityId) {
