@@ -807,21 +807,25 @@ exports.logPasswordResetRequest = onCall(async (request) => {
   const { email } = request.data;
   if (!email) throw new HttpsError("invalid-argument", "Email is required");
 
+  await checkRateLimit(
+    email,
+    "logPasswordResetRequest",
+    LIMITS.GENERAL
+  );
+
   const eventId = `pwd_reset_${Date.now()}`;
-  await insertBigQuery("audit_events", {
-    event_id: eventId,
-    occurred_at: new Date().toISOString(),
-    actor_id: "system",
-    source: "auth",
-    entity_type: "user",
-    entity_id: email,
+
+  // Log to admin dashboard via audit_logs
+  const db = admin.firestore();
+  await db.collection("audit_logs").add({
+    adminId: "system",
+    timestamp: admin.firestore.FieldValue.serverTimestamp(),
     action: "password_reset_requested",
-    facility_id: null,
-    medicine_name: null,
-    before_json: null,
-    after_json: null,
-    metadata_json: safeJson({ email }),
-  }, "password_reset");
+    resourceType: "user",
+    resourceId: email,
+    metadata: { email },
+    status: "success"
+  });
 
   await auditEvent({
     eventId,

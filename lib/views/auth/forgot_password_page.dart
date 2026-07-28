@@ -33,20 +33,18 @@ class _ForgotPasswordPageState extends ConsumerState<ForgotPasswordPage> {
     setState(() => _isLoading = true);
     try {
       await ref.read(firebaseServiceProvider).sendPasswordReset(email);
+    } catch (e) {
+      // Ignore exceptions to prevent email enumeration
+    } finally {
       if (mounted) {
+        setState(() => _isLoading = false);
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Password reset email sent. Please check your inbox.')),
+          const SnackBar(
+              content: Text(
+                  "If an account exists for that email, we've sent a reset link.")),
         );
         context.pop();
       }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to send reset email: ${e.toString().split(']').last.trim()}')),
-        );
-      }
-    } finally {
-      if (mounted) setState(() => _isLoading = false);
     }
   }
 
@@ -141,8 +139,7 @@ class _ForgotPasswordPageState extends ConsumerState<ForgotPasswordPage> {
                                   strokeWidth: 2, color: Colors.white))
                           : const Text('Send Reset Link',
                               style: TextStyle(
-                                  fontSize: 15,
-                                  fontWeight: FontWeight.w700)),
+                                  fontSize: 15, fontWeight: FontWeight.w700)),
                     ),
                   ),
                 ),
