@@ -8,6 +8,7 @@ import '../../models/facility.dart';
 import '../../models/request.dart';
 import '../../models/inventory_item.dart';
 import 'package:med_supply_prototype/constants/colors.dart';
+import '../shared/skeleton_loaders.dart';
 
 class AdminOverview extends ConsumerStatefulWidget {
   const AdminOverview({super.key});
@@ -58,6 +59,10 @@ class _AdminOverviewState extends ConsumerState<AdminOverview> {
   }
 
   Future<void> _loadData() async {
+    final firebaseService = ref.read(firebaseServiceProvider);
+    final aiService = ref.read(aiServiceProvider);
+
+    if (!mounted) return;
     await _requestsSub?.cancel();
 
     if (mounted) {
@@ -98,7 +103,7 @@ class _AdminOverviewState extends ConsumerState<AdminOverview> {
       facs.map((f) async {
         try {
           final inv =
-              await ref.read(firebaseServiceProvider).getInventoryOnce(f.id);
+              await firebaseService.getInventoryOnce(f.id);
 
           double totalInitial = 0;
           double totalRemaining = 0;
@@ -113,7 +118,7 @@ class _AdminOverviewState extends ConsumerState<AdminOverview> {
               totalInitial == 0 ? 100.0 : (totalRemaining / totalInitial) * 100;
 
           final fAlerts =
-              await ref.read(aiServiceProvider).generateSmartAlerts(inv);
+              await aiService.generateSmartAlerts(inv);
           alerts[f.id] = fAlerts.length;
         } catch (e) {
           debugPrint(
@@ -124,7 +129,7 @@ class _AdminOverviewState extends ConsumerState<AdminOverview> {
     );
 
     _requestsSub =
-        ref.read(firebaseServiceProvider).streamRequests(null).listen(
+        firebaseService.streamRequests(null).listen(
       (reqs) {
         if (!mounted) return;
         int shortage = 0;
@@ -212,7 +217,13 @@ class _AdminOverviewState extends ConsumerState<AdminOverview> {
           );
         }
         if (!snapshot.hasData) {
-          return const Center(child: CircularProgressIndicator());
+          return const Column(
+            children: [
+              SkeletonTableRow(),
+              SkeletonTableRow(),
+              SkeletonTableRow(),
+            ],
+          );
         }
 
         final filtered = _applyFilters(snapshot.data!);
@@ -342,7 +353,7 @@ class _AdminOverviewState extends ConsumerState<AdminOverview> {
       backgroundColor: MediColors.bg,
       appBar: AppBar(title: const Text('Admin Dashboard')),
       body: _isInitialLoading
-          ? const Center(child: CircularProgressIndicator())
+          ? const AdminOverviewSkeleton()
           : _errorMessage != null
               ? _buildErrorView()
               : RefreshIndicator(
@@ -364,19 +375,16 @@ class _AdminOverviewState extends ConsumerState<AdminOverview> {
                           runSpacing: 20,
                           children: [
                             _buildKpiCard('TOTAL FACILITIES',
-                                '${_facilities.length}', Icons.business_rounded,
-                                onTap: () {}),
+                                '${_facilities.length}', Icons.business_rounded),
                             _buildKpiCard(
                                 'OPEN SHORTAGE REQUESTS',
                                 '$_openShortageRequests',
                                 Icons.warning_amber_rounded,
-                                isAlert: true,
-                                onTap: () {}),
+                                isAlert: true),
                             _buildKpiCard('SURPLUS / EXPIRY OFFERS',
                                 '$_surplusOffers', Icons.swap_horiz_rounded,
                                 isAlert: false,
-                                iconColor: MediColors.warning,
-                                onTap: () {}),
+                                iconColor: MediColors.warning),
                             _buildKpiCard(
                                 'PENDING INDENT APPROVALS',
                                 '$_pendingIndents',
