@@ -273,8 +273,8 @@ class _ActiveIndentsPageState extends ConsumerState<ActiveIndentsPage> {
         facilityName: facility?.name,
       );
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Transfer requests CSV exported ✓')));
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+            content: Text('Transfer requests CSV exported ✓')));
       }
     } catch (e) {
       if (mounted) {
@@ -389,7 +389,7 @@ class _ActiveIndentsPageState extends ConsumerState<ActiveIndentsPage> {
             SizedBox(
               width: 220,
               child: DropdownButtonFormField<RequestStatus?>(
-                value: _selectedHistoryStatus,
+                initialValue: _selectedHistoryStatus,
                 dropdownColor: MediColors.surface,
                 decoration:
                     controlDecoration('Filter by status', Icons.filter_list),
@@ -414,7 +414,7 @@ class _ActiveIndentsPageState extends ConsumerState<ActiveIndentsPage> {
             SizedBox(
               width: 210,
               child: DropdownButtonFormField<_IndentSortOption>(
-                value: _selectedHistorySort,
+                initialValue: _selectedHistorySort,
                 dropdownColor: MediColors.surface,
                 decoration: controlDecoration('Sort by date', Icons.sort),
                 style: const TextStyle(color: MediColors.textPrimary),
@@ -435,7 +435,8 @@ class _ActiveIndentsPageState extends ConsumerState<ActiveIndentsPage> {
             ),
             Text(
               '$visibleCount of $totalCount requests shown',
-              style: const TextStyle(color: MediColors.textMuted, fontSize: 12),
+              style:
+                  const TextStyle(color: MediColors.textMuted, fontSize: 12),
             ),
           ],
         ),

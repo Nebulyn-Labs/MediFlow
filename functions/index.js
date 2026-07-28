@@ -102,7 +102,8 @@ const BQ_LOCATION = process.env.BQ_LOCATION || "US";
 // NOTE: GEMINI_API_KEY must be set in Firebase Secrets
 // Use: firebase functions:secrets:set GEMINI_API_KEY
 function getGenAI() {
-  return new GoogleGenerativeAI(GEMINI_API_KEY.value());
+  const key = process.env.GEMINI_API_KEY || (typeof GEMINI_API_KEY !== "undefined" && GEMINI_API_KEY.value ? GEMINI_API_KEY.value() : "");
+  return new GoogleGenerativeAI(key);
 }
 
 const BIGQUERY_TABLES = {
@@ -203,22 +204,6 @@ function toIsoTimestamp(value) {
 function toBigQueryDate(value) {
   const iso = toIsoTimestamp(value);
   return iso ? iso.substring(0, 10) : null;
-}
-
-const bigQueryRecovery = createBigQueryRecovery({
-  bigquery,
-  firestore: admin.firestore(),
-  logger,
-  tables: BIGQUERY_TABLES,
-  datasetName: BQ_DATASET,
-  location: BQ_LOCATION,
-});
-
-  if (daysLeft !== null && daysLeft < 0) return "expired";
-  if (pct >= 0.7 && daysLeft !== null && daysLeft <= 30) return "wastage_risk";
-  if (pct <= 0.2 || remaining <= 500) return "low_stock";
-  if (daysLeft !== null && daysLeft <= 30) return "expiring_soon";
-  return "healthy";
 }
 
 const bigQueryRecovery = createBigQueryRecovery({
@@ -815,6 +800,47 @@ async function executeTool(name, args, authInfo) {
   throw new Error(`Unknown function call: ${name}`);
 }
 
+/**
+ * 4. logPasswordResetRequest(email)
+ * Explicit audit hook for password reset requests.
+ */
+exports.logPasswordResetRequest = onCall(async (request) => {
+  const { email } = request.data;
+  if (!email) throw new HttpsError("invalid-argument", "Email is required");
+
+  await checkRateLimit(
+    email,
+    "logPasswordResetRequest",
+    LIMITS.GENERAL
+  );
+
+  const eventId = `pwd_reset_${Date.now()}`;
+
+  // Log to admin dashboard via audit_logs
+  const db = admin.firestore();
+  await db.collection("audit_logs").add({
+    adminId: "system",
+    timestamp: admin.firestore.FieldValue.serverTimestamp(),
+    action: "password_reset_requested",
+    resourceType: "user",
+    resourceId: email,
+    metadata: { email },
+    status: "success"
+  });
+
+  await auditEvent({
+    eventId,
+    action: "password_reset_requested",
+    entityType: "user",
+    entityId: email,
+    actorId: "system",
+    metadata: { email }
+  });
+
+  return { ok: true };
+});
+
+
 exports.generateSmartAlertsSecure = onCall({ secrets: [GEMINI_API_KEY] }, async (request) => {
   if (!request.auth) throw new HttpsError('unauthenticated', 'User must log in');
 
@@ -988,7 +1014,7 @@ exports.callGeminiSecure = onCall({ secrets: [GEMINI_API_KEY] }, async (request)
     return { text: result.response.text() };
   } catch (error) {
     logger.error("Gemini callGeminiSecure Error:", error);
-    throw new HttpsError('internal', 'AI generation failed');
+    throw new HttpsError('internal', `AI generation failed: ${error.message || error}`);
   }
 });
 
