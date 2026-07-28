@@ -371,7 +371,6 @@ Output JSON only.
     }
   }
 
-  // ─── MULTI-MODAL VISION ─────────────────────────────────────────
   Future<String> parseImageWithVision(
       Uint8List imageBytes, String prompt) async {
     final imageBase64 = base64Encode(imageBytes);
