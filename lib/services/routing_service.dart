@@ -6,6 +6,34 @@ import 'package:latlong2/latlong.dart';
 
 final routingServiceProvider = Provider((ref) => RoutingService());
 
+/// Converts a sequence of stop coordinates into a road-accurate polyline.
+///
+/// ### Inputs
+/// - [getRoute]: a `start` and `end` [LatLng] pair.
+/// - [getMultiStopRoute]: an ordered list of [LatLng] stops (typically
+///   produced by `OptimizationService.calculateMultiStopRoutes`).
+///
+/// ### Outputs
+/// - A list of [LatLng] points describing the road path. For
+///   [getMultiStopRoute], consecutive per-segment routes are concatenated,
+///   de-duplicating a shared boundary point where one segment's last point
+///   equals the next segment's first point.
+///
+/// ### Algorithm assumptions
+/// - **Provider order:** OpenRouteService (ORS) is preferred when an API
+///   key is configured (`orsKey`, currently hardcoded to `null` and
+///   therefore always skipped at runtime), falling back to the public
+///   OSRM demo server, and finally to a straight-line fallback route
+///   (`[start, end]`) if both external services fail or time out (5s each).
+/// - **Coordinate validation:** requests are only sent to ORS/OSRM when
+///   both points are within valid latitude/longitude bounds and are not
+///   known placeholder coordinates (`(0, 0)` or `(-1, -1)`, used
+///   elsewhere in the codebase to mean "location not set"). This avoids
+///   wasting external API calls on facilities with incomplete geodata.
+/// - **No caching/retries:** each segment is fetched independently and
+///   only once; a failed segment falls back to a straight line rather than
+///   being retried, so a multi-stop route can mix real road polylines and
+///   straight-line segments.
 class RoutingService {
   static const String _osrmBaseUrl =
       'https://router.project-osrm.org/route/v1/driving';
