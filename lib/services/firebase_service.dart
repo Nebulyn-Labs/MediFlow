@@ -8,6 +8,7 @@ import '../models/facility.dart';
 import '../models/inventory_item.dart';
 import '../models/daily_usage_log.dart';
 import '../models/request.dart';
+import '../models/audit_log.dart';
 import 'simulation_service.dart';
 
 final firebaseServiceProvider = Provider<FirebaseService>((ref) {
@@ -161,7 +162,8 @@ class FirebaseService {
           'lastUpdated': Timestamp.now(),
         });
       } else {
-        throw Exception('Inventory document not found for medicine: $medicineName');
+        throw Exception(
+            'Inventory document not found for medicine: $medicineName');
       }
     });
   }
@@ -252,6 +254,26 @@ class FirebaseService {
     required List<Map<String, dynamic>> items,
   }) async {
     if (items.isEmpty) return;
+    // Guard against Firestore's 500-operation limit per transaction by chunking large imports
+    const int maxBatchSize = 150;
+    for (int i = 0; i < items.length; i += maxBatchSize) {
+      final end = (i + maxBatchSize < items.length)
+          ? i + maxBatchSize
+          : items.length;
+      final chunk = items.sublist(i, end);
+      await _logUsageBatchChunk(
+        facilityId: facilityId,
+        date: date,
+        items: chunk,
+      );
+    }
+  }
+
+  Future<void> _logUsageBatchChunk({
+    required String facilityId,
+    required DateTime date,
+    required List<Map<String, dynamic>> items,
+  }) async {
     final dateStr =
         "${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}";
     final logRef = _firestore
@@ -296,11 +318,15 @@ class FirebaseService {
             'lastUpdated': Timestamp.now(),
           });
         } else {
-          // Auto-seed missing inventory items so import doesn't throw
-          final initialQty = max(100, quantity * 5);
+          // TODO: replace with proper inventory onboarding flow to allow specifying Batch ID and dates.
+          // Currently auto-seeding a baseline stock so bulk CSV imports of new medicines do not abort.
+          final int initialQty = max(500, quantity + 200);
+          final int uniqueSuffix = (DateTime.now().microsecondsSinceEpoch + medName.hashCode).abs() % 1000000;
+          final String uniqueBatchId = 'B-${DateTime.now().millisecondsSinceEpoch}-$uniqueSuffix';
+
           transaction.set(invRef, {
             'medicineName': medName,
-            'batchId': 'B-${1000 + DateTime.now().millisecond % 9000}',
+            'batchId': uniqueBatchId,
             'initialQuantity': initialQty,
             'remainingQuantity': max(0, initialQty - quantity),
             'unit': 'units',
@@ -687,6 +713,45 @@ class FirebaseService {
       return null; // Success
     } catch (e) {
       return 'Critical error: $e';
+    }
+  }
+
+  // --- AUDIT LOGS ---
+
+  Future<PaginatedAuditLogsResult> getPaginatedAuditLogs({
+    int pageSize = 20,
+    DocumentSnapshot? startAfter,
+    String? actionFilter,
+  }) async {
+    try {
+      Query query = _firestore.collection('audit_logs');
+      
+      if (actionFilter != null && actionFilter.isNotEmpty && actionFilter != 'All') {
+        query = query.where('action', isEqualTo: actionFilter);
+      }
+      
+      query = query.orderBy('timestamp', descending: true).limit(pageSize);
+
+      if (startAfter != null) {
+        query = query.startAfterDocument(startAfter);
+      }
+
+      final snapshot = await query.get();
+      final logs = snapshot.docs
+          .map((doc) =>
+              AuditLog.fromMap(doc.data() as Map<String, dynamic>, doc.id))
+          .toList();
+
+      final hasMore = snapshot.docs.length == pageSize;
+      final lastDocument = snapshot.docs.isNotEmpty ? snapshot.docs.last : null;
+
+      return PaginatedAuditLogsResult(
+        logs: logs,
+        lastDocument: lastDocument,
+        hasMore: hasMore,
+      );
+    } catch (e) {
+      throw Exception('Error fetching audit logs: $e');
     }
   }
 }

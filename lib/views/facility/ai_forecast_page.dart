@@ -255,11 +255,13 @@ class _AIForecastPageState extends ConsumerState<AIForecastPage> {
                               : _historyError != null
                                   ? Center(
                                       child: Padding(
-                                        padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                                        padding: const EdgeInsets.symmetric(
+                                            horizontal: 16.0),
                                         child: Text(
                                           'Failed to load historical data.\n$_historyError',
                                           textAlign: TextAlign.center,
-                                          style: const TextStyle(color: MediColors.error),
+                                          style: const TextStyle(
+                                              color: MediColors.error),
                                         ),
                                       ),
                                     )
@@ -301,7 +303,7 @@ class _AIForecastPageState extends ConsumerState<AIForecastPage> {
                         if (_forecastResult == null)
                           const Text(
                               'Run the forecaster to see AI-powered demand predictions.',
-                              style: TextStyle(color: MediColors.textSecondary))
+                              style: TextStyle(color: MediColors.textPrimary))
                         else ...[
                           Text(
                               'Predicted: ${_forecastResult!['prediction']} units over $_forecastDays days',
@@ -312,7 +314,7 @@ class _AIForecastPageState extends ConsumerState<AIForecastPage> {
                           const SizedBox(height: 8),
                           Text('${_forecastResult!['reasoning']}',
                               style: const TextStyle(
-                                  color: MediColors.textSecondary,
+                                  color: MediColors.textPrimary,
                                   height: 1.6)),
                         ],
                       ]),
@@ -334,16 +336,22 @@ class _AIForecastPageState extends ConsumerState<AIForecastPage> {
   }
 
   Widget _buildLegendDot(Color color, String label) {
-    return Row(children: [
-      Container(
-          width: 10,
-          height: 10,
-          decoration: BoxDecoration(
-              color: color, borderRadius: BorderRadius.circular(3))),
-      const SizedBox(width: 6),
-      Text(label,
-          style: const TextStyle(fontSize: 12, color: MediColors.textMuted)),
-    ]);
+    return Semantics(
+      label: '$label series',
+      child: ExcludeSemantics(
+        child: Row(children: [
+          Container(
+              width: 10,
+              height: 10,
+              decoration: BoxDecoration(
+                  color: color, borderRadius: BorderRadius.circular(3))),
+          const SizedBox(width: 6),
+          Text(label,
+              style:
+                  const TextStyle(fontSize: 12, color: MediColors.textMuted)),
+        ]),
+      ),
+    );
   }
 
   Widget _buildChart() {

@@ -25,6 +25,7 @@ import 'views/admin/admin_overview.dart';
 import 'views/admin/admin_indent_approval_page.dart';
 import 'views/admin/admin_indent_status_page.dart';
 import 'views/admin/route_optimization_map.dart';
+import 'views/admin/audit_trail_page.dart';
 import 'views/shared/ai_chat_page.dart';
 
 final GlobalKey<NavigatorState> _rootNavigatorKey = GlobalKey<NavigatorState>();
@@ -141,6 +142,9 @@ final _router = GoRouter(
         GoRoute(
             path: '/admin/chat',
             builder: (context, state) => const AIChatPage(role: 'admin')),
+        GoRoute(
+            path: '/admin/audit',
+            builder: (context, state) => const AuditTrailPage()),
         GoRoute(
             path: '/admin/help',
             builder: (context, state) => const HelpPage(role: 'admin')),

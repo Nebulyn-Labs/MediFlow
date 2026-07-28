@@ -10,6 +10,7 @@ import '../../services/csv_export_service.dart';
 import '../../services/ai_service.dart';
 import 'package:med_supply_prototype/constants/colors.dart';
 import '../shared/skeleton_loaders.dart';
+import '../../utils/retry_snackbar.dart';
 
 class DailyLoggingPage extends ConsumerStatefulWidget {
   final String facilityId;
@@ -177,8 +178,11 @@ class _DailyLoggingPageState extends ConsumerState<DailyLoggingPage>
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text('Error: ${_readableError(e)}')));
+        showRetrySnackBar(
+          context,
+          message: 'Failed to save log: ${_readableError(e)}',
+          onRetry: _submitLog,
+        );
       }
     } finally {
       if (mounted) setState(() => _isSubmitting = false);
@@ -205,8 +209,11 @@ class _DailyLoggingPageState extends ConsumerState<DailyLoggingPage>
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text('Export failed: ${_readableError(e)}')));
+        showRetrySnackBar(
+          context,
+          message: 'Export failed: ${_readableError(e)}',
+          onRetry: _exportUsageLogsCsv,
+        );
       }
     } finally {
       if (mounted) setState(() => _isExportingCsv = false);
@@ -253,8 +260,11 @@ class _DailyLoggingPageState extends ConsumerState<DailyLoggingPage>
       });
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text('CSV Error: ${_readableError(e)}')));
+        showRetrySnackBar(
+          context,
+          message: 'CSV Error: ${_readableError(e)}',
+          onRetry: _pickCSV,
+        );
       }
     }
   }
@@ -278,8 +288,11 @@ class _DailyLoggingPageState extends ConsumerState<DailyLoggingPage>
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text('Error: ${_readableError(e)}')));
+        showRetrySnackBar(
+          context,
+          message: 'Failed to save CSV logs: ${_readableError(e)}',
+          onRetry: _submitCSVLogs,
+        );
       }
     } finally {
       if (mounted) setState(() => _isSubmittingCsv = false);
@@ -319,8 +332,11 @@ class _DailyLoggingPageState extends ConsumerState<DailyLoggingPage>
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text('Error: ${_readableError(e)}')));
+        showRetrySnackBar(
+          context,
+          message: 'Failed to save scanned logs: ${_readableError(e)}',
+          onRetry: _submitScannedLogs,
+        );
       }
     } finally {
       if (mounted) setState(() => _isSubmittingQr = false);
@@ -356,14 +372,10 @@ class _DailyLoggingPageState extends ConsumerState<DailyLoggingPage>
           _imageParseError = _readableError(e);
           _isParsingImage = false;
         });
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Image parsing failed: ${_readableError(e)}'),
-            action: SnackBarAction(
-              label: 'Retry',
-              onPressed: _parseImage,
-            ),
-          ),
+        showRetrySnackBar(
+          context,
+          message: 'Image parsing failed: ${_readableError(e)}',
+          onRetry: _parseImage,
         );
       }
     }

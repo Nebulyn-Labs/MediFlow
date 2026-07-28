@@ -8,8 +8,15 @@ const { GoogleGenerativeAI } = require("@google/generative-ai");
 const { BigQuery } = require("@google-cloud/bigquery");
 const { checkRateLimit, LIMITS } = require("./helpers/rateLimiter");
 const { createBigQueryRecovery } = require("./helpers/bigQueryRecovery");
+const { createLowStockService } = require("./helpers/lowStock");
+const { handleCspReport } = require("./helpers/cspReport");
 
 admin.initializeApp();
+
+const lowStockService = createLowStockService({
+  serverTimestamp: () => admin.firestore.FieldValue.serverTimestamp(),
+});
+const { stockStatus } = lowStockService;
 
 const GEMINI_API_KEY = defineSecret("GEMINI_API_KEY");
 
@@ -198,20 +205,6 @@ function toBigQueryDate(value) {
   return iso ? iso.substring(0, 10) : null;
 }
 
-function stockStatus(data) {
-  const initial = Number(data.initialQuantity || 0);
-  const remaining = Number(data.remainingQuantity || 0);
-  const pct = initial > 0 ? remaining / initial : 0;
-  const expiry = toIsoTimestamp(data.expiryDate);
-  const daysLeft = expiry ? Math.ceil((new Date(expiry).getTime() - Date.now()) / 86400000) : null;
-
-  if (daysLeft !== null && daysLeft < 0) return "expired";
-  if (pct >= 0.7 && daysLeft !== null && daysLeft <= 30) return "wastage_risk";
-  if (pct <= 0.2 || remaining <= 500) return "low_stock";
-  if (daysLeft !== null && daysLeft <= 30) return "expiring_soon";
-  return "healthy";
-}
-
 const bigQueryRecovery = createBigQueryRecovery({
   bigquery,
   firestore: admin.firestore(),
@@ -263,9 +256,17 @@ exports.forecastDemand = onCall({ secrets: [GEMINI_API_KEY] }, async (request) =
     LIMITS.AI
   );
 
+  if (!medicineNames || !Array.isArray(medicineNames)) {
+    throw new HttpsError('invalid-argument', 'medicineNames must be an array');
+  }
+
   // 1. Fetch facility details
   const facilityDoc = await db.collection("facilities").doc(facilityId).get();
   const facility = facilityDoc.data();
+
+  if (!facility || typeof facility.name !== 'string') {
+    throw new HttpsError('invalid-argument', 'facility must have a valid name property');
+  }
 
   // 2. Fetch last 90 days of usage_logs
   const ninetyDaysAgo = new Date();
@@ -436,43 +437,6 @@ exports.mirrorRequestToBigQuery = onDocumentWritten("requests/{requestId}", asyn
   }
 });
 
-async function syncAlertForMedicine(db, facilityId, medicineId, data) {
-  const alertId = `${facilityId}_${medicineId}`;
-  const alertRef = db.collection("alerts").doc(alertId);
-
-  if (!data) {
-    await alertRef.delete();
-    return;
-  }
-
-  const status = stockStatus(data);
-  if (status === "healthy") {
-    await alertRef.delete();
-  } else {
-    const facilityDoc = await db.collection("facilities").doc(facilityId).get();
-    const facilityName = facilityDoc.exists ? (facilityDoc.data().name || "") : "";
-
-    const alertDoc = await alertRef.get();
-    const alertData = {
-      facilityId,
-      facilityName,
-      stockId: medicineId,
-      medicineName: data.medicineName || "",
-      qtyRemaining: Number(data.remainingQuantity || 0),
-      initialQuantity: Number(data.initialQuantity || 0),
-      batchId: data.batchId || "",
-      unit: data.unit || "units",
-      expiryDate: data.expiryDate,
-      type: status,
-      isRead: false
-    };
-    if (!alertDoc.exists) {
-      alertData.createdAt = admin.firestore.FieldValue.serverTimestamp();
-    }
-    await alertRef.set(alertData, { merge: true });
-  }
-}
-
 exports.onUserWritten = onDocumentWritten("users/{userId}", async (event) => {
   const change = event.data;
   const before = change.before.exists ? change.before.data() : null;
@@ -507,7 +471,7 @@ exports.mirrorInventoryToBigQuery = onDocumentWritten("inventory/{facilityId}/me
   const action = !before && after ? "created" : before && after ? "updated" : "deleted";
 
   const db = admin.firestore();
-  await syncAlertForMedicine(db, facilityId, medicineId, after);
+  await lowStockService.syncAlertForMedicine(db, facilityId, medicineId, after);
 
   await insertBigQuery("inventory_snapshots", {
     snapshot_id: `${facilityId}_${medicineId}_${Date.now()}`,
@@ -585,50 +549,12 @@ exports.retryFailedBigQueryInsertions = onSchedule("every 5 minutes", async () =
  */
 exports.checkLowStock = onSchedule("every 24 hours", async () => {
   const db = admin.firestore();
-  const facilities = await db.collection("facilities").get();
-
-  for (const facilityDoc of facilities.docs) {
-    const medicinesSnapshot = await db.collection("inventory")
-      .doc(facilityDoc.id)
-      .collection("medicines")
-      .get();
-
-    for (const medDoc of medicinesSnapshot.docs) {
-      const data = medDoc.data();
-      const status = stockStatus(data);
-      const { existed } = await createOrUpdateAlert(
-        db,
-        facilityDoc.id,
-        facilityDoc.data().name || "",
-        medDoc.id,
-        data,
-        status
-      );
-
-      // Trigger FCM Notification for low stock if it's new
-      if (status === "low_stock" && !existed) {
-        const userQuery = await db.collection("users")
-          .where("facilityId", "==", facilityDoc.id)
-          .where("role", "==", "facility_head")
-          .limit(1)
-          .get();
-
-        if (!userQuery.empty) {
-          const user = userQuery.docs[0].data();
-          if (user.fcmToken) {
-            await admin.messaging().send({
-              token: user.fcmToken,
-              notification: {
-                title: "Low Stock Alert",
-                body: `${data.medicineName} is below reorder level (${data.remainingQuantity} left).`
-              }
-            });
-          }
-        }
-      }
-    }
-  }
-  return null;
+  return lowStockService.runLowStockSweep({
+    db,
+    sendNotification: async (token, notification) => {
+      await admin.messaging().send({ token, notification });
+    },
+  });
 });
 
 /**
@@ -733,6 +659,7 @@ exports.onIndentApproved = onDocumentUpdated("requests/{requestId}", async (even
           }
 
           transaction.update(event.data.after.ref, {
+            status: "fulfilled",
             resolvedAt: admin.firestore.FieldValue.serverTimestamp(),
           });
         });
@@ -794,6 +721,7 @@ exports.onIndentApproved = onDocumentUpdated("requests/{requestId}", async (even
           }
 
           transaction.update(event.data.after.ref, {
+            status: "fulfilled",
             resolvedAt: admin.firestore.FieldValue.serverTimestamp(),
           });
         });
@@ -802,6 +730,10 @@ exports.onIndentApproved = onDocumentUpdated("requests/{requestId}", async (even
         );
       } catch (err) {
         logger.error(`Stock update failed for request ${requestId}:`, err);
+        await event.data.after.ref.update({
+          status: "rejected",
+          rejectionReason: err.message,
+        });
       }
     }
   }
@@ -880,6 +812,10 @@ exports.generateSmartAlertsSecure = onCall({ secrets: [GEMINI_API_KEY] }, async 
     LIMITS.AI
   );
 
+  if (!inventory || !Array.isArray(inventory)) {
+    throw new HttpsError('invalid-argument', 'inventory must be an array');
+  }
+
   const payload = inventory
     .map(i => `${i.medicineName} (Batch: ${i.batchId}): ${i.remainingQuantity}/${i.initialQuantity} units left. Expiry: ${i.expiryDate}`)
     .join('\n');
@@ -914,6 +850,10 @@ exports.getChatResponseSecure = onCall({ secrets: [GEMINI_API_KEY] }, async (req
     "getChatResponseSecure",
     LIMITS.AI
   );
+
+  if (!history || !Array.isArray(history)) {
+    throw new HttpsError('invalid-argument', 'history must be an array');
+  }
 
   const contextStr = JSON.stringify(clientContext);
 
@@ -1079,64 +1019,25 @@ exports.adminDeleteResource = onCall(async (request) => {
   return { success: true };
 });
 const cspReportLastSeen = new Map();
-const CSP_REPORT_MAX_BODY_BYTES = 10 * 1024; // 10KB
-const CSP_REPORT_MIN_INTERVAL_MS = 5000; // 1 report per IP per 5s
-const CSP_REPORT_MAP_MAX_SIZE = 5000; // hard cap to bound memory
 
-function getClientIp(req) {
-  // Cloud Run / GFE APPENDS the real client IP as the LAST entry in
-  // X-Forwarded-For; every entry before that can be spoofed by the client.
-  const xff = req.headers["x-forwarded-for"];
-  if (xff) {
-    const parts = xff.split(",").map((p) => p.trim()).filter(Boolean);
-    if (parts.length > 0) return parts[parts.length - 1];
-  }
-  return req.ip || "unknown";
-}
-
-function pruneCspReportMap(now) {
-  // Periodic sweep: drop stale entries, and if we're still oversized
-  // (e.g. distinct-IP flood), drop the oldest entries outright.
-  for (const [ip, ts] of cspReportLastSeen) {
-    if (now - ts >= CSP_REPORT_MIN_INTERVAL_MS) {
-      cspReportLastSeen.delete(ip);
-    }
-  }
-  if (cspReportLastSeen.size > CSP_REPORT_MAP_MAX_SIZE) {
-    const excess = cspReportLastSeen.size - CSP_REPORT_MAP_MAX_SIZE;
-    const oldestKeys = Array.from(cspReportLastSeen.keys()).slice(0, excess);
-    for (const key of oldestKeys) {
-      cspReportLastSeen.delete(key);
-    }
-  }
-}
-
+/**
+ * Public HTTP endpoint for receiving Content Security Policy (CSP) violation reports.
+ *
+ * Requirements & Constraints:
+ * - Method: POST
+ * - Content-Type: application/csp-report, application/reports+json, application/json
+ * - Payload Size Limit: Max 10 KB (10,240 bytes)
+ * - Rate Limit: 1 report per IP per 5 seconds
+ * - Payload Schema: Must contain valid CSP report directive properties
+ *
+ * HTTP Responses:
+ * - 204 No Content: Report successfully received and logged
+ * - 400 Bad Request: Missing, malformed, or invalid CSP report payload
+ * - 405 Method Not Allowed: Non-POST HTTP methods
+ * - 413 Payload Too Large: Content-Length or body byte size exceeds 10 KB limit
+ * - 415 Unsupported Media Type: Invalid or missing Content-Type header
+ * - 429 Too Many Requests: Rate limit exceeded for client IP
+ */
 exports.cspReport = onRequest(async (req, res) => {
-  if (req.method !== "POST") {
-    res.status(405).send("Method Not Allowed");
-    return;
-  }
-
-  const contentLength = Number(req.headers["content-length"] || 0);
-  if (contentLength > CSP_REPORT_MAX_BODY_BYTES) {
-    res.status(413).send("Payload Too Large");
-    return;
-  }
-
-  const ip = getClientIp(req);
-  const now = Date.now();
-
-  if (cspReportLastSeen.size > CSP_REPORT_MAP_MAX_SIZE) {
-    pruneCspReportMap(now);
-  }
-
-  const lastSeen = cspReportLastSeen.get(ip);
-  if (lastSeen && now - lastSeen < CSP_REPORT_MIN_INTERVAL_MS) {
-    res.status(429).send("Too Many Requests");
-    return;
-  }
-  cspReportLastSeen.set(ip, now);
-
-  logger.warn("CSP Violation Report", { report: req.body });
-  res.status(204).send();
+  await handleCspReport(req, res, logger, cspReportLastSeen);
 });
