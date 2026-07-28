@@ -19,6 +19,7 @@ import 'views/facility/ai_forecast_page.dart';
 import 'views/facility/active_indents_page.dart';
 import 'views/facility/daily_logging_page.dart';
 import 'views/facility/alerts_page.dart';
+import 'views/facility/wastage_report_page.dart';
 
 // Admin Pages
 import 'views/admin/admin_overview.dart';
@@ -112,6 +113,10 @@ final _router = GoRouter(
             path: '/facility/:id/alerts',
             builder: (context, state) =>
                 AlertsPage(facilityId: state.pathParameters['id']!)),
+        GoRoute(
+            path: '/facility/:id/wastage',
+            builder: (context, state) =>
+                WastageReportPage(facilityId: state.pathParameters['id']!)),
         GoRoute(
             path: '/facility/:id/chat',
             builder: (context, state) => AIChatPage(
