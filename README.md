@@ -242,8 +242,6 @@ high-concurrency performance:
 - [Node.js](https://nodejs.org/) (for Firebase Cloud Functions deployment)
 - Firebase Project configured on
   [Firebase Console](https://console.firebase.google.com/)
-- Google AI Studio API Key (for Gemini)
-- OpenRouteService API Key (for route calculations)
 
 ### Local Setup Steps
 
@@ -260,16 +258,20 @@ high-concurrency performance:
    flutter pub get
    ```
 
-3. **Configure the Environment:**
+   > [!NOTE]
+   > No `.env` file is required for local development. Firebase client
+   > configuration is already included through `lib/firebase_options.dart`.
+   > Cloud Functions use Firebase Secrets instead of environment files.
 
-   Create a `.env` file in the root of the project (and copy from
-   `.env.example` if needed):
+3. **Firebase Configuration**
 
-   ```ini
-   GEMINI_API_KEY=your_gemini_api_key
-   ORS_API_KEY=your_openroute_service_key
-   FIREBASE_PROJECT_ID=mediflow-92e6f
-   ```
+   No additional client configuration is required.
+
+   For Flutter Web, see **Step 6** for configuring the
+  `RECAPTCHA_SITE_KEY` using `--dart-define`.
+
+   If you are modifying Cloud Functions, configure the required Firebase
+   Secrets as described in the Troubleshooting section.
 
 4. **Initialize Firebase CLI (if modifying functions):**
 
@@ -311,20 +313,7 @@ high-concurrency performance:
 
 ## Troubleshooting
 
-### 1. `asset_does_not_exist` Error for `.env`
-
-If compilation fails with an error indicating `.env` does not exist:
-
-- Make sure you created a `.env` file in the root folder.
-- If you don't have API keys yet, you can create a placeholder `.env` with
-  dummy values:
-
-  ```ini
-  GEMINI_API_KEY=dummy_key
-  ORS_API_KEY=dummy_key
-  ```
-
-### 2. Web Map Fails to Render (CORS or Rendering mode)
+### 1. Web Map Fails to Render (CORS or Rendering mode)
 
 If the map does not display in your web browser:
 
@@ -334,7 +323,7 @@ If the map does not display in your web browser:
 - Verify that your OpenRouteService API key is valid and has not exceeded its
   request limit.
 
-### 3. Cloud Functions Authentication Errors
+### 2. Cloud Functions Authentication Errors
 
 If calling Gemini forecasts yields an authentication error:
 
