@@ -154,7 +154,7 @@ class FirebaseService {
               final pathSegments = doc.reference.path.split('/');
               final facId = pathSegments.length >= 2 ? pathSegments[1] : '';
               return InventoryItem.fromMap(
-                doc.data() as Map<String, dynamic>,
+                doc.data(),
                 doc.id,
                 facilityId: facId,
               );
