@@ -269,8 +269,8 @@ class _ActiveIndentsPageState extends ConsumerState<ActiveIndentsPage> {
         facilityName: facility?.name,
       );
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-            content: Text('Transfer requests CSV exported ✓')));
+        ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Transfer requests CSV exported ✓')));
       }
     } catch (e) {
       if (mounted) {
