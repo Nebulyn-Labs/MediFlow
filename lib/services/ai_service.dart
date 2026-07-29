@@ -7,16 +7,29 @@ import '../models/request.dart';
 import '../models/facility.dart';
 import '../models/inventory_item.dart';
 
+typedef GeminiCaller = Future<String> Function(
+  String prompt, {
+  String? imageBase64,
+  String? imageMimeType,
+});
+
 final aiServiceProvider = Provider<AIService>((ref) {
   return AIService(ref);
 });
 
 class AIService {
-  final Ref ref;
+  final Ref? ref;
+  final FirebaseFunctions functions;
+  final GeminiCaller? geminiCaller;
+
   bool _quotaExhausted = false;
   DateTime? _quotaResetTime;
 
-  AIService(this.ref);
+  AIService(
+  this.ref, {
+  FirebaseFunctions? functions,
+  this.geminiCaller,
+}) : functions = functions ?? FirebaseFunctions.instance;
 
   bool get _shouldUseLocal {
     if (!_quotaExhausted) return false;
@@ -42,8 +55,15 @@ class AIService {
   // Helper method to call the generic callGeminiSecure Cloud Function
   Future<String> _callGeminiBackend(String prompt,
       {String? imageBase64, String? imageMimeType}) async {
+        if (geminiCaller != null) {
+           return geminiCaller!(
+              prompt,
+              imageBase64: imageBase64,
+              imageMimeType: imageMimeType,
+           );
+          }
     final callable =
-        FirebaseFunctions.instance.httpsCallable('callGeminiSecure');
+        functions.httpsCallable('callGeminiSecure');
     final response = await callable.call({
       'prompt': prompt,
       if (imageBase64 != null) 'imageBase64': imageBase64,
@@ -136,7 +156,7 @@ class AIService {
     String? facilityId,
   }) async {
     try {
-      await FirebaseFunctions.instance.httpsCallable('logAIDecision').call({
+      await functions.httpsCallable('logAIDecision').call({
         'facilityId': facilityId,
         'medicineName': medicineName,
         'decisionType': 'demand_forecast',
@@ -191,7 +211,7 @@ class AIService {
     if (_shouldUseLocal) return _localSystemResponse(query, context, role);
     try {
       final callable =
-          FirebaseFunctions.instance.httpsCallable('getChatResponseSecure');
+         functions.httpsCallable('getChatResponseSecure');
       final response = await callable.call({
         'query': query,
         'context': context,
