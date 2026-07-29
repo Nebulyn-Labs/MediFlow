@@ -209,8 +209,8 @@ class _AdminOverviewState extends ConsumerState<AdminOverview> {
     if (daysToExpiry <= 90) return 'Expiring Soon';
 
     if (item.initialQuantity == 0) return 'Healthy';
+    if (item.isLowStock) return 'Low Stock';
     final ratio = item.remainingQuantity / item.initialQuantity;
-    if (ratio < 0.2) return 'Low Stock';
     if (ratio > 0.8) return 'Surplus';
     return 'Healthy';
   }

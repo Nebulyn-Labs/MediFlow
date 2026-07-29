@@ -18,6 +18,7 @@ class _AIChatPageState extends ConsumerState<AIChatPage> {
   final ScrollController _scrollController = ScrollController();
   final List<Map<String, String>> _messages = [];
   bool _isTyping = false;
+  bool _isLocalMode = false;
   Map<String, dynamic> _activeContext = {};
 
   @override
@@ -91,6 +92,7 @@ class _AIChatPageState extends ConsumerState<AIChatPage> {
         setState(() {
           _messages.add({'role': 'ai', 'content': response});
           _isTyping = false;
+          _isLocalMode = ref.read(aiServiceProvider).isLocalFallbackActive;
         });
         _scrollToBottom();
       }
@@ -134,9 +136,10 @@ class _AIChatPageState extends ConsumerState<AIChatPage> {
                         fontSize: 16,
                         fontWeight: FontWeight.w700,
                         color: MediColors.textPrimary)),
-                const Text(
-                  'gemini-flash-lite-latest',
-                  style: TextStyle(fontSize: 11, color: MediColors.textMuted),
+                Text(
+                  _isLocalMode ? 'Local Assistant Mode' : 'Powered by Gemini',
+                  style: const TextStyle(
+                      fontSize: 11, color: MediColors.textMuted),
                 ),
               ],
             ),
