@@ -12,6 +12,42 @@ import 'package:med_supply_prototype/constants/colors.dart';
 import '../shared/skeleton_loaders.dart';
 import '../../utils/retry_snackbar.dart';
 
+int _parseNumber(dynamic val) {
+  if (val == null) return 0;
+  final str = val.toString().trim();
+  final intVal = int.tryParse(str);
+  if (intVal != null) return intVal;
+  final doubleVal = double.tryParse(str);
+  if (doubleVal != null) return doubleVal.round();
+  return 0;
+}
+
+List<Map<String, dynamic>> parseVisionJson(String text) {
+  try {
+    int start = text.indexOf('[');
+    int end = text.lastIndexOf(']');
+    if (start != -1 && end != -1 && end > start) {
+      final jsonSub = text.substring(start, end + 1);
+      final decoded = jsonDecode(jsonSub);
+      if (decoded is List) {
+        return decoded.map<Map<String, dynamic>>((item) {
+          if (item is Map) {
+            return {
+              'medicine': item['medicine']?.toString().trim() ?? '',
+              'quantity': _parseNumber(item['quantity']),
+              'patients': _parseNumber(item['patients']),
+            };
+          }
+          return {'medicine': '', 'quantity': 0, 'patients': 0};
+        }).toList();
+      }
+    }
+  } catch (e) {
+    debugPrint('Error parsing vision JSON: $e');
+  }
+  return [];
+}
+
 class DailyLoggingPage extends ConsumerStatefulWidget {
   final String facilityId;
   const DailyLoggingPage({super.key, required this.facilityId});
@@ -42,6 +78,8 @@ class _DailyLoggingPageState extends ConsumerState<DailyLoggingPage>
   bool _isParsingImage = false;
   String? _imageParseResult;
   String? _imageParseError;
+  List<Map<String, dynamic>> _imageItems = [];
+  bool _isSubmittingImage = false;
 
   // --- History tab state ---
   List<DailyUsageLog> _historyLogs = [];
@@ -339,14 +377,21 @@ class _DailyLoggingPageState extends ConsumerState<DailyLoggingPage>
         _isParsingImage = true;
         _imageParseResult = null;
         _imageParseError = null;
+        _imageItems.clear();
       });
       final parsed = await ref.read(aiServiceProvider).parseImageWithVision(
           bytes,
           'Extract all medicine names, quantities, and patient counts from this image. Output JSON: [{"medicine": "string", "quantity": int, "patients": int}]');
       if (mounted) {
+        final extractedItems = parseVisionJson(parsed);
         setState(() {
           _imageParseResult = parsed;
+          _imageItems = extractedItems;
           _isParsingImage = false;
+          if (extractedItems.isEmpty) {
+            _imageParseError =
+                'Could not parse structured medicine data from the image output.';
+          }
         });
       }
     } catch (e) {
@@ -365,6 +410,60 @@ class _DailyLoggingPageState extends ConsumerState<DailyLoggingPage>
           ),
         );
       }
+    }
+  }
+
+  Future<void> _submitImageLogs() async {
+    if (_imageItems.isEmpty) return;
+
+    final invalidItems = _imageItems.where((item) {
+      final med = item['medicine']?.toString() ?? '';
+      final qty = item['quantity'] as int? ?? 0;
+      final pat = item['patients'] as int? ?? 0;
+      return med.isEmpty ||
+          !_availableMedicines.contains(med) ||
+          qty <= 0 ||
+          pat < 0;
+    }).toList();
+
+    if (invalidItems.isNotEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Cannot submit: ${invalidItems.length} item(s) are invalid or not present in inventory. Please fix or remove them.',
+          ),
+          backgroundColor: MediColors.error,
+        ),
+      );
+      return;
+    }
+
+    setState(() => _isSubmittingImage = true);
+    try {
+      for (var item in _imageItems) {
+        await ref.read(firebaseServiceProvider).logUsage(
+            facilityId: widget.facilityId,
+            date: _selectedDate,
+            medicineName: item['medicine'],
+            quantity: item['quantity'],
+            patients: item['patients']);
+      }
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('${_imageItems.length} logs saved ✓')));
+        setState(() {
+          _imageItems.clear();
+          _imageParseResult = null;
+        });
+        _fetchHistoryFirstPage();
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('Error: $e')));
+      }
+    } finally {
+      if (mounted) setState(() => _isSubmittingImage = false);
     }
   }
 
@@ -841,41 +940,222 @@ class _DailyLoggingPageState extends ConsumerState<DailyLoggingPage>
                     onPressed: _parseImage),
               ])),
         ],
-        if (_imageParseResult != null) ...[
+        if (_imageItems.isNotEmpty) ...[
+          const SizedBox(height: 20),
+          Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                  color: MediColors.successSubtle,
+                  borderRadius: BorderRadius.circular(10)),
+              child: Row(children: [
+                const Icon(Icons.check_circle_rounded,
+                    color: MediColors.success, size: 18),
+                const SizedBox(width: 10),
+                Expanded(
+                    child: Text(
+                        'Extracted ${_imageItems.length} entries from image. Review and edit before submitting.',
+                        style: const TextStyle(
+                            color: MediColors.success, fontSize: 13)))
+              ])),
           const SizedBox(height: 16),
           Container(
               width: double.infinity,
-              padding: const EdgeInsets.all(14),
               decoration: BoxDecoration(
-                  color: MediColors.successSubtle,
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: MediColors.successBorder)),
-              child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Row(children: [
-                      Icon(Icons.check_circle_rounded,
-                          color: MediColors.success, size: 18),
-                      SizedBox(width: 10),
-                      Text('AI Extraction Result',
-                          style: TextStyle(
-                              color: MediColors.success,
-                              fontWeight: FontWeight.w600,
-                              fontSize: 14)),
-                    ]),
-                    const SizedBox(height: 10),
-                    Container(
-                        width: double.infinity,
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                            color: MediColors.surface,
-                            borderRadius: BorderRadius.circular(8)),
-                        child: Text(_imageParseResult!,
-                            style: const TextStyle(
-                                color: MediColors.textSecondary,
-                                fontSize: 13,
-                                fontFamily: 'monospace'))),
-                  ])),
+                  color: MediColors.surface,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: MediColors.border)),
+              child: SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: DataTable(
+                      columns: const [
+                        DataColumn(label: Text('Medicine')),
+                        DataColumn(label: Text('Units')),
+                        DataColumn(label: Text('Patients')),
+                        DataColumn(label: Text(''))
+                      ],
+                      rows: _imageItems.map((item) {
+                        final currentMed = item['medicine']?.toString() ?? '';
+                        final isMedValid =
+                            _availableMedicines.contains(currentMed);
+                        final dropdownItems =
+                            List<String>.from(_availableMedicines);
+                        if (!isMedValid && currentMed.isNotEmpty) {
+                          dropdownItems.add(currentMed);
+                        }
+
+                        return DataRow(
+                            key: ObjectKey(item),
+                            cells: [
+                          DataCell(Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              if (!isMedValid) ...[
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 6, vertical: 2),
+                                  decoration: BoxDecoration(
+                                    color: MediColors.error
+                                        .withValues(alpha: 0.12),
+                                    borderRadius: BorderRadius.circular(6),
+                                    border: Border.all(
+                                        color: MediColors.error
+                                            .withValues(alpha: 0.3)),
+                                  ),
+                                  child: const Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Icon(Icons.warning_amber_rounded,
+                                          color: MediColors.error, size: 14),
+                                      SizedBox(width: 4),
+                                      Text(
+                                        'Not in inventory',
+                                        style: TextStyle(
+                                          color: MediColors.error,
+                                          fontSize: 11,
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                              ],
+                              DropdownButton<String>(
+                                value: dropdownItems.contains(currentMed)
+                                    ? currentMed
+                                    : null,
+                                underline: const SizedBox(),
+                                isDense: true,
+                                style: TextStyle(
+                                  color: isMedValid
+                                      ? MediColors.textPrimary
+                                      : MediColors.error,
+                                  fontWeight: isMedValid
+                                      ? FontWeight.w600
+                                      : FontWeight.bold,
+                                  fontSize: 14,
+                                ),
+                                items: dropdownItems.map((med) {
+                                  final isValid =
+                                      _availableMedicines.contains(med);
+                                  return DropdownMenuItem<String>(
+                                    value: med,
+                                    child: Text(
+                                      med,
+                                      style: TextStyle(
+                                        color: isValid
+                                            ? MediColors.textPrimary
+                                            : MediColors.error,
+                                        fontWeight: isValid
+                                            ? FontWeight.normal
+                                            : FontWeight.bold,
+                                      ),
+                                    ),
+                                  );
+                                }).toList(),
+                                onChanged: (newVal) {
+                                  if (newVal != null) {
+                                    setState(() {
+                                      item['medicine'] = newVal;
+                                    });
+                                  }
+                                },
+                              ),
+                            ],
+                          )),
+                          DataCell(SizedBox(
+                            width: 75,
+                            child: TextFormField(
+                              initialValue: item['quantity'].toString(),
+                              keyboardType: TextInputType.number,
+                              decoration: InputDecoration(
+                                isDense: true,
+                                contentPadding: const EdgeInsets.symmetric(
+                                    horizontal: 8, vertical: 8),
+                                border: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(6)),
+                              ),
+                              onChanged: (val) {
+                                item['quantity'] = _parseNumber(val);
+                                setState(() {});
+                              },
+                            ),
+                          )),
+                          DataCell(SizedBox(
+                            width: 75,
+                            child: TextFormField(
+                              initialValue: item['patients'].toString(),
+                              keyboardType: TextInputType.number,
+                              decoration: InputDecoration(
+                                isDense: true,
+                                contentPadding: const EdgeInsets.symmetric(
+                                    horizontal: 8, vertical: 8),
+                                border: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(6)),
+                              ),
+                              onChanged: (val) {
+                                item['patients'] = _parseNumber(val);
+                                setState(() {});
+                              },
+                            ),
+                          )),
+                          DataCell(IconButton(
+                            icon: const Icon(Icons.close_rounded,
+                                color: MediColors.error, size: 18),
+                            onPressed: () =>
+                                setState(() => _imageItems.remove(item)),
+                          )),
+                        ]);
+                      }).toList()))),
+          const SizedBox(height: 20),
+          Row(children: [
+            Expanded(
+              child: OutlinedButton.icon(
+                icon: const Icon(Icons.photo_camera_rounded),
+                label: const Text('Parse Another Image'),
+                onPressed: _isParsingImage ? null : _parseImage,
+              ),
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: FilledButton.icon(
+                icon: const Icon(Icons.save_rounded),
+                label: _isSubmittingImage
+                    ? const SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(
+                            color: Colors.white, strokeWidth: 2))
+                    : Text('Submit ${_imageItems.length} Logs'),
+                onPressed: _isSubmittingImage ? null : _submitImageLogs,
+              ),
+            ),
+          ]),
+        ],
+        if (_imageParseResult != null) ...[
+          const SizedBox(height: 16),
+          ExpansionTile(
+            title: const Text('View Raw AI Output',
+                style: TextStyle(fontSize: 13, color: MediColors.textMuted)),
+            children: [
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: MediColors.surface,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(
+                  _imageParseResult!,
+                  style: const TextStyle(
+                    color: MediColors.textSecondary,
+                    fontSize: 12,
+                    fontFamily: 'monospace',
+                  ),
+                ),
+              ),
+            ],
+          ),
         ],
       ]),
     );
