@@ -6,6 +6,7 @@ import '../models/daily_usage_log.dart';
 import '../models/request.dart';
 import '../models/facility.dart';
 import '../models/inventory_item.dart';
+import '../constants/inventory_thresholds.dart';
 
 final aiServiceProvider = Provider<AIService>((ref) {
   return AIService(ref);
@@ -27,6 +28,11 @@ class AIService {
     }
     return true;
   }
+
+  /// Public read-only view of fallback state, so UI (e.g. AIChatPage)
+  /// can accurately reflect whether responses are coming from Gemini
+  /// or the local rule-based engine.
+  bool get isLocalFallbackActive => _shouldUseLocal;
 
   void _handleQuotaError(String errorMsg) {
     if (errorMsg.contains('quota') ||
@@ -221,8 +227,11 @@ class AIService {
         final rem = item['remainingQuantity'] ?? 0;
         final tot = item['initialQuantity'] ?? 0;
         final name = item['medicineName'] ?? 'Unknown';
-        final status =
-            (tot > 0 && rem / tot < 0.2) ? "⚠️ CRITICAL" : "✅ STABLE";
+        final status = (tot > 0 &&
+                (rem / tot <= InventoryThresholds.lowStockPercentage ||
+                    rem <= InventoryThresholds.lowStockAbsolute))
+            ? "⚠️ CRITICAL"
+            : "✅ STABLE";
         buffer.writeln("• **$name**: $rem/$tot units ($status)");
       }
     } else {

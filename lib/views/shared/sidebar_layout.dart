@@ -190,14 +190,9 @@ class _SidebarLayoutState extends ConsumerState<SidebarLayout> {
                     builder: (context, snapshot) {
                       final inventory = snapshot.data ?? [];
                       final hasAlerts = inventory.any((i) {
-                        final pct = i.initialQuantity > 0
-                            ? i.remainingQuantity / i.initialQuantity
-                            : 0.0;
                         final daysLeft =
                             i.expiryDate.difference(DateTime.now()).inDays;
-                        return pct <= 0.20 ||
-                            i.remainingQuantity <= 500 ||
-                            daysLeft <= 30;
+                        return i.isLowStock || daysLeft <= 30;
                       });
 
                       return Column(

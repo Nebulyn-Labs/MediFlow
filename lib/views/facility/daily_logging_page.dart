@@ -121,7 +121,7 @@ class _DailyLoggingPageState extends ConsumerState<DailyLoggingPage>
           _isLoadingInventory = false;
         });
       }
-    } catch (e) {
+    } catch (_) {
       if (mounted) {
         setState(() {
           _inventoryError = 'Failed to load inventory. Please try again.';
