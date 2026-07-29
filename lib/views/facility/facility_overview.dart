@@ -220,7 +220,11 @@ class _FacilityOverviewState extends ConsumerState<FacilityOverview> {
           body: RefreshIndicator(
             onRefresh: () => ref
                 .read(firebaseServiceProvider)
-                .getInventoryOnce(widget.facilityId),
+                () async {
+                  // Trigger provider invalidation to refresh the live stream
+                  ref.invalidate(inventoryStreamProvider);
+                  await ref.read(firebaseServiceProvider).getInventoryOnce(facilityId);
+                },
             color: MediColors.primary,
             backgroundColor: MediColors.surface,
             strokeWidth: 2.5,
