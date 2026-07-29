@@ -805,16 +805,28 @@ async function executeTool(name, args, authInfo) {
  * Explicit audit hook for password reset requests.
  */
 exports.logPasswordResetRequest = onCall(async (request) => {
-  const { email } = request.data;
-  if (!email) throw new HttpsError("invalid-argument", "Email is required");
+  let { email, status } = request.data;
+  
+  if (!email || typeof email !== "string") {
+    throw new HttpsError("invalid-argument", "Email is required and must be a string");
+  }
+
+  email = email.trim().toLowerCase();
+
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || email.length > 1500) {
+    throw new HttpsError("invalid-argument", "Invalid email format");
+  }
+
+  const clientIp = request.rawRequest?.ip || "unknown";
 
   await checkRateLimit(
-    email,
+    clientIp,
     "logPasswordResetRequest",
     LIMITS.GENERAL
   );
 
   const eventId = `pwd_reset_${Date.now()}`;
+  const requestStatus = status === "failure" ? "failure" : "success";
 
   // Log to admin dashboard via audit_logs
   const db = admin.firestore();
@@ -824,8 +836,8 @@ exports.logPasswordResetRequest = onCall(async (request) => {
     action: "password_reset_requested",
     resourceType: "user",
     resourceId: email,
-    metadata: { email },
-    status: "success"
+    metadata: { email, ip: clientIp },
+    status: requestStatus
   });
 
   await auditEvent({
@@ -834,7 +846,7 @@ exports.logPasswordResetRequest = onCall(async (request) => {
     entityType: "user",
     entityId: email,
     actorId: "system",
-    metadata: { email }
+    metadata: { email, status: requestStatus, ip: clientIp }
   });
 
   return { ok: true };
