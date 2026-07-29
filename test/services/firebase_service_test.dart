@@ -7,7 +7,7 @@ import 'package:mocktail/mocktail.dart';
 class MockFirebaseAuth extends Mock implements FirebaseAuth {}
 
 void main() {
-  group('FirebaseService - logUsage', () {
+  group('FirebaseService', () {
     late FakeFirebaseFirestore fakeFirestore;
     late MockFirebaseAuth mockAuth;
     late FirebaseService firebaseService;
@@ -39,10 +39,30 @@ void main() {
           isA<Exception>().having(
             (e) => e.toString(),
             'message',
-            contains('Inventory document not found for medicine: $medicineName'),
+            contains(
+                'Inventory document not found for medicine: $medicineName'),
           ),
         ),
       );
+    });
+
+    test('updateFacility updates facility document', () async {
+      const facilityId = 'facility_123';
+      final testData = {'name': 'Updated Name', 'region': 'Updated Region'};
+      
+      // Seed a document first
+      await fakeFirestore.collection('facilities').doc(facilityId).set({
+        'name': 'Original Name',
+        'region': 'Original Region',
+        'email': 'test@test.com',
+      });
+
+      await firebaseService.updateFacility(facilityId, testData);
+
+      final doc = await fakeFirestore.collection('facilities').doc(facilityId).get();
+      expect(doc.data()?['name'], 'Updated Name');
+      expect(doc.data()?['region'], 'Updated Region');
+      expect(doc.data()?['email'], 'test@test.com');
     });
   });
 }

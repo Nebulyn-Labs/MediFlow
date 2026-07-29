@@ -60,18 +60,17 @@ By participating in this project, you agree to abide by our
    flutter pub get
    ```
 
-5. **Configure Environment Variables:**
-   Create a `.env` file in the root of the project:
+5. **Firebase Configuration:**
 
-   ```ini
-   GEMINI_API_KEY=your_gemini_api_key_here
-   ORS_API_KEY=your_openroute_service_key_here
-   FIREBASE_PROJECT_ID=mediflow-92e6f
+   Firebase client configuration is provided through
+   `lib/firebase_options.dart`.
+
+   For Flutter Web, provide the reCAPTCHA site key when running the app:
+
+   ```bash
+   flutter run -d chrome \
+     --dart-define=RECAPTCHA_SITE_KEY=your_recaptcha_site_key
    ```
-
-   *Note: If you do not have API keys, you can use placeholder values like
-   `dummy_key`. The application will still compile but some online features
-   will be disabled.*
 
 ### Firebase Configuration
 
@@ -89,6 +88,64 @@ If you plan to modify or deploy Cloud Functions or Firestore rules:
    firebase login
    firebase use mediflow-92e6f
    ```
+
+---
+
+## Firebase Emulator Setup
+
+### Prerequisites
+
+- Node.js
+- npm
+- Firebase CLI installation (`npm install -g firebase-tools`)
+
+### Repository setup
+
+- Install dependencies:
+
+  ```bash
+  cd functions
+  npm install
+  ```
+
+- Firebase client configuration is already provided through
+  `lib/firebase_options.dart`.
+
+- If you're developing or deploying Cloud Functions that use Gemini,
+  configure the required Firebase Secret:
+
+  ```bash
+  firebase functions:secrets:set GEMINI_API_KEY="your_actual_key"
+  ```
+
+- Login:
+
+  ```bash
+  firebase login
+  firebase use mediflow-92e6f
+  ```
+
+### Starting emulators
+
+```bash
+firebase emulators:start
+```
+
+### Backend development
+
+- **Available emulator services**: Hosting, Firestore, and Functions.
+- **Backend startup**: Run the emulators from the root directory.
+
+### Running tests
+
+```bash
+cd functions
+npm run test
+```
+
+### Sample data
+
+No seed process currently exists.
 
 ---
 

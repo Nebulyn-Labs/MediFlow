@@ -1,5 +1,6 @@
 import 'dart:math';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_auth/firebase_auth.dart' as auth;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter/foundation.dart';
@@ -7,6 +8,7 @@ import '../models/facility.dart';
 import '../models/inventory_item.dart';
 import '../models/daily_usage_log.dart';
 import '../models/request.dart';
+import '../models/audit_log.dart';
 import 'simulation_service.dart';
 
 final firebaseServiceProvider = Provider<FirebaseService>((ref) {
@@ -28,6 +30,17 @@ class FirebaseService {
   Future<auth.UserCredential> login(String email, String password) async {
     return await _auth.signInWithEmailAndPassword(
         email: email, password: password);
+  }
+
+  Future<void> sendPasswordReset(String email) async {
+    await _auth.sendPasswordResetEmail(email: email);
+    try {
+      final callable =
+          FirebaseFunctions.instance.httpsCallable('logPasswordResetRequest');
+      await callable.call({'email': email});
+    } catch (e) {
+      debugPrint('Failed to log password reset request: $e');
+    }
   }
 
   Future<void> signUpFacility({
@@ -79,6 +92,17 @@ class FirebaseService {
         .doc(facilityId)
         .set(facility.toMap());
 
+    // Register role in the 'users' collection for RBAC
+    final String? uid = _auth.currentUser?.uid;
+    if (uid != null) {
+      await _firestore.collection('users').doc(uid).set({
+        'email': email,
+        'role': 'facility_head',
+        'facilityId': facilityId,
+        'createdAt': FieldValue.serverTimestamp(),
+      });
+    }
+
     // 5. Run Initial Simulation (30 days)
     await _simulation.runFullSimulation(facilityId, facility.type);
   }
@@ -94,6 +118,10 @@ class FirebaseService {
     final doc = await _firestore.collection('facilities').doc(id).get();
     if (!doc.exists) return null;
     return Facility.fromMap(doc.data()!, doc.id);
+  }
+
+  Future<void> updateFacility(String id, Map<String, dynamic> data) async {
+    await _firestore.collection('facilities').doc(id).update(data);
   }
 
   // --- INVENTORY ---
@@ -149,7 +177,8 @@ class FirebaseService {
           'lastUpdated': Timestamp.now(),
         });
       } else {
-        throw Exception('Inventory document not found for medicine: $medicineName');
+        throw Exception(
+            'Inventory document not found for medicine: $medicineName');
       }
     });
   }
@@ -244,7 +273,8 @@ class FirebaseService {
       // 1. Update Inventory
       final invDoc = await transaction.get(invRef);
       if (!invDoc.exists) {
-        throw Exception('Inventory document not found for medicine: $medicineName');
+        throw Exception(
+            'Inventory document not found for medicine: $medicineName');
       }
 
       int remaining = invDoc.data()?['remainingQuantity'] ?? 0;
@@ -388,7 +418,15 @@ class FirebaseService {
             deleteFutures.add(l.reference.delete());
           }
         }
-        deleteFutures.add(doc.reference.delete());
+        if (collection == 'facilities' || collection == 'requests') {
+          final callable = FirebaseFunctions.instance.httpsCallable('adminDeleteResource');
+          deleteFutures.add(callable.call({
+            'resourceType': collection,
+            'resourceId': doc.id,
+          }));
+        } else {
+          deleteFutures.add(doc.reference.delete());
+        }
 
         if (deleteFutures.length >= 50) {
           await Future.wait(deleteFutures);
@@ -412,6 +450,15 @@ class FirebaseService {
         } catch (loginError) {
           debugPrint('Admin login failed during seed: $loginError');
         }
+      }
+
+      final String? adminUid = _auth.currentUser?.uid;
+      if (adminUid != null) {
+        await _firestore.collection('users').doc(adminUid).set({
+          'email': 'admin@mediflow.com',
+          'role': 'admin',
+          'createdAt': FieldValue.serverTimestamp(),
+        });
       }
 
       // 2. Clear old data to avoid duplicates and schema conflicts
@@ -598,6 +645,45 @@ class FirebaseService {
       return null; // Success
     } catch (e) {
       return 'Critical error: $e';
+    }
+  }
+
+  // --- AUDIT LOGS ---
+
+  Future<PaginatedAuditLogsResult> getPaginatedAuditLogs({
+    int pageSize = 20,
+    DocumentSnapshot? startAfter,
+    String? actionFilter,
+  }) async {
+    try {
+      Query query = _firestore.collection('audit_logs');
+      
+      if (actionFilter != null && actionFilter.isNotEmpty && actionFilter != 'All') {
+        query = query.where('action', isEqualTo: actionFilter);
+      }
+      
+      query = query.orderBy('timestamp', descending: true).limit(pageSize);
+
+      if (startAfter != null) {
+        query = query.startAfterDocument(startAfter);
+      }
+
+      final snapshot = await query.get();
+      final logs = snapshot.docs
+          .map((doc) =>
+              AuditLog.fromMap(doc.data() as Map<String, dynamic>, doc.id))
+          .toList();
+
+      final hasMore = snapshot.docs.length == pageSize;
+      final lastDocument = snapshot.docs.isNotEmpty ? snapshot.docs.last : null;
+
+      return PaginatedAuditLogsResult(
+        logs: logs,
+        lastDocument: lastDocument,
+        hasMore: hasMore,
+      );
+    } catch (e) {
+      throw Exception('Error fetching audit logs: $e');
     }
   }
 }
