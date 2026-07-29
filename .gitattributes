@@ -1,0 +1,45 @@
+# Set default behavior to auto-detect text files and normalize line endings to LF
+* text=auto eol=lf
+
+# Image formats
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.webp binary
+*.avif binary
+*.bmp binary
+*.tiff binary
+*.psd binary
+
+# Font formats
+*.ttf binary
+*.otf binary
+*.woff binary
+*.woff2 binary
+*.eot binary
+
+# Documents and Media
+*.pdf binary
+*.mp3 binary
+*.mp4 binary
+*.wav binary
+*.ogg binary
+*.mov binary
+
+# Archives and Executables
+*.zip binary
+*.gz binary
+*.tar binary
+*.7z binary
+*.jar binary
+*.aar binary
+*.so binary
+*.dll binary
+*.dylib binary
+*.exe binary
+
+# Security and Keys
+*.keystore binary
+*.jks binary
