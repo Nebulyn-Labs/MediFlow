@@ -114,7 +114,7 @@ class RoutingService {
   }
 
   Future<RouteResult> getRoute(LatLng start, LatLng end) async {
-    const String? orsKey = null;
+    final String? orsKey = null;
 
     // Validate coordinates before making external API requests.
     if (!_canGenerateRoute(start, end)) {

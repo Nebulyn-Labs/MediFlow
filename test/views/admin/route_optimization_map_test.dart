@@ -171,6 +171,9 @@ class FakeRoutingService implements RoutingService {
   Future<RouteResult> getMultiStopRoute(List<LatLng> stops) async {
     return customResult ?? RouteResult(points: stops);
   }
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 }
 
 class FakeAIService implements AIService {
