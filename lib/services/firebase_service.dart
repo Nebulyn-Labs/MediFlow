@@ -464,7 +464,8 @@ class FirebaseService {
           }
         }
         if (collection == 'facilities' || collection == 'requests') {
-          final callable = FirebaseFunctions.instance.httpsCallable('adminDeleteResource');
+          final callable =
+              FirebaseFunctions.instance.httpsCallable('adminDeleteResource');
           deleteFutures.add(callable.call({
             'resourceType': collection,
             'resourceId': doc.id,
@@ -702,11 +703,13 @@ class FirebaseService {
   }) async {
     try {
       Query query = _firestore.collection('audit_logs');
-      
-      if (actionFilter != null && actionFilter.isNotEmpty && actionFilter != 'All') {
+
+      if (actionFilter != null &&
+          actionFilter.isNotEmpty &&
+          actionFilter != 'All') {
         query = query.where('action', isEqualTo: actionFilter);
       }
-      
+
       query = query.orderBy('timestamp', descending: true).limit(pageSize);
 
       if (startAfter != null) {

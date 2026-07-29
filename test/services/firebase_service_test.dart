@@ -76,7 +76,7 @@ void main() {
     test('updateFacility updates facility document', () async {
       const facilityId = 'facility_123';
       final testData = {'name': 'Updated Name', 'region': 'Updated Region'};
-      
+
       // Seed a document first
       await fakeFirestore.collection('facilities').doc(facilityId).set({
         'name': 'Original Name',
@@ -86,7 +86,8 @@ void main() {
 
       await firebaseService.updateFacility(facilityId, testData);
 
-      final doc = await fakeFirestore.collection('facilities').doc(facilityId).get();
+      final doc =
+          await fakeFirestore.collection('facilities').doc(facilityId).get();
       expect(doc.data()?['name'], 'Updated Name');
       expect(doc.data()?['region'], 'Updated Region');
       expect(doc.data()?['email'], 'test@test.com');
@@ -122,7 +123,8 @@ void main() {
       expect(result.lastDocument, isNotNull);
     });
 
-    test('cursor advancement: lastDocument is set and can be passed as startAfter',
+    test(
+        'cursor advancement: lastDocument is set and can be passed as startAfter',
         () async {
       // Seed 4 medicines and verify the cursor returned on page 1 is usable.
       // Note: fake_cloud_firestore does not simulate startAfterDocument on
@@ -154,7 +156,8 @@ void main() {
       expect(page2.medicines, isA<List<InventoryItem>>());
     });
 
-    test('cursor advances: items returned on page 1 are distinct InventoryItems',
+    test(
+        'cursor advances: items returned on page 1 are distinct InventoryItems',
         () async {
       for (var i = 1; i <= 6; i++) {
         await _addMedicine(
@@ -171,7 +174,8 @@ void main() {
       final ids = page1.medicines.map((m) => m.id).toList();
       final uniqueIds = ids.toSet();
       expect(uniqueIds.length, ids.length,
-          reason: 'A single page must not contain duplicate medicine documents');
+          reason:
+              'A single page must not contain duplicate medicine documents');
     });
 
     test('hasMore is false when fewer than pageSize documents are returned',

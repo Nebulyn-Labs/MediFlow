@@ -107,7 +107,6 @@ class _RouteOptimizationMapState extends ConsumerState<RouteOptimizationMap> {
       debugPrint(
           'RouteOptimizationMap: Generated ${multiRoutes.length} multi-stop routes.');
       debugPrint('RouteOptimizationMap: Fetched ${routes.length} road routes.');
-
       setState(() {
         _multiStopRoutes = multiRoutes;
         _roadRoutes = routes;
