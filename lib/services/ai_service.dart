@@ -29,6 +29,11 @@ class AIService {
     return true;
   }
 
+  /// Public read-only view of fallback state, so UI (e.g. AIChatPage)
+  /// can accurately reflect whether responses are coming from Gemini
+  /// or the local rule-based engine.
+  bool get isLocalFallbackActive => _shouldUseLocal;
+
   void _handleQuotaError(String errorMsg) {
     if (errorMsg.contains('quota') ||
         errorMsg.contains('Quota') ||
