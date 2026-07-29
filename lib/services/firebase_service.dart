@@ -120,6 +120,10 @@ class FirebaseService {
     return Facility.fromMap(doc.data()!, doc.id);
   }
 
+  Future<void> updateFacility(String id, Map<String, dynamic> data) async {
+    await _firestore.collection('facilities').doc(id).update(data);
+  }
+
   // --- INVENTORY ---
 
   Stream<List<InventoryItem>> streamInventory(String facilityId) {
@@ -440,7 +444,7 @@ class FirebaseService {
       try {
         await _auth.createUserWithEmailAndPassword(
             email: 'admin@mediflow.com', password: 'password123');
-      } catch (e) {
+      } catch (_) {
         try {
           await _auth.signInWithEmailAndPassword(
               email: 'admin@mediflow.com', password: 'password123');
