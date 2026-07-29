@@ -180,38 +180,45 @@ class _SidebarLayoutState extends ConsumerState<SidebarLayout> {
                   ),
 
                   // Nav Items
-                  StreamBuilder<List<InventoryItem>>(
-                    stream:
-                        widget.role == 'facility' && widget.facilityId != null
-                            ? ref
-                                .watch(firebaseServiceProvider)
-                                .streamInventory(widget.facilityId!)
-                            : Stream.value([]),
-                    builder: (context, snapshot) {
-                      final inventory = snapshot.data ?? [];
-                      final hasAlerts = inventory.any((i) {
-                        final daysLeft =
-                            i.expiryDate.difference(DateTime.now()).inDays;
-                        return i.isLowStock || daysLeft <= 30;
-                      });
+                  Expanded(
+                    child: ScrollConfiguration(
+                      behavior: ScrollConfiguration.of(context)
+                          .copyWith(scrollbars: false),
+                      child: SingleChildScrollView(
+                        child: StreamBuilder<List<InventoryItem>>(
+                          stream: widget.role == 'facility' &&
+                                  widget.facilityId != null
+                              ? ref
+                                  .watch(firebaseServiceProvider)
+                                  .streamInventory(widget.facilityId!)
+                              : Stream.value([]),
+                          builder: (context, snapshot) {
+                            final inventory = snapshot.data ?? [];
+                            final hasAlerts = inventory.any((i) {
+                              final daysLeft = i.expiryDate
+                                  .difference(DateTime.now())
+                                  .inDays;
+                              return i.isLowStock || daysLeft <= 30;
+                            });
 
-                      return Column(
-                        children: List.generate(items.length, (i) {
-                          final isSelected = i == selectedIndex;
-                          final isAlertTab = widget.role == 'facility' &&
-                              i == 3; // Alerts index
-                          return _buildNavItem(
-                            items[i],
-                            isSelected,
-                            () => _onItemTapped(i, context),
-                            showBadge: isAlertTab && hasAlerts,
-                          );
-                        }),
-                      );
-                    },
+                            return Column(
+                              children: List.generate(items.length, (i) {
+                                final isSelected = i == selectedIndex;
+                                final isAlertTab = widget.role == 'facility' &&
+                                    i == 3; // Alerts index
+                                return _buildNavItem(
+                                  items[i],
+                                  isSelected,
+                                  () => _onItemTapped(i, context),
+                                  showBadge: isAlertTab && hasAlerts,
+                                );
+                              }),
+                            );
+                          },
+                        ),
+                      ),
+                    ),
                   ),
-
-                  const Spacer(),
 
                   // Logout
                   _buildNavItem(
@@ -322,8 +329,12 @@ class _SidebarLayoutState extends ConsumerState<SidebarLayout> {
                         ),
                     ],
                   ),
-                  if (_isExpanded) ...[
-                    const SizedBox(width: 14),
+                  AnimatedContainer(
+                    duration: const Duration(milliseconds: 200),
+                    curve: Curves.easeOutCubic,
+                    width: _isExpanded ? 14 : 0,
+                  ),
+                  if (_isExpanded)
                     Expanded(
                       child: Text(
                         item.label,
@@ -341,7 +352,6 @@ class _SidebarLayoutState extends ConsumerState<SidebarLayout> {
                         maxLines: 1,
                       ),
                     ),
-                  ],
                 ],
               ),
             ),

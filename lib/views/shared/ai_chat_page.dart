@@ -4,6 +4,22 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../services/ai_service.dart';
 import '../../services/firebase_service.dart';
 import 'package:med_supply_prototype/constants/colors.dart';
+import '../../models/inventory_item.dart';
+
+List<Map<String, dynamic>> buildInventoryContextList(List<InventoryItem> inventory) {
+  return inventory
+      .map((i) => {
+            "medicineName": i.medicineName,
+            "batchId": i.batchId,
+            "arrivalDate": i.arrivalDate.toIso8601String(),
+            "expiryDate": i.expiryDate.toIso8601String(),
+            "initialQuantity": i.initialQuantity,
+            "remainingQuantity": i.remainingQuantity,
+            "unit": i.unit,
+            if (i.facilityId != null) "facilityId": i.facilityId,
+          })
+      .toList();
+}
 
 class AIChatPage extends ConsumerStatefulWidget {
   final String? facilityId;
@@ -39,16 +55,7 @@ class _AIChatPageState extends ConsumerState<AIChatPage> {
             _activeContext = {
               "system_state": "LIVE",
               "data_sources": ["Firestore", "Local Logs"],
-              "current_inventory": inventory
-                  .map((i) => {
-                        "medicineName": i.medicineName,
-                        "batchId": i.batchId,
-                        "expiryDate": i.expiryDate.toIso8601String(),
-                        "initialQuantity": i.initialQuantity,
-                        "remainingQuantity": i.remainingQuantity,
-                        "unit": i.unit,
-                      })
-                  .toList(),
+              "current_inventory": buildInventoryContextList(inventory),
               "historical_data": logs
                   .map((l) => {
                         "date": l.date.toIso8601String(),
@@ -344,6 +351,7 @@ class _AIChatPageState extends ConsumerState<AIChatPage> {
                 : MarkdownBody(
                     data: text,
                     selectable: true,
+                    imageBuilder: (uri, title, alt) => const SizedBox.shrink(),
                     styleSheet: MarkdownStyleSheet(
                       p: const TextStyle(
                         color: MediColors.textPrimary,
