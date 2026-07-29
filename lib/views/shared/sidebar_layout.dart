@@ -40,10 +40,12 @@ class _SidebarLayoutState extends ConsumerState<SidebarLayout> {
       if (location.endsWith('/logging')) return 1;
       if (location.endsWith('/forecast')) return 2;
       if (location.endsWith('/alerts')) return 3;
-      if (location.endsWith('/indent')) return 4;
-      if (location.endsWith('/active-indents')) return 4;
-      if (location.endsWith('/chat')) return 5;
-      if (location.endsWith('/help')) return 6;
+      if (location.endsWith('/wastage')) return 4;
+      if (location.endsWith('/indent')) return 5;
+      if (location.endsWith('/active-indents')) return 5;
+      if (location.endsWith('/chat')) return 6;
+      if (location.endsWith('/profile')) return 7;
+      if (location.endsWith('/help')) return 8;
       return 0;
     } else {
       if (location.endsWith('/overview')) return 0;
@@ -73,12 +75,18 @@ class _SidebarLayoutState extends ConsumerState<SidebarLayout> {
           context.go('/facility/${widget.facilityId}/alerts');
           break;
         case 4:
-          context.go('/facility/${widget.facilityId}/indent');
+          context.go('/facility/${widget.facilityId}/wastage');
           break;
         case 5:
-          context.go('/facility/${widget.facilityId}/chat');
+          context.go('/facility/${widget.facilityId}/indent');
           break;
         case 6:
+          context.go('/facility/${widget.facilityId}/chat');
+          break;
+        case 7:
+          context.go('/facility/${widget.facilityId}/profile');
+          break;
+        case 8:
           context.go('/facility/${widget.facilityId}/help');
           break;
       }
@@ -115,8 +123,10 @@ class _SidebarLayoutState extends ConsumerState<SidebarLayout> {
           _NavItem(Icons.edit_calendar_rounded, 'Daily Log'),
           _NavItem(Icons.auto_graph_rounded, 'Forecast'),
           _NavItem(Icons.notifications_active_rounded, 'Alerts'),
+          _NavItem(Icons.delete_outline_rounded, 'Wastage Report'),
           _NavItem(Icons.receipt_long_rounded, 'Requests'),
           _NavItem(Icons.smart_toy_rounded, 'AI Chat'),
+          _NavItem(Icons.person_outline_rounded, 'Profile'),
           _NavItem(Icons.help_outline_rounded, 'Help'),
         ]
       : [
