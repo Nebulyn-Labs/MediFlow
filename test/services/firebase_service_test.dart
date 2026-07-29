@@ -49,7 +49,7 @@ void main() {
     test('updateFacility updates facility document', () async {
       const facilityId = 'facility_123';
       final testData = {'name': 'Updated Name', 'region': 'Updated Region'};
-      
+
       // Seed a document first
       await fakeFirestore.collection('facilities').doc(facilityId).set({
         'name': 'Original Name',
@@ -59,7 +59,8 @@ void main() {
 
       await firebaseService.updateFacility(facilityId, testData);
 
-      final doc = await fakeFirestore.collection('facilities').doc(facilityId).get();
+      final doc =
+          await fakeFirestore.collection('facilities').doc(facilityId).get();
       expect(doc.data()?['name'], 'Updated Name');
       expect(doc.data()?['region'], 'Updated Region');
       expect(doc.data()?['email'], 'test@test.com');

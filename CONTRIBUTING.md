@@ -262,9 +262,8 @@ We expect bug fixes and features to be accompanied by tests where applicable.
 
 - Write clear unit, widget, or integration tests to verify your implementation.
 
-- We also enforce a minimum test coverage baseline in CI. 
+- We also enforce a minimum test coverage baseline in CI.
 See [COVERAGE.md](COVERAGE.md) for instructions on checking your coverage locally before opening a PR.
-
 
 ---
 

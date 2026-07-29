@@ -102,8 +102,7 @@ class _AdminOverviewState extends ConsumerState<AdminOverview> {
     await Future.wait(
       facs.map((f) async {
         try {
-          final inv =
-              await firebaseService.getInventoryOnce(f.id);
+          final inv = await firebaseService.getInventoryOnce(f.id);
 
           double totalInitial = 0;
           double totalRemaining = 0;
@@ -117,8 +116,7 @@ class _AdminOverviewState extends ConsumerState<AdminOverview> {
           health[f.id] =
               totalInitial == 0 ? 100.0 : (totalRemaining / totalInitial) * 100;
 
-          final fAlerts =
-              await aiService.generateSmartAlerts(inv);
+          final fAlerts = await aiService.generateSmartAlerts(inv);
           alerts[f.id] = fAlerts.length;
         } catch (e) {
           debugPrint(
@@ -128,8 +126,7 @@ class _AdminOverviewState extends ConsumerState<AdminOverview> {
       }),
     );
 
-    _requestsSub =
-        firebaseService.streamRequests(null).listen(
+    _requestsSub = firebaseService.streamRequests(null).listen(
       (reqs) {
         if (!mounted) return;
         int shortage = 0;
@@ -373,8 +370,10 @@ class _AdminOverviewState extends ConsumerState<AdminOverview> {
                           spacing: 20,
                           runSpacing: 20,
                           children: [
-                            _buildKpiCard('TOTAL FACILITIES',
-                                '${_facilities.length}', Icons.business_rounded),
+                            _buildKpiCard(
+                                'TOTAL FACILITIES',
+                                '${_facilities.length}',
+                                Icons.business_rounded),
                             _buildKpiCard(
                                 'OPEN SHORTAGE REQUESTS',
                                 '$_openShortageRequests',
@@ -382,8 +381,7 @@ class _AdminOverviewState extends ConsumerState<AdminOverview> {
                                 isAlert: true),
                             _buildKpiCard('SURPLUS / EXPIRY OFFERS',
                                 '$_surplusOffers', Icons.swap_horiz_rounded,
-                                isAlert: false,
-                                iconColor: MediColors.warning),
+                                isAlert: false, iconColor: MediColors.warning),
                             _buildKpiCard(
                                 'PENDING INDENT APPROVALS',
                                 '$_pendingIndents',

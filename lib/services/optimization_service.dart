@@ -146,7 +146,9 @@ class OptimizationService {
   }) {
     List<TransferRecommendation> recommendations = [];
     final Distance distanceCalc = const Distance();
-    final facilityById = {for (final facility in facilities) facility.id: facility};
+    final facilityById = {
+      for (final facility in facilities) facility.id: facility
+    };
 
     // 1. Group needs (shortage or regular indent) by medicine
     final pendingIndents = <MedRequest>[];

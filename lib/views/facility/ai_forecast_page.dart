@@ -314,8 +314,7 @@ class _AIForecastPageState extends ConsumerState<AIForecastPage> {
                           const SizedBox(height: 8),
                           Text('${_forecastResult!['reasoning']}',
                               style: const TextStyle(
-                                  color: MediColors.textPrimary,
-                                  height: 1.6)),
+                                  color: MediColors.textPrimary, height: 1.6)),
                         ],
                       ]),
                 ),
