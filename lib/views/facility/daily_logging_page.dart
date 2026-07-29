@@ -727,8 +727,10 @@ class _DailyLoggingPageState extends ConsumerState<DailyLoggingPage>
                                 DataCell(IconButton(
                                     icon: const Icon(Icons.close_rounded,
                                         color: MediColors.error, size: 18),
-                                    onPressed: () => setState(
-                                        () => _csvItems.remove(item)))),
+                                    onPressed: _isSubmittingCsv
+                                        ? null
+                                        : () => setState(
+                                            () => _csvItems.remove(item)))),
                               ]))
                           .toList()))),
           const SizedBox(height: 20),
@@ -828,8 +830,10 @@ class _DailyLoggingPageState extends ConsumerState<DailyLoggingPage>
                                 DataCell(IconButton(
                                     icon: const Icon(Icons.close_rounded,
                                         color: MediColors.error, size: 18),
-                                    onPressed: () => setState(
-                                        () => _scannedItems.remove(item)))),
+                                    onPressed: _isSubmittingQr
+                                        ? null
+                                        : () => setState(
+                                            () => _scannedItems.remove(item)))),
                               ]))
                           .toList()))),
           const SizedBox(height: 20),
@@ -1102,8 +1106,10 @@ class _DailyLoggingPageState extends ConsumerState<DailyLoggingPage>
                           DataCell(IconButton(
                             icon: const Icon(Icons.close_rounded,
                                 color: MediColors.error, size: 18),
-                            onPressed: () =>
-                                setState(() => _imageItems.remove(item)),
+                            onPressed: _isSubmittingImage
+                                ? null
+                                : () => setState(
+                                    () => _imageItems.remove(item)),
                           )),
                         ]);
                       }).toList()))),
