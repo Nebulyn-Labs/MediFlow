@@ -18,7 +18,7 @@ void main() {
       firebaseService = FirebaseService(fakeFirestore, mockAuth);
     });
 
-    test('auto-seeds inventory document when it is missing during logUsage', () async {
+    test('throws exception when inventory document is missing', () async {
       const facilityId = 'facility_123';
       const medicineName = 'NonExistentMeds';
       final date = DateTime.now();
@@ -26,23 +26,20 @@ void main() {
       const patients = 2;
 
       // Note: We intentionally do NOT create the inventory document in fakeFirestore beforehand.
-      await firebaseService.logUsage(
-        facilityId: facilityId,
-        date: date,
-        medicineName: medicineName,
-        quantity: quantity,
-        patients: patients,
+      expect(
+        () => firebaseService.logUsage(
+          facilityId: facilityId,
+          date: date,
+          medicineName: medicineName,
+          quantity: quantity,
+          patients: patients,
+        ),
+        throwsA(isA<Exception>().having(
+            (e) => e.toString(),
+            'message',
+            contains(
+                'Inventory document not found for medicine: $medicineName'))),
       );
-
-      // Verify that the inventory document was auto-seeded as expected for bulk imports
-      final invSnap = await fakeFirestore
-          .collection('inventory')
-          .doc(facilityId)
-          .collection('medicines')
-          .doc('nonexistentmeds')
-          .get();
-      expect(invSnap.exists, isTrue);
-      expect(invSnap.data()!['medicineName'], equals(medicineName));
     });
   });
 }

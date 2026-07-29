@@ -273,10 +273,15 @@ class _DailyLoggingPageState extends ConsumerState<DailyLoggingPage>
     if (_csvItems.isEmpty) return;
     setState(() => _isSubmittingCsv = true);
     try {
-      await ref.read(firebaseServiceProvider).logUsageBatch(
-          facilityId: widget.facilityId,
-          date: _selectedDate,
-          items: _csvItems);
+      for (var item in _csvItems) {
+        await ref.read(firebaseServiceProvider).logUsage(
+              facilityId: widget.facilityId,
+              date: _selectedDate,
+              medicineName: item['medicine'].toString(),
+              quantity: (item['quantity'] as num? ?? 0).toInt(),
+              patients: (item['patients'] as num? ?? 0).toInt(),
+            );
+      }
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(content: Text('${_csvItems.length} logs saved ✓')));
@@ -320,10 +325,15 @@ class _DailyLoggingPageState extends ConsumerState<DailyLoggingPage>
     if (_scannedItems.isEmpty) return;
     setState(() => _isSubmittingQr = true);
     try {
-      await ref.read(firebaseServiceProvider).logUsageBatch(
-          facilityId: widget.facilityId,
-          date: _selectedDate,
-          items: _scannedItems);
+      for (var item in _scannedItems) {
+        await ref.read(firebaseServiceProvider).logUsage(
+              facilityId: widget.facilityId,
+              date: _selectedDate,
+              medicineName: item['medicine'].toString(),
+              quantity: (item['quantity'] as num? ?? 0).toInt(),
+              patients: (item['patients'] as num? ?? 0).toInt(),
+            );
+      }
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(content: Text('${_scannedItems.length} logs saved ✓')));

@@ -239,146 +239,68 @@ class FirebaseService {
     required int quantity,
     required int patients,
   }) async {
-    return logUsageBatch(
-      facilityId: facilityId,
-      date: date,
-      items: [
-        {'medicine': medicineName, 'quantity': quantity, 'patients': patients}
-      ],
-    );
-  }
-
-  Future<void> logUsageBatch({
-    required String facilityId,
-    required DateTime date,
-    required List<Map<String, dynamic>> items,
-  }) async {
-    if (items.isEmpty) return;
-    // Guard against Firestore's 500-operation limit per transaction by chunking large imports
-    const int maxBatchSize = 150;
-    for (int i = 0; i < items.length; i += maxBatchSize) {
-      final end = (i + maxBatchSize < items.length)
-          ? i + maxBatchSize
-          : items.length;
-      final chunk = items.sublist(i, end);
-      await _logUsageBatchChunk(
-        facilityId: facilityId,
-        date: date,
-        items: chunk,
-      );
-    }
-  }
-
-  Future<void> _logUsageBatchChunk({
-    required String facilityId,
-    required DateTime date,
-    required List<Map<String, dynamic>> items,
-  }) async {
     final dateStr =
         "${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}";
+    final medicineId = medicineName.toLowerCase().replaceAll(' ', '_');
     final logRef = _firestore
         .collection('daily_usage_logs')
         .doc(facilityId)
         .collection('logs')
         .doc(dateStr);
+    final invRef = _firestore
+        .collection('inventory')
+        .doc(facilityId)
+        .collection('medicines')
+        .doc(medicineId);
 
     await _firestore.runTransaction((transaction) async {
-      // 1. All GET operations must happen before writes in Firestore transactions
+      // 1. Update Inventory
+      final invDoc = await transaction.get(invRef);
+      if (!invDoc.exists) {
+        throw Exception(
+            'Inventory document not found for medicine: $medicineName');
+      }
+
+      final data = invDoc.data() as Map<String, dynamic>? ?? {};
+      int remaining = (data['remainingQuantity'] as num? ?? 0).toInt();
+      int actualDeduction = min(quantity, remaining);
+      transaction.update(invRef, {
+        'remainingQuantity': max(0, remaining - actualDeduction),
+        'lastUpdated': Timestamp.now(),
+      });
+
+      // 2. Update Daily Log
       final logDoc = await transaction.get(logRef);
-      final Map<String, DocumentSnapshot> invDocs = {};
-      final Map<String, DocumentReference> invRefs = {};
-
-      for (var item in items) {
-        final medName = item['medicine'].toString().trim();
-        final medicineId = medName.toLowerCase().replaceAll(' ', '_');
-        final invRef = _firestore
-            .collection('inventory')
-            .doc(facilityId)
-            .collection('medicines')
-            .doc(medicineId);
-        invRefs[medName] = invRef;
-        if (!invDocs.containsKey(medName)) {
-          invDocs[medName] = await transaction.get(invRef);
-        }
-      }
-
-      // 2. Perform all updates/sets on inventory items
-      for (var item in items) {
-        final medName = item['medicine'].toString().trim();
-        final int quantity = (item['quantity'] as num? ?? 0).toInt();
-        final invRef = invRefs[medName]!;
-        final invDoc = invDocs[medName]!;
-
-        if (invDoc.exists) {
-          final data = invDoc.data() as Map<String, dynamic>? ?? {};
-          int remaining = (data['remainingQuantity'] as num? ?? 0).toInt();
-          int actualDeduction = min(quantity, remaining);
-          transaction.update(invRef, {
-            'remainingQuantity': max(0, remaining - actualDeduction),
-            'lastUpdated': Timestamp.now(),
-          });
-        } else {
-          // TODO: replace with proper inventory onboarding flow to allow specifying Batch ID and dates.
-          // Currently auto-seeding a baseline stock so bulk CSV imports of new medicines do not abort.
-          final int initialQty = max(500, quantity + 200);
-          final int uniqueSuffix = (DateTime.now().microsecondsSinceEpoch + medName.hashCode).abs() % 1000000;
-          final String uniqueBatchId = 'B-${DateTime.now().millisecondsSinceEpoch}-$uniqueSuffix';
-
-          transaction.set(invRef, {
-            'medicineName': medName,
-            'batchId': uniqueBatchId,
-            'initialQuantity': initialQty,
-            'remainingQuantity': max(0, initialQty - quantity),
-            'unit': 'units',
-            'arrivalDate': Timestamp.now(),
-            'expiryDate': Timestamp.fromDate(
-                DateTime.now().add(const Duration(days: 365))),
-            'lastUpdated': Timestamp.now(),
-          });
-        }
-      }
-
-      // 3. Update or set Daily Log (creating modifiable copies for Web safety)
-      List<Map<String, dynamic>> updatedMedicines = [];
-      int totalPatients = 0;
-
       if (logDoc.exists) {
-        final data = logDoc.data() ?? {};
-        totalPatients = (data['totalPatients'] as num? ?? 0).toInt();
-        final existingList = data['medicines'] as List<dynamic>? ?? [];
-        updatedMedicines = existingList
+        final logData = logDoc.data() ?? {};
+        int totalPatients = (logData['totalPatients'] as num? ?? 0).toInt();
+        List<dynamic> medicines = logData['medicines'] ?? [];
+        List<Map<String, dynamic>> updatedMedicines = medicines
             .map((m) => Map<String, dynamic>.from(m as Map))
             .toList();
-      }
 
-      for (var item in items) {
-        final medName = item['medicine'].toString().trim();
-        final int quantity = (item['quantity'] as num? ?? 0).toInt();
-        final int patients = (item['patients'] as num? ?? 0).toInt();
-
-        totalPatients += patients;
-        int index =
-            updatedMedicines.indexWhere((m) => m['medicineName'] == medName);
+        int index = updatedMedicines
+            .indexWhere((m) => m['medicineName'] == medicineName);
         if (index >= 0) {
           int currentUnits =
               (updatedMedicines[index]['unitsDistributed'] as num? ?? 0).toInt();
           updatedMedicines[index]['unitsDistributed'] = currentUnits + quantity;
         } else {
           updatedMedicines.add(
-              {'medicineName': medName, 'unitsDistributed': quantity});
+              {'medicineName': medicineName, 'unitsDistributed': quantity});
         }
-      }
 
-      if (logDoc.exists) {
         transaction.update(logRef, {
           'medicines': updatedMedicines,
-          'totalPatients': totalPatients,
+          'totalPatients': totalPatients + patients,
         });
       } else {
         transaction.set(logRef, {
           'date': Timestamp.fromDate(date),
-          'medicines': updatedMedicines,
-          'totalPatients': totalPatients,
+          'medicines': [
+            {'medicineName': medicineName, 'unitsDistributed': quantity}
+          ],
+          'totalPatients': patients,
         });
       }
     });
