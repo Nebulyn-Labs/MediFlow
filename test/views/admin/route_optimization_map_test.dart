@@ -157,7 +157,7 @@ class FakeOptimizationService implements OptimizationService {
   }
 }
 
-class FakeRoutingService implements RoutingService {
+class FakeRoutingService extends RoutingService {
   final RouteResult? customResult;
 
   FakeRoutingService({this.customResult});
@@ -171,9 +171,6 @@ class FakeRoutingService implements RoutingService {
   Future<RouteResult> getMultiStopRoute(List<LatLng> stops) async {
     return customResult ?? RouteResult(points: stops);
   }
-
-  @override
-  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 }
 
 class FakeAIService implements AIService {
