@@ -983,9 +983,7 @@ class _DailyLoggingPageState extends ConsumerState<DailyLoggingPage>
                           dropdownItems.add(currentMed);
                         }
 
-                        return DataRow(
-                            key: ObjectKey(item),
-                            cells: [
+                        return DataRow(key: ObjectKey(item), cells: [
                           DataCell(Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
