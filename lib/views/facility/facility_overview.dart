@@ -255,47 +255,56 @@ class _FacilityOverviewState extends ConsumerState<FacilityOverview> {
                       OutlinedButton.icon(
                         onPressed: _isSimulating
                             ? null
-                            : () async {
-                                setState(() => _isSimulating = true);
+                              : () async {
+                                  setState(() => _isSimulating = true);
 
-                                final firebase =
-                                    ref.read(firebaseServiceProvider);
-                                final fac = await firebase
-                                    .getFacility(widget.facilityId);
-                                if (fac == null) {
-                                  if (mounted) {
-                                    setState(() => _isSimulating = false);
-                                  }
-                                  return;
-                                }
-
-                                if (context.mounted) {
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                      const SnackBar(
-                                          content: Text(
-                                              'Simulating 30 days of usage data...')));
-                                }
-                                try {
-                                  await ref
-                                      .read(simulationServiceProvider)
-                                      .runFullSimulation(
-                                          widget.facilityId, fac.type);
                                   if (context.mounted) {
                                     ScaffoldMessenger.of(context).showSnackBar(
                                         const SnackBar(
                                             content: Text(
-                                                'Simulation complete! Analytics ready.')));
+                                                'Simulating 30 days of usage data...')));
                                   }
-                                } catch (_) {
-                                  if (context.mounted) {
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                        const SnackBar(
+                                  try {
+                                    final firebase =
+                                        ref.read(firebaseServiceProvider);
+                                    final fac = await firebase
+                                        .getFacility(widget.facilityId);
+                                    if (fac == null) {
+                                      if (context.mounted) {
+                                        ScaffoldMessenger.of(context)
+                                            .showSnackBar(const SnackBar(
                                           content: Text(
                                               'Simulation failed. Please try again.'),
                                           backgroundColor: MediColors.error,
                                         ));
+                                      }
+                                      if (mounted) {
+                                        setState(
+                                            () => _isSimulating = false);
+                                      }
+                                      return;
+                                    }
+
+                                    await ref
+                                        .read(simulationServiceProvider)
+                                        .runFullSimulation(
+                                            widget.facilityId, fac.type);
+                                    if (context.mounted) {
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                          const SnackBar(
+                                              content: Text(
+                                                  'Simulation complete! Analytics ready.')));
+                                    }
+                                  } catch (_) {
+                                    if (context.mounted) {
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                          const SnackBar(
+                                            content: Text(
+                                                'Simulation failed. Please try again.'),
+                                            backgroundColor: MediColors.error,
+                                          ));
+                                    }
                                   }
-                                }
                                 if (mounted) {
                                   setState(() => _isSimulating = false);
                                 }
