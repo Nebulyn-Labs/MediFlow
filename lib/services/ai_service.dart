@@ -245,32 +245,38 @@ class AIService {
   // ─── SMART ALERTS ──────────────────────────────────────────────
   Future<List<Map<String, dynamic>>> generateSmartAlerts(
       List<InventoryItem> inventory) async {
-    final local = inventory
-        .where((i) => i.isLowStock)
-        .map((i) => {
-              "type": "low_stock",
-              "severity": "red",
-              "title": i.medicineName,
-              "batchId": i.batchId,
-              "remainingQuantity": i.remainingQuantity,
-              "remainingPercentage":
-                  ((i.remainingQuantity / i.initialQuantity) * 100).round(),
-              "burnRate": "24/day",
-              "depletesInDays": (i.remainingQuantity / 24).round(),
-            })
-        .toList();
-
-    final now = DateTime.now();
+    final local = <Map<String, dynamic>>[];
     for (var i in inventory) {
-      final daysToExpiry = i.expiryDate.difference(now).inDays;
-      if (daysToExpiry <= 90) {
+      if (i.status == ItemStatus.expired) {
         local.add({
-          "type": "expiry",
-          "severity": daysToExpiry <= 30 ? "red" : "yellow",
+          "type": "expired",
+          "severity": "red",
           "title": i.medicineName,
           "batchId": i.batchId,
           "remainingQuantity": i.remainingQuantity,
-          "expiresInDays": daysToExpiry,
+          "expiresInDays": i.daysToExpiry,
+        });
+      } else if (i.status == ItemStatus.lowStock) {
+        local.add({
+          "type": "low_stock",
+          "severity": "red",
+          "title": i.medicineName,
+          "batchId": i.batchId,
+          "remainingQuantity": i.remainingQuantity,
+          "remainingPercentage": (i.remainingPercentage * 100).round(),
+          "burnRate": "24/day",
+          "depletesInDays": (i.remainingQuantity / 24).round(),
+        });
+      } else if (i.status == ItemStatus.expiringSoon ||
+          i.status == ItemStatus.wastageRisk) {
+        local.add({
+          "type":
+              i.status == ItemStatus.wastageRisk ? "wastage_risk" : "expiry",
+          "severity": "yellow",
+          "title": i.medicineName,
+          "batchId": i.batchId,
+          "remainingQuantity": i.remainingQuantity,
+          "expiresInDays": i.daysToExpiry,
         });
       }
     }

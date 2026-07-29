@@ -39,12 +39,11 @@ void main() {
       expect(item.hasAlert, isTrue);
     });
 
-    test('item expiring in 0 days is expired, not expiringSoon', () {
+    test('item expiring today (0 days left) is not yet expired', () {
       // daysUntilExpiry == 0 means the expiry date is today; difference
-      // in inDays rounds down, so this is 0 – still >= 0, not expired.
-      // This edge case should be classified as expiringSoon.
+      // in inDays rounds down to 0 – still >= 0, not yet expired.
       final item = _item(daysUntilExpiry: 0);
-      // daysLeft = 0 (>= 0), so NOT expired; within kExpiringSoonDays.
+      expect(item.isExpired, isFalse);
       expect(item.status, isNot(ItemStatus.expired));
     });
 

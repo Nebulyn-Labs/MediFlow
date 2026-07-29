@@ -68,6 +68,12 @@ class InventoryItem {
   double get remainingPercentage =>
       initialQuantity > 0 ? remainingQuantity / initialQuantity : 0.0;
 
+  /// Days remaining until the expiry date. Negative values indicate expired stock.
+  int get daysToExpiry => expiryDate.difference(DateTime.now()).inDays;
+
+  /// Single source of truth for expired stock detection.
+  bool get isExpired => daysToExpiry < 0;
+
   /// Single source of truth for low-stock detection across the whole app.
   /// An item is low stock if either:
   ///  - it has dropped to [kLowStockPercentage] or less of its initial
@@ -76,6 +82,14 @@ class InventoryItem {
   bool get isLowStock =>
       remainingPercentage <= kLowStockPercentage ||
       remainingQuantity <= kLowStockAbsolute;
+
+  /// Single source of truth for wastage risk detection (high stock nearing expiry).
+  bool get isWastageRisk =>
+      !isExpired && !isLowStock && daysToExpiry <= kExpiringSoonDays && remainingPercentage >= 0.70;
+
+  /// Single source of truth for expiring-soon detection (nearing expiry, not expired/low/wastageRisk).
+  bool get isExpiringSoon =>
+      !isExpired && !isLowStock && !isWastageRisk && daysToExpiry <= kExpiringSoonDays;
 
   /// Single source of truth for the canonical stock-status of this item.
   ///
@@ -90,21 +104,27 @@ class InventoryItem {
   /// that expired items are never double-counted in both [ItemStatus.expired]
   /// and [ItemStatus.expiringSoon].
   ItemStatus get status {
-    final daysLeft = expiryDate.difference(DateTime.now()).inDays;
-
-    if (daysLeft < 0) return ItemStatus.expired;
-
+    if (isExpired) return ItemStatus.expired;
     if (isLowStock) return ItemStatus.lowStock;
-
-    final nearingExpiry = daysLeft <= kExpiringSoonDays;
-
-    if (nearingExpiry && remainingPercentage >= 0.70) {
-      return ItemStatus.wastageRisk;
-    }
-
-    if (nearingExpiry) return ItemStatus.expiringSoon;
-
+    if (isWastageRisk) return ItemStatus.wastageRisk;
+    if (isExpiringSoon) return ItemStatus.expiringSoon;
     return ItemStatus.healthy;
+  }
+
+  /// Display string for the stock status.
+  String get statusText {
+    switch (status) {
+      case ItemStatus.expired:
+        return 'Expired';
+      case ItemStatus.lowStock:
+        return 'Low Stock';
+      case ItemStatus.wastageRisk:
+        return 'Wastage Risk';
+      case ItemStatus.expiringSoon:
+        return 'Expiring Soon';
+      case ItemStatus.healthy:
+        return 'Healthy';
+    }
   }
 
   /// `true` when the item has any non-healthy status — convenient for

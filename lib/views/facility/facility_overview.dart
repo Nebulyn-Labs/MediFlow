@@ -36,14 +36,7 @@ class _FacilityOverviewState extends ConsumerState<FacilityOverview> {
           );
         }
         final inventory = snapshot.data ?? [];
-        // Use centralized ItemStatus; expired items are intentionally excluded
-        // from the expiringSoon count so they are not double-counted.
-        final expiringSoon = inventory
-            .where((i) => i.status == ItemStatus.expiringSoon)
-            .length;
-        final lowStock = inventory
-            .where((i) => i.status == ItemStatus.lowStock)
-            .length;
+        final alertCount = inventory.where((i) => i.hasAlert).length;
 
         return Scaffold(
           backgroundColor: MediColors.bg,
@@ -57,7 +50,7 @@ class _FacilityOverviewState extends ConsumerState<FacilityOverview> {
                   children: [
                     const Icon(Icons.notifications_outlined,
                         color: MediColors.textSecondary),
-                    if (lowStock + expiringSoon > 0)
+                    if (alertCount > 0)
                       Positioned(
                         top: -2,
                         right: -2,
@@ -67,7 +60,7 @@ class _FacilityOverviewState extends ConsumerState<FacilityOverview> {
                           decoration: const BoxDecoration(
                               color: MediColors.error, shape: BoxShape.circle),
                           child: Center(
-                              child: Text('${lowStock + expiringSoon}',
+                              child: Text('$alertCount',
                                   style: const TextStyle(
                                       fontSize: 9,
                                       color: Colors.white,
@@ -559,28 +552,22 @@ class _FacilityOverviewState extends ConsumerState<FacilityOverview> {
                       DataColumn(label: Text('Time Left')),
                     ],                     rows: inventory.map((item) {
                       final pct = item.remainingPercentage;
-                      final daysToExpiry =
-                          item.expiryDate.difference(DateTime.now()).inDays;
+                      final daysToExpiry = item.daysToExpiry;
                       // Use centralized status — single source of truth.
                       Color statusColor;
-                      String statusText;
                       switch (item.status) {
                         case ItemStatus.expired:
                           statusColor = MediColors.error;
-                          statusText = 'Expired';
                         case ItemStatus.wastageRisk:
                           statusColor = const Color(0xFFF59E0B);
-                          statusText = 'Wastage Risk';
                         case ItemStatus.lowStock:
                           statusColor = MediColors.error;
-                          statusText = 'Low Stock';
                         case ItemStatus.expiringSoon:
                           statusColor = MediColors.warning;
-                          statusText = 'Expiring Soon';
                         case ItemStatus.healthy:
                           statusColor = MediColors.success;
-                          statusText = 'Healthy';
-                      } }
+                      }
+                      final statusText = item.statusText;
 
                       return DataRow(cells: [
                         DataCell(Row(children: [
