@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import '../constants/inventory_thresholds.dart';
 
 /// Canonical stock-status categories for a single inventory item.
 ///
