@@ -163,7 +163,6 @@ lib/
 │
 ├── services/                   # Business Logic & Intelligence Layer
 │   ├── ai_service.dart         # Gemini-1.5-Flash forecasting & reasoning
-│   ├── chat_service.dart       # NLP pipeline for the AI Assistant
 │   ├── firebase_service.dart   # Firestore infrastructure & transactions
 │   ├── optimization_service.dart # OTS heuristic & matching algorithm
 │   ├── routing_service.dart    # Geospatial OSRM/ORS pathfinding logic

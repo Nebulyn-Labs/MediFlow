@@ -32,6 +32,17 @@ class FirebaseService {
         email: email, password: password);
   }
 
+  Future<void> sendPasswordReset(String email) async {
+    await _auth.sendPasswordResetEmail(email: email);
+    try {
+      final callable =
+          FirebaseFunctions.instance.httpsCallable('logPasswordResetRequest');
+      await callable.call({'email': email});
+    } catch (e) {
+      debugPrint('Failed to log password reset request: $e');
+    }
+  }
+
   Future<void> signUpFacility({
     required String name,
     required String email,
@@ -107,6 +118,10 @@ class FirebaseService {
     final doc = await _firestore.collection('facilities').doc(id).get();
     if (!doc.exists) return null;
     return Facility.fromMap(doc.data()!, doc.id);
+  }
+
+  Future<void> updateFacility(String id, Map<String, dynamic> data) async {
+    await _firestore.collection('facilities').doc(id).update(data);
   }
 
   // --- INVENTORY ---
