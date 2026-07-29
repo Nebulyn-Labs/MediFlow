@@ -66,6 +66,10 @@ class RoutingService {
       'https://router.project-osrm.org/route/v1/driving';
   static const String _orsBaseUrl =
       'https://api.openrouteservice.org/v2/directions/driving-car';
+  
+  // Cache for storing previously fetched routes
+  final Map<String, List<LatLng>> _routeCache = {};
+  static const int _maxCacheSize = 100;
 
   /// Validates whether the latitude and longitude fall within
   /// valid geographic ranges.
@@ -107,6 +111,15 @@ class RoutingService {
       );
       return _fallbackRoute(start, end);
     }
+
+    final cacheKey = _generateCacheKey(start, end);
+
+   final cachedRoute = _routeCache[cacheKey];
+    if (cachedRoute != null) {
+      debugPrint('RoutingService: Returning cached route.');
+      return cachedRoute;
+    }
+
 
     // 1. Try OpenRouteService (ORS) if API key exists
     if (orsKey != null && orsKey.isNotEmpty) {
@@ -202,6 +215,7 @@ class RoutingService {
 
     // Final fallback
     debugPrint('RoutingService: Falling back to straight-line route.');
+
     return _fallbackRoute(start, end);
   }
 
