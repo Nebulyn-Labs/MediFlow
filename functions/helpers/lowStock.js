@@ -130,6 +130,21 @@ function createLowStockService({ serverTimestamp }) {
         );
 
         if (status === "low_stock" && !existed) {
+          // Write to real-time notification feed subcollection
+          const notifRef = db
+            .collection("notifications")
+            .doc(facilityDoc.id)
+            .collection("items")
+            .doc();
+          
+          await notifRef.set({
+            facilityId: facilityDoc.id,
+            type: "low_stock",
+            message: `${data.medicineName} is below reorder level (${data.remainingQuantity} left).`,
+            isRead: false,
+            createdAt: serverTimestamp(),
+          });
+
           const userQuery = await db
             .collection("users")
             .where("facilityId", "==", facilityDoc.id)

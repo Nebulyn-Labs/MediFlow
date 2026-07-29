@@ -81,6 +81,15 @@ service cloud.firestore {
       allow write: if isAdmin();
     }
 
+    // Notifications collection
+    match /notifications/{facilityId} {
+      allow read: if isAdmin() || isFacilityUser(facilityId);
+      
+      match /items/{notificationId} {
+        allow read, write: if isAdmin() || isFacilityUser(facilityId);
+      }
+    }
+
     // Users collection (RBAC)
     match /users/{userId} {
       allow read: if isAdmin() || (isAuthenticated() && request.auth.uid == userId);
