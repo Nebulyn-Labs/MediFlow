@@ -123,10 +123,12 @@ class NearestNeighborRoutingStrategy implements RoutingStrategy {
 /// - **Scoring (Optimal Transfer Score):** for each candidate donor of a
 ///   given medicine, a score is computed from proximity (closer is worth
 ///   more, capped at 200km), a flat +150 bonus when the recipient is rural,
-///   and a fulfillment bonus (+50 full, +25 partial). The highest-scoring
-///   donor is chosen per iteration; this repeats until the deficit is met
-///   or no donor has stock left, allowing a single indent to be split
-///   across multiple donors.
+///   a fulfillment bonus (+50 full, +25 partial), and a +100 near-expiry
+///   bonus when the donor's soonest-expiring batch of the requested medicine
+///   expires within 90 days — this ensures stock is redistributed before
+///   wastage. The highest-scoring donor is chosen per iteration; this repeats
+///   until the deficit is met or no donor has stock left, allowing a single
+///   indent to be split across multiple donors.
 /// - **Routing** ([NearestNeighborRoutingStrategy]): stops for a donor are
 ///   ordered with a simple greedy nearest-neighbor heuristic starting from
 ///   the donor's own location. This is not a shortest-path/TSP solver — it
@@ -293,6 +295,25 @@ class OptimizationService {
           } else {
             score += 25;
             reasons.add('Partial Fulfillment');
+          }
+
+          // D. Near-Expiry Priority (+100 when soonest batch expires ≤90 days)
+          // Prefer donors whose surplus expires soonest so stock is redistributed
+          // before wastage, matching the documented heuristic in the AI prompt.
+          final donorBatches = inventories[donorFac.id] ?? [];
+          final medicineBatches = donorBatches
+              .where((item) => item.medicineName == medicine)
+              .toList();
+          if (medicineBatches.isNotEmpty) {
+            final soonestExpiry = medicineBatches
+                .map((item) => item.expiryDate)
+                .reduce((a, b) => a.isBefore(b) ? a : b);
+            final daysUntilExpiry =
+                soonestExpiry.difference(DateTime.now()).inDays;
+            if (daysUntilExpiry <= 90) {
+              score += 100;
+              reasons.add('Near Expiry (${daysUntilExpiry}d)');
+            }
           }
 
           if (score > highestScore) {

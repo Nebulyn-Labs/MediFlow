@@ -43,6 +43,23 @@ void main() {
       );
     }
 
+    /// Like [createInventory] but lets the caller control the expiry offset.
+    InventoryItem createInventoryWithExpiry(String facilityId, String medName,
+        int initial, int remaining, int expiryDays) {
+      return InventoryItem(
+        id: 'inv_${facilityId}_exp$expiryDays',
+        medicineName: medName,
+        batchId: 'B_exp$expiryDays',
+        arrivalDate: now,
+        expiryDate: now.add(Duration(days: expiryDays)),
+        initialQuantity: initial,
+        remainingQuantity: remaining,
+        unit: 'tablets',
+        lastUpdated: now,
+        facilityId: facilityId,
+      );
+    }
+
     MedRequest createRequest(String id, String facilityId, String medName,
         RequestType type, int quantity) {
       return MedRequest(
@@ -534,6 +551,64 @@ void main() {
       expect(recommendations.first.recipient.id, recipientFacility.id);
       expect(recommendations.first.quantity, 100);
       expect(recommendations.first.medicine, 'Paracetamol');
+    });
+
+    // -----------------------------------------------------------------------
+    // Issue #271 – Near-Expiry Scoring
+    // -----------------------------------------------------------------------
+    test(
+        'near-expiry donor is preferred when distance and quantity are equal',
+        () {
+      // Two donors at the exact same coordinates (identical distance to
+      // recipient) and with identical surplus. The only difference is how
+      // soon their stock expires.
+      //
+      //   donorExpiring : expires in  30 days → earns +100 Near-Expiry bonus
+      //   donorFresh    : expires in 365 days → no bonus
+      //
+      // With all other scoring terms equal, donorExpiring must win so that
+      // near-expiry stock is moved before it goes to waste.
+      const double lat = 28.6;
+      const double lng = 77.2;
+
+      final donorExpiring =
+          createFacility('d_expiring', 'urban', lat, lng + 0.1);
+      final donorFresh = createFacility('d_fresh', 'urban', lat, lng + 0.1);
+      final recipient = createFacility('r1', 'urban', lat, lng);
+
+      // Both donors have 70 units of surplus (100 initial, 100 remaining,
+      // surplus = 100 − 30% × 100 = 70).
+      final invExpiring = createInventoryWithExpiry(
+          donorExpiring.id, 'Amoxicillin', 100, 100, 30); // expires in 30 d
+      final invFresh = createInventoryWithExpiry(
+          donorFresh.id, 'Amoxicillin', 100, 100, 365); // expires in 365 d
+
+      final request = createRequest(
+          'req1', recipient.id, 'Amoxicillin', RequestType.shortage, 40);
+
+      final result = service.calculateOptimalTransfers(
+        facilities: [donorExpiring, donorFresh, recipient],
+        inventories: {
+          donorExpiring.id: [invExpiring],
+          donorFresh.id: [invFresh],
+        },
+        requests: [request],
+      );
+
+      // Exactly one recommendation — full fulfillment from the near-expiry donor.
+      expect(result.length, 1);
+      expect(
+        result.first.donor.id,
+        'd_expiring',
+        reason: 'Near-expiry donor must be selected to prevent wastage',
+      );
+      expect(result.first.quantity, 40);
+      // The reasoning string must surface the Near-Expiry term.
+      expect(
+        result.first.reasoning,
+        contains('Near Expiry'),
+        reason: 'Score reasoning must include the Near Expiry label',
+      );
     });
   });
 }
