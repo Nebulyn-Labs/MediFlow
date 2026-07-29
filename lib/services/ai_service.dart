@@ -40,10 +40,14 @@ class AIService {
   }
 
   // Helper method to call the generic callGeminiSecure Cloud Function
-  Future<String> _callGeminiBackend(String prompt,
-      {String? imageBase64, String? imageMimeType}) async {
-    final callable =
-        FirebaseFunctions.instance.httpsCallable('callGeminiSecure');
+  Future<String> _callGeminiBackend(
+    String prompt, {
+    String? imageBase64,
+    String? imageMimeType,
+  }) async {
+    final callable = FirebaseFunctions.instance.httpsCallable(
+      'callGeminiSecure',
+    );
     final response = await callable.call({
       'prompt': prompt,
       if (imageBase64 != null) 'imageBase64': imageBase64,
@@ -54,13 +58,17 @@ class AIService {
 
   // ─── FORECASTING ───────────────────────────────────────────────
   Future<Map<String, dynamic>> forecastDemand(
-      String medicineName, List<DailyUsageLog> logs, int daysToForecast,
-      {String? facilityId}) async {
+    String medicineName,
+    List<DailyUsageLog> logs,
+    int daysToForecast, {
+    String? facilityId,
+  }) async {
     final medLogs = logs.map((l) {
       final usage = l.medicines.firstWhere(
-          (m) => m.medicineName == medicineName,
-          orElse: () =>
-              MedicineUsage(medicineName: medicineName, unitsDistributed: 0));
+        (m) => m.medicineName == medicineName,
+        orElse: () =>
+            MedicineUsage(medicineName: medicineName, unitsDistributed: 0),
+      );
       return {'date': l.date.toIso8601String(), 'used': usage.unitsDistributed};
     }).toList();
 
@@ -88,7 +96,8 @@ class AIService {
       final responseText = await _callGeminiBackend(prompt);
       final raw = responseText.trim();
       var decoded = jsonDecode(
-          raw.replaceAll('```json', '').replaceAll('```', '').trim());
+        raw.replaceAll('```json', '').replaceAll('```', '').trim(),
+      );
       if (decoded is Map) {
         final result = Map<String, dynamic>.from(decoded);
         await _logAIDecision(
@@ -153,14 +162,17 @@ class AIService {
     }
   }
 
-  Map<String, dynamic> _localForecast(List<Map<String, dynamic>> medLogs,
-      int daysToForecast, String medicineName) {
+  Map<String, dynamic> _localForecast(
+    List<Map<String, dynamic>> medLogs,
+    int daysToForecast,
+    String medicineName,
+  ) {
     double avg = medLogs.isEmpty
         ? 10.0
         : medLogs
-                .map((l) => (l['used'] as int).toDouble())
-                .fold(0.0, (a, b) => a + b) /
-            medLogs.length;
+                  .map((l) => (l['used'] as int).toDouble())
+                  .fold(0.0, (a, b) => a + b) /
+              medLogs.length;
     int prediction = (avg * daysToForecast * 1.1).round();
 
     String reason = "Standard historical average computation with 10% buffer.";
@@ -190,8 +202,9 @@ class AIService {
   }) async {
     if (_shouldUseLocal) return _localSystemResponse(query, context, role);
     try {
-      final callable =
-          FirebaseFunctions.instance.httpsCallable('getChatResponseSecure');
+      final callable = FirebaseFunctions.instance.httpsCallable(
+        'getChatResponseSecure',
+      );
       final response = await callable.call({
         'query': query,
         'context': context,
@@ -207,7 +220,10 @@ class AIService {
   }
 
   String _localSystemResponse(
-      String query, Map<String, dynamic> context, String role) {
+    String query,
+    Map<String, dynamic> context,
+    String role,
+  ) {
     final inventory = (context['current_inventory'] as List? ?? []);
 
     final intro =
@@ -221,13 +237,15 @@ class AIService {
         final rem = item['remainingQuantity'] ?? 0;
         final tot = item['initialQuantity'] ?? 0;
         final name = item['medicineName'] ?? 'Unknown';
-        final status =
-            (tot > 0 && rem / tot < 0.2) ? "⚠️ CRITICAL" : "✅ STABLE";
+        final status = (tot > 0 && rem / tot < 0.2)
+            ? "⚠️ CRITICAL"
+            : "✅ STABLE";
         buffer.writeln("• **$name**: $rem/$tot units ($status)");
       }
     } else {
       buffer.writeln(
-          "I am the MediFlow Local Intelligence Engine. Ask me about your stock or usage trends.");
+        "I am the MediFlow Local Intelligence Engine. Ask me about your stock or usage trends.",
+      );
     }
 
     return buffer.toString();
@@ -235,20 +253,23 @@ class AIService {
 
   // ─── SMART ALERTS ──────────────────────────────────────────────
   Future<List<Map<String, dynamic>>> generateSmartAlerts(
-      List<InventoryItem> inventory) async {
+    List<InventoryItem> inventory,
+  ) async {
     final local = inventory
         .where((i) => i.isLowStock)
-        .map((i) => {
-              "type": "low_stock",
-              "severity": "red",
-              "title": i.medicineName,
-              "batchId": i.batchId,
-              "remainingQuantity": i.remainingQuantity,
-              "remainingPercentage":
-                  ((i.remainingQuantity / i.initialQuantity) * 100).round(),
-              "burnRate": "24/day",
-              "depletesInDays": (i.remainingQuantity / 24).round(),
-            })
+        .map(
+          (i) => {
+            "type": "low_stock",
+            "severity": "red",
+            "title": i.medicineName,
+            "batchId": i.batchId,
+            "remainingQuantity": i.remainingQuantity,
+            "remainingPercentage":
+                ((i.remainingQuantity / i.initialQuantity) * 100).round(),
+            "burnRate": "24/day",
+            "depletesInDays": (i.remainingQuantity / 24).round(),
+          },
+        )
         .toList();
 
     final now = DateTime.now();
@@ -269,10 +290,13 @@ class AIService {
     if (_shouldUseLocal || inventory.isEmpty) return local;
     try {
       final payload = inventory
-          .map((i) =>
-              "${i.medicineName} (Batch: ${i.batchId}): ${i.remainingQuantity}/${i.initialQuantity} units left. Expiry: ${i.expiryDate.toIso8601String()}")
+          .map(
+            (i) =>
+                "${i.medicineName} (Batch: ${i.batchId}): ${i.remainingQuantity}/${i.initialQuantity} units left. Expiry: ${i.expiryDate.toIso8601String()}",
+          )
           .join('\n');
-      final prompt = '''
+      final prompt =
+          '''
 Identify risks in the following inventory:
 $payload
 
@@ -297,7 +321,8 @@ Output raw JSON array only.
 ''';
       final responseText = await _callGeminiBackend(prompt);
       var decoded = jsonDecode(
-          responseText.replaceAll('```json', '').replaceAll('```', '').trim());
+        responseText.replaceAll('```json', '').replaceAll('```', '').trim(),
+      );
       if (decoded is List) {
         return decoded.map((e) => Map<String, dynamic>.from(e as Map)).toList();
       }
@@ -310,16 +335,21 @@ Output raw JSON array only.
 
   // ─── REDISTRIBUTION ────────────────────────────────────────────
   Future<String> generateRedistributionPlan(
-      List<MedRequest> requests, List<Facility> facilities) async {
+    List<MedRequest> requests,
+    List<Facility> facilities,
+  ) async {
     final indents = requests
-        .where((r) =>
-            r.status == RequestStatus.pending &&
-            r.type == RequestType.regularIndent)
+        .where(
+          (r) =>
+              r.status == RequestStatus.pending &&
+              r.type == RequestType.regularIndent,
+        )
         .toList();
     if (indents.isEmpty) return "No active indents found to optimize.";
 
     try {
-      final prompt = '''
+      final prompt =
+          '''
 Analyze these ${indents.length} pending indents across ${facilities.length} health facilities.
 The logistics engine has prioritized routes based on:
 1. Rural Facility Priority (+150 score)
@@ -349,7 +379,8 @@ Output plain text only.
         "Current Season: Approaching Monsoon (High Risk for Malaria/Dengue)",
   }) async {
     try {
-      final prompt = '''
+      final prompt =
+          '''
 Scenario: MediFlow shipment split (Target: $targetMonths months active).
 External Context: $externalContext
 Inventory: ${items.map((i) => '${i.medicineName}: ${i.remainingQuantity}').join(", ")}
@@ -360,7 +391,8 @@ Output JSON only.
 
       final responseText = await _callGeminiBackend(prompt);
       var decoded = jsonDecode(
-          responseText.replaceAll('```json', '').replaceAll('```', '').trim());
+        responseText.replaceAll('```json', '').replaceAll('```', '').trim(),
+      );
       if (decoded is Map) {
         return Map<String, dynamic>.from(decoded);
       }
@@ -373,20 +405,29 @@ Output JSON only.
 
   // ─── MULTI-MODAL VISION ─────────────────────────────────────────
   Future<String> parseImageWithVision(
-      Uint8List imageBytes, String prompt) async {
+    Uint8List imageBytes,
+    String prompt,
+  ) async {
     final imageBase64 = base64Encode(imageBytes);
-    return _callGeminiBackend(prompt,
-        imageBase64: imageBase64, imageMimeType: 'image/jpeg');
+    return _callGeminiBackend(
+      prompt,
+      imageBase64: imageBase64,
+      imageMimeType: 'image/jpeg',
+    );
   }
 
   Map<String, dynamic> _localShipmentStrategy(
-      List<InventoryItem> items, List<DailyUsageLog> logs, int targetMonths) {
+    List<InventoryItem> items,
+    List<DailyUsageLog> logs,
+    int targetMonths,
+  ) {
     Map<String, dynamic> results = {};
     for (var item in items) {
       double sum = 0;
       for (var log in logs) {
-        final matches =
-            log.medicines.where((m) => m.medicineName == item.medicineName);
+        final matches = log.medicines.where(
+          (m) => m.medicineName == item.medicineName,
+        );
         if (matches.isNotEmpty) sum += matches.first.unitsDistributed;
       }
       double dailyAvg = logs.isEmpty ? 25.0 : sum / logs.length;
@@ -395,7 +436,7 @@ Output JSON only.
         "active": retentionNeed,
         "coldStorage": (retentionNeed * (12 / targetMonths - 1)).round(),
         "reasoning":
-            "Local Intelligence: Calculated using current distribution rate of ${dailyAvg.toStringAsFixed(1)} units/day."
+            "Local Intelligence: Calculated using current distribution rate of ${dailyAvg.toStringAsFixed(1)} units/day.",
       };
     }
     return results;

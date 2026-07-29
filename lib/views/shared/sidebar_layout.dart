@@ -149,7 +149,8 @@ class _SidebarLayoutState extends ConsumerState<SidebarLayout> {
               decoration: BoxDecoration(
                 color: MediColors.surface,
                 border: Border(
-                    right: BorderSide(color: MediColors.border, width: 1)),
+                  right: BorderSide(color: MediColors.border, width: 1),
+                ),
               ),
               child: Column(
                 children: [
@@ -164,8 +165,11 @@ class _SidebarLayoutState extends ConsumerState<SidebarLayout> {
                         gradient: MediColors.primaryGradient,
                         borderRadius: BorderRadius.circular(14),
                       ),
-                      child: const Icon(Icons.health_and_safety_rounded,
-                          color: Colors.white, size: 24),
+                      child: const Icon(
+                        Icons.health_and_safety_rounded,
+                        color: Colors.white,
+                        size: 24,
+                      ),
                     ),
                   ),
 
@@ -173,18 +177,19 @@ class _SidebarLayoutState extends ConsumerState<SidebarLayout> {
                   StreamBuilder<List<InventoryItem>>(
                     stream:
                         widget.role == 'facility' && widget.facilityId != null
-                            ? ref
-                                .watch(firebaseServiceProvider)
-                                .streamInventory(widget.facilityId!)
-                            : Stream.value([]),
+                        ? ref
+                              .watch(firebaseServiceProvider)
+                              .streamInventory(widget.facilityId!)
+                        : Stream.value([]),
                     builder: (context, snapshot) {
                       final inventory = snapshot.data ?? [];
                       final hasAlerts = inventory.any((i) {
                         final pct = i.initialQuantity > 0
                             ? i.remainingQuantity / i.initialQuantity
                             : 0.0;
-                        final daysLeft =
-                            i.expiryDate.difference(DateTime.now()).inDays;
+                        final daysLeft = i.expiryDate
+                            .difference(DateTime.now())
+                            .inDays;
                         return pct <= 0.20 ||
                             i.remainingQuantity <= 500 ||
                             daysLeft <= 30;
@@ -193,7 +198,8 @@ class _SidebarLayoutState extends ConsumerState<SidebarLayout> {
                       return Column(
                         children: List.generate(items.length, (i) {
                           final isSelected = i == selectedIndex;
-                          final isAlertTab = widget.role == 'facility' &&
+                          final isAlertTab =
+                              widget.role == 'facility' &&
                               i == 3; // Alerts index
                           return _buildNavItem(
                             items[i],
@@ -258,8 +264,13 @@ class _SidebarLayoutState extends ConsumerState<SidebarLayout> {
     );
   }
 
-  Widget _buildNavItem(_NavItem item, bool isSelected, VoidCallback onTap,
-      {bool isLogout = false, bool showBadge = false}) {
+  Widget _buildNavItem(
+    _NavItem item,
+    bool isSelected,
+    VoidCallback onTap, {
+    bool isLogout = false,
+    bool showBadge = false,
+  }) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
       child: Material(
@@ -278,7 +289,8 @@ class _SidebarLayoutState extends ConsumerState<SidebarLayout> {
                   : Colors.transparent,
               border: isSelected
                   ? Border.all(
-                      color: MediColors.primary.withValues(alpha: 0.25))
+                      color: MediColors.primary.withValues(alpha: 0.25),
+                    )
                   : null,
             ),
             child: ClipRect(
@@ -297,8 +309,8 @@ class _SidebarLayoutState extends ConsumerState<SidebarLayout> {
                             color: isLogout
                                 ? MediColors.error
                                 : isSelected
-                                    ? MediColors.primary
-                                    : MediColors.textMuted,
+                                ? MediColors.primary
+                                : MediColors.textMuted,
                           ),
                         ),
                       ),
@@ -324,13 +336,14 @@ class _SidebarLayoutState extends ConsumerState<SidebarLayout> {
                         item.label,
                         style: TextStyle(
                           fontSize: 13,
-                          fontWeight:
-                              isSelected ? FontWeight.w600 : FontWeight.w500,
+                          fontWeight: isSelected
+                              ? FontWeight.w600
+                              : FontWeight.w500,
                           color: isLogout
                               ? MediColors.error
                               : isSelected
-                                  ? MediColors.primary
-                                  : MediColors.textSecondary,
+                              ? MediColors.primary
+                              : MediColors.textSecondary,
                         ),
                         overflow: TextOverflow.ellipsis,
                         maxLines: 1,

@@ -128,8 +128,7 @@ class _AlertsPageState extends ConsumerState<AlertsPage> {
           color: color,
           icon: icon,
         );
-      }).toList()
-        ..sort((a, b) => _priority(a).compareTo(_priority(b)));
+      }).toList()..sort((a, b) => _priority(a).compareTo(_priority(b)));
 
       if (mounted) {
         setState(() {
@@ -140,8 +139,9 @@ class _AlertsPageState extends ConsumerState<AlertsPage> {
     } catch (e) {
       if (mounted) {
         setState(() => _isLoading = false);
-        ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text('Error loading alerts: $e')));
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Error loading alerts: $e')));
       }
     }
   }
@@ -165,15 +165,20 @@ class _AlertsPageState extends ConsumerState<AlertsPage> {
           .read(firebaseServiceProvider)
           .disposeInventory(widget.facilityId, alert.item.medicineName);
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-            content:
-                Text('Marked ${alert.item.medicineName} for safe disposal.')));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Marked ${alert.item.medicineName} for safe disposal.',
+            ),
+          ),
+        );
         _loadAlerts();
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text('Error: $e')));
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Error: $e')));
       }
     }
   }
@@ -184,24 +189,31 @@ class _AlertsPageState extends ConsumerState<AlertsPage> {
 
   @override
   Widget build(BuildContext context) {
-    final expiredAlerts =
-        _alerts.where((a) => a.kind == _AlertKind.expired).toList();
-    final stockAlerts = _alerts
-        .where((a) =>
-            a.kind == _AlertKind.lowStock || a.kind == _AlertKind.wastageRisk)
+    final expiredAlerts = _alerts
+        .where((a) => a.kind == _AlertKind.expired)
         .toList();
-    final expiryAlerts =
-        _alerts.where((a) => a.kind == _AlertKind.expiringSoon).toList();
+    final stockAlerts = _alerts
+        .where(
+          (a) =>
+              a.kind == _AlertKind.lowStock || a.kind == _AlertKind.wastageRisk,
+        )
+        .toList();
+    final expiryAlerts = _alerts
+        .where((a) => a.kind == _AlertKind.expiringSoon)
+        .toList();
 
     return Scaffold(
       backgroundColor: MediColors.bg,
       appBar: AppBar(
         title: Row(
           children: [
-            const Text('Alerts',
-                style: TextStyle(
-                    fontWeight: FontWeight.w800,
-                    color: MediColors.textPrimary)),
+            const Text(
+              'Alerts',
+              style: TextStyle(
+                fontWeight: FontWeight.w800,
+                color: MediColors.textPrimary,
+              ),
+            ),
             const SizedBox(width: 12),
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
@@ -212,17 +224,20 @@ class _AlertsPageState extends ConsumerState<AlertsPage> {
               child: Text(
                 widget.facilityId.replaceAll('_', ' ').toUpperCase(),
                 style: const TextStyle(
-                    fontSize: 12,
-                    color: MediColors.info,
-                    fontWeight: FontWeight.w600),
+                  fontSize: 12,
+                  color: MediColors.info,
+                  fontWeight: FontWeight.w600,
+                ),
               ),
             ),
           ],
         ),
         actions: [
           IconButton(
-            icon: const Icon(Icons.refresh_rounded,
-                color: MediColors.textSecondary),
+            icon: const Icon(
+              Icons.refresh_rounded,
+              color: MediColors.textSecondary,
+            ),
             onPressed: _loadAlerts,
             tooltip: 'Refresh',
           ),
@@ -231,9 +246,11 @@ class _AlertsPageState extends ConsumerState<AlertsPage> {
       floatingActionButton: FloatingActionButton(
         onPressed: () {
           Navigator.push(
-              context,
-              MaterialPageRoute(
-                  builder: (_) => const AIChatPage(role: "Facility Manager")));
+            context,
+            MaterialPageRoute(
+              builder: (_) => const AIChatPage(role: "Facility Manager"),
+            ),
+          );
         },
         backgroundColor: const Color(0xFF1E3A8A),
         tooltip: 'Open MediFlow AI Assistant',
@@ -270,16 +287,22 @@ class _AlertsPageState extends ConsumerState<AlertsPage> {
                         child: Column(
                           children: [
                             ExcludeSemantics(
-                              child: Icon(Icons.check_circle_rounded,
-                                  size: 64,
-                                  color: MediColors.success
-                                      .withValues(alpha: 0.8)),
+                              child: Icon(
+                                Icons.check_circle_rounded,
+                                size: 64,
+                                color: MediColors.success.withValues(
+                                  alpha: 0.8,
+                                ),
+                              ),
                             ),
                             const SizedBox(height: 16),
-                            const Text('No active alerts detected.',
-                                style: TextStyle(
-                                    color: MediColors.textSecondary,
-                                    fontSize: 16)),
+                            const Text(
+                              'No active alerts detected.',
+                              style: TextStyle(
+                                color: MediColors.textSecondary,
+                                fontSize: 16,
+                              ),
+                            ),
                           ],
                         ),
                       ),
@@ -291,11 +314,14 @@ class _AlertsPageState extends ConsumerState<AlertsPage> {
   }
 
   Widget _sectionHeader(String title) {
-    return Text(title,
-        style: const TextStyle(
-            fontSize: 18,
-            fontWeight: FontWeight.w800,
-            color: MediColors.textPrimary));
+    return Text(
+      title,
+      style: const TextStyle(
+        fontSize: 18,
+        fontWeight: FontWeight.w800,
+        color: MediColors.textPrimary,
+      ),
+    );
   }
 
   Widget _buildAlertCard(_InventoryAlert alert) {
@@ -317,7 +343,7 @@ class _AlertsPageState extends ConsumerState<AlertsPage> {
                 color: alert.color.withValues(alpha: 0.05),
                 blurRadius: 10,
                 spreadRadius: 1,
-              )
+              ),
             ],
           ),
           child: Row(
@@ -341,35 +367,54 @@ class _AlertsPageState extends ConsumerState<AlertsPage> {
                       spacing: 8,
                       runSpacing: 6,
                       children: [
-                        Text(alert.item.medicineName,
-                            style: const TextStyle(
-                                fontWeight: FontWeight.w800,
-                                fontSize: 17,
-                                color: MediColors.textPrimary)),
-                        Text(alert.item.batchId,
-                            style: const TextStyle(
-                                fontSize: 12,
-                                color: MediColors.textMuted,
-                                fontWeight: FontWeight.w600)),
+                        Text(
+                          alert.item.medicineName,
+                          style: const TextStyle(
+                            fontWeight: FontWeight.w800,
+                            fontSize: 17,
+                            color: MediColors.textPrimary,
+                          ),
+                        ),
+                        Text(
+                          alert.item.batchId,
+                          style: const TextStyle(
+                            fontSize: 12,
+                            color: MediColors.textMuted,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
                         _statusBadge(alert),
                       ],
                     ),
                     const SizedBox(height: 8),
-                    Text(alert.reason,
-                        style: const TextStyle(
-                            color: MediColors.textPrimary,
-                            fontSize: 14,
-                            fontWeight: FontWeight.w600)),
+                    Text(
+                      alert.reason,
+                      style: const TextStyle(
+                        color: MediColors.textPrimary,
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
                     const SizedBox(height: 4),
-                    Text(alert.detail,
-                        style: const TextStyle(
-                            color: MediColors.textSecondary, fontSize: 14)),
+                    Text(
+                      alert.detail,
+                      style: const TextStyle(
+                        color: MediColors.textSecondary,
+                        fontSize: 14,
+                      ),
+                    ),
                     const SizedBox(height: 16),
                     isExpired
-                        ? _buildActionButton('Mark for Disposal', alert.color,
-                            () => _handleDisposal(alert))
-                        : _buildActionButton('Run Smart AI Stock Analysis',
-                            MediColors.primary, _openSmartAnalysis),
+                        ? _buildActionButton(
+                            'Mark for Disposal',
+                            alert.color,
+                            () => _handleDisposal(alert),
+                          )
+                        : _buildActionButton(
+                            'Run Smart AI Stock Analysis',
+                            MediColors.primary,
+                            _openSmartAnalysis,
+                          ),
                   ],
                 ),
               ),
@@ -390,13 +435,19 @@ class _AlertsPageState extends ConsumerState<AlertsPage> {
       child: Text(
         alert.title,
         style: TextStyle(
-            color: alert.color, fontSize: 12, fontWeight: FontWeight.w700),
+          color: alert.color,
+          fontSize: 12,
+          fontWeight: FontWeight.w700,
+        ),
       ),
     );
   }
 
   Widget _buildActionButton(
-      String text, Color accentColor, VoidCallback onTap) {
+    String text,
+    Color accentColor,
+    VoidCallback onTap,
+  ) {
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(8),
@@ -410,7 +461,10 @@ class _AlertsPageState extends ConsumerState<AlertsPage> {
         child: Text(
           text,
           style: TextStyle(
-              color: accentColor, fontSize: 13, fontWeight: FontWeight.w700),
+            color: accentColor,
+            fontSize: 13,
+            fontWeight: FontWeight.w700,
+          ),
         ),
       ),
     );

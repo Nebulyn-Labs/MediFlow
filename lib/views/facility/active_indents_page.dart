@@ -7,6 +7,7 @@ import '../../models/request.dart';
 import '../../models/inventory_item.dart';
 import 'package:med_supply_prototype/constants/colors.dart';
 import '../shared/skeleton_loaders.dart';
+import '../../utils/date_formatter.dart';
 
 class ActiveIndentsPage extends ConsumerStatefulWidget {
   final String facilityId;
@@ -69,8 +70,9 @@ class _ActiveIndentsPageState extends ConsumerState<ActiveIndentsPage> {
       });
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Error fetching inventory: $e')));
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Error fetching inventory: $e')));
       }
     } finally {
       if (mounted) setState(() => _isLoading = false);
@@ -81,14 +83,19 @@ class _ActiveIndentsPageState extends ConsumerState<ActiveIndentsPage> {
   Future<void> _getAIForecast() async {
     final aiService = ref.read(aiServiceProvider);
     final firebaseService = ref.read(firebaseServiceProvider);
-    final logs =
-        await firebaseService.getRecentLogs(widget.facilityId, days: 90);
+    final logs = await firebaseService.getRecentLogs(
+      widget.facilityId,
+      days: 90,
+    );
     for (var item in _inventory) {
       setState(() => _forecastLoading[item.id] = true);
       try {
         final dynamic result = await aiService.forecastDemand(
-            item.medicineName, logs, _selectedPeriod,
-            facilityId: widget.facilityId);
+          item.medicineName,
+          logs,
+          _selectedPeriod,
+          facilityId: widget.facilityId,
+        );
         setState(() {
           dynamic predRaw;
           dynamic reasonRaw;
@@ -106,8 +113,10 @@ class _ActiveIndentsPageState extends ConsumerState<ActiveIndentsPage> {
           _reasoning[item.id] =
               reasonRaw?.toString() ?? "Calculated based on demand.";
 
-          _analysisControllers[item.id]?.text =
-              _suggestedQuantity(item, predicted).toString();
+          _analysisControllers[item.id]?.text = _suggestedQuantity(
+            item,
+            predicted,
+          ).toString();
         });
       } catch (e) {
         debugPrint('Forecast error for ${item.medicineName}: $e');
@@ -148,7 +157,8 @@ class _ActiveIndentsPageState extends ConsumerState<ActiveIndentsPage> {
     final isExpired = item.expiryDate.difference(DateTime.now()).inDays < 0;
     final expiringSoon =
         item.expiryDate.difference(DateTime.now()).inDays <= 30;
-    final hasSurplus = !isExpired &&
+    final hasSurplus =
+        !isExpired &&
         ((available - forecast) > (forecast * 1.5) ||
             (available > forecast && expiringSoon));
 
@@ -163,9 +173,11 @@ class _ActiveIndentsPageState extends ConsumerState<ActiveIndentsPage> {
     }).toList();
 
     if (itemsToSubmit.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-          content:
-              Text('Enter a request quantity for at least one medicine.')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Enter a request quantity for at least one medicine.'),
+        ),
+      );
       return;
     }
 
@@ -196,12 +208,14 @@ class _ActiveIndentsPageState extends ConsumerState<ActiveIndentsPage> {
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Requests saved as drafts.')));
+          const SnackBar(content: Text('Requests saved as drafts.')),
+        );
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text('Save failed: $e')));
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Save failed: $e')));
       }
     } finally {
       if (mounted) setState(() => _isSubmitting = false);
@@ -217,8 +231,9 @@ class _ActiveIndentsPageState extends ConsumerState<ActiveIndentsPage> {
           .updateRequestQuantity(requestId, quantity);
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text('Update failed: $e')));
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Update failed: $e')));
       }
     } finally {
       if (mounted) setState(() => _isDraftActionInProgress = false);
@@ -231,8 +246,9 @@ class _ActiveIndentsPageState extends ConsumerState<ActiveIndentsPage> {
       await ref.read(firebaseServiceProvider).deleteRequest(requestId);
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text('Delete failed: $e')));
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Delete failed: $e')));
       }
     } finally {
       if (mounted) setState(() => _isDraftActionInProgress = false);
@@ -247,12 +263,14 @@ class _ActiveIndentsPageState extends ConsumerState<ActiveIndentsPage> {
           .updateRequestStatus(requestId, RequestStatus.pending);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Request sent to CMS! âœ“')));
+          const SnackBar(content: Text('Request sent to CMS! âœ“')),
+        );
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text('Submission failed: $e')));
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Submission failed: $e')));
       }
     } finally {
       if (mounted) setState(() => _isDraftActionInProgress = false);
@@ -269,13 +287,15 @@ class _ActiveIndentsPageState extends ConsumerState<ActiveIndentsPage> {
         facilityName: facility?.name,
       );
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-            content: Text('Transfer requests CSV exported ✓')));
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Transfer requests CSV exported ✓')),
+        );
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text('Export failed: $e')));
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Export failed: $e')));
       }
     } finally {
       if (mounted) setState(() => _isExportingHistoryCsv = false);
@@ -309,55 +329,83 @@ class _ActiveIndentsPageState extends ConsumerState<ActiveIndentsPage> {
   }
 
   // ---------- UI Helpers ----------
-  Widget _sectionHeader(String title) => Text(title,
-      style: const TextStyle(
-          fontSize: 18,
-          fontWeight: FontWeight.w700,
-          color: MediColors.textPrimary));
+  Widget _sectionHeader(String title) => Text(
+    title,
+    style: const TextStyle(
+      fontSize: 18,
+      fontWeight: FontWeight.w700,
+      color: MediColors.textPrimary,
+    ),
+  );
 
   // ----- AI Table -----
   Widget _analysisHeader() {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
       decoration: const BoxDecoration(
-          color: MediColors.surfaceLight,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
+        color: MediColors.surfaceLight,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
       child: const Row(
         children: [
           SizedBox(
-              width: 40,
-              child: Icon(Icons.check_box_outline_blank,
-                  color: MediColors.textMuted, size: 20)),
+            width: 40,
+            child: Icon(
+              Icons.check_box_outline_blank,
+              color: MediColors.textMuted,
+              size: 20,
+            ),
+          ),
           Expanded(
-              flex: 3,
-              child: Text('Medicine',
-                  style: TextStyle(
-                      color: MediColors.textSecondary,
-                      fontWeight: FontWeight.bold))),
+            flex: 3,
+            child: Text(
+              'Medicine',
+              style: TextStyle(
+                color: MediColors.textSecondary,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ),
           Expanded(
-              flex: 2,
-              child: Text('Available',
-                  style: TextStyle(
-                      color: MediColors.textSecondary,
-                      fontWeight: FontWeight.bold))),
+            flex: 2,
+            child: Text(
+              'Available',
+              style: TextStyle(
+                color: MediColors.textSecondary,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ),
           Expanded(
-              flex: 2,
-              child: Text('AI Predicted Usage',
-                  style: TextStyle(
-                      color: MediColors.textSecondary,
-                      fontWeight: FontWeight.bold))),
+            flex: 2,
+            child: Text(
+              'AI Predicted Usage',
+              style: TextStyle(
+                color: MediColors.textSecondary,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ),
           Expanded(
-              flex: 2,
-              child: Text('Status',
-                  style: TextStyle(
-                      color: MediColors.textSecondary,
-                      fontWeight: FontWeight.bold))),
+            flex: 2,
+            child: Text(
+              'Status',
+              style: TextStyle(
+                color: MediColors.textSecondary,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ),
           Expanded(
-              flex: 2,
-              child: Text('Request Qty',
-                  style: TextStyle(
-                      color: MediColors.textSecondary,
-                      fontWeight: FontWeight.bold))),
+            flex: 2,
+            child: Text(
+              'Request Qty',
+              style: TextStyle(
+                color: MediColors.textSecondary,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ),
         ],
       ),
     );
@@ -407,41 +455,55 @@ class _ActiveIndentsPageState extends ConsumerState<ActiveIndentsPage> {
       child: Row(
         children: [
           SizedBox(
-              width: 40,
-              child: Checkbox(
-                  value: true,
-                  onChanged: (v) {},
-                  activeColor: MediColors.surfaceLight,
-                  checkColor: MediColors.textPrimary,
-                  side: const BorderSide(color: MediColors.textMuted))),
+            width: 40,
+            child: Checkbox(
+              value: true,
+              onChanged: (v) {},
+              activeColor: MediColors.surfaceLight,
+              checkColor: MediColors.textPrimary,
+              side: const BorderSide(color: MediColors.textMuted),
+            ),
+          ),
           Expanded(
             flex: 3,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(item.medicineName,
-                    style: const TextStyle(
-                        fontWeight: FontWeight.w600,
-                        color: MediColors.textPrimary)),
-                Text(item.batchId,
-                    style: const TextStyle(
-                        color: MediColors.textSecondary, fontSize: 12)),
+                Text(
+                  item.medicineName,
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w600,
+                    color: MediColors.textPrimary,
+                  ),
+                ),
+                Text(
+                  item.batchId,
+                  style: const TextStyle(
+                    color: MediColors.textSecondary,
+                    fontSize: 12,
+                  ),
+                ),
               ],
             ),
           ),
           Expanded(
-              flex: 2,
-              child: Text(available.toString(),
-                  style: const TextStyle(
-                      color: MediColors.textPrimary,
-                      fontWeight: FontWeight.bold))),
+            flex: 2,
+            child: Text(
+              available.toString(),
+              style: const TextStyle(
+                color: MediColors.textPrimary,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ),
           Expanded(
             flex: 2,
             child: isLoading
                 ? const SizedBox(
                     width: 16,
                     height: 16,
-                    child: CircularProgressIndicator(strokeWidth: 2))
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
                 : Tooltip(
                     message: reasoning ?? "AI reasoning will appear here.",
                     child: Row(
@@ -450,17 +512,21 @@ class _ActiveIndentsPageState extends ConsumerState<ActiveIndentsPage> {
                         Text(
                           forecast != null ? forecast.toString() : 'â€”',
                           style: TextStyle(
-                              color: forecast != null
-                                  ? MediColors.primaryLight
-                                  : MediColors.textMuted,
-                              fontWeight: forecast != null
-                                  ? FontWeight.bold
-                                  : FontWeight.normal),
+                            color: forecast != null
+                                ? MediColors.primaryLight
+                                : MediColors.textMuted,
+                            fontWeight: forecast != null
+                                ? FontWeight.bold
+                                : FontWeight.normal,
+                          ),
                         ),
                         if (forecast != null) ...[
                           const SizedBox(width: 6),
-                          const Icon(Icons.info_outline,
-                              color: MediColors.primaryLight, size: 14)
+                          const Icon(
+                            Icons.info_outline,
+                            color: MediColors.primaryLight,
+                            size: 14,
+                          ),
                         ],
                       ],
                     ),
@@ -473,17 +539,22 @@ class _ActiveIndentsPageState extends ConsumerState<ActiveIndentsPage> {
               child: Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                 decoration: BoxDecoration(
-                    color: statusBg, borderRadius: BorderRadius.circular(6)),
+                  color: statusBg,
+                  borderRadius: BorderRadius.circular(6),
+                ),
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     Icon(statusIcon, color: statusColor, size: 14),
                     const SizedBox(width: 6),
-                    Text(status,
-                        style: TextStyle(
-                            color: statusColor,
-                            fontSize: 11,
-                            fontWeight: FontWeight.bold)),
+                    Text(
+                      status,
+                      style: TextStyle(
+                        color: statusColor,
+                        fontSize: 11,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
                   ],
                 ),
               ),
@@ -494,9 +565,10 @@ class _ActiveIndentsPageState extends ConsumerState<ActiveIndentsPage> {
             child: Container(
               height: 40,
               decoration: BoxDecoration(
-                  color: MediColors.surfaceLight,
-                  borderRadius: BorderRadius.circular(20),
-                  border: Border.all(color: MediColors.border)),
+                color: MediColors.surfaceLight,
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(color: MediColors.border),
+              ),
               child: Row(
                 children: [
                   Expanded(
@@ -505,17 +577,25 @@ class _ActiveIndentsPageState extends ConsumerState<ActiveIndentsPage> {
                       keyboardType: TextInputType.number,
                       textAlign: TextAlign.center,
                       style: const TextStyle(
-                          fontSize: 14, color: MediColors.textPrimary),
+                        fontSize: 14,
+                        color: MediColors.textPrimary,
+                      ),
                       decoration: const InputDecoration(
-                          border: InputBorder.none,
-                          contentPadding: EdgeInsets.zero),
+                        border: InputBorder.none,
+                        contentPadding: EdgeInsets.zero,
+                      ),
                     ),
                   ),
                   Padding(
-                      padding: const EdgeInsets.only(right: 12.0),
-                      child: Text(item.unit,
-                          style: const TextStyle(
-                              color: MediColors.textMuted, fontSize: 11))),
+                    padding: const EdgeInsets.only(right: 12.0),
+                    child: Text(
+                      item.unit,
+                      style: const TextStyle(
+                        color: MediColors.textMuted,
+                        fontSize: 11,
+                      ),
+                    ),
+                  ),
                 ],
               ),
             ),
@@ -528,8 +608,9 @@ class _ActiveIndentsPageState extends ConsumerState<ActiveIndentsPage> {
   // ----- Drafts List -----
   Widget _draftsList() {
     return StreamBuilder<List<MedRequest>>(
-      stream:
-          ref.read(firebaseServiceProvider).streamRequests(widget.facilityId),
+      stream: ref
+          .read(firebaseServiceProvider)
+          .streamRequests(widget.facilityId),
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const Column(
@@ -542,10 +623,14 @@ class _ActiveIndentsPageState extends ConsumerState<ActiveIndentsPage> {
         }
         if (snapshot.hasError) {
           return Center(
-              child: Text('Error: ${snapshot.error}',
-                  style: const TextStyle(color: MediColors.error)));
+            child: Text(
+              'Error: ${snapshot.error}',
+              style: const TextStyle(color: MediColors.error),
+            ),
+          );
         }
-        final drafts = snapshot.data
+        final drafts =
+            snapshot.data
                 ?.where((r) => r.status == RequestStatus.draft)
                 .toList() ??
             [];
@@ -556,15 +641,20 @@ class _ActiveIndentsPageState extends ConsumerState<ActiveIndentsPage> {
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Icon(Icons.assignment_outlined,
-                      size: 72,
-                      color: MediColors.textMuted.withValues(alpha: 0.5)),
+                  Icon(
+                    Icons.assignment_outlined,
+                    size: 72,
+                    color: MediColors.textMuted.withValues(alpha: 0.5),
+                  ),
                   const SizedBox(height: 20),
-                  const Text('No Active Indents',
-                      style: TextStyle(
-                          color: MediColors.textPrimary,
-                          fontSize: 18,
-                          fontWeight: FontWeight.w700)),
+                  const Text(
+                    'No Active Indents',
+                    style: TextStyle(
+                      color: MediColors.textPrimary,
+                      fontSize: 18,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
                   const SizedBox(height: 8),
                   const Padding(
                     padding: EdgeInsets.symmetric(horizontal: 32),
@@ -572,8 +662,10 @@ class _ActiveIndentsPageState extends ConsumerState<ActiveIndentsPage> {
                       'You have no active supply requests right now. '
                       'Use the AI analysis above to create a new indent.',
                       textAlign: TextAlign.center,
-                      style:
-                          TextStyle(color: MediColors.textMuted, fontSize: 13),
+                      style: TextStyle(
+                        color: MediColors.textMuted,
+                        fontSize: 13,
+                      ),
                     ),
                   ),
                   const SizedBox(height: 20),
@@ -599,34 +691,46 @@ class _ActiveIndentsPageState extends ConsumerState<ActiveIndentsPage> {
               itemBuilder: (context, idx) {
                 final draft = drafts[idx];
                 if (!_draftControllers.containsKey(draft.id)) {
-                  _draftControllers[draft.id] =
-                      TextEditingController(text: draft.quantity.toString());
+                  _draftControllers[draft.id] = TextEditingController(
+                    text: draft.quantity.toString(),
+                  );
                 }
                 final medicineInfo = Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(draft.medicineName,
-                        style: const TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
-                            color: MediColors.textPrimary)),
+                    Text(
+                      draft.medicineName,
+                      style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: MediColors.textPrimary,
+                      ),
+                    ),
                     const SizedBox(height: 4),
                     Text(
-                        'Created: ${draft.requestDate.day}/${draft.requestDate.month}/${draft.requestDate.year}',
-                        style: const TextStyle(
-                            fontSize: 12, color: MediColors.textMuted)),
+                      'Created: ${DateFormatter.formatDate(draft.requestDate)}',
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: MediColors.textMuted,
+                      ),
+                    ),
                     if (draft.notes != null) ...[
                       const SizedBox(height: 8),
-                      Text(draft.notes!,
-                          style: const TextStyle(
-                              fontSize: 12,
-                              color: MediColors.info,
-                              fontStyle: FontStyle.italic)),
+                      Text(
+                        draft.notes!,
+                        style: const TextStyle(
+                          fontSize: 12,
+                          color: MediColors.info,
+                          fontStyle: FontStyle.italic,
+                        ),
+                      ),
                     ],
                     const SizedBox(height: 6),
                     Container(
                       padding: const EdgeInsets.symmetric(
-                          horizontal: 8, vertical: 4),
+                        horizontal: 8,
+                        vertical: 4,
+                      ),
                       decoration: BoxDecoration(
                         color: draft.type == RequestType.surplus
                             ? MediColors.successOverlay
@@ -651,11 +755,12 @@ class _ActiveIndentsPageState extends ConsumerState<ActiveIndentsPage> {
                                 ? 'Offering Redistribution'
                                 : 'Requesting Restock',
                             style: TextStyle(
-                                color: draft.type == RequestType.surplus
-                                    ? MediColors.success
-                                    : MediColors.error,
-                                fontSize: 11,
-                                fontWeight: FontWeight.bold),
+                              color: draft.type == RequestType.surplus
+                                  ? MediColors.success
+                                  : MediColors.error,
+                              fontSize: 11,
+                              fontWeight: FontWeight.bold,
+                            ),
                           ),
                         ],
                       ),
@@ -667,10 +772,11 @@ class _ActiveIndentsPageState extends ConsumerState<ActiveIndentsPage> {
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     Flexible(
-                      child: Text('Request Qty: ',
-                          overflow: TextOverflow.ellipsis,
-                          style:
-                              const TextStyle(color: MediColors.textSecondary)),
+                      child: Text(
+                        'Request Qty: ',
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(color: MediColors.textSecondary),
+                      ),
                     ),
                     const SizedBox(width: 8),
                     SizedBox(
@@ -681,10 +787,13 @@ class _ActiveIndentsPageState extends ConsumerState<ActiveIndentsPage> {
                         keyboardType: TextInputType.number,
                         style: const TextStyle(fontSize: 14),
                         decoration: InputDecoration(
-                            contentPadding:
-                                const EdgeInsets.symmetric(horizontal: 10),
-                            border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(8))),
+                          contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 10,
+                          ),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                        ),
                         onSubmitted: (val) {
                           final qty = int.tryParse(val) ?? draft.quantity;
                           _updateQuantity(draft.id, qty);
@@ -698,12 +807,15 @@ class _ActiveIndentsPageState extends ConsumerState<ActiveIndentsPage> {
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     IconButton(
-                        icon: const Icon(Icons.delete_outline_rounded,
-                            color: MediColors.error),
-                        onPressed: _isDraftActionInProgress
-                            ? null
-                            : () => _deleteDraft(draft.id),
-                        tooltip: 'Remove Draft'),
+                      icon: const Icon(
+                        Icons.delete_outline_rounded,
+                        color: MediColors.error,
+                      ),
+                      onPressed: _isDraftActionInProgress
+                          ? null
+                          : () => _deleteDraft(draft.id),
+                      tooltip: 'Remove Draft',
+                    ),
                     const SizedBox(width: 8),
                     FilledButton.icon(
                       onPressed: _isDraftActionInProgress
@@ -712,8 +824,11 @@ class _ActiveIndentsPageState extends ConsumerState<ActiveIndentsPage> {
                       icon: const Icon(Icons.send_rounded, size: 16),
                       label: const Text('Submit to CMS'),
                       style: FilledButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 16, vertical: 12)),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 12,
+                        ),
+                      ),
                     ),
                   ],
                 );
@@ -734,8 +849,9 @@ class _ActiveIndentsPageState extends ConsumerState<ActiveIndentsPage> {
                               quantityEditor,
                               const SizedBox(height: 16),
                               Align(
-                                  alignment: Alignment.centerRight,
-                                  child: actions),
+                                alignment: Alignment.centerRight,
+                                child: actions,
+                              ),
                             ],
                           );
                         }
@@ -760,8 +876,9 @@ class _ActiveIndentsPageState extends ConsumerState<ActiveIndentsPage> {
 
   Widget _historyList() {
     return StreamBuilder<List<MedRequest>>(
-      stream:
-          ref.read(firebaseServiceProvider).streamRequests(widget.facilityId),
+      stream: ref
+          .read(firebaseServiceProvider)
+          .streamRequests(widget.facilityId),
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const SizedBox.shrink();
@@ -769,10 +886,11 @@ class _ActiveIndentsPageState extends ConsumerState<ActiveIndentsPage> {
         if (snapshot.hasError || snapshot.data == null) {
           return const SizedBox.shrink();
         }
-        final history = snapshot.data!
-            .where((r) => r.status != RequestStatus.draft)
-            .toList()
-          ..sort((a, b) => b.requestDate.compareTo(a.requestDate));
+        final history =
+            snapshot.data!
+                .where((r) => r.status != RequestStatus.draft)
+                .toList()
+              ..sort((a, b) => b.requestDate.compareTo(a.requestDate));
 
         if (history.isEmpty) {
           return const SizedBox.shrink();
@@ -804,7 +922,8 @@ class _ActiveIndentsPageState extends ConsumerState<ActiveIndentsPage> {
                     foregroundColor: MediColors.textSecondary,
                     side: const BorderSide(color: MediColors.border),
                     shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(10)),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
                   ),
                 ),
               ],
@@ -841,29 +960,37 @@ class _ActiveIndentsPageState extends ConsumerState<ActiveIndentsPage> {
                 if (hasResolution) {
                   final resDate = req.resolvedAt!;
                   resolutionText =
-                      'Resolved: ${resDate.day}/${resDate.month}/${resDate.year} ${resDate.hour.toString().padLeft(2, '0')}:${resDate.minute.toString().padLeft(2, '0')}';
+                      'Resolved: ${DateFormatter.formatDate(resDate)} ${resDate.hour.toString().padLeft(2, '0')}:${resDate.minute.toString().padLeft(2, '0')}';
                 }
-
                 final requestInfo = Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(req.medicineName,
-                        style: const TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
-                            color: MediColors.textPrimary)),
+                    Text(
+                      req.medicineName,
+                      style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: MediColors.textPrimary,
+                      ),
+                    ),
                     const SizedBox(height: 4),
                     Text(
-                        'Submitted: ${req.requestDate.day}/${req.requestDate.month}/${req.requestDate.year}',
-                        style: const TextStyle(
-                            fontSize: 12, color: MediColors.textMuted)),
+                      'Submitted: ${DateFormatter.formatDate(req.requestDate)}',
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: MediColors.textMuted,
+                      ),
+                    ),
                     if (hasResolution) ...[
                       const SizedBox(height: 2),
-                      Text(resolutionText,
-                          style: const TextStyle(
-                              fontSize: 12,
-                              color: MediColors.textSecondary,
-                              fontWeight: FontWeight.w500)),
+                      Text(
+                        resolutionText,
+                        style: const TextStyle(
+                          fontSize: 12,
+                          color: MediColors.textSecondary,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
                     ],
                     if (isRejected &&
                         req.rejectionReason != null &&
@@ -876,21 +1003,25 @@ class _ActiveIndentsPageState extends ConsumerState<ActiveIndentsPage> {
                           color: MediColors.errorOverlay,
                           borderRadius: BorderRadius.circular(8),
                           border: Border.all(
-                              color: MediColors.error.withValues(alpha: 0.3)),
+                            color: MediColors.error.withValues(alpha: 0.3),
+                          ),
                         ),
                         child: Text(
                           'Rejection Reason: ${req.rejectionReason}',
                           style: const TextStyle(
-                              fontSize: 12,
-                              color: MediColors.error,
-                              fontWeight: FontWeight.w600),
+                            fontSize: 12,
+                            color: MediColors.error,
+                            fontWeight: FontWeight.w600,
+                          ),
                         ),
                       ),
                     ],
                     const SizedBox(height: 6),
                     Container(
                       padding: const EdgeInsets.symmetric(
-                          horizontal: 8, vertical: 4),
+                        horizontal: 8,
+                        vertical: 4,
+                      ),
                       decoration: BoxDecoration(
                         color: req.type == RequestType.surplus
                             ? MediColors.successOverlay
@@ -915,11 +1046,12 @@ class _ActiveIndentsPageState extends ConsumerState<ActiveIndentsPage> {
                                 ? 'Offering Redistribution'
                                 : 'Requesting Restock',
                             style: TextStyle(
-                                color: req.type == RequestType.surplus
-                                    ? MediColors.success
-                                    : MediColors.error,
-                                fontSize: 11,
-                                fontWeight: FontWeight.bold),
+                              color: req.type == RequestType.surplus
+                                  ? MediColors.success
+                                  : MediColors.error,
+                              fontSize: 11,
+                              fontWeight: FontWeight.bold,
+                            ),
                           ),
                         ],
                       ),
@@ -928,20 +1060,24 @@ class _ActiveIndentsPageState extends ConsumerState<ActiveIndentsPage> {
                 );
 
                 final statusBadge = Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 6,
+                  ),
                   decoration: BoxDecoration(
                     color: statusColor.withValues(alpha: 0.12),
                     borderRadius: BorderRadius.circular(8),
-                    border:
-                        Border.all(color: statusColor.withValues(alpha: 0.25)),
+                    border: Border.all(
+                      color: statusColor.withValues(alpha: 0.25),
+                    ),
                   ),
                   child: Text(
                     req.status.name.toUpperCase(),
                     style: TextStyle(
-                        color: statusColor,
-                        fontSize: 12,
-                        fontWeight: FontWeight.bold),
+                      color: statusColor,
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
                 );
 
@@ -965,9 +1101,10 @@ class _ActiveIndentsPageState extends ConsumerState<ActiveIndentsPage> {
                                   Text(
                                     'Quantity: ${req.quantity}',
                                     style: const TextStyle(
-                                        fontSize: 14,
-                                        fontWeight: FontWeight.bold,
-                                        color: MediColors.textPrimary),
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.bold,
+                                      color: MediColors.textPrimary,
+                                    ),
                                   ),
                                   statusBadge,
                                 ],
@@ -983,9 +1120,10 @@ class _ActiveIndentsPageState extends ConsumerState<ActiveIndentsPage> {
                               child: Text(
                                 'Quantity: ${req.quantity}',
                                 style: const TextStyle(
-                                    fontSize: 15,
-                                    fontWeight: FontWeight.bold,
-                                    color: MediColors.textPrimary),
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.bold,
+                                  color: MediColors.textPrimary,
+                                ),
                               ),
                             ),
                             statusBadge,
@@ -1026,23 +1164,33 @@ class _ActiveIndentsPageState extends ConsumerState<ActiveIndentsPage> {
                       _sectionHeader('Select Period'),
                       Container(
                         padding: const EdgeInsets.symmetric(
-                            horizontal: 16, vertical: 4),
+                          horizontal: 16,
+                          vertical: 4,
+                        ),
                         decoration: BoxDecoration(
-                            border: Border.all(color: MediColors.border),
-                            borderRadius: BorderRadius.circular(12)),
+                          border: Border.all(color: MediColors.border),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
                         child: DropdownButtonHideUnderline(
                           child: DropdownButton<int>(
                             value: _selectedPeriod,
                             dropdownColor: MediColors.surface,
                             items: [30, 60, 90]
-                                .map((int v) => DropdownMenuItem<int>(
+                                .map(
+                                  (int v) => DropdownMenuItem<int>(
                                     value: v,
-                                    child: Text('$v days',
-                                        style: const TextStyle(
-                                            color: MediColors.textPrimary))))
+                                    child: Text(
+                                      '$v days',
+                                      style: const TextStyle(
+                                        color: MediColors.textPrimary,
+                                      ),
+                                    ),
+                                  ),
+                                )
                                 .toList(),
                             onChanged: (val) => setState(
-                                () => _selectedPeriod = val ?? _selectedPeriod),
+                              () => _selectedPeriod = val ?? _selectedPeriod,
+                            ),
                           ),
                         ),
                       ),
@@ -1052,9 +1200,10 @@ class _ActiveIndentsPageState extends ConsumerState<ActiveIndentsPage> {
                   Row(
                     children: [
                       FilledButton.icon(
-                          onPressed: _getAIForecast,
-                          icon: const Icon(Icons.auto_awesome, size: 18),
-                          label: const Text('Get AI Forecast')),
+                        onPressed: _getAIForecast,
+                        icon: const Icon(Icons.auto_awesome, size: 18),
+                        label: const Text('Get AI Forecast'),
+                      ),
                       const SizedBox(width: 12),
                       OutlinedButton.icon(
                         onPressed: _isSubmitting ? null : _saveAnalysisAsDrafts,
@@ -1062,8 +1211,10 @@ class _ActiveIndentsPageState extends ConsumerState<ActiveIndentsPage> {
                             ? const SizedBox(
                                 width: 16,
                                 height: 16,
-                                child:
-                                    CircularProgressIndicator(strokeWidth: 2))
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                ),
+                              )
                             : const Icon(Icons.save_alt_rounded, size: 18),
                         label: const Text('Save Draft Requests'),
                       ),

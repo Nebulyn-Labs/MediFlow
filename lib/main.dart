@@ -63,7 +63,8 @@ final _router = GoRouter(
   initialLocation: '/',
   redirect: (context, state) {
     final isLoggedIn = FirebaseAuth.instance.currentUser != null;
-    final isAuthRoute = state.uri.toString() == '/' ||
+    final isAuthRoute =
+        state.uri.toString() == '/' ||
         state.uri.toString().startsWith('/login');
     if (!isLoggedIn && !isAuthRoute) return '/';
     return null;
@@ -85,40 +86,53 @@ final _router = GoRouter(
       builder: (context, state, child) {
         final pathParams = state.pathParameters;
         return SidebarLayout(
-            role: 'facility', facilityId: pathParams['id'], child: child);
+          role: 'facility',
+          facilityId: pathParams['id'],
+          child: child,
+        );
       },
       routes: [
         GoRoute(
-            path: '/facility/:id/overview',
-            builder: (context, state) =>
-                FacilityOverview(facilityId: state.pathParameters['id']!)),
+          path: '/facility/:id/overview',
+          builder: (context, state) =>
+              FacilityOverview(facilityId: state.pathParameters['id']!),
+        ),
         GoRoute(
-            path: '/facility/:id/forecast',
-            builder: (context, state) =>
-                AIForecastPage(facilityId: state.pathParameters['id']!)),
+          path: '/facility/:id/forecast',
+          builder: (context, state) =>
+              AIForecastPage(facilityId: state.pathParameters['id']!),
+        ),
         GoRoute(
-            path: '/facility/:id/indent',
-            builder: (context, state) =>
-                ActiveIndentsPage(facilityId: state.pathParameters['id']!)),
+          path: '/facility/:id/indent',
+          builder: (context, state) =>
+              ActiveIndentsPage(facilityId: state.pathParameters['id']!),
+        ),
         GoRoute(
-            path: '/facility/:id/active-indents',
-            builder: (context, state) =>
-                ActiveIndentsPage(facilityId: state.pathParameters['id']!)),
+          path: '/facility/:id/active-indents',
+          builder: (context, state) =>
+              ActiveIndentsPage(facilityId: state.pathParameters['id']!),
+        ),
         GoRoute(
-            path: '/facility/:id/logging',
-            builder: (context, state) =>
-                DailyLoggingPage(facilityId: state.pathParameters['id']!)),
+          path: '/facility/:id/logging',
+          builder: (context, state) =>
+              DailyLoggingPage(facilityId: state.pathParameters['id']!),
+        ),
         GoRoute(
-            path: '/facility/:id/alerts',
-            builder: (context, state) =>
-                AlertsPage(facilityId: state.pathParameters['id']!)),
+          path: '/facility/:id/alerts',
+          builder: (context, state) =>
+              AlertsPage(facilityId: state.pathParameters['id']!),
+        ),
         GoRoute(
-            path: '/facility/:id/chat',
-            builder: (context, state) => AIChatPage(
-                facilityId: state.pathParameters['id']!, role: 'facility')),
+          path: '/facility/:id/chat',
+          builder: (context, state) => AIChatPage(
+            facilityId: state.pathParameters['id']!,
+            role: 'facility',
+          ),
+        ),
         GoRoute(
-            path: '/facility/:id/help',
-            builder: (context, state) => HelpPage(role: 'facility')),
+          path: '/facility/:id/help',
+          builder: (context, state) => HelpPage(role: 'facility'),
+        ),
       ],
     ),
     ShellRoute(
@@ -128,26 +142,33 @@ final _router = GoRouter(
       },
       routes: [
         GoRoute(
-            path: '/admin/overview',
-            builder: (context, state) => const AdminOverview()),
+          path: '/admin/overview',
+          builder: (context, state) => const AdminOverview(),
+        ),
         GoRoute(
-            path: '/admin/approvals',
-            builder: (context, state) => const AdminIndentApprovalPage()),
+          path: '/admin/approvals',
+          builder: (context, state) => const AdminIndentApprovalPage(),
+        ),
         GoRoute(
-            path: '/admin/supply-status',
-            builder: (context, state) => const AdminIndentStatusPage()),
+          path: '/admin/supply-status',
+          builder: (context, state) => const AdminIndentStatusPage(),
+        ),
         GoRoute(
-            path: '/admin/routing',
-            builder: (context, state) => const RouteOptimizationMap()),
+          path: '/admin/routing',
+          builder: (context, state) => const RouteOptimizationMap(),
+        ),
         GoRoute(
-            path: '/admin/chat',
-            builder: (context, state) => const AIChatPage(role: 'admin')),
+          path: '/admin/chat',
+          builder: (context, state) => const AIChatPage(role: 'admin'),
+        ),
         GoRoute(
-            path: '/admin/audit',
-            builder: (context, state) => const AuditTrailPage()),
+          path: '/admin/audit',
+          builder: (context, state) => const AuditTrailPage(),
+        ),
         GoRoute(
-            path: '/admin/help',
-            builder: (context, state) => const HelpPage(role: 'admin')),
+          path: '/admin/help',
+          builder: (context, state) => const HelpPage(role: 'admin'),
+        ),
       ],
     ),
   ],
@@ -156,11 +177,11 @@ final _router = GoRouter(
 class AppScrollBehavior extends MaterialScrollBehavior {
   @override
   Set<PointerDeviceKind> get dragDevices => {
-        PointerDeviceKind.touch,
-        PointerDeviceKind.mouse,
-        PointerDeviceKind.stylus,
-        PointerDeviceKind.trackpad,
-      };
+    PointerDeviceKind.touch,
+    PointerDeviceKind.mouse,
+    PointerDeviceKind.stylus,
+    PointerDeviceKind.trackpad,
+  };
 }
 
 class MediFlowApp extends StatelessWidget {
@@ -185,9 +206,7 @@ class MediFlowApp extends StatelessWidget {
           onPrimary: Colors.white,
           outline: MediColors.border,
         ),
-        textTheme: GoogleFonts.interTextTheme(
-          ThemeData.dark().textTheme,
-        ),
+        textTheme: GoogleFonts.interTextTheme(ThemeData.dark().textTheme),
         cardTheme: CardThemeData(
           color: MediColors.surface,
           elevation: 0,
@@ -230,10 +249,13 @@ class MediFlowApp extends StatelessWidget {
             backgroundColor: MediColors.primary,
             foregroundColor: Colors.white,
             padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-            shape:
-                RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-            textStyle:
-                const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+            textStyle: const TextStyle(
+              fontWeight: FontWeight.w600,
+              fontSize: 14,
+            ),
           ),
         ),
         outlinedButtonTheme: OutlinedButtonThemeData(
@@ -241,17 +263,21 @@ class MediFlowApp extends StatelessWidget {
             foregroundColor: MediColors.primary,
             side: const BorderSide(color: MediColors.border),
             padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-            shape:
-                RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
           ),
         ),
-        dividerTheme:
-            const DividerThemeData(color: MediColors.border, thickness: 1),
+        dividerTheme: const DividerThemeData(
+          color: MediColors.border,
+          thickness: 1,
+        ),
         snackBarTheme: SnackBarThemeData(
           backgroundColor: MediColors.surfaceLight,
           contentTextStyle: const TextStyle(color: MediColors.textPrimary),
-          shape:
-              RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
           behavior: SnackBarBehavior.floating,
         ),
         popupMenuTheme: PopupMenuThemeData(
@@ -263,12 +289,14 @@ class MediFlowApp extends StatelessWidget {
         ),
         dialogTheme: DialogThemeData(
           backgroundColor: MediColors.surface,
-          shape:
-              RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+          ),
           titleTextStyle: const TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.w700,
-              color: MediColors.textPrimary),
+            fontSize: 18,
+            fontWeight: FontWeight.w700,
+            color: MediColors.textPrimary,
+          ),
         ),
         tabBarTheme: TabBarThemeData(
           labelColor: MediColors.primary,
@@ -278,11 +306,14 @@ class MediFlowApp extends StatelessWidget {
         ),
         dataTableTheme: DataTableThemeData(
           headingTextStyle: const TextStyle(
-              fontWeight: FontWeight.w600,
-              color: MediColors.textSecondary,
-              fontSize: 13),
-          dataTextStyle:
-              const TextStyle(color: MediColors.textPrimary, fontSize: 13),
+            fontWeight: FontWeight.w600,
+            color: MediColors.textSecondary,
+            fontSize: 13,
+          ),
+          dataTextStyle: const TextStyle(
+            color: MediColors.textPrimary,
+            fontSize: 13,
+          ),
           headingRowColor: WidgetStateProperty.all(MediColors.surfaceLight),
           dataRowColor: WidgetStateProperty.resolveWith((states) {
             if (states.contains(WidgetState.hovered)) {
@@ -292,8 +323,10 @@ class MediFlowApp extends StatelessWidget {
           }),
           dividerThickness: 1,
           decoration: const BoxDecoration(
-              border: Border(
-                  bottom: BorderSide(color: MediColors.border, width: 0.5))),
+            border: Border(
+              bottom: BorderSide(color: MediColors.border, width: 0.5),
+            ),
+          ),
         ),
       ),
       routerConfig: _router,

@@ -34,12 +34,16 @@ class MedRequest {
       id: id,
       facilityId: map['facilityId'] ?? '',
       medicineName: map['medicineName'] ?? '',
-      type: RequestType.values.firstWhere((e) => e.name == map['type'],
-          orElse: () => RequestType.regularIndent),
+      type: RequestType.values.firstWhere(
+        (e) => e.name == map['type'],
+        orElse: () => RequestType.regularIndent,
+      ),
       quantity: map['quantity']?.toInt() ?? 0,
       requestDate: (map['requestDate'] as Timestamp).toDate(),
-      status: RequestStatus.values.firstWhere((e) => e.name == map['status'],
-          orElse: () => RequestStatus.pending),
+      status: RequestStatus.values.firstWhere(
+        (e) => e.name == map['status'],
+        orElse: () => RequestStatus.pending,
+      ),
       notes: map['notes'],
       rejectionReason: map['rejectionReason'],
       resolvedAt: map['resolvedAt'] != null

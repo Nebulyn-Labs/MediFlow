@@ -40,7 +40,8 @@ void main() {
             (e) => e.toString(),
             'message',
             contains(
-                'Inventory document not found for medicine: $medicineName'),
+              'Inventory document not found for medicine: $medicineName',
+            ),
           ),
         ),
       );

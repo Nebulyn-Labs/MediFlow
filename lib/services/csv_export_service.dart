@@ -66,12 +66,7 @@ class CsvExportService {
     String? facilityName,
   }) async {
     final rows = <List<dynamic>>[
-      [
-        'Date',
-        'Medicine Name',
-        'Units Distributed',
-        'Total Patients (day)',
-      ],
+      ['Date', 'Medicine Name', 'Units Distributed', 'Total Patients (day)'],
     ];
 
     final sorted = [...logs]..sort((a, b) => a.date.compareTo(b.date));
@@ -108,7 +103,8 @@ class CsvExportService {
   }
 
   static List<List<dynamic>> buildTransferRequestHistoryRows(
-      List<MedRequest> requests) {
+    List<MedRequest> requests,
+  ) {
     final rows = <List<dynamic>>[
       [
         'Submitted Date',
@@ -157,8 +153,9 @@ class CsvExportService {
     final sorted = [...requests]
       ..sort((a, b) => b.requestDate.compareTo(a.requestDate));
     for (final request in sorted) {
-      final facilityLabel =
-          request.facilityId.replaceAll('_', ' ').toUpperCase();
+      final facilityLabel = request.facilityId
+          .replaceAll('_', ' ')
+          .toUpperCase();
       rows.add([
         _dateFmt.format(request.requestDate),
         facilityLabel,
@@ -169,19 +166,24 @@ class CsvExportService {
       ]);
     }
 
-    final fileName = 'transfer_requests_${_stampFmt.format(DateTime.now())}.csv';
+    final fileName =
+        'transfer_requests_${_stampFmt.format(DateTime.now())}.csv';
     return _saveCsv(rows, fileName);
   }
 
   static String _slug(String? name) {
     if (name == null || name.trim().isEmpty) return '';
-    final cleaned =
-        name.trim().toLowerCase().replaceAll(RegExp(r'[^a-z0-9]+'), '_');
+    final cleaned = name.trim().toLowerCase().replaceAll(
+      RegExp(r'[^a-z0-9]+'),
+      '_',
+    );
     return '${cleaned}_';
   }
 
   static Future<String?> _saveCsv(
-      List<List<dynamic>> rows, String fileName) async {
+    List<List<dynamic>> rows,
+    String fileName,
+  ) async {
     final csvString = const CsvEncoder().convert(rows);
     final bytes = Uint8List.fromList(utf8.encode(csvString));
 

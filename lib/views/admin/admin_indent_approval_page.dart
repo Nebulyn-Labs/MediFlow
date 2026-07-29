@@ -27,18 +27,24 @@ class _AdminIndentApprovalPageState
       final aiService = ref.read(aiServiceProvider);
 
       // Fetch facility inventory for context
-      final inventory =
-          await firebaseService.getInventoryOnce(request.facilityId);
-      final logs =
-          await firebaseService.getRecentLogs(request.facilityId, days: 90);
+      final inventory = await firebaseService.getInventoryOnce(
+        request.facilityId,
+      );
+      final logs = await firebaseService.getRecentLogs(
+        request.facilityId,
+        days: 90,
+      );
 
       final currentItem = inventory.firstWhere(
         (i) => i.medicineName == request.medicineName,
         orElse: () => throw 'Medicine not found in facility inventory',
       );
 
-      final forecast =
-          await aiService.forecastDemand(request.medicineName, logs, 30);
+      final forecast = await aiService.forecastDemand(
+        request.medicineName,
+        logs,
+        30,
+      );
       final predictedDemand = forecast['prediction'] as int;
 
       String suggestion;
@@ -69,12 +75,14 @@ class _AdminIndentApprovalPageState
           .updateRequestStatus(requestId, status);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Request ${status.name} successfully!')));
+          SnackBar(content: Text('Request ${status.name} successfully!')),
+        );
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text('Failed to update: $e')));
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Failed to update: $e')));
       }
     } finally {
       if (mounted) setState(() => _isActionInProgress = false);
@@ -93,15 +101,19 @@ class _AdminIndentApprovalPageState
             return const AdminIndentApprovalSkeleton();
           }
 
-          final pending = snapshot.data
+          final pending =
+              snapshot.data
                   ?.where((r) => r.status == RequestStatus.pending)
                   .toList() ??
               [];
 
           if (pending.isEmpty) {
             return const Center(
-                child: Text('No pending requests.',
-                    style: TextStyle(color: MediColors.textMuted)));
+              child: Text(
+                'No pending requests.',
+                style: TextStyle(color: MediColors.textMuted),
+              ),
+            );
           }
 
           return ListView.builder(
@@ -129,15 +141,20 @@ class _AdminIndentApprovalPageState
                             children: [
                               Row(
                                 children: [
-                                  Text(req.medicineName,
-                                      style: const TextStyle(
-                                          fontSize: 18,
-                                          fontWeight: FontWeight.bold,
-                                          color: MediColors.textPrimary)),
+                                  Text(
+                                    req.medicineName,
+                                    style: const TextStyle(
+                                      fontSize: 18,
+                                      fontWeight: FontWeight.bold,
+                                      color: MediColors.textPrimary,
+                                    ),
+                                  ),
                                   const SizedBox(width: 12),
                                   Container(
                                     padding: const EdgeInsets.symmetric(
-                                        horizontal: 8, vertical: 4),
+                                      horizontal: 8,
+                                      vertical: 4,
+                                    ),
                                     decoration: BoxDecoration(
                                       color: isRedistribution
                                           ? MediColors.successOverlay
@@ -161,34 +178,45 @@ class _AdminIndentApprovalPageState
                               ),
                               const SizedBox(height: 4),
                               Text(
-                                  'Facility: ${req.facilityId.replaceAll('_', ' ').toUpperCase()}',
-                                  style: const TextStyle(
-                                      color: MediColors.primaryLight,
-                                      fontWeight: FontWeight.w600,
-                                      fontSize: 12)),
+                                'Facility: ${req.facilityId.replaceAll('_', ' ').toUpperCase()}',
+                                style: const TextStyle(
+                                  color: MediColors.primaryLight,
+                                  fontWeight: FontWeight.w600,
+                                  fontSize: 12,
+                                ),
+                              ),
                             ],
                           ),
                           Container(
                             padding: const EdgeInsets.symmetric(
-                                horizontal: 16, vertical: 8),
+                              horizontal: 16,
+                              vertical: 8,
+                            ),
                             decoration: BoxDecoration(
-                                color: MediColors.surfaceLight,
-                                borderRadius: BorderRadius.circular(8)),
-                            child: Text('${req.quantity} Units',
-                                style: const TextStyle(
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.w800,
-                                    color: MediColors.textPrimary)),
+                              color: MediColors.surfaceLight,
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Text(
+                              '${req.quantity} Units',
+                              style: const TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w800,
+                                color: MediColors.textPrimary,
+                              ),
+                            ),
                           ),
                         ],
                       ),
                       const SizedBox(height: 16),
                       if (req.notes != null)
-                        Text('Facility Notes: ${req.notes}',
-                            style: const TextStyle(
-                                color: MediColors.textSecondary,
-                                fontSize: 13,
-                                fontStyle: FontStyle.italic)),
+                        Text(
+                          'Facility Notes: ${req.notes}',
+                          style: const TextStyle(
+                            color: MediColors.textSecondary,
+                            fontSize: 13,
+                            fontStyle: FontStyle.italic,
+                          ),
+                        ),
 
                       const SizedBox(height: 24),
                       const Divider(),
@@ -206,41 +234,51 @@ class _AdminIndentApprovalPageState
                                 : MediColors.warningOverlay,
                             borderRadius: BorderRadius.circular(12),
                             border: Border.all(
-                                color: suggestion.contains('✅')
-                                    ? MediColors.success.withValues(alpha: 0.3)
-                                    : MediColors.warning
-                                        .withValues(alpha: 0.3)),
+                              color: suggestion.contains('✅')
+                                  ? MediColors.success.withValues(alpha: 0.3)
+                                  : MediColors.warning.withValues(alpha: 0.3),
+                            ),
                           ),
-                          child: Text(suggestion,
-                              style: const TextStyle(
-                                  color: MediColors.textPrimary,
-                                  fontWeight: FontWeight.w500)),
+                          child: Text(
+                            suggestion,
+                            style: const TextStyle(
+                              color: MediColors.textPrimary,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
                         ),
 
                       Row(
                         children: [
                           OutlinedButton.icon(
-                            onPressed:
-                                isAiLoading ? null : () => _analyzeRequest(req),
+                            onPressed: isAiLoading
+                                ? null
+                                : () => _analyzeRequest(req),
                             icon: isAiLoading
                                 ? const SizedBox(
                                     width: 14,
                                     height: 14,
                                     child: CircularProgressIndicator(
-                                        strokeWidth: 2))
+                                      strokeWidth: 2,
+                                    ),
+                                  )
                                 : const Icon(Icons.auto_awesome, size: 16),
                             label: const Text('Analyze with AI'),
                             style: OutlinedButton.styleFrom(
-                                foregroundColor: MediColors.primaryLight),
+                              foregroundColor: MediColors.primaryLight,
+                            ),
                           ),
                           const Spacer(),
                           TextButton(
                             onPressed: _isActionInProgress
                                 ? null
                                 : () => _updateStatus(
-                                    req.id, RequestStatus.rejected),
+                                    req.id,
+                                    RequestStatus.rejected,
+                                  ),
                             style: TextButton.styleFrom(
-                                foregroundColor: MediColors.error),
+                              foregroundColor: MediColors.error,
+                            ),
                             child: const Text('Decline'),
                           ),
                           const SizedBox(width: 12),
@@ -248,9 +286,12 @@ class _AdminIndentApprovalPageState
                             onPressed: _isActionInProgress
                                 ? null
                                 : () => _updateStatus(
-                                    req.id, RequestStatus.approved),
+                                    req.id,
+                                    RequestStatus.approved,
+                                  ),
                             style: FilledButton.styleFrom(
-                                backgroundColor: MediColors.success),
+                              backgroundColor: MediColors.success,
+                            ),
                             child: const Text('Approve'),
                           ),
                         ],

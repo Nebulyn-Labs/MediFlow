@@ -3,8 +3,9 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/daily_usage_log.dart';
 
-final simulationServiceProvider =
-    Provider((ref) => SimulationService(FirebaseFirestore.instance));
+final simulationServiceProvider = Provider(
+  (ref) => SimulationService(FirebaseFirestore.instance),
+);
 
 /// Generates realistic demo data so a freshly created facility has
 /// plausible inventory, usage history, and stock-health variety without
@@ -70,7 +71,7 @@ class SimulationService {
       'South District',
       'East State',
       'West Sector',
-      'Central Zone'
+      'Central Zone',
     ];
     final String region = regions[_random.nextInt(regions.length)];
 
@@ -170,7 +171,8 @@ class SimulationService {
       };
       if (daysToExpiryOverride != null) {
         updates['expiryDate'] = Timestamp.fromDate(
-            DateTime.now().add(Duration(days: daysToExpiryOverride)));
+          DateTime.now().add(Duration(days: daysToExpiryOverride)),
+        );
       }
 
       await doc.reference.update(updates);
@@ -186,7 +188,7 @@ class SimulationService {
       'Vitamin Tablets': 'tablets',
       'Metformin 500mg': 'tablets',
       'Iron Folic Acid': 'tablets',
-      'Amoxicillin 250mg': 'capsules'
+      'Amoxicillin 250mg': 'capsules',
     };
 
     for (var entry in medicines.entries) {
@@ -226,10 +228,12 @@ class SimulationService {
           'initialQuantity': initialQty,
           'remainingQuantity': initialQty,
           'unit': unit,
-          'arrivalDate': Timestamp.fromDate(DateTime.now()
-              .subtract(Duration(days: 90 + _random.nextInt(100)))),
+          'arrivalDate': Timestamp.fromDate(
+            DateTime.now().subtract(Duration(days: 90 + _random.nextInt(100))),
+          ),
           'expiryDate': Timestamp.fromDate(
-              DateTime.now().add(Duration(days: daysToExpiry))),
+            DateTime.now().add(Duration(days: daysToExpiry)),
+          ),
           'lastUpdated': Timestamp.now(),
         });
       }
@@ -237,7 +241,11 @@ class SimulationService {
   }
 
   void _addSimulateDayToBatch(
-      WriteBatch batch, String facilityId, String facilityType, DateTime date) {
+    WriteBatch batch,
+    String facilityId,
+    String facilityType,
+    DateTime date,
+  ) {
     // 1. Determine patient count
     int basePatients = facilityType == 'urban' ? 150 : 35;
     double variation = 0.8 + (_random.nextDouble() * 0.4); // 80% to 120%
@@ -252,7 +260,7 @@ class SimulationService {
       'Vitamin Tablets',
       'Metformin 500mg',
       'Iron Folic Acid',
-      'Amoxicillin 250mg'
+      'Amoxicillin 250mg',
     ];
     List<MedicineUsage> usages = [];
     final month = date.month;

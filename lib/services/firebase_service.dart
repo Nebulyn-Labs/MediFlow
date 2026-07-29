@@ -13,7 +13,9 @@ import 'simulation_service.dart';
 
 final firebaseServiceProvider = Provider<FirebaseService>((ref) {
   return FirebaseService(
-      FirebaseFirestore.instance, auth.FirebaseAuth.instance);
+    FirebaseFirestore.instance,
+    auth.FirebaseAuth.instance,
+  );
 });
 
 class FirebaseService {
@@ -29,7 +31,9 @@ class FirebaseService {
 
   Future<auth.UserCredential> login(String email, String password) async {
     return await _auth.signInWithEmailAndPassword(
-        email: email, password: password);
+      email: email,
+      password: password,
+    );
   }
 
   Future<void> signUpFacility({
@@ -43,19 +47,25 @@ class FirebaseService {
   }) async {
     // 1. Generate a deterministic ID from email to bypass Auth dependency
     // This ensures Firestore docs are created even if Auth rate limits hit.
-    final String facilityId =
-        email.toLowerCase().replaceAll('@', '_').replaceAll('.', '_');
+    final String facilityId = email
+        .toLowerCase()
+        .replaceAll('@', '_')
+        .replaceAll('.', '_');
 
     // 2. Try to create Auth User in background (Non-blocking for data seeding)
     try {
       await _auth.createUserWithEmailAndPassword(
-          email: email, password: password);
+        email: email,
+        password: password,
+      );
     } catch (e) {
       // If user exists or rate limit hits, we don't care for seeding Firestore data
       debugPrint('Auth skip/fail for $email: $e');
       try {
         await _auth.signInWithEmailAndPassword(
-            email: email, password: password);
+          email: email,
+          password: password,
+        );
       } catch (loginErr) {
         debugPrint('Sign in fallback failed for $email: $loginErr');
       }
@@ -117,9 +127,11 @@ class FirebaseService {
         .doc(facilityId)
         .collection('medicines')
         .snapshots()
-        .map((snapshot) => snapshot.docs
-            .map((doc) => InventoryItem.fromMap(doc.data(), doc.id))
-            .toList());
+        .map(
+          (snapshot) => snapshot.docs
+              .map((doc) => InventoryItem.fromMap(doc.data(), doc.id))
+              .toList(),
+        );
   }
 
   Future<List<InventoryItem>> getInventoryOnce(String facilityId) async {
@@ -145,7 +157,10 @@ class FirebaseService {
   }
 
   Future<void> restock(
-      String facilityId, String medicineName, int quantity) async {
+    String facilityId,
+    String medicineName,
+    int quantity,
+  ) async {
     final medicineId = medicineName.toLowerCase().replaceAll(' ', '_');
     final invRef = _firestore
         .collection('inventory')
@@ -163,7 +178,8 @@ class FirebaseService {
         });
       } else {
         throw Exception(
-            'Inventory document not found for medicine: $medicineName');
+          'Inventory document not found for medicine: $medicineName',
+        );
       }
     });
   }
@@ -178,13 +194,17 @@ class FirebaseService {
         .orderBy('date', descending: true)
         .limit(120)
         .snapshots()
-        .map((snapshot) => snapshot.docs
-            .map((doc) => DailyUsageLog.fromMap(doc.data(), doc.id))
-            .toList());
+        .map(
+          (snapshot) => snapshot.docs
+              .map((doc) => DailyUsageLog.fromMap(doc.data(), doc.id))
+              .toList(),
+        );
   }
 
-  Future<List<DailyUsageLog>> getRecentLogs(String facilityId,
-      {int days = 30}) async {
+  Future<List<DailyUsageLog>> getRecentLogs(
+    String facilityId, {
+    int days = 30,
+  }) async {
     final snapshot = await _firestore
         .collection('daily_usage_logs')
         .doc(facilityId)
@@ -219,8 +239,10 @@ class FirebaseService {
 
     final snapshot = await query.get();
     final logs = snapshot.docs
-        .map((doc) =>
-            DailyUsageLog.fromMap(doc.data() as Map<String, dynamic>, doc.id))
+        .map(
+          (doc) =>
+              DailyUsageLog.fromMap(doc.data() as Map<String, dynamic>, doc.id),
+        )
         .toList();
 
     return PaginatedLogsResult(
@@ -259,7 +281,8 @@ class FirebaseService {
       final invDoc = await transaction.get(invRef);
       if (!invDoc.exists) {
         throw Exception(
-            'Inventory document not found for medicine: $medicineName');
+          'Inventory document not found for medicine: $medicineName',
+        );
       }
 
       int remaining = invDoc.data()?['remainingQuantity'] ?? 0;
@@ -276,13 +299,16 @@ class FirebaseService {
         int totalPatients = logDoc.data()?['totalPatients'] ?? 0;
 
         // Update existing medicine usage or add new
-        int index =
-            medicines.indexWhere((m) => m['medicineName'] == medicineName);
+        int index = medicines.indexWhere(
+          (m) => m['medicineName'] == medicineName,
+        );
         if (index >= 0) {
           medicines[index]['unitsDistributed'] += quantity;
         } else {
-          medicines.add(
-              {'medicineName': medicineName, 'unitsDistributed': quantity});
+          medicines.add({
+            'medicineName': medicineName,
+            'unitsDistributed': quantity,
+          });
         }
 
         transaction.update(logRef, {
@@ -293,7 +319,7 @@ class FirebaseService {
         transaction.set(logRef, {
           'date': Timestamp.fromDate(date),
           'medicines': [
-            {'medicineName': medicineName, 'unitsDistributed': quantity}
+            {'medicineName': medicineName, 'unitsDistributed': quantity},
           ],
           'totalPatients': patients,
         });
@@ -305,14 +331,20 @@ class FirebaseService {
     var query = _firestore.collection('requests');
     if (facilityId != null) {
       // Note: Requests are still top-level as they involve cross-facility matching
-      return query.where('facilityId', isEqualTo: facilityId).snapshots().map(
-          (snapshot) => snapshot.docs
-              .map((doc) => MedRequest.fromMap(doc.data(), doc.id))
-              .toList());
+      return query
+          .where('facilityId', isEqualTo: facilityId)
+          .snapshots()
+          .map(
+            (snapshot) => snapshot.docs
+                .map((doc) => MedRequest.fromMap(doc.data(), doc.id))
+                .toList(),
+          );
     }
-    return query.snapshots().map((snapshot) => snapshot.docs
-        .map((doc) => MedRequest.fromMap(doc.data(), doc.id))
-        .toList());
+    return query.snapshots().map(
+      (snapshot) => snapshot.docs
+          .map((doc) => MedRequest.fromMap(doc.data(), doc.id))
+          .toList(),
+    );
   }
 
   Future<void> addRequest(MedRequest request) async {
@@ -320,7 +352,9 @@ class FirebaseService {
   }
 
   Future<void> updateRequestStatus(
-      String requestId, RequestStatus status) async {
+    String requestId,
+    RequestStatus status,
+  ) async {
     await _firestore.collection('requests').doc(requestId).update({
       'status': status.name,
     });
@@ -373,7 +407,7 @@ class FirebaseService {
       'facilities',
       'inventory',
       'daily_usage_logs',
-      'requests'
+      'requests',
     ];
 
     for (var collection in collections) {
@@ -404,11 +438,12 @@ class FirebaseService {
           }
         }
         if (collection == 'facilities' || collection == 'requests') {
-          final callable = FirebaseFunctions.instance.httpsCallable('adminDeleteResource');
-          deleteFutures.add(callable.call({
-            'resourceType': collection,
-            'resourceId': doc.id,
-          }));
+          final callable = FirebaseFunctions.instance.httpsCallable(
+            'adminDeleteResource',
+          );
+          deleteFutures.add(
+            callable.call({'resourceType': collection, 'resourceId': doc.id}),
+          );
         } else {
           deleteFutures.add(doc.reference.delete());
         }
@@ -427,11 +462,15 @@ class FirebaseService {
       // 1. Seed/Login Admin first to ensure authorization for database clearing/seeding
       try {
         await _auth.createUserWithEmailAndPassword(
-            email: 'admin@mediflow.com', password: 'password123');
+          email: 'admin@mediflow.com',
+          password: 'password123',
+        );
       } catch (e) {
         try {
           await _auth.signInWithEmailAndPassword(
-              email: 'admin@mediflow.com', password: 'password123');
+            email: 'admin@mediflow.com',
+            password: 'password123',
+          );
         } catch (loginError) {
           debugPrint('Admin login failed during seed: $loginError');
         }
@@ -458,7 +497,7 @@ class FirebaseService {
           'password': 'password123',
           'region': 'North District',
           'lat': 28.6139,
-          'lng': 77.2090
+          'lng': 77.2090,
         },
         {
           'name': 'CHC Modinagar',
@@ -467,7 +506,7 @@ class FirebaseService {
           'password': 'password123',
           'region': 'East Zone',
           'lat': 28.6500,
-          'lng': 77.3000
+          'lng': 77.3000,
         },
         {
           'name': 'PHC Loni',
@@ -476,7 +515,7 @@ class FirebaseService {
           'password': 'password123',
           'region': 'North District',
           'lat': 28.7000,
-          'lng': 77.2800
+          'lng': 77.2800,
         },
         {
           'name': 'DH Ghaziabad',
@@ -485,7 +524,7 @@ class FirebaseService {
           'password': 'password123',
           'region': 'Central Hub',
           'lat': 28.6600,
-          'lng': 77.4200
+          'lng': 77.4200,
         },
         {
           'name': 'PHC Bhojpur',
@@ -494,7 +533,7 @@ class FirebaseService {
           'password': 'password123',
           'region': 'West Sector',
           'lat': 28.7500,
-          'lng': 77.5000
+          'lng': 77.5000,
         },
         {
           'name': 'CHC Hapur',
@@ -503,7 +542,7 @@ class FirebaseService {
           'password': 'password123',
           'region': 'East Zone',
           'lat': 28.7200,
-          'lng': 77.7800
+          'lng': 77.7800,
         },
         {
           'name': 'PHC Dasna',
@@ -512,7 +551,7 @@ class FirebaseService {
           'password': 'password123',
           'region': 'Central Hub',
           'lat': 28.6800,
-          'lng': 77.5200
+          'lng': 77.5200,
         },
         {
           'name': 'SubCentre Pilkhuwa',
@@ -521,7 +560,7 @@ class FirebaseService {
           'password': 'password123',
           'region': 'West Sector',
           'lat': 28.7100,
-          'lng': 77.6500
+          'lng': 77.6500,
         },
       ];
 
@@ -547,7 +586,9 @@ class FirebaseService {
       // Sign back in as admin to have global access to create requests for different facilities
       try {
         await _auth.signInWithEmailAndPassword(
-            email: 'admin@mediflow.com', password: 'password123');
+          email: 'admin@mediflow.com',
+          password: 'password123',
+        );
       } catch (e) {
         debugPrint('Failed to sign back in as admin: $e');
       }
@@ -575,7 +616,8 @@ class FirebaseService {
           .replaceAll('.', '_'); // Bhojpur (Rural)
 
       // Match 1: ORS (Rampur Rural Needs, Modinagar Urban Surplus)
-      await addRequest(MedRequest(
+      await addRequest(
+        MedRequest(
           id: '',
           facilityId: f1Id,
           medicineName: 'ORS',
@@ -583,9 +625,12 @@ class FirebaseService {
           quantity: 800,
           requestDate: DateTime.now(),
           status: RequestStatus.pending,
-          notes: 'Critical shortage predicted by AI for summer spike.'));
+          notes: 'Critical shortage predicted by AI for summer spike.',
+        ),
+      );
 
-      await addRequest(MedRequest(
+      await addRequest(
+        MedRequest(
           id: '',
           facilityId: f2Id,
           medicineName: 'ORS',
@@ -593,10 +638,13 @@ class FirebaseService {
           quantity: 1000,
           requestDate: DateTime.now(),
           status: RequestStatus.pending,
-          notes: 'Excess stock identified. Available for redistribution.'));
+          notes: 'Excess stock identified. Available for redistribution.',
+        ),
+      );
 
       // Match 2: Antibiotics (Bhojpur Rural Needs, Ghaziabad Urban Surplus)
-      await addRequest(MedRequest(
+      await addRequest(
+        MedRequest(
           id: '',
           facilityId: f5Id,
           medicineName: 'Antibiotic',
@@ -604,9 +652,12 @@ class FirebaseService {
           quantity: 300,
           requestDate: DateTime.now(),
           status: RequestStatus.approved,
-          notes: 'Post-monsoon surge in infections.'));
+          notes: 'Post-monsoon surge in infections.',
+        ),
+      );
 
-      await addRequest(MedRequest(
+      await addRequest(
+        MedRequest(
           id: '',
           facilityId: f4Id,
           medicineName: 'Antibiotic',
@@ -614,18 +665,22 @@ class FirebaseService {
           quantity: 500,
           requestDate: DateTime.now(),
           status: RequestStatus.pending,
-          notes: 'Surplus stock optimization.'));
+          notes: 'Surplus stock optimization.',
+        ),
+      );
 
       // Unmatched: Paracetamol (Just for variety)
-      await addRequest(MedRequest(
-        id: '',
-        facilityId: f3Id,
-        medicineName: 'Paracetamol',
-        type: RequestType.regularIndent,
-        quantity: 1200,
-        requestDate: DateTime.now(),
-        status: RequestStatus.pending,
-      ));
+      await addRequest(
+        MedRequest(
+          id: '',
+          facilityId: f3Id,
+          medicineName: 'Paracetamol',
+          type: RequestType.regularIndent,
+          quantity: 1200,
+          requestDate: DateTime.now(),
+          status: RequestStatus.pending,
+        ),
+      );
 
       return null; // Success
     } catch (e) {
@@ -642,11 +697,13 @@ class FirebaseService {
   }) async {
     try {
       Query query = _firestore.collection('audit_logs');
-      
-      if (actionFilter != null && actionFilter.isNotEmpty && actionFilter != 'All') {
+
+      if (actionFilter != null &&
+          actionFilter.isNotEmpty &&
+          actionFilter != 'All') {
         query = query.where('action', isEqualTo: actionFilter);
       }
-      
+
       query = query.orderBy('timestamp', descending: true).limit(pageSize);
 
       if (startAfter != null) {
@@ -655,8 +712,10 @@ class FirebaseService {
 
       final snapshot = await query.get();
       final logs = snapshot.docs
-          .map((doc) =>
-              AuditLog.fromMap(doc.data() as Map<String, dynamic>, doc.id))
+          .map(
+            (doc) =>
+                AuditLog.fromMap(doc.data() as Map<String, dynamic>, doc.id),
+          )
           .toList();
 
       final hasMore = snapshot.docs.length == pageSize;

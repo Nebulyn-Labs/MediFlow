@@ -37,8 +37,11 @@ class InventoryItem {
   bool get isLowStock =>
       remainingPercentage <= 0.20 || remainingQuantity <= 500;
 
-  factory InventoryItem.fromMap(Map<String, dynamic> map, String id,
-      {String? facilityId}) {
+  factory InventoryItem.fromMap(
+    Map<String, dynamic> map,
+    String id, {
+    String? facilityId,
+  }) {
     return InventoryItem(
       id: id,
       medicineName: map['medicineName'] ?? '',
