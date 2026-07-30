@@ -816,7 +816,7 @@ exports.logPasswordResetRequest = onCall(async (request) => {
   if (email.length > 254 || Buffer.byteLength(email, "utf8") > 1500) {
     throw new HttpsError("invalid-argument", "Invalid email format");
   }
-  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+  if (!/^[^\s@/]+@[^\s@/]+\.[^\s@/]+$/.test(email)) {
     throw new HttpsError("invalid-argument", "Invalid email format");
   }
 
