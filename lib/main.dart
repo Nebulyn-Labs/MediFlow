@@ -130,8 +130,8 @@ final _router = GoRouter(
                 facilityId: state.pathParameters['id']!, role: 'facility')),
         GoRoute(
             path: '/facility/:id/profile',
-            builder: (context, state) => FacilityProfilePage(
-                facilityId: state.pathParameters['id']!)),
+            builder: (context, state) =>
+                FacilityProfilePage(facilityId: state.pathParameters['id']!)),
         GoRoute(
             path: '/facility/:id/help',
             builder: (context, state) => HelpPage(role: 'facility')),
