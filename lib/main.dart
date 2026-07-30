@@ -37,6 +37,46 @@ final GlobalKey<NavigatorState> _facilityShellNavigatorKey =
 final GlobalKey<NavigatorState> _adminShellNavigatorKey =
     GlobalKey<NavigatorState>();
 
+// ─── Role cache for the router redirect ──────────────────────────────────────
+
+const _roleCacheDuration = Duration(minutes: 5);
+
+class _CachedRole {
+  final String role;
+  final String? facilityId;
+  final DateTime fetchedAt;
+  _CachedRole({required this.role, this.facilityId, required this.fetchedAt});
+}
+
+final _roleCache = <String, _CachedRole>{};
+
+Future<Map<String, dynamic>?> _resolveUserRole(String uid) async {
+  final cached = _roleCache[uid];
+  if (cached != null &&
+      DateTime.now().difference(cached.fetchedAt) < _roleCacheDuration) {
+    return {'role': cached.role, 'facilityId': cached.facilityId};
+  }
+
+  try {
+    final doc =
+        await FirebaseFirestore.instance.collection('users').doc(uid).get();
+    if (!doc.exists) return null;
+    final data = doc.data()!;
+    final role = data['role'] as String?;
+    if (role == null) return null;
+    final facilityId = data['facilityId'] as String?;
+
+    _roleCache[uid] = _CachedRole(
+      role: role,
+      facilityId: facilityId,
+      fetchedAt: DateTime.now(),
+    );
+    return {'role': role, 'facilityId': facilityId};
+  } catch (_) {
+    return null;
+  }
+}
+
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
@@ -64,12 +104,60 @@ void main() async {
 final _router = GoRouter(
   navigatorKey: _rootNavigatorKey,
   initialLocation: '/',
-  redirect: (context, state) {
-    final isLoggedIn = FirebaseAuth.instance.currentUser != null;
-    final isAuthRoute = state.uri.toString() == '/' ||
-        state.uri.toString().startsWith('/login') ||
-        state.uri.toString().startsWith('/forgot-password');
-    if (!isLoggedIn && !isAuthRoute) return '/';
+  redirect: (context, state) async {
+    final user = FirebaseAuth.instance.currentUser;
+    final path = state.uri.toString();
+    final isAuthRoute = path == '/' ||
+        path.startsWith('/login') ||
+        path.startsWith('/forgot-password');
+
+    if (user == null) {
+      if (!isAuthRoute) return '/';
+      return null;
+    }
+
+    // Resolve role (cached in memory for 5 min)
+    final roleInfo = await _resolveUserRole(user.uid);
+    if (roleInfo == null) {
+      // No resolvable role — bounce to landing
+      if (!isAuthRoute) return '/';
+      return null;
+    }
+
+    final role = roleInfo['role'] as String;
+    final facilityId = roleInfo['facilityId'] as String?;
+
+    final isAdminRoute = path.startsWith('/admin');
+    final isFacilityRoute = path.startsWith('/facility');
+
+    String? extractedFacilityId;
+    if (isFacilityRoute) {
+      final segments = path.split('/');
+      if (segments.length >= 3) {
+        extractedFacilityId = segments[2];
+      }
+    }
+
+    if (role == 'admin') {
+      // Admin should not be on facility routes
+      if (isFacilityRoute) return '/admin/overview';
+      return null;
+    }
+
+    if (role == 'facility_head') {
+      // Facility user on admin routes → bounce to their own overview
+      if (isAdminRoute) {
+        return '/facility/$facilityId/overview';
+      }
+      // Facility user on another facility's route → bounce to their own
+      if (isFacilityRoute && extractedFacilityId != facilityId) {
+        return '/facility/$facilityId/overview';
+      }
+      return null;
+    }
+
+    // Unknown role
+    if (!isAuthRoute) return '/';
     return null;
   },
   routes: [
