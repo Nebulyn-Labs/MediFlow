@@ -472,7 +472,9 @@ exports.mirrorInventoryToBigQuery = onDocumentWritten("inventory/{facilityId}/me
   const action = !before && after ? "created" : before && after ? "updated" : "deleted";
 
   const db = admin.firestore();
-  await lowStockService.syncAlertForMedicine(db, facilityId, medicineId, after);
+  await lowStockService.syncAlertForMedicine(db, facilityId, medicineId, after, null, async (token, notification) => {
+    await admin.messaging().send({ token, notification });
+  });
 
   await insertBigQuery("inventory_snapshots", {
     snapshot_id: `${facilityId}_${medicineId}_${Date.now()}`,

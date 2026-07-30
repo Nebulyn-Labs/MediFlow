@@ -246,7 +246,10 @@ class _AlertsPageState extends ConsumerState<AlertsPage> {
             );
 
     if (widget.isTabBody) {
-      return body;
+      return RefreshIndicator(
+        onRefresh: _loadAlerts,
+        child: body,
+      );
     }
 
     return Scaffold(
