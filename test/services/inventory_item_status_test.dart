@@ -54,11 +54,12 @@ void main() {
 
     test('expiring-soon item (within 30 days, low stock pct) is expiringSoon',
         () {
-      // remainingQuantity = 400 / 1000 = 40 % → NOT wastageRisk (< 70 %)
+      // remainingQuantity = 600 / 1000 = 60 % → NOT wastageRisk (< 70 %)
+      // and > kLowStockAbsolute (500), so NOT lowStock either.
       final item = _item(
         daysUntilExpiry: 20,
         initialQuantity: 1000,
-        remainingQuantity: 400,
+        remainingQuantity: 600,
       );
       expect(item.status, ItemStatus.expiringSoon);
       expect(item.hasAlert, isTrue);
@@ -101,7 +102,7 @@ void main() {
       final expiringSoonItem = _item(
         daysUntilExpiry: 10,
         initialQuantity: 1000,
-        remainingQuantity: 400,
+        remainingQuantity: 600,
       );
       final inventory = [expiredItem, expiringSoonItem];
 
