@@ -28,13 +28,19 @@ jobs:
       - name: Install Dependencies
         run: flutter pub get
 
+      # Recorded rather than fatal, so a whitespace problem does not hide the
+      # analyze/test/build results. The job is failed again at the end.
       - name: Verify Code Formatting
         id: format
+        continue-on-error: true
         run: dart format --output=none --set-exit-if-changed .
 
-      - name: Apply Code Formatting
-        if: failure() && steps.format.outcome == 'failure'
-        run: dart format .
+      - name: Show Required Formatting Changes
+        if: steps.format.outcome == 'failure'
+        run: |
+          echo "::error::Code is not formatted. Run 'dart format .' locally and commit the result."
+          dart format .
+          git --no-pager diff
 
       - name: Analyze Code
         run: flutter analyze
@@ -44,6 +50,12 @@ jobs:
 
       - name: Build Web App
         run: flutter build web --release
+
+      - name: Fail If Formatting Was Wrong
+        if: steps.format.outcome == 'failure'
+        run: |
+          echo "::error::Formatting check failed. The exact diff is in the 'Show Required Formatting Changes' step above."
+          exit 1
 
   functions_ci:
     name: Cloud Functions CI
