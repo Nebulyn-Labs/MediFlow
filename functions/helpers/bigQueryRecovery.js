@@ -53,10 +53,12 @@ function canonicalJson(value) {
   return JSON.stringify(value);
 }
 
-function insertionId(tableName, row, index) {
+// Derive insertId from stable event metadata, ignoring volatile row content like captured_at
+function insertionId(tableName, row, index, eventId, documentPath) {
+  const stableKey = `${tableName}:${documentPath}:${eventId}:${index}`;
   return crypto
     .createHash("sha256")
-    .update(`${tableName}:${index}:${canonicalJson(row)}`)
+    .update(stableKey)
     .digest("hex");
 }
 
@@ -117,7 +119,8 @@ function createBigQueryRecovery({
     }
   }
 
-  async function tryInsert(tableName, rows) {
+  // Accept eventId and documentPath to generate deterministic insertId
+  async function tryInsert(tableName, rows, eventId, documentPath) {
     let lastError;
     let attempts = 0;
     for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
@@ -125,7 +128,7 @@ function createBigQueryRecovery({
       try {
         const table = await ensureTable(tableName);
         const rawRows = rows.map((row, index) => ({
-          insertId: insertionId(tableName, row, index),
+          insertId: insertionId(tableName, row, index, eventId, documentPath),
           json: row,
         }));
         await table.insert(rawRows, {
@@ -191,14 +194,15 @@ function createBigQueryRecovery({
     return failureRef.id;
   }
 
-  async function insert(tableName, rows, { source = "unspecified" } = {}) {
+  // Extract eventId and documentPath from options and pass to tryInsert
+  async function insert(tableName, rows, { source = "unspecified", eventId, documentPath } = {}) {
     if (!tables[tableName]) {
       throw new Error(`Unknown BigQuery table: ${tableName}`);
     }
     const rowList = Array.isArray(rows) ? rows : [rows];
     if (rowList.length === 0) return { ok: true, attempts: 0 };
 
-    const result = await tryInsert(tableName, rowList);
+    const result = await tryInsert(tableName, rowList, eventId, documentPath);
     if (result.ok) return result;
 
     const failureId = await queueFailure(tableName, rowList, source, result);
@@ -255,27 +259,18 @@ function createBigQueryRecovery({
       if (!failure) continue;
 
       const recoveryAttempts = Number(failure.recoveryAttempts || 0) + 1;
-      const result = await tryInsert(failure.tableName, failure.rows);
+      const result = await tryInsert(failure.tableName, failure.rows, failure.eventId, failure.documentPath);
       if (result.ok) {
-        await document.ref.update({
-          status: "recovered",
-          recoveryAttempts,
-          recoveredAt: now(),
-          lastError: null,
-        });
+        await document.ref.update({ status: "recovered", recoveryAttempts, recoveredAt: now(), lastError: null });
         summary.recovered += 1;
         continue;
       }
 
-      const permanentlyFailed = recoveryAttempts >= maxRecoveryAttempts ||
-        !isRetryableError(result.error);
+      const permanentlyFailed = recoveryAttempts >= maxRecoveryAttempts || !isRetryableError(result.error);
       await document.ref.update({
-        status: permanentlyFailed ? "dead" : "pending",
-        recoveryAttempts,
+        status: permanentlyFailed ? "dead" : "pending", recoveryAttempts,
         lastFailedAt: now(),
-        nextRetryAt: permanentlyFailed ? null : new Date(
-          now().getTime() + retryDelay(baseDelayMs, recoveryAttempts)
-        ),
+        nextRetryAt: permanentlyFailed ? null : new Date(now().getTime() + retryDelay(baseDelayMs, recoveryAttempts)),
         lastError: serializeError(result.error),
       });
       summary[permanentlyFailed ? "dead" : "pending"] += 1;
@@ -293,4 +288,5 @@ module.exports = {
   createBigQueryRecovery,
   isRetryableError,
   serializeError,
+  insertionId, // Exported for testing deterministic behavior
 };

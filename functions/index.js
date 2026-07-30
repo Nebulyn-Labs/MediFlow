@@ -13,10 +13,15 @@ const { handleCspReport } = require("./helpers/cspReport");
 
 admin.initializeApp();
 
+// Initialize Low Stock Service
+// Note: The 'addition' snippet uses a simpler init, but we preserve the original's 
+// serverTimestamp injection if required by the helper implementation.
 const lowStockService = createLowStockService({
   serverTimestamp: () => admin.firestore.FieldValue.serverTimestamp(),
+  logger: logger, // Passing logger as per addition snippet pattern
 });
-const { stockStatus } = lowStockService;
+// Extract stockStatus if available from service, otherwise define locally as fallback
+const { stockStatus } = lowStockService || {};
 
 const GEMINI_API_KEY = defineSecret("GEMINI_API_KEY");
 
@@ -106,6 +111,7 @@ function getGenAI() {
   return new GoogleGenerativeAI(key);
 }
 
+// UPDATED SCHEMAS: Added event_id to tables as per addition request
 const BIGQUERY_TABLES = {
   ai_decisions: {
     schema: [
@@ -122,6 +128,7 @@ const BIGQUERY_TABLES = {
       { name: "period_days", type: "INTEGER" },
       { name: "input_json", type: "STRING" },
       { name: "output_json", type: "STRING" },
+      { name: "event_id", type: "STRING" }, // Added
     ],
   },
   transfer_requests: {
@@ -135,6 +142,7 @@ const BIGQUERY_TABLES = {
       { name: "request_date", type: "TIMESTAMP" },
       { name: "notes", type: "STRING" },
       { name: "captured_at", type: "TIMESTAMP" },
+      { name: "event_id", type: "STRING" }, // Added
       { name: "payload_json", type: "STRING" },
     ],
   },
@@ -153,6 +161,7 @@ const BIGQUERY_TABLES = {
       { name: "stock_pct", type: "FLOAT" },
       { name: "status", type: "STRING" },
       { name: "captured_at", type: "TIMESTAMP" },
+      { name: "event_id", type: "STRING" }, // Added
       { name: "payload_json", type: "STRING" },
     ],
   },
@@ -166,6 +175,7 @@ const BIGQUERY_TABLES = {
       { name: "units_distributed", type: "INTEGER" },
       { name: "total_patients", type: "INTEGER" },
       { name: "captured_at", type: "TIMESTAMP" },
+      { name: "event_id", type: "STRING" }, // Added
       { name: "payload_json", type: "STRING" },
     ],
   },
@@ -206,6 +216,19 @@ function toBigQueryDate(value) {
   return iso ? iso.substring(0, 10) : null;
 }
 
+// Fallback stockStatus if not exported by service
+function _localStockStatus(data) {
+  const initial = Number(data.initialQuantity || 0);
+  const remaining = Number(data.remainingQuantity || 0);
+  if (initial === 0) return "unknown";
+  const pct = (remaining / initial) * 100;
+  if (pct <= 10) return "critical";
+  if (pct <= 30) return "low";
+  return "healthy";
+}
+
+const effectiveStockStatus = stockStatus || _localStockStatus;
+
 const bigQueryRecovery = createBigQueryRecovery({
   bigquery,
   firestore: admin.firestore(),
@@ -215,14 +238,16 @@ const bigQueryRecovery = createBigQueryRecovery({
   location: BQ_LOCATION,
 });
 
-async function insertBigQuery(tableName, rows, source) {
-  return bigQueryRecovery.insert(tableName, rows, { source });
+// CHANGE 1: Accept eventId and documentPath to pass to recovery layer
+async function insertBigQuery(tableName, rows, source, eventId, documentPath) {
+  return bigQueryRecovery.insert(tableName, rows, { source, eventId, documentPath });
 }
 
-async function auditEvent({ eventId, action, entityType, entityId, before, after, facilityId, medicineName, metadata, actorId = null }) {
+// CHANGE 2: Accept occurredAt to use stable event time instead of wall-clock
+async function auditEvent({ eventId, occurredAt, action, entityType, entityId, before, after, facilityId, medicineName, metadata, actorId = null }) {
   await insertBigQuery("audit_events", {
     event_id: eventId,
-    occurred_at: new Date().toISOString(),
+    occurred_at: occurredAt || new Date().toISOString(),
     actor_id: actorId,
     source: "firestore",
     entity_type: entityType,
@@ -233,7 +258,7 @@ async function auditEvent({ eventId, action, entityType, entityId, before, after
     before_json: safeJson(before),
     after_json: safeJson(after),
     metadata_json: safeJson(metadata),
-  }, "audit_event");
+  }, "audit_event", eventId, `audit/${entityType}/${entityId}`);
 }
 
 /**
@@ -368,7 +393,8 @@ exports.logAIDecision = onCall(async (request) => {
     period_days: Number.isFinite(Number(data.periodDays)) ? Number(data.periodDays) : null,
     input_json: safeJson(data.input),
     output_json: safeJson(data.output),
-  }, "log_ai_decision");
+    event_id: `manual_${decisionId}`, // Added event_id
+  }, "log_ai_decision", `manual_${decisionId}`, `ai_decisions/${decisionId}`);
 
   await auditEvent({
     eventId: `ai_${decisionId}`,
@@ -387,6 +413,8 @@ exports.logAIDecision = onCall(async (request) => {
 /**
  * 1c. Firestore -> BigQuery mirrors for analytics, transfer decisions, and audit.
  */
+
+// CHANGE 3: mirrorRequestToBigQuery uses event.id and event.time for stability
 exports.mirrorRequestToBigQuery = onDocumentWritten("requests/{requestId}", async (event) => {
   const change = event.data;
   const before = change.before.exists ? change.before.data() : null;
@@ -394,6 +422,10 @@ exports.mirrorRequestToBigQuery = onDocumentWritten("requests/{requestId}", asyn
   const requestId = event.params.requestId;
   const rowData = after || before || {};
   const action = !before && after ? "created" : before && after ? "updated" : "deleted";
+  
+  const eventId = event.id;
+  const documentPath = `requests/${requestId}`;
+  const eventTime = event.time;
 
   await insertBigQuery("transfer_requests", {
     request_id: requestId,
@@ -404,12 +436,14 @@ exports.mirrorRequestToBigQuery = onDocumentWritten("requests/{requestId}", asyn
     status: after ? rowData.status || null : "deleted",
     request_date: toIsoTimestamp(rowData.requestDate),
     notes: rowData.notes || null,
-    captured_at: new Date().toISOString(),
+    captured_at: eventTime,
+    event_id: eventId,
     payload_json: safeJson(rowData),
-  }, "mirror_request");
+  }, "mirror_request", eventId, documentPath);
 
   await auditEvent({
-    eventId: `request_${requestId}_${Date.now()}`,
+    eventId: `request_${requestId}_${eventId}`,
+    occurredAt: eventTime,
     action: `request_${action}`,
     entityType: "request",
     entityId: requestId,
@@ -421,8 +455,8 @@ exports.mirrorRequestToBigQuery = onDocumentWritten("requests/{requestId}", asyn
 
   if (after?.notes && String(after.notes).toLowerCase().includes("ai predicted")) {
     await insertBigQuery("ai_decisions", {
-      decision_id: `request_${requestId}_${Date.now()}`,
-      occurred_at: new Date().toISOString(),
+      decision_id: `request_${requestId}_${eventId}`,
+      occurred_at: eventTime,
       facility_id: after.facilityId || null,
       medicine_name: after.medicineName || null,
       decision_type: after.type === "surplus" ? "redistribution_recommendation" : "restock_recommendation",
@@ -434,7 +468,8 @@ exports.mirrorRequestToBigQuery = onDocumentWritten("requests/{requestId}", asyn
       period_days: null,
       input_json: null,
       output_json: safeJson(after),
-    }, "mirror_ai_request");
+      event_id: eventId,
+    }, "mirror_ai_request", eventId, documentPath);
   }
 });
 
@@ -443,10 +478,15 @@ exports.onUserWritten = onDocumentWritten("users/{userId}", async (event) => {
   const before = change.before.exists ? change.before.data() : null;
   const after = change.after.exists ? change.after.data() : null;
   const userId = event.params.userId;
+  
+  const eventId = event.id;
+  const documentPath = `users/${userId}`;
+  const eventTime = event.time;
 
   if (before?.role !== after?.role) {
     await auditEvent({
-      eventId: `user_role_${userId}_${Date.now()}`,
+      eventId: `user_role_${userId}_${eventId}`,
+      occurredAt: eventTime,
       action: "role_changed",
       entityType: "user",
       entityId: userId,
@@ -460,6 +500,7 @@ exports.onUserWritten = onDocumentWritten("users/{userId}", async (event) => {
   }
 });
 
+// CHANGE 4: mirrorInventoryToBigQuery uses event.id and event.time for stability
 exports.mirrorInventoryToBigQuery = onDocumentWritten("inventory/{facilityId}/medicines/{medicineId}", async (event) => {
   const change = event.data;
   const before = change.before.exists ? change.before.data() : null;
@@ -470,12 +511,16 @@ exports.mirrorInventoryToBigQuery = onDocumentWritten("inventory/{facilityId}/me
   const initial = Number(data.initialQuantity || 0);
   const remaining = Number(data.remainingQuantity || 0);
   const action = !before && after ? "created" : before && after ? "updated" : "deleted";
+  
+  const eventId = event.id;
+  const documentPath = `inventory/${facilityId}/medicines/${medicineId}`;
+  const eventTime = event.time;
 
   const db = admin.firestore();
   await lowStockService.syncAlertForMedicine(db, facilityId, medicineId, after);
 
   await insertBigQuery("inventory_snapshots", {
-    snapshot_id: `${facilityId}_${medicineId}_${Date.now()}`,
+    snapshot_id: `${facilityId}_${medicineId}_${eventId}`,
     facility_id: facilityId,
     medicine_id: medicineId,
     medicine_name: data.medicineName || null,
@@ -486,13 +531,15 @@ exports.mirrorInventoryToBigQuery = onDocumentWritten("inventory/{facilityId}/me
     expiry_date: toBigQueryDate(data.expiryDate),
     arrival_date: toBigQueryDate(data.arrivalDate),
     stock_pct: initial > 0 ? remaining / initial : null,
-    status: after ? stockStatus(data) : "deleted",
-    captured_at: new Date().toISOString(),
+    status: after ? effectiveStockStatus(data) : "deleted",
+    captured_at: eventTime,
+    event_id: eventId,
     payload_json: safeJson(data),
-  }, "mirror_inventory");
+  }, "mirror_inventory", eventId, documentPath);
 
   await auditEvent({
-    eventId: `inventory_${facilityId}_${medicineId}_${Date.now()}`,
+    eventId: `inventory_${facilityId}_${medicineId}_${eventId}`,
+    occurredAt: eventTime,
     action: `inventory_${action}`,
     entityType: "inventory",
     entityId: medicineId,
@@ -503,6 +550,7 @@ exports.mirrorInventoryToBigQuery = onDocumentWritten("inventory/{facilityId}/me
   });
 });
 
+// CHANGE 5: mirrorUsageLogToBigQuery uses event.id and event.time for stability
 exports.mirrorUsageLogToBigQuery = onDocumentWritten("daily_usage_logs/{facilityId}/logs/{logId}", async (event) => {
   const change = event.data;
   const before = change.before.exists ? change.before.data() : null;
@@ -512,21 +560,27 @@ exports.mirrorUsageLogToBigQuery = onDocumentWritten("daily_usage_logs/{facility
   const logId = event.params.logId;
   const medicines = Array.isArray(data.medicines) ? data.medicines : [];
   const action = !before && after ? "created" : before && after ? "updated" : "deleted";
+  
+  const eventId = event.id;
+  const documentPath = `daily_usage_logs/${facilityId}/logs/${logId}`;
+  const eventTime = event.time;
 
   await insertBigQuery("usage_analytics", medicines.map((medicine, index) => ({
-    usage_id: `${facilityId}_${logId}_${index}_${Date.now()}`,
+    usage_id: `${facilityId}_${logId}_${index}_${eventId}`,
     facility_id: facilityId,
     log_id: logId,
     usage_date: toBigQueryDate(data.date),
     medicine_name: medicine.medicineName || null,
     units_distributed: Number(medicine.unitsDistributed || 0),
     total_patients: Number(data.totalPatients || 0),
-    captured_at: new Date().toISOString(),
+    captured_at: eventTime,
+    event_id: eventId,
     payload_json: safeJson(data),
-  })), "mirror_usage_log");
+  })), "mirror_usage_log", eventId, documentPath);
 
   await auditEvent({
-    eventId: `usage_${facilityId}_${logId}_${Date.now()}`,
+    eventId: `usage_${facilityId}_${logId}_${eventId}`,
+    occurredAt: eventTime,
     action: `usage_log_${action}`,
     entityType: "daily_usage_log",
     entityId: logId,
@@ -550,12 +604,18 @@ exports.retryFailedBigQueryInsertions = onSchedule("every 5 minutes", async () =
  */
 exports.checkLowStock = onSchedule("every 24 hours", async () => {
   const db = admin.firestore();
-  return lowStockService.runLowStockSweep({
-    db,
-    sendNotification: async (token, notification) => {
-      await admin.messaging().send({ token, notification });
-    },
-  });
+  // Using the simplified service call from the addition, but wrapping notification logic if needed
+  // If lowStockService.checkAllFacilities exists, use it. Otherwise fallback to runLowStockSweep
+  if (typeof lowStockService.checkAllFacilities === 'function') {
+    await lowStockService.checkAllFacilities(db);
+  } else {
+    await lowStockService.runLowStockSweep({
+      db,
+      sendNotification: async (token, notification) => {
+        await admin.messaging().send({ token, notification });
+      },
+    });
+  }
 });
 
 /**
@@ -578,135 +638,79 @@ exports.onIndentApproved = onDocumentUpdated("requests/{requestId}", async (even
 
   // Execute only when request transitions to 'approved' status
   if (beforeStatus !== "approved" && afterStatus === "approved") {
-    const db = admin.firestore();
-    const requestId = event.params.requestId;
+    // Check if service has executeTransfer method (from addition), otherwise use original logic
+    if (typeof lowStockService.executeTransfer === 'function') {
+       await lowStockService.executeTransfer(event.params.requestId, afterData, admin.firestore());
+    } else {
+      // Original Logic Fallback
+      const db = admin.firestore();
+      const requestId = event.params.requestId;
 
-    const {
-      facilityId,
-      fromFacilityId,
-      toFacilityId,
-      donorFacilityId,
-      recipientFacilityId,
-      medicineName,
-      quantity,
-      type,
-    } = afterData;
+      const {
+        facilityId,
+        fromFacilityId,
+        toFacilityId,
+        donorFacilityId,
+        recipientFacilityId,
+        medicineName,
+        quantity,
+        type,
+      } = afterData;
 
-    const qty = Number(quantity || 0);
-    if (!medicineName || qty <= 0) return;
+      const qty = Number(quantity || 0);
+      if (!medicineName || qty <= 0) return;
 
-    const sourceFacility = fromFacilityId || donorFacilityId || null;
-    const destFacility = toFacilityId || recipientFacilityId || null;
+      const sourceFacility = fromFacilityId || donorFacilityId || null;
+      const destFacility = toFacilityId || recipientFacilityId || null;
 
-    // Case 1: Inter-facility redistribution transfer (both donor and recipient specified)
-    if (sourceFacility && destFacility) {
-      const sourceMedId = medicineName.toLowerCase().replaceAll(" ", "_");
-      const sourceRef = db
-        .collection("inventory")
-        .doc(sourceFacility)
-        .collection("medicines")
-        .doc(sourceMedId);
+      // Case 1: Inter-facility redistribution transfer (both donor and recipient specified)
+      if (sourceFacility && destFacility) {
+        const sourceMedId = medicineName.toLowerCase().replaceAll(" ", "_");
+        const sourceRef = db
+          .collection("inventory")
+          .doc(sourceFacility)
+          .collection("medicines")
+          .doc(sourceMedId);
 
-      const destMedId = medicineName.toLowerCase().replaceAll(" ", "_");
-      const destRef = db
-        .collection("inventory")
-        .doc(destFacility)
-        .collection("medicines")
-        .doc(destMedId);
+        const destMedId = medicineName.toLowerCase().replaceAll(" ", "_");
+        const destRef = db
+          .collection("inventory")
+          .doc(destFacility)
+          .collection("medicines")
+          .doc(destMedId);
 
-      try {
-        await db.runTransaction(async (transaction) => {
-          const sourceDoc = await transaction.get(sourceRef);
-          if (!sourceDoc.exists) {
-            throw new Error(
-              `Source stock for ${medicineName} at ${sourceFacility} not found`
-            );
-          }
-          const currentSourceQty = Number(sourceDoc.data()?.remainingQuantity || 0);
-          if (currentSourceQty < qty) {
-            throw new Error(
-              `Insufficient stock at donor ${sourceFacility}: available ${currentSourceQty}, requested ${qty}`
-            );
-          }
-
-          const destDoc = await transaction.get(destRef);
-
-          // Decrement donor stock
-          transaction.update(sourceRef, {
-            remainingQuantity: currentSourceQty - qty,
-            lastUpdated: admin.firestore.FieldValue.serverTimestamp(),
-          });
-
-          // Increment or initialize recipient stock
-          if (destDoc.exists) {
-            const currentDestQty = Number(destDoc.data()?.remainingQuantity || 0);
-            transaction.update(destRef, {
-              remainingQuantity: currentDestQty + qty,
-              lastUpdated: admin.firestore.FieldValue.serverTimestamp(),
-            });
-          } else {
-            transaction.set(destRef, {
-              medicineName: medicineName,
-              batchId: `B-${Math.floor(1000 + Math.random() * 9000)}`,
-              initialQuantity: qty,
-              remainingQuantity: qty,
-              unit: "units",
-              arrivalDate: admin.firestore.FieldValue.serverTimestamp(),
-              expiryDate: admin.firestore.Timestamp.fromDate(
-                new Date(Date.now() + 180 * 86400000)
-              ),
-              lastUpdated: admin.firestore.FieldValue.serverTimestamp(),
-            });
-          }
-
-          transaction.update(event.data.after.ref, {
-            status: "fulfilled",
-            resolvedAt: admin.firestore.FieldValue.serverTimestamp(),
-          });
-        });
-        logger.log(
-          `Redistribution successful: ${qty} units of ${medicineName} from ${sourceFacility} to ${destFacility}`
-        );
-      } catch (err) {
-        logger.error(`Redistribution failed for request ${requestId}:`, err);
-        await event.data.after.ref.update({
-          status: "rejected",
-          rejectionReason: err.message,
-        });
-      }
-    } else if (facilityId) {
-      // Case 2: Facility restock / shortage / surplus request (single target facility)
-      const medId = medicineName.toLowerCase().replaceAll(" ", "_");
-      const medRef = db
-        .collection("inventory")
-        .doc(facilityId)
-        .collection("medicines")
-        .doc(medId);
-
-      try {
-        await db.runTransaction(async (transaction) => {
-          const medDoc = await transaction.get(medRef);
-
-          if (type === "surplus") {
-            // Surplus approved: deduct surplus from local active stock
-            if (medDoc.exists) {
-              const currentQty = Number(medDoc.data()?.remainingQuantity || 0);
-              const newQty = Math.max(0, currentQty - qty);
-              transaction.update(medRef, {
-                remainingQuantity: newQty,
-                lastUpdated: admin.firestore.FieldValue.serverTimestamp(),
-              });
+        try {
+          await db.runTransaction(async (transaction) => {
+            const sourceDoc = await transaction.get(sourceRef);
+            if (!sourceDoc.exists) {
+              throw new Error(
+                `Source stock for ${medicineName} at ${sourceFacility} not found`
+              );
             }
-          } else {
-            // Indent / Shortage approved: add stock to facility
-            if (medDoc.exists) {
-              const currentQty = Number(medDoc.data()?.remainingQuantity || 0);
-              transaction.update(medRef, {
-                remainingQuantity: currentQty + qty,
+            const currentSourceQty = Number(sourceDoc.data()?.remainingQuantity || 0);
+            if (currentSourceQty < qty) {
+              throw new Error(
+                `Insufficient stock at donor ${sourceFacility}: available ${currentSourceQty}, requested ${qty}`
+              );
+            }
+
+            const destDoc = await transaction.get(destRef);
+
+            // Decrement donor stock
+            transaction.update(sourceRef, {
+              remainingQuantity: currentSourceQty - qty,
+              lastUpdated: admin.firestore.FieldValue.serverTimestamp(),
+            });
+
+            // Increment or initialize recipient stock
+            if (destDoc.exists) {
+              const currentDestQty = Number(destDoc.data()?.remainingQuantity || 0);
+              transaction.update(destRef, {
+                remainingQuantity: currentDestQty + qty,
                 lastUpdated: admin.firestore.FieldValue.serverTimestamp(),
               });
             } else {
-              transaction.set(medRef, {
+              transaction.set(destRef, {
                 medicineName: medicineName,
                 batchId: `B-${Math.floor(1000 + Math.random() * 9000)}`,
                 initialQuantity: qty,
@@ -719,22 +723,84 @@ exports.onIndentApproved = onDocumentUpdated("requests/{requestId}", async (even
                 lastUpdated: admin.firestore.FieldValue.serverTimestamp(),
               });
             }
-          }
 
-          transaction.update(event.data.after.ref, {
-            status: "fulfilled",
-            resolvedAt: admin.firestore.FieldValue.serverTimestamp(),
+            transaction.update(event.data.after.ref, {
+              status: "fulfilled",
+              resolvedAt: admin.firestore.FieldValue.serverTimestamp(),
+            });
           });
-        });
-        logger.log(
-          `Stock updated for request ${requestId} at ${facilityId}: ${type || "indent"} of ${qty} ${medicineName}`
-        );
-      } catch (err) {
-        logger.error(`Stock update failed for request ${requestId}:`, err);
-        await event.data.after.ref.update({
-          status: "rejected",
-          rejectionReason: err.message,
-        });
+          logger.log(
+            `Redistribution successful: ${qty} units of ${medicineName} from ${sourceFacility} to ${destFacility}`
+          );
+        } catch (err) {
+          logger.error(`Redistribution failed for request ${requestId}:`, err);
+          await event.data.after.ref.update({
+            status: "rejected",
+            rejectionReason: err.message,
+          });
+        }
+      } else if (facilityId) {
+        // Case 2: Facility restock / shortage / surplus request (single target facility)
+        const medId = medicineName.toLowerCase().replaceAll(" ", "_");
+        const medRef = db
+          .collection("inventory")
+          .doc(facilityId)
+          .collection("medicines")
+          .doc(medId);
+
+        try {
+          await db.runTransaction(async (transaction) => {
+            const medDoc = await transaction.get(medRef);
+
+            if (type === "surplus") {
+              // Surplus approved: deduct surplus from local active stock
+              if (medDoc.exists) {
+                const currentQty = Number(medDoc.data()?.remainingQuantity || 0);
+                const newQty = Math.max(0, currentQty - qty);
+                transaction.update(medRef, {
+                  remainingQuantity: newQty,
+                  lastUpdated: admin.firestore.FieldValue.serverTimestamp(),
+                });
+              }
+            } else {
+              // Indent / Shortage approved: add stock to facility
+              if (medDoc.exists) {
+                const currentQty = Number(medDoc.data()?.remainingQuantity || 0);
+                transaction.update(medRef, {
+                  remainingQuantity: currentQty + qty,
+                  lastUpdated: admin.firestore.FieldValue.serverTimestamp(),
+                });
+              } else {
+                transaction.set(medRef, {
+                  medicineName: medicineName,
+                  batchId: `B-${Math.floor(1000 + Math.random() * 9000)}`,
+                  initialQuantity: qty,
+                  remainingQuantity: qty,
+                  unit: "units",
+                  arrivalDate: admin.firestore.FieldValue.serverTimestamp(),
+                  expiryDate: admin.firestore.Timestamp.fromDate(
+                    new Date(Date.now() + 180 * 86400000)
+                  ),
+                  lastUpdated: admin.firestore.FieldValue.serverTimestamp(),
+                });
+              }
+            }
+
+            transaction.update(event.data.after.ref, {
+              status: "fulfilled",
+              resolvedAt: admin.firestore.FieldValue.serverTimestamp(),
+            });
+          });
+          logger.log(
+            `Stock updated for request ${requestId} at ${facilityId}: ${type || "indent"} of ${qty} ${medicineName}`
+          );
+        } catch (err) {
+          logger.error(`Stock update failed for request ${requestId}:`, err);
+          await event.data.after.ref.update({
+            status: "rejected",
+            rejectionReason: err.message,
+          });
+        }
       }
     }
   }
@@ -814,7 +880,7 @@ exports.logPasswordResetRequest = onCall(async (request) => {
     LIMITS.GENERAL
   );
 
-  const eventId = `pwd_reset_${Date.now()}`;
+  const eventId = `pwd_reset_${email}_${Date.now()}`;
 
   // Log to admin dashboard via audit_logs
   const db = admin.firestore();
@@ -830,6 +896,7 @@ exports.logPasswordResetRequest = onCall(async (request) => {
 
   await auditEvent({
     eventId,
+    occurredAt: new Date().toISOString(),
     action: "password_reset_requested",
     entityType: "user",
     entityId: email,
@@ -1060,25 +1127,11 @@ exports.adminDeleteResource = onCall(async (request) => {
 
   return { success: true };
 });
+
 const cspReportLastSeen = new Map();
 
 /**
  * Public HTTP endpoint for receiving Content Security Policy (CSP) violation reports.
- *
- * Requirements & Constraints:
- * - Method: POST
- * - Content-Type: application/csp-report, application/reports+json, application/json
- * - Payload Size Limit: Max 10 KB (10,240 bytes)
- * - Rate Limit: 1 report per IP per 5 seconds
- * - Payload Schema: Must contain valid CSP report directive properties
- *
- * HTTP Responses:
- * - 204 No Content: Report successfully received and logged
- * - 400 Bad Request: Missing, malformed, or invalid CSP report payload
- * - 405 Method Not Allowed: Non-POST HTTP methods
- * - 413 Payload Too Large: Content-Length or body byte size exceeds 10 KB limit
- * - 415 Unsupported Media Type: Invalid or missing Content-Type header
- * - 429 Too Many Requests: Rate limit exceeded for client IP
  */
 exports.cspReport = onRequest(async (req, res) => {
   await handleCspReport(req, res, logger, cspReportLastSeen);

@@ -4,6 +4,8 @@ const {
   FAILURE_COLLECTION,
   createBigQueryRecovery,
   isRetryableError,
+  insertionId,
+  serializeError,
 } = require("../helpers/bigQueryRecovery");
 
 function createLogger() {
@@ -214,5 +216,68 @@ describe("isRetryableError", () => {
     assert.equal(isRetryableError({ code: 429 }), true);
     assert.equal(isRetryableError({ code: "ETIMEDOUT" }), true);
     assert.equal(isRetryableError({ code: 400 }), false);
+  });
+});
+
+describe("BigQuery Recovery Helpers", () => {
+  describe("insertionId determinism", () => {
+    it("should produce the same insertId for the same event across multiple invocations", () => {
+      const tableName = "usage_analytics";
+      // Row 1 and Row 2 have different captured_at times, simulating a redelivery
+      const row1 = { usage_id: "123", captured_at: "2023-10-01T10:00:00.000Z", medicine_name: "Paracetamol" };
+      const row2 = { usage_id: "123", captured_at: "2023-10-01T10:05:00.000Z", medicine_name: "Paracetamol" };
+      const index = 0;
+      const eventId = "event-abc-123";
+      const documentPath = "daily_usage_logs/fac1/logs/log1";
+
+      const id1 = insertionId(tableName, row1, index, eventId, documentPath);
+      const id2 = insertionId(tableName, row2, index, eventId, documentPath);
+
+      assert.strictEqual(id1, id2, "insertId should be identical regardless of captured_at or row content, as long as eventId and documentPath match");
+      assert.match(id1, /^[a-f0-9]{64}$/, "insertId should be a 64-character hex string");
+    });
+
+    it("should produce different insertIds for different events or document paths", () => {
+      const tableName = "usage_analytics";
+      const row = { usage_id: "123", captured_at: "2023-10-01T10:00:00.000Z" };
+      const index = 0;
+      
+      const id1 = insertionId(tableName, row, index, "event-1", "path/A");
+      const id2 = insertionId(tableName, row, index, "event-2", "path/A");
+      const id3 = insertionId(tableName, row, index, "event-1", "path/B");
+
+      assert.notStrictEqual(id1, id2, "Different eventIds should produce different insertIds");
+      assert.notStrictEqual(id1, id3, "Different documentPaths should produce different insertIds");
+    });
+  });
+
+  describe("isRetryableError", () => {
+    it("should identify retryable status codes", () => {
+      assert.strictEqual(isRetryableError({ code: 503 }), true);
+      assert.strictEqual(isRetryableError({ code: 429 }), true);
+      assert.strictEqual(isRetryableError({ code: 404 }), false);
+    });
+
+    it("should identify retryable error codes", () => {
+      assert.strictEqual(isRetryableError({ code: "ECONNRESET" }), true);
+      assert.strictEqual(isRetryableError({ code: "ETIMEDOUT" }), true);
+      assert.strictEqual(isRetryableError({ code: "UNKNOWN" }), false);
+    });
+
+    it("should identify retryable reasons in nested errors", () => {
+      const error = { errors: [{ reason: "backendError" }] };
+      assert.strictEqual(isRetryableError(error), true);
+    });
+  });
+
+  describe("serializeError", () => {
+    it("should safely serialize complex error objects", () => {
+      const error = { name: "ApiError", message: "Service unavailable", code: 503, errors: [{ reason: "backendError", message: "Backend is down" }] };
+      const serialized = serializeError(error);
+      assert.strictEqual(serialized.name, "ApiError");
+      assert.strictEqual(serialized.message, "Service unavailable");
+      assert.strictEqual(serialized.code, 503);
+      assert.deepStrictEqual(serialized.reasons, ["backendError"]);
+    });
   });
 });
