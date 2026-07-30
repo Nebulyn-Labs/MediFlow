@@ -16,7 +16,7 @@ class AuditTrailPage extends ConsumerStatefulWidget {
 class _AuditTrailPageState extends ConsumerState<AuditTrailPage> {
   static const int _pageSize = 20;
   final ScrollController _scrollController = ScrollController();
-  
+
   List<AuditLog> _logs = [];
   DocumentSnapshot? _lastDocument;
   bool _isLoading = false;
@@ -45,7 +45,8 @@ class _AuditTrailPageState extends ConsumerState<AuditTrailPage> {
   }
 
   void _onScroll() {
-    if (_scrollController.position.pixels >= _scrollController.position.maxScrollExtent - 200 &&
+    if (_scrollController.position.pixels >=
+            _scrollController.position.maxScrollExtent - 200 &&
         !_isLoading &&
         _hasMore) {
       _loadMoreData();
@@ -95,7 +96,7 @@ class _AuditTrailPageState extends ConsumerState<AuditTrailPage> {
     });
 
     final firebaseService = ref.read(firebaseServiceProvider);
-    
+
     try {
       final result = await firebaseService.getPaginatedAuditLogs(
         pageSize: _pageSize,
@@ -139,7 +140,9 @@ class _AuditTrailPageState extends ConsumerState<AuditTrailPage> {
             padding: const EdgeInsets.only(right: 8),
             child: FilterChip(
               label: Text(
-                filter == 'All' ? 'All Actions' : filter.replaceAll('_', ' ').toUpperCase(),
+                filter == 'All'
+                    ? 'All Actions'
+                    : filter.replaceAll('_', ' ').toUpperCase(),
                 style: TextStyle(
                   color: isSelected ? Colors.white : MediColors.textSecondary,
                   fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
@@ -171,7 +174,8 @@ class _AuditTrailPageState extends ConsumerState<AuditTrailPage> {
         backgroundColor: MediColors.surface,
         title: const Text(
           'Audit Trail',
-          style: TextStyle(color: MediColors.textPrimary, fontWeight: FontWeight.bold),
+          style: TextStyle(
+              color: MediColors.textPrimary, fontWeight: FontWeight.bold),
         ),
         elevation: 1,
         shadowColor: Colors.black12,
@@ -188,7 +192,8 @@ class _AuditTrailPageState extends ConsumerState<AuditTrailPage> {
                       padding: const EdgeInsets.all(24.0),
                       child: Text(
                         'Error loading logs:\n$_errorMessage',
-                        style: const TextStyle(color: MediColors.error, fontSize: 14),
+                        style: const TextStyle(
+                            color: MediColors.error, fontSize: 14),
                         textAlign: TextAlign.center,
                       ),
                     ),
@@ -197,27 +202,30 @@ class _AuditTrailPageState extends ConsumerState<AuditTrailPage> {
                     ? const Center(
                         child: Text(
                           'No audit logs found.',
-                          style: TextStyle(color: MediColors.textSecondary, fontSize: 16),
+                          style: TextStyle(
+                              color: MediColors.textSecondary, fontSize: 16),
                         ),
                       )
-                : ListView.separated(
-                    controller: _scrollController,
-                    padding: const EdgeInsets.all(24),
-                    itemCount: _logs.length + (_hasMore ? 1 : 0),
-                    separatorBuilder: (context, index) => const SizedBox(height: 12),
-                    itemBuilder: (context, index) {
-                      if (index == _logs.length) {
-                        return const Center(
-                          child: Padding(
-                            padding: EdgeInsets.all(16.0),
-                            child: CircularProgressIndicator(color: MediColors.primary),
-                          ),
-                        );
-                      }
-                      final log = _logs[index];
-                      return _buildLogCard(log);
-                    },
-                  ),
+                    : ListView.separated(
+                        controller: _scrollController,
+                        padding: const EdgeInsets.all(24),
+                        itemCount: _logs.length + (_hasMore ? 1 : 0),
+                        separatorBuilder: (context, index) =>
+                            const SizedBox(height: 12),
+                        itemBuilder: (context, index) {
+                          if (index == _logs.length) {
+                            return const Center(
+                              child: Padding(
+                                padding: EdgeInsets.all(16.0),
+                                child: CircularProgressIndicator(
+                                    color: MediColors.primary),
+                              ),
+                            );
+                          }
+                          final log = _logs[index];
+                          return _buildLogCard(log);
+                        },
+                      ),
           ),
         ],
       ),
@@ -262,13 +270,20 @@ class _AuditTrailPageState extends ConsumerState<AuditTrailPage> {
           const SizedBox(height: 8),
           RichText(
             text: TextSpan(
-              style: const TextStyle(fontSize: 14, color: MediColors.textPrimary),
+              style:
+                  const TextStyle(fontSize: 14, color: MediColors.textPrimary),
               children: [
-                const TextSpan(text: 'Admin ID: ', style: TextStyle(fontWeight: FontWeight.w600)),
+                const TextSpan(
+                    text: 'Admin ID: ',
+                    style: TextStyle(fontWeight: FontWeight.w600)),
                 TextSpan(text: '${log.adminId}\n'),
-                const TextSpan(text: 'Resource: ', style: TextStyle(fontWeight: FontWeight.w600)),
+                const TextSpan(
+                    text: 'Resource: ',
+                    style: TextStyle(fontWeight: FontWeight.w600)),
                 TextSpan(text: '${log.resourceType} (${log.resourceId})\n'),
-                const TextSpan(text: 'Status: ', style: TextStyle(fontWeight: FontWeight.w600)),
+                const TextSpan(
+                    text: 'Status: ',
+                    style: TextStyle(fontWeight: FontWeight.w600)),
                 TextSpan(text: log.status),
               ],
             ),
@@ -277,7 +292,10 @@ class _AuditTrailPageState extends ConsumerState<AuditTrailPage> {
             const SizedBox(height: 8),
             const Text(
               'Details:',
-              style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14, color: MediColors.textPrimary),
+              style: TextStyle(
+                  fontWeight: FontWeight.w600,
+                  fontSize: 14,
+                  color: MediColors.textPrimary),
             ),
             const SizedBox(height: 4),
             Container(
@@ -288,7 +306,10 @@ class _AuditTrailPageState extends ConsumerState<AuditTrailPage> {
               ),
               child: Text(
                 log.metadata.toString(),
-                style: const TextStyle(fontSize: 12, color: MediColors.textSecondary, fontFamily: 'monospace'),
+                style: const TextStyle(
+                    fontSize: 12,
+                    color: MediColors.textSecondary,
+                    fontFamily: 'monospace'),
               ),
             ),
           ]
