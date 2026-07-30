@@ -12,9 +12,9 @@ import '../models/audit_log.dart';
 import '../models/notification.dart' as import_notification;
 import 'simulation_service.dart';
 
-final firebaseServiceProvider = Provider<FirebaseService>((ref) {
+final firebaseServiceProvider = Provider((ref) {
   return FirebaseService(
-      FirebaseFirestore.instance, auth.FirebaseAuth.instance);
+    FirebaseFirestore.instance, auth.FirebaseAuth.instance);
 });
 
 class FirebaseService {
@@ -24,11 +24,18 @@ class FirebaseService {
 
   FirebaseService(this._firestore, this._auth) {
     _simulation = SimulationService(_firestore);
+    
+    // Explicitly enable and configure offline persistence 
+    // to guarantee local storage and automatic retry of pending writes.
+    _firestore.settings = const Settings(
+      persistenceEnabled: true,
+      cacheSizeBytes: Settings.CACHE_SIZE_UNLIMITED,
+    );
   }
 
   // --- AUTH & FACILITY ---
 
-  Future<auth.UserCredential> login(String email, String password) async {
+  Future login(String email, String password) async {
     return await _auth.signInWithEmailAndPassword(
         email: email, password: password);
   }
@@ -51,7 +58,7 @@ class FirebaseService {
     }
   }
 
-  Future<void> signUpFacility({
+  Future signUpFacility({
     required String name,
     required String email,
     required String password,
@@ -128,7 +135,7 @@ class FirebaseService {
     return Facility.fromMap(doc.data()!, doc.id);
   }
 
-  Future<void> updateFacility(String id, Map<String, dynamic> data) async {
+  Future updateFacility(String id, Map<String, dynamic> data) async {
     await _firestore.collection('facilities').doc(id).update(data);
   }
 
@@ -212,7 +219,7 @@ class FirebaseService {
     );
   }
 
-  Future<void> restock(
+  Future restock(
       String facilityId, String medicineName, int quantity) async {
     final medicineId = medicineName.toLowerCase().replaceAll(' ', '_');
     final invRef = _firestore
@@ -300,7 +307,7 @@ class FirebaseService {
 
   // --- LOGGING ---
 
-  Future<void> logUsage({
+  Future logUsage({
     required String facilityId,
     required DateTime date,
     required String medicineName,
@@ -340,7 +347,7 @@ class FirebaseService {
       // 2. Update Daily Log
       final logDoc = await transaction.get(logRef);
       if (logDoc.exists) {
-        List medicines = logDoc.data()?['medicines'] ?? [];
+        List<dynamic> medicines = logDoc.data()?['medicines'] ?? [];
         int totalPatients = logDoc.data()?['totalPatients'] ?? 0;
 
         // Update existing medicine usage or add new
@@ -383,28 +390,28 @@ class FirebaseService {
         .toList());
   }
 
-  Future<void> addRequest(MedRequest request) async {
+  Future addRequest(MedRequest request) async {
     await _firestore.collection('requests').add(request.toMap());
   }
 
-  Future<void> updateRequestStatus(
+  Future updateRequestStatus(
       String requestId, RequestStatus status) async {
     await _firestore.collection('requests').doc(requestId).update({
       'status': status.name,
     });
   }
 
-  Future<void> updateRequestQuantity(String requestId, int quantity) async {
+  Future updateRequestQuantity(String requestId, int quantity) async {
     await _firestore.collection('requests').doc(requestId).update({
       'quantity': quantity,
     });
   }
 
-  Future<void> deleteRequest(String requestId) async {
+  Future deleteRequest(String requestId) async {
     await _firestore.collection('requests').doc(requestId).delete();
   }
 
-  Future<void> disposeInventory(String facilityId, String medicineName) async {
+  Future disposeInventory(String facilityId, String medicineName) async {
     final medicineId = medicineName.toLowerCase().replaceAll(' ', '_');
     final invRef = _firestore
         .collection('inventory')
@@ -460,10 +467,7 @@ class FirebaseService {
 
   // --- CLEANUP & SEEDING ---
 
-  Future<void> clearDatabase() async {
-    // Note: This is for demo purposes to provide a clean state.
-    // In production, you would never wipe collections like this.
-
+  Future clearDatabase() async {
     final collections = [
       'facilities',
       'inventory',
@@ -672,45 +676,45 @@ class FirebaseService {
 
       // Match 1: ORS (Rampur Rural Needs, Modinagar Urban Surplus)
       await addRequest(MedRequest(
-          id: '',
-          facilityId: f1Id,
-          medicineName: 'ORS',
-          type: RequestType.regularIndent,
-          quantity: 800,
-          requestDate: DateTime.now(),
-          status: RequestStatus.pending,
-          notes: 'Critical shortage predicted by AI for summer spike.'));
+        id: '',
+        facilityId: f1Id,
+        medicineName: 'ORS',
+        type: RequestType.regularIndent,
+        quantity: 800,
+        requestDate: DateTime.now(),
+        status: RequestStatus.pending,
+        notes: 'Critical shortage predicted by AI for summer spike.'));
 
       await addRequest(MedRequest(
-          id: '',
-          facilityId: f2Id,
-          medicineName: 'ORS',
-          type: RequestType.surplus,
-          quantity: 1000,
-          requestDate: DateTime.now(),
-          status: RequestStatus.pending,
-          notes: 'Excess stock identified. Available for redistribution.'));
+        id: '',
+        facilityId: f2Id,
+        medicineName: 'ORS',
+        type: RequestType.surplus,
+        quantity: 1000,
+        requestDate: DateTime.now(),
+        status: RequestStatus.pending,
+        notes: 'Excess stock identified. Available for redistribution.'));
 
       // Match 2: Antibiotics (Bhojpur Rural Needs, Ghaziabad Urban Surplus)
       await addRequest(MedRequest(
-          id: '',
-          facilityId: f5Id,
-          medicineName: 'Antibiotic',
-          type: RequestType.shortage,
-          quantity: 300,
-          requestDate: DateTime.now(),
-          status: RequestStatus.approved,
-          notes: 'Post-monsoon surge in infections.'));
+        id: '',
+        facilityId: f5Id,
+        medicineName: 'Antibiotic',
+        type: RequestType.shortage,
+        quantity: 300,
+        requestDate: DateTime.now(),
+        status: RequestStatus.approved,
+        notes: 'Post-monsoon surge in infections.'));
 
       await addRequest(MedRequest(
-          id: '',
-          facilityId: f4Id,
-          medicineName: 'Antibiotic',
-          type: RequestType.surplus,
-          quantity: 500,
-          requestDate: DateTime.now(),
-          status: RequestStatus.pending,
-          notes: 'Surplus stock optimization.'));
+        id: '',
+        facilityId: f4Id,
+        medicineName: 'Antibiotic',
+        type: RequestType.surplus,
+        quantity: 500,
+        requestDate: DateTime.now(),
+        status: RequestStatus.pending,
+        notes: 'Surplus stock optimization.'));
 
       // Unmatched: Paracetamol (Just for variety)
       await addRequest(MedRequest(
@@ -767,6 +771,29 @@ class FirebaseService {
       );
     } catch (e) {
       throw Exception('Error fetching audit logs: $e');
+    }
+  }
+
+  // --- OFFLINE SYNC & RETRY SUPPORT ---
+
+  /// Stream that emits true when there are pending writes in the daily_usage_logs collection,
+  /// indicating offline changes are waiting to be synchronized.
+  Stream<bool> get hasPendingWritesStream {
+    return _firestore
+        .collection('daily_usage_logs')
+        .limit(1)
+        .snapshots(includeMetadataChanges: true)
+        .map((snapshot) => snapshot.metadata.hasPendingWrites);
+  }
+
+  /// Forces the Firestore client to attempt to synchronize any pending writes.
+  /// This serves as a manual retry mechanism if automatic synchronization is delayed.
+  Future<void> forceSyncPendingWrites() async {
+    try {
+      await _firestore.enableNetwork();
+      await _firestore.waitForPendingWrites();
+    } catch (e) {
+      debugPrint('Force sync failed or no pending writes: $e');
     }
   }
 }

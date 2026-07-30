@@ -30,7 +30,7 @@ List<Map<String, dynamic>> parseVisionJson(String text) {
       final jsonSub = text.substring(start, end + 1);
       final decoded = jsonDecode(jsonSub);
       if (decoded is List) {
-        return decoded.map<Map<String, dynamic>>((item) {
+        return decoded.map((item) {
           if (item is Map) {
             return {
               'medicine': item['medicine']?.toString().trim() ?? '',
@@ -192,11 +192,11 @@ class _DailyLoggingPageState extends ConsumerState<DailyLoggingPage>
     setState(() => _isSubmitting = true);
     try {
       await ref.read(firebaseServiceProvider).logUsage(
-          facilityId: widget.facilityId,
-          date: _selectedDate,
-          medicineName: _medName!,
-          quantity: _quantity,
-          patients: _patients);
+            facilityId: widget.facilityId,
+            date: _selectedDate,
+            medicineName: _medName!,
+            quantity: _quantity,
+            patients: _patients);
       if (mounted) {
         ScaffoldMessenger.of(context)
             .showSnackBar(const SnackBar(content: Text('Log saved ✓')));
@@ -294,11 +294,11 @@ class _DailyLoggingPageState extends ConsumerState<DailyLoggingPage>
     try {
       for (var item in _csvItems) {
         await ref.read(firebaseServiceProvider).logUsage(
-            facilityId: widget.facilityId,
-            date: _selectedDate,
-            medicineName: item['medicine'],
-            quantity: item['quantity'],
-            patients: item['patients']);
+              facilityId: widget.facilityId,
+              date: _selectedDate,
+              medicineName: item['medicine'],
+              quantity: item['quantity'],
+              patients: item['patients']);
       }
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -342,11 +342,11 @@ class _DailyLoggingPageState extends ConsumerState<DailyLoggingPage>
     try {
       for (var item in _scannedItems) {
         await ref.read(firebaseServiceProvider).logUsage(
-            facilityId: widget.facilityId,
-            date: _selectedDate,
-            medicineName: item['medicine'],
-            quantity: item['quantity'],
-            patients: item['patients']);
+              facilityId: widget.facilityId,
+              date: _selectedDate,
+              medicineName: item['medicine'],
+              quantity: item['quantity'],
+              patients: item['patients']);
       }
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -380,8 +380,8 @@ class _DailyLoggingPageState extends ConsumerState<DailyLoggingPage>
         _imageItems.clear();
       });
       final parsed = await ref.read(aiServiceProvider).parseImageWithVision(
-          bytes,
-          'Extract all medicine names, quantities, and patient counts from this image. Output JSON: [{"medicine": "string", "quantity": int, "patients": int}]');
+            bytes,
+            'Extract all medicine names, quantities, and patient counts from this image. Output JSON: [{"medicine": "string", "quantity": int, "patients": int}]');
       if (mounted) {
         final extractedItems = parseVisionJson(parsed);
         setState(() {
@@ -442,11 +442,11 @@ class _DailyLoggingPageState extends ConsumerState<DailyLoggingPage>
     try {
       for (var item in _imageItems) {
         await ref.read(firebaseServiceProvider).logUsage(
-            facilityId: widget.facilityId,
-            date: _selectedDate,
-            medicineName: item['medicine'],
-            quantity: item['quantity'],
-            patients: item['patients']);
+              facilityId: widget.facilityId,
+              date: _selectedDate,
+              medicineName: item['medicine'],
+              quantity: item['quantity'],
+              patients: item['patients']);
       }
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -467,6 +467,48 @@ class _DailyLoggingPageState extends ConsumerState<DailyLoggingPage>
     }
   }
 
+  // --- NEW: Sync Status Banner ---
+  Widget _buildSyncStatusBanner() {
+    return StreamBuilder<bool>(
+      stream: ref.read(firebaseServiceProvider).hasPendingWritesStream,
+      builder: (context, snapshot) {
+        if (snapshot.hasData && snapshot.data == true) {
+          return Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+            color: MediColors.warning.withValues(alpha: 0.15),
+            child: Row(
+              children: const [
+                Icon(Icons.cloud_upload_outlined, color: MediColors.warning, size: 20),
+                SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    'Saving locally. Changes will sync automatically when online.',
+                    style: TextStyle(
+                      color: MediColors.warning,
+                      fontWeight: FontWeight.w600,
+                      fontSize: 13,
+                    ),
+                  ),
+                ),
+                SizedBox(width: 8),
+                SizedBox(
+                  width: 16,
+                  height: 16,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: MediColors.warning,
+                  ),
+                ),
+              ],
+            ),
+          );
+        }
+        return const SizedBox.shrink();
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -474,6 +516,18 @@ class _DailyLoggingPageState extends ConsumerState<DailyLoggingPage>
       appBar: AppBar(
         title: const Text('Daily Logging'),
         actions: [
+          IconButton(
+            tooltip: 'Force Sync Pending Writes',
+            icon: const Icon(Icons.sync_rounded),
+            onPressed: () async {
+              await ref.read(firebaseServiceProvider).forceSyncPendingWrites();
+              if (mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Sync triggered')),
+                );
+              }
+            },
+          ),
           IconButton(
             tooltip: 'Export usage logs (CSV)',
             icon: _isExportingCsv
@@ -498,14 +552,21 @@ class _DailyLoggingPageState extends ConsumerState<DailyLoggingPage>
           ],
         ),
       ),
-      body: TabBarView(
-        controller: _tabController,
+      body: Column(
         children: [
-          _buildManualTab(),
-          _buildCsvTab(),
-          _buildQrTab(),
-          _buildImageTab(),
-          _buildHistoryTab(),
+          _buildSyncStatusBanner(),
+          Expanded(
+            child: TabBarView(
+              controller: _tabController,
+              children: [
+                _buildManualTab(),
+                _buildCsvTab(),
+                _buildQrTab(),
+                _buildImageTab(),
+                _buildHistoryTab(),
+              ],
+            ),
+          ),
         ],
       ),
     );
@@ -588,7 +649,7 @@ class _DailyLoggingPageState extends ConsumerState<DailyLoggingPage>
                           style: TextStyle(
                               color: MediColors.warning, fontSize: 13)))
                 else
-                  DropdownButtonFormField<String>(
+                  DropdownButtonFormField(
                     decoration: const InputDecoration(labelText: 'Medicine'),
                     dropdownColor: MediColors.surfaceLight,
                     initialValue: _medName,
@@ -621,20 +682,21 @@ class _DailyLoggingPageState extends ConsumerState<DailyLoggingPage>
                     onSaved: (v) => _patients = int.parse(v!)),
                 const SizedBox(height: 28),
                 SizedBox(
-                    width: double.infinity,
-                    height: 50,
-                    child: FilledButton(
-                        onPressed:
-                            (_isSubmitting || _availableMedicines.isEmpty)
-                                ? null
-                                : _submitLog,
-                        child: _isSubmitting
-                            ? const SizedBox(
-                                width: 20,
-                                height: 20,
-                                child: CircularProgressIndicator(
-                                    color: Colors.white, strokeWidth: 2))
-                            : const Text('Save Log'))),
+                  width: double.infinity,
+                  height: 50,
+                  child: FilledButton(
+                      onPressed:
+                          (_isSubmitting || _availableMedicines.isEmpty)
+                              ? null
+                              : _submitLog,
+                      child: _isSubmitting
+                          ? const SizedBox(
+                              width: 20,
+                              height: 20,
+                              child: CircularProgressIndicator(
+                                  color: Colors.white, strokeWidth: 2))
+                          : const Text('Save Log')),
+                ),
               ],
             ),
           ),
@@ -782,16 +844,17 @@ class _DailyLoggingPageState extends ConsumerState<DailyLoggingPage>
                         style: TextStyle(color: MediColors.textMuted)),
                     const SizedBox(height: 20),
                     Container(
-                        decoration: BoxDecoration(
-                            gradient: MediColors.cyanGradient,
-                            borderRadius: BorderRadius.circular(12)),
-                        child: FilledButton.icon(
-                            style: FilledButton.styleFrom(
-                                backgroundColor: Colors.transparent,
-                                shadowColor: Colors.transparent),
-                            icon: const Icon(Icons.camera_alt_rounded),
-                            label: const Text('Simulate Scan'),
-                            onPressed: _simulateQRScan)),
+                      decoration: BoxDecoration(
+                          gradient: MediColors.cyanGradient,
+                          borderRadius: BorderRadius.circular(12)),
+                      child: FilledButton.icon(
+                          style: FilledButton.styleFrom(
+                              backgroundColor: Colors.transparent,
+                              shadowColor: Colors.transparent),
+                          icon: const Icon(Icons.camera_alt_rounded),
+                          label: const Text('Simulate Scan'),
+                          onPressed: _simulateQRScan),
+                    ),
                   ]),
           ),
         ),
@@ -921,18 +984,18 @@ class _DailyLoggingPageState extends ConsumerState<DailyLoggingPage>
                     child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                      const Text('Parsing Failed',
-                          style: TextStyle(
-                              color: MediColors.error,
-                              fontWeight: FontWeight.w600,
-                              fontSize: 14)),
-                      const SizedBox(height: 4),
-                      Text(_imageParseError!,
-                          style: const TextStyle(
-                              color: MediColors.textMuted, fontSize: 12),
-                          maxLines: 3,
-                          overflow: TextOverflow.ellipsis),
-                    ])),
+                          const Text('Parsing Failed',
+                              style: TextStyle(
+                                  color: MediColors.error,
+                                  fontWeight: FontWeight.w600,
+                                  fontSize: 14)),
+                          const SizedBox(height: 4),
+                          Text(_imageParseError!,
+                              style: const TextStyle(
+                                  color: MediColors.textMuted, fontSize: 12),
+                              maxLines: 3,
+                              overflow: TextOverflow.ellipsis),
+                        ])),
                 const SizedBox(width: 12),
                 TextButton.icon(
                     icon: const Icon(Icons.refresh_rounded, size: 18),
@@ -997,113 +1060,118 @@ class _DailyLoggingPageState extends ConsumerState<DailyLoggingPage>
                                     borderRadius: BorderRadius.circular(6),
                                     border: Border.all(
                                         color: MediColors.error
-                                            .withValues(alpha: 0.3)),
-                                  ),
-                                  child: const Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      Icon(Icons.warning_amber_rounded,
-                                          color: MediColors.error, size: 14),
-                                      SizedBox(width: 4),
-                                      Text(
-                                        'Not in inventory',
-                                        style: TextStyle(
-                                          color: MediColors.error,
-                                          fontSize: 11,
-                                          fontWeight: FontWeight.w600,
-                                        ),
+                                            .withValues(alpha: 0.12),
+                                        borderRadius: BorderRadius.circular(6),
+                                        border: Border.all(
+                                            color: MediColors.error
+                                                .withValues(alpha: 0.3)),
                                       ),
-                                    ],
-                                  ),
-                                ),
-                                const SizedBox(width: 8),
-                              ],
-                              DropdownButton<String>(
-                                value: dropdownItems.contains(currentMed)
-                                    ? currentMed
-                                    : null,
-                                underline: const SizedBox(),
-                                isDense: true,
-                                style: TextStyle(
-                                  color: isMedValid
-                                      ? MediColors.textPrimary
-                                      : MediColors.error,
-                                  fontWeight: isMedValid
-                                      ? FontWeight.w600
-                                      : FontWeight.bold,
-                                  fontSize: 14,
-                                ),
-                                items: dropdownItems.map((med) {
-                                  final isValid =
-                                      _availableMedicines.contains(med);
-                                  return DropdownMenuItem<String>(
-                                    value: med,
-                                    child: Text(
-                                      med,
-                                      style: TextStyle(
-                                        color: isValid
-                                            ? MediColors.textPrimary
-                                            : MediColors.error,
-                                        fontWeight: isValid
-                                            ? FontWeight.normal
-                                            : FontWeight.bold,
+                                      child: const Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          Icon(Icons.warning_amber_rounded,
+                                              color: MediColors.error,
+                                              size: 14),
+                                          SizedBox(width: 4),
+                                          Text(
+                                            'Not in inventory',
+                                            style: TextStyle(
+                                              color: MediColors.error,
+                                              fontSize: 11,
+                                              fontWeight: FontWeight.w600,
+                                            ),
+                                          ),
+                                        ],
                                       ),
                                     ),
-                                  );
-                                }).toList(),
-                                onChanged: (newVal) {
-                                  if (newVal != null) {
-                                    setState(() {
-                                      item['medicine'] = newVal;
-                                    });
-                                  }
-                                },
-                              ),
-                            ],
-                          )),
-                          DataCell(SizedBox(
-                            width: 75,
-                            child: TextFormField(
-                              initialValue: item['quantity'].toString(),
-                              keyboardType: TextInputType.number,
-                              decoration: InputDecoration(
-                                isDense: true,
-                                contentPadding: const EdgeInsets.symmetric(
-                                    horizontal: 8, vertical: 8),
-                                border: OutlineInputBorder(
-                                    borderRadius: BorderRadius.circular(6)),
-                              ),
-                              onChanged: (val) {
-                                item['quantity'] = _parseNumber(val);
-                                setState(() {});
-                              },
-                            ),
-                          )),
-                          DataCell(SizedBox(
-                            width: 75,
-                            child: TextFormField(
-                              initialValue: item['patients'].toString(),
-                              keyboardType: TextInputType.number,
-                              decoration: InputDecoration(
-                                isDense: true,
-                                contentPadding: const EdgeInsets.symmetric(
-                                    horizontal: 8, vertical: 8),
-                                border: OutlineInputBorder(
-                                    borderRadius: BorderRadius.circular(6)),
-                              ),
-                              onChanged: (val) {
-                                item['patients'] = _parseNumber(val);
-                                setState(() {});
-                              },
-                            ),
-                          )),
-                          DataCell(IconButton(
-                            icon: const Icon(Icons.close_rounded,
-                                color: MediColors.error, size: 18),
-                            onPressed: () =>
-                                setState(() => _imageItems.remove(item)),
-                          )),
-                        ]);
+                                    const SizedBox(width: 8),
+                                  ],
+                                  DropdownButton(
+                                    value: dropdownItems.contains(currentMed)
+                                        ? currentMed
+                                        : null,
+                                    underline: const SizedBox(),
+                                    isDense: true,
+                                    style: TextStyle(
+                                      color: isMedValid
+                                          ? MediColors.textPrimary
+                                          : MediColors.error,
+                                      fontWeight: isMedValid
+                                          ? FontWeight.w600
+                                          : FontWeight.bold,
+                                      fontSize: 14,
+                                    ),
+                                    items: dropdownItems.map((med) {
+                                      final isValid =
+                                          _availableMedicines.contains(med);
+                                      return DropdownMenuItem(
+                                        value: med,
+                                        child: Text(
+                                          med,
+                                          style: TextStyle(
+                                            color: isValid
+                                                ? MediColors.textPrimary
+                                                : MediColors.error,
+                                            fontWeight: isValid
+                                                ? FontWeight.normal
+                                                : FontWeight.bold,
+                                          ),
+                                        ),
+                                      );
+                                    }).toList(),
+                                    onChanged: (newVal) {
+                                      if (newVal != null) {
+                                        setState(() {
+                                          item['medicine'] = newVal;
+                                        });
+                                      }
+                                    },
+                                  ),
+                                ],
+                              )),
+                              DataCell(SizedBox(
+                                width: 75,
+                                child: TextFormField(
+                                  initialValue: item['quantity'].toString(),
+                                  keyboardType: TextInputType.number,
+                                  decoration: InputDecoration(
+                                    isDense: true,
+                                    contentPadding: const EdgeInsets.symmetric(
+                                        horizontal: 8, vertical: 8),
+                                    border: OutlineInputBorder(
+                                        borderRadius: BorderRadius.circular(6)),
+                                  ),
+                                  onChanged: (val) {
+                                    item['quantity'] = _parseNumber(val);
+                                    setState(() {});
+                                  },
+                                ),
+                              )),
+                              DataCell(SizedBox(
+                                width: 75,
+                                child: TextFormField(
+                                  initialValue: item['patients'].toString(),
+                                  keyboardType: TextInputType.number,
+                                  decoration: InputDecoration(
+                                    isDense: true,
+                                    contentPadding: const EdgeInsets.symmetric(
+                                        horizontal: 8, vertical: 8),
+                                    border: OutlineInputBorder(
+                                        borderRadius: BorderRadius.circular(6)),
+                                  ),
+                                  onChanged: (val) {
+                                    item['patients'] = _parseNumber(val);
+                                    setState(() {});
+                                  },
+                                ),
+                              )),
+                              DataCell(IconButton(
+                                icon: const Icon(Icons.close_rounded,
+                                    color: MediColors.error, size: 18),
+                                onPressed: () =>
+                                    setState(() => _imageItems.remove(item)),
+                              )),
+                            ]);
                       }).toList()))),
           const SizedBox(height: 20),
           Row(children: [
