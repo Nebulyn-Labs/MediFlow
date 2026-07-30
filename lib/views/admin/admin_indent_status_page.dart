@@ -19,10 +19,7 @@ class _AdminIndentStatusPageState extends ConsumerState<AdminIndentStatusPage> {
   bool _isExportingCsv = false;
 
   List<MedRequest> _buildVisibleRequests(List<MedRequest>? source) {
-    final requests =
-        source?.where((r) => r.status != RequestStatus.draft).toList() ?? [];
-    requests.sort((a, b) => b.requestDate.compareTo(a.requestDate));
-    return requests;
+    return source ?? [];
   }
 
   Future<void> _exportTransferRequestsCsv(List<MedRequest> requests) async {
@@ -83,7 +80,14 @@ class _AdminIndentStatusPageState extends ConsumerState<AdminIndentStatusPage> {
       backgroundColor: MediColors.bg,
       appBar: AppBar(title: const Text('Supply Status')),
       body: StreamBuilder<List<MedRequest>>(
-        stream: ref.read(firebaseServiceProvider).streamRequests(null),
+        stream: ref.read(firebaseServiceProvider).streamRequests(
+          statuses: [
+            RequestStatus.pending,
+            RequestStatus.approved,
+            RequestStatus.fulfilled,
+            RequestStatus.rejected,
+          ],
+        ),
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
             return const AdminIndentStatusSkeleton();

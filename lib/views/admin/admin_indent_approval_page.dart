@@ -87,16 +87,13 @@ class _AdminIndentApprovalPageState
       backgroundColor: MediColors.bg,
       appBar: AppBar(title: const Text('Pending Requests Approval')),
       body: StreamBuilder<List<MedRequest>>(
-        stream: ref.read(firebaseServiceProvider).streamRequests(null),
+        stream: ref.read(firebaseServiceProvider).streamRequests(status: RequestStatus.pending),
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
             return const AdminIndentApprovalSkeleton();
           }
 
-          final pending = snapshot.data
-                  ?.where((r) => r.status == RequestStatus.pending)
-                  .toList() ??
-              [];
+          final pending = snapshot.data ?? [];
 
           if (pending.isEmpty) {
             return const Center(

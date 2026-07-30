@@ -129,18 +129,16 @@ class _AdminOverviewState extends ConsumerState<AdminOverview> {
     );
 
     _requestsSub =
-        firebaseService.streamRequests(null).listen(
+        firebaseService.streamRequests(status: RequestStatus.pending).listen(
       (reqs) {
         if (!mounted) return;
         int shortage = 0;
         int surplus = 0;
         int pending = 0;
         for (var r in reqs) {
-          if (r.status == RequestStatus.pending) {
-            if (r.type == RequestType.shortage) shortage++;
-            if (r.type == RequestType.surplus) surplus++;
-            if (r.type == RequestType.regularIndent) pending++;
-          }
+          if (r.type == RequestType.shortage) shortage++;
+          if (r.type == RequestType.surplus) surplus++;
+          if (r.type == RequestType.regularIndent) pending++;
         }
         setState(() {
           _openShortageRequests = shortage;

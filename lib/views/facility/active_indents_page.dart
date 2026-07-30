@@ -552,8 +552,10 @@ class _ActiveIndentsPageState extends ConsumerState<ActiveIndentsPage> {
   // ----- Drafts List -----
   Widget _draftsList() {
     return StreamBuilder<List<MedRequest>>(
-      stream:
-          ref.read(firebaseServiceProvider).streamRequests(widget.facilityId),
+      stream: ref.read(firebaseServiceProvider).streamRequests(
+            facilityId: widget.facilityId,
+            status: RequestStatus.draft,
+          ),
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const Column(
@@ -569,10 +571,7 @@ class _ActiveIndentsPageState extends ConsumerState<ActiveIndentsPage> {
               child: Text('Error: ${snapshot.error}',
                   style: const TextStyle(color: MediColors.error)));
         }
-        final drafts = snapshot.data
-                ?.where((r) => r.status == RequestStatus.draft)
-                .toList() ??
-            [];
+        final drafts = snapshot.data ?? [];
         if (drafts.isEmpty) {
           return Center(
             child: Padding(
@@ -784,8 +783,15 @@ class _ActiveIndentsPageState extends ConsumerState<ActiveIndentsPage> {
 
   Widget _historyList() {
     return StreamBuilder<List<MedRequest>>(
-      stream:
-          ref.read(firebaseServiceProvider).streamRequests(widget.facilityId),
+      stream: ref.read(firebaseServiceProvider).streamRequests(
+            facilityId: widget.facilityId,
+            statuses: [
+              RequestStatus.pending,
+              RequestStatus.approved,
+              RequestStatus.fulfilled,
+              RequestStatus.rejected,
+            ],
+          ),
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const SizedBox.shrink();
@@ -793,10 +799,7 @@ class _ActiveIndentsPageState extends ConsumerState<ActiveIndentsPage> {
         if (snapshot.hasError || snapshot.data == null) {
           return const SizedBox.shrink();
         }
-        final history = snapshot.data!
-            .where((r) => r.status != RequestStatus.draft)
-            .toList()
-          ..sort((a, b) => b.requestDate.compareTo(a.requestDate));
+        final history = snapshot.data!;
 
         if (history.isEmpty) {
           return const SizedBox.shrink();

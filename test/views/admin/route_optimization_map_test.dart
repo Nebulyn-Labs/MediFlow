@@ -47,12 +47,29 @@ class FakeFirebaseService implements FirebaseService {
   }
 
   @override
-  Stream<List<MedRequest>> streamRequests(String? facilityId) {
+  Stream<List<MedRequest>> streamRequests({
+    String? facilityId,
+    RequestStatus? status,
+    List<RequestStatus>? statuses,
+    int? limit,
+  }) {
+    Iterable<MedRequest> filtered = requests;
     if (facilityId != null) {
-      return Stream.value(
-          requests.where((r) => r.facilityId == facilityId).toList());
+      filtered = filtered.where((r) => r.facilityId == facilityId);
     }
-    return _requestsStream;
+    if (status != null) {
+      filtered = filtered.where((r) => r.status == status);
+    } else if (statuses != null && statuses.isNotEmpty) {
+      filtered = filtered.where((r) => statuses.contains(r.status));
+    }
+    
+    final sorted = filtered.toList()
+      ..sort((a, b) => b.requestDate.compareTo(a.requestDate));
+      
+    if (limit != null && limit < sorted.length) {
+      return Stream.value(sorted.sublist(0, limit));
+    }
+    return Stream.value(sorted);
   }
 
   @override
@@ -82,7 +99,12 @@ class FailingFirebaseService implements FirebaseService {
   }
 
   @override
-  Stream<List<MedRequest>> streamRequests(String? facilityId) {
+  Stream<List<MedRequest>> streamRequests({
+    String? facilityId,
+    RequestStatus? status,
+    List<RequestStatus>? statuses,
+    int? limit,
+  }) {
     return Stream.value([]);
   }
 
@@ -115,7 +137,12 @@ class RetryableFirebaseService implements FirebaseService {
   }
 
   @override
-  Stream<List<MedRequest>> streamRequests(String? facilityId) {
+  Stream<List<MedRequest>> streamRequests({
+    String? facilityId,
+    RequestStatus? status,
+    List<RequestStatus>? statuses,
+    int? limit,
+  }) {
     return Stream.value([]);
   }
 

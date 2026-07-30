@@ -189,7 +189,12 @@ class _RouteOptimizationMapState extends ConsumerState<RouteOptimizationMap> {
           final allMeds = invSnapshot.data ?? [];
 
           return StreamBuilder<List<MedRequest>>(
-            stream: ref.watch(firebaseServiceProvider).streamRequests(null),
+            stream: ref.watch(firebaseServiceProvider).streamRequests(
+              statuses: [
+                RequestStatus.pending,
+                RequestStatus.approved,
+              ],
+            ),
             builder: (context, snapshot) {
               final requests = snapshot.data ?? [];
 

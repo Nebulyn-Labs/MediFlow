@@ -316,17 +316,30 @@ class FirebaseService {
     });
   }
 
-  Stream<List<MedRequest>> streamRequests(String? facilityId) {
-    var query = _firestore.collection('requests');
+  Stream<List<MedRequest>> streamRequests({
+    String? facilityId,
+    RequestStatus? status,
+    List<RequestStatus>? statuses,
+    int? limit,
+  }) {
+    Query query = _firestore.collection('requests');
     if (facilityId != null) {
-      // Note: Requests are still top-level as they involve cross-facility matching
-      return query.where('facilityId', isEqualTo: facilityId).snapshots().map(
-          (snapshot) => snapshot.docs
-              .map((doc) => MedRequest.fromMap(doc.data(), doc.id))
-              .toList());
+      query = query.where('facilityId', isEqualTo: facilityId);
     }
+    if (status != null) {
+      query = query.where('status', isEqualTo: status.name);
+    } else if (statuses != null && statuses.isNotEmpty) {
+      query = query.where('status', whereIn: statuses.map((e) => e.name).toList());
+    }
+
+    query = query.orderBy('requestDate', descending: true);
+
+    if (limit != null) {
+      query = query.limit(limit);
+    }
+
     return query.snapshots().map((snapshot) => snapshot.docs
-        .map((doc) => MedRequest.fromMap(doc.data(), doc.id))
+        .map((doc) => MedRequest.fromMap(doc.data() as Map<String, dynamic>, doc.id))
         .toList());
   }
 
