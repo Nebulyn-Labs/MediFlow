@@ -9,6 +9,7 @@ import '../models/inventory_item.dart';
 import '../models/daily_usage_log.dart';
 import '../models/request.dart';
 import '../models/audit_log.dart';
+import '../models/notification.dart' as import_notification;
 import 'simulation_service.dart';
 
 final firebaseServiceProvider = Provider<FirebaseService>((ref) {
@@ -33,11 +34,18 @@ class FirebaseService {
   }
 
   Future<void> sendPasswordReset(String email) async {
-    await _auth.sendPasswordResetEmail(email: email);
+    String status = 'success';
+    try {
+      await _auth.sendPasswordResetEmail(email: email);
+    } catch (e) {
+      status = 'failure';
+      debugPrint('Failed to send password reset email: $e');
+    }
+
     try {
       final callable =
           FirebaseFunctions.instance.httpsCallable('logPasswordResetRequest');
-      await callable.call({'email': email});
+      await callable.call({'email': email, 'status': status});
     } catch (e) {
       debugPrint('Failed to log password reset request: $e');
     }
@@ -148,15 +156,60 @@ class FirebaseService {
         .toList();
   }
 
+  /// Streams the entire collectionGroup of medicines across all facilities.
+  /// Used for map overlays where live updates of all facilities are needed.
   Stream<List<InventoryItem>> streamAllMedicines() {
-    return _firestore.collectionGroup('medicines').snapshots().map((snapshot) {
-      return snapshot.docs.map((doc) {
-        // Path is inventory/{facilityId}/medicines/{medicineId}
-        final pathSegments = doc.reference.path.split('/');
-        final facId = pathSegments.length >= 2 ? pathSegments[1] : '';
-        return InventoryItem.fromMap(doc.data(), doc.id, facilityId: facId);
-      }).toList();
-    });
+    return _firestore
+        .collectionGroup('medicines')
+        .snapshots()
+        .map((snapshot) => snapshot.docs.map((doc) {
+              final pathSegments = doc.reference.path.split('/');
+              final facId = pathSegments.length >= 2 ? pathSegments[1] : '';
+              return InventoryItem.fromMap(
+                doc.data(),
+                doc.id,
+                facilityId: facId,
+              );
+            }).toList());
+  }
+
+  /// Fetches one page of medicines from the global collectionGroup, ordered
+  /// by medicineName ascending, using startAfterDocument cursor pagination.
+  /// Pass the previous page's [lastDocument] as [startAfter] to get the next
+  /// page. Mirrors [getPaginatedLogs] in structure.
+  Future<PaginatedMedicinesResult> getPaginatedMedicines({
+    int pageSize = 20,
+    DocumentSnapshot? startAfter,
+  }) async {
+    // Note: Firestore orderBy() automatically excludes documents missing the 'medicineName' field.
+    // In our schema, 'medicineName' is a required field for all inventory items,
+    // so this is intentional and safe. Documents without medicineName represent malformed data.
+    Query query = _firestore
+        .collectionGroup('medicines')
+        .orderBy('medicineName')
+        .limit(pageSize);
+
+    if (startAfter != null) {
+      query = query.startAfterDocument(startAfter);
+    }
+
+    final snapshot = await query.get();
+    final medicines = snapshot.docs.map((doc) {
+      // Path is inventory/{facilityId}/medicines/{medicineId}
+      final pathSegments = doc.reference.path.split('/');
+      final facId = pathSegments.length >= 2 ? pathSegments[1] : '';
+      return InventoryItem.fromMap(
+        doc.data() as Map<String, dynamic>,
+        doc.id,
+        facilityId: facId,
+      );
+    }).toList();
+
+    return PaginatedMedicinesResult(
+      medicines: medicines,
+      lastDocument: snapshot.docs.isNotEmpty ? snapshot.docs.last : null,
+      hasMore: snapshot.docs.length == pageSize,
+    );
   }
 
   Future<void> restock(
@@ -378,6 +431,33 @@ class FirebaseService {
     return snapshot.docs.map((doc) => doc.data()).toList();
   }
 
+  // --- NOTIFICATIONS ---
+
+  Stream<List<import_notification.NotificationModel>> streamNotifications(
+      String facilityId) {
+    return _firestore
+        .collection('notifications')
+        .doc(facilityId)
+        .collection('items')
+        .orderBy('createdAt', descending: true)
+        .limit(50)
+        .snapshots()
+        .map((snapshot) => snapshot.docs
+            .map((doc) => import_notification.NotificationModel.fromMap(
+                doc.data(), doc.id))
+            .toList());
+  }
+
+  Future<void> markNotificationRead(
+      String facilityId, String notificationId) async {
+    await _firestore
+        .collection('notifications')
+        .doc(facilityId)
+        .collection('items')
+        .doc(notificationId)
+        .update({'isRead': true});
+  }
+
   // --- CLEANUP & SEEDING ---
 
   Future<void> clearDatabase() async {
@@ -419,7 +499,8 @@ class FirebaseService {
           }
         }
         if (collection == 'facilities' || collection == 'requests') {
-          final callable = FirebaseFunctions.instance.httpsCallable('adminDeleteResource');
+          final callable =
+              FirebaseFunctions.instance.httpsCallable('adminDeleteResource');
           deleteFutures.add(callable.call({
             'resourceType': collection,
             'resourceId': doc.id,
@@ -657,11 +738,13 @@ class FirebaseService {
   }) async {
     try {
       Query query = _firestore.collection('audit_logs');
-      
-      if (actionFilter != null && actionFilter.isNotEmpty && actionFilter != 'All') {
+
+      if (actionFilter != null &&
+          actionFilter.isNotEmpty &&
+          actionFilter != 'All') {
         query = query.where('action', isEqualTo: actionFilter);
       }
-      
+
       query = query.orderBy('timestamp', descending: true).limit(pageSize);
 
       if (startAfter != null) {
