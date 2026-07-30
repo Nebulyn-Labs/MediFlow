@@ -35,7 +35,7 @@ class AlertsPage extends ConsumerStatefulWidget {
   const AlertsPage({super.key, required this.facilityId});
 
   @override
-  ConsumerState<AlertsPage> createState() => _AlertsPageState();
+  ConsumerState createState() => _AlertsPageState();
 }
 
 class _AlertsPageState extends ConsumerState<AlertsPage> {
@@ -107,7 +107,6 @@ class _AlertsPageState extends ConsumerState<AlertsPage> {
           color = MediColors.warning;
           icon = Icons.warning_amber_rounded;
         } else {
-          // expiring_soon
           kind = _AlertKind.expiringSoon;
           title = 'Expiring Soon';
           reason = '${item.medicineName} is within the 30-day expiry window.';
@@ -159,19 +158,70 @@ class _AlertsPageState extends ConsumerState<AlertsPage> {
     }
   }
 
+  // --- CHANGE 2: Updated _handleDisposal with confirmation dialog, error surfacing, and local list removal ---
   Future<void> _handleDisposal(_InventoryAlert alert) async {
+    // Show confirmation dialog naming medicine, batch, and unit count
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Confirm Disposal'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Are you sure you want to mark the following for disposal?',
+              style: TextStyle(color: MediColors.textSecondary),
+            ),
+            const SizedBox(height: 16),
+            Text(
+              'Medicine: ${alert.item.medicineName}',
+              style: const TextStyle(fontWeight: FontWeight.bold, color: MediColors.textPrimary),
+            ),
+            Text(
+              'Batch: ${alert.item.batchId}',
+              style: const TextStyle(color: MediColors.textPrimary),
+            ),
+            Text(
+              'Quantity: ${alert.item.remainingQuantity} ${alert.item.unit}',
+              style: const TextStyle(color: MediColors.textPrimary),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            style: FilledButton.styleFrom(backgroundColor: MediColors.error),
+            child: const Text('Confirm Disposal'),
+          ),
+        ],
+      ),
+    );
+
+    // Canceling leaves inventory untouched
+    if (confirmed != true) return;
+
     try {
       await ref
           .read(firebaseServiceProvider)
           .disposeInventory(widget.facilityId, alert.item.medicineName);
+
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-            content:
-                Text('Marked ${alert.item.medicineName} for safe disposal.')));
-        _loadAlerts();
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+            content: Text('Successfully marked for disposal and recorded in wastage logs.')));
+        
+        // After success, the disposed alert is gone from the list immediately
+        setState(() {
+          _alerts.removeWhere((a) => a.item.medicineName == alert.item.medicineName);
+        });
       }
     } catch (e) {
       if (mounted) {
+        // Page surfaces the failure (e.g., missing document throws)
         ScaffoldMessenger.of(context)
             .showSnackBar(SnackBar(content: Text('Error: $e')));
       }
@@ -231,9 +281,9 @@ class _AlertsPageState extends ConsumerState<AlertsPage> {
       floatingActionButton: FloatingActionButton(
         onPressed: () {
           Navigator.push(
-              context,
-              MaterialPageRoute(
-                  builder: (_) => const AIChatPage(role: "Facility Manager")));
+            context,
+            MaterialPageRoute(
+                builder: (_) => const AIChatPage(role: "Facility Manager")));
         },
         backgroundColor: const Color(0xFF1E3A8A),
         tooltip: 'Open MediFlow AI Assistant',
