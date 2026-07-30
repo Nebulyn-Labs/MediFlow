@@ -18,13 +18,8 @@ function toIsoTimestamp(value) {
   return value;
 }
 
-/**
- * Single source of truth for backend stock-health classification.
- * The low_stock thresholds intentionally mirror InventoryItem.isLowStock in
- * lib/models/inventory_item.dart (<=20% remaining, or <=500 units in
- * absolute terms) so the app and backend never disagree about what counts
- * as low stock.
- */
+const thresholds = require("./inventory_thresholds.json");
+
 function stockStatus(data) {
   const initial = Number(data.initialQuantity || 0);
   const remaining = Number(data.remainingQuantity || 0);
@@ -36,7 +31,7 @@ function stockStatus(data) {
 
   if (daysLeft !== null && daysLeft < 0) return "expired";
   if (pct >= 0.7 && daysLeft !== null && daysLeft <= 30) return "wastage_risk";
-  if (pct <= 0.2 || remaining <= 500) return "low_stock";
+  if (pct <= thresholds.lowStockPercentage || remaining <= thresholds.lowStockAbsolute) return "low_stock";
   if (daysLeft !== null && daysLeft <= 30) return "expiring_soon";
   return "healthy";
 }

@@ -468,7 +468,7 @@ class FirebaseService {
       try {
         await _auth.createUserWithEmailAndPassword(
             email: 'admin@mediflow.com', password: 'password123');
-      } catch (e) {
+      } catch (_) {
         try {
           await _auth.signInWithEmailAndPassword(
               email: 'admin@mediflow.com', password: 'password123');

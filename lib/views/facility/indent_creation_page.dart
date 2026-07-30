@@ -64,66 +64,89 @@ class _IndentCreationPageState extends ConsumerState<IndentCreationPage> {
     }
   }
 
+  /// Maximum number of forecast requests that may run concurrently.
+  ///
+  /// A value of 5 keeps total in-flight requests bounded while still
+  /// providing a large speed-up over fully-sequential execution (#238).
+  static const int _kForecastConcurrency = 5;
+
   Future<void> _getAIForecast() async {
     final aiService = ref.read(aiServiceProvider);
     final firebaseService = ref.read(firebaseServiceProvider);
 
-    // Fetch logs for forecasting
+    // Fetch logs once, shared across all concurrent forecast calls.
     final logs =
         await firebaseService.getRecentLogs(widget.facilityId, days: 90);
 
-    for (var item in _inventory) {
-      setState(() => _forecastLoading[item.id] = true);
-      try {
-        final dynamic result = await aiService.forecastDemand(
-            item.medicineName, logs, _selectedPeriod,
-            facilityId: widget.facilityId);
-        setState(() {
-          dynamic predRaw;
-          dynamic reasonRaw;
-          if (result != null && result is Map) {
-            predRaw = result['prediction'];
-            reasonRaw = result['reasoning'];
-          }
-
-          int predicted = 0;
-          if (predRaw is num) {
-            predicted = predRaw.toInt();
-          } else if (predRaw is String) {
-            predicted = double.tryParse(predRaw)?.toInt() ?? 0;
-          }
-
-          _forecasts[item.id] = predicted;
-          _reasoning[item.id] =
-              reasonRaw?.toString() ?? "Calculated based on demand.";
-
-          int available = item.remainingQuantity;
-          bool isExpired =
-              item.expiryDate.difference(DateTime.now()).inDays < 0;
-          bool expiringSoon =
-              item.expiryDate.difference(DateTime.now()).inDays <= 30;
-          int suggestedQty = 0;
-
-          if (isExpired) {
-            suggestedQty = (predicted * 1.2).round();
-          } else if (predicted > available) {
-            suggestedQty = ((predicted - available) * 1.2).round();
-          } else if (predicted > 0 &&
-              ((available - predicted) > (predicted * 1.5) ||
-                  (available > predicted && expiringSoon))) {
-            suggestedQty = available - (predicted * 1.2).round();
-            if (suggestedQty < 0) suggestedQty = 0;
-          } else {
-            suggestedQty = 0;
-          }
-
-          _controllers[item.id]?.text = suggestedQty.toString();
-        });
-      } catch (e) {
-        debugPrint('Forecast error for ${item.medicineName}: $e');
-      } finally {
-        setState(() => _forecastLoading[item.id] = false);
+    // Mark every item as loading before we start any futures.
+    setState(() {
+      for (final item in _inventory) {
+        _forecastLoading[item.id] = true;
       }
+    });
+
+    // Run forecasts concurrently in chunks of [_kForecastConcurrency] to
+    // avoid both serialising N round-trips and flooding the API (#238).
+    for (int i = 0; i < _inventory.length; i += _kForecastConcurrency) {
+      final chunk = _inventory.sublist(
+        i,
+        (i + _kForecastConcurrency).clamp(0, _inventory.length),
+      );
+
+      await Future.wait(chunk.map((item) async {
+        try {
+          final dynamic result = await aiService.forecastDemand(
+              item.medicineName, logs, _selectedPeriod,
+              facilityId: widget.facilityId);
+
+          if (!mounted) return;
+          setState(() {
+            dynamic predRaw;
+            dynamic reasonRaw;
+            if (result != null && result is Map) {
+              predRaw = result['prediction'];
+              reasonRaw = result['reasoning'];
+            }
+
+            int predicted = 0;
+            if (predRaw is num) {
+              predicted = predRaw.toInt();
+            } else if (predRaw is String) {
+              predicted = double.tryParse(predRaw)?.toInt() ?? 0;
+            }
+
+            _forecasts[item.id] = predicted;
+            _reasoning[item.id] =
+                reasonRaw?.toString() ?? "Calculated based on demand.";
+
+            int available = item.remainingQuantity;
+            bool isExpired =
+                item.expiryDate.difference(DateTime.now()).inDays < 0;
+            bool expiringSoon =
+                item.expiryDate.difference(DateTime.now()).inDays <= 30;
+            int suggestedQty = 0;
+
+            if (isExpired) {
+              suggestedQty = (predicted * 1.2).round();
+            } else if (predicted > available) {
+              suggestedQty = ((predicted - available) * 1.2).round();
+            } else if (predicted > 0 &&
+                ((available - predicted) > (predicted * 1.5) ||
+                    (available > predicted && expiringSoon))) {
+              suggestedQty = available - (predicted * 1.2).round();
+              if (suggestedQty < 0) suggestedQty = 0;
+            } else {
+              suggestedQty = 0;
+            }
+
+            _controllers[item.id]?.text = suggestedQty.toString();
+            _forecastLoading[item.id] = false;
+          });
+        } catch (e) {
+          debugPrint('Forecast error for ${item.medicineName}: $e');
+          if (mounted) setState(() => _forecastLoading[item.id] = false);
+        }
+      }));
     }
   }
 
