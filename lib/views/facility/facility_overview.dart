@@ -344,6 +344,9 @@ class _FacilityOverviewState extends ConsumerState<FacilityOverview> {
                       final wastageRisk = inventory
                           .where((i) => i.status == ItemStatus.wastageRisk)
                           .length;
+                      final lowStock = inventory
+                          .where((i) => i.status == ItemStatus.lowStock)
+                          .length;
                       final unhealthy = inventory
                           .where((i) => i.hasAlert)
                           .length;

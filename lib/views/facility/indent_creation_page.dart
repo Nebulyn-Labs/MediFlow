@@ -78,59 +78,9 @@ class _IndentCreationPageState extends ConsumerState<IndentCreationPage> {
     final logs =
         await firebaseService.getRecentLogs(widget.facilityId, days: 90);
 
-    for (var item in _inventory) {
-      setState(() => _forecastLoading[item.id] = true);
-      try {
-        final dynamic result = await aiService.forecastDemand(
-            item.medicineName, logs, _selectedPeriod,
-            facilityId: widget.facilityId);
-        setState(() {
-          dynamic predRaw;
-          dynamic reasonRaw;
-          if (result != null && result is Map) {
-            predRaw = result['prediction'];
-            reasonRaw = result['reasoning'];
-          }
-
-          int predicted = 0;
-          if (predRaw is num) {
-            predicted = predRaw.toInt();
-          } else if (predRaw is String) {
-            predicted = double.tryParse(predRaw)?.toInt() ?? 0;
-          }
-
-          _forecasts[item.id] = predicted;
-          _reasoning[item.id] =
-              reasonRaw?.toString() ?? "Calculated based on demand.";
-
-          // Use centralized ItemStatus to avoid inline threshold duplication.
-          final itemStatus = item.status;
-          final int available = item.remainingQuantity;
-          final bool isExpired = itemStatus == ItemStatus.expired;
-          // expiringSoon must NOT include already-expired items.
-          final bool expiringSoon = itemStatus == ItemStatus.expiringSoon ||
-              itemStatus == ItemStatus.wastageRisk;
-          int suggestedQty = 0;
-
-          if (isExpired) {
-            suggestedQty = (predicted * 1.2).round();
-          } else if (predicted > available) {
-            suggestedQty = ((predicted - available) * 1.2).round();
-          } else if (predicted > 0 &&
-              ((available - predicted) > (predicted * 1.5) ||
-                  (available > predicted && expiringSoon))) {
-            suggestedQty = available - (predicted * 1.2).round();
-            if (suggestedQty < 0) suggestedQty = 0;
-          } else {
-            suggestedQty = 0;
-          }
-
-          _controllers[item.id]?.text = suggestedQty.toString();
-        });
-      } catch (e) {
-        debugPrint('Forecast error for ${item.medicineName}: $e');
-      } finally {
-        setState(() => _forecastLoading[item.id] = false);
+    setState(() {
+      for (var item in _inventory) {
+        _forecastLoading[item.id] = true;
       }
     });
 
@@ -168,11 +118,13 @@ class _IndentCreationPageState extends ConsumerState<IndentCreationPage> {
             _reasoning[item.id] =
                 reasonRaw?.toString() ?? "Calculated based on demand.";
 
+            // Use centralized ItemStatus to avoid inline threshold duplication.
+            final itemStatus = item.status;
             int available = item.remainingQuantity;
-            bool isExpired =
-                item.expiryDate.difference(DateTime.now()).inDays < 0;
-            bool expiringSoon =
-                item.expiryDate.difference(DateTime.now()).inDays <= 30;
+            bool isExpired = itemStatus == ItemStatus.expired;
+            // expiringSoon must NOT include already-expired items.
+            bool expiringSoon = itemStatus == ItemStatus.expiringSoon ||
+                itemStatus == ItemStatus.wastageRisk;
             int suggestedQty = 0;
 
             if (isExpired) {
