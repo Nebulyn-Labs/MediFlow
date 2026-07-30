@@ -17,7 +17,8 @@ class NotificationModel {
     required this.createdAt,
   });
 
-  factory NotificationModel.fromMap(Map<String, dynamic> data, String documentId) {
+  factory NotificationModel.fromMap(
+      Map<String, dynamic> data, String documentId) {
     return NotificationModel(
       id: documentId,
       facilityId: data['facilityId'] ?? '',

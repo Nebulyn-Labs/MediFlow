@@ -34,7 +34,8 @@ class AlertsPage extends ConsumerStatefulWidget {
   final String facilityId;
   final bool isTabBody;
 
-  const AlertsPage({super.key, required this.facilityId, this.isTabBody = false});
+  const AlertsPage(
+      {super.key, required this.facilityId, this.isTabBody = false});
 
   @override
   ConsumerState<AlertsPage> createState() => _AlertsPageState();
@@ -205,45 +206,45 @@ class _AlertsPageState extends ConsumerState<AlertsPage> {
               children: [
                 if (expiredAlerts.isNotEmpty) ...[
                   _sectionHeader('Expired Medicines'),
-                    const SizedBox(height: 16),
-                    ...expiredAlerts.map(_buildAlertCard),
-                    const SizedBox(height: 32),
-                  ],
-                  if (stockAlerts.isNotEmpty) ...[
-                    _sectionHeader('Stock Action Alerts'),
-                    const SizedBox(height: 16),
-                    ...stockAlerts.map(_buildAlertCard),
-                    const SizedBox(height: 32),
-                  ],
-                  if (expiryAlerts.isNotEmpty) ...[
-                    _sectionHeader('Expiry Watch'),
-                    const SizedBox(height: 16),
-                    ...expiryAlerts.map(_buildAlertCard),
-                  ],
-                  if (_alerts.isEmpty)
-                    Center(
-                      child: Padding(
-                        padding: const EdgeInsets.only(top: 96),
-                        child: Column(
-                          children: [
-                            ExcludeSemantics(
-                              child: Icon(Icons.check_circle_rounded,
-                                  size: 64,
-                                  color: MediColors.success
-                                      .withValues(alpha: 0.8)),
-                            ),
-                            const SizedBox(height: 16),
-                            const Text('No active alerts detected.',
-                                style: TextStyle(
-                                    color: MediColors.textSecondary,
-                                    fontSize: 16)),
-                          ],
-                        ),
+                  const SizedBox(height: 16),
+                  ...expiredAlerts.map(_buildAlertCard),
+                  const SizedBox(height: 32),
+                ],
+                if (stockAlerts.isNotEmpty) ...[
+                  _sectionHeader('Stock Action Alerts'),
+                  const SizedBox(height: 16),
+                  ...stockAlerts.map(_buildAlertCard),
+                  const SizedBox(height: 32),
+                ],
+                if (expiryAlerts.isNotEmpty) ...[
+                  _sectionHeader('Expiry Watch'),
+                  const SizedBox(height: 16),
+                  ...expiryAlerts.map(_buildAlertCard),
+                ],
+                if (_alerts.isEmpty)
+                  Center(
+                    child: Padding(
+                      padding: const EdgeInsets.only(top: 96),
+                      child: Column(
+                        children: [
+                          ExcludeSemantics(
+                            child: Icon(Icons.check_circle_rounded,
+                                size: 64,
+                                color:
+                                    MediColors.success.withValues(alpha: 0.8)),
+                          ),
+                          const SizedBox(height: 16),
+                          const Text('No active alerts detected.',
+                              style: TextStyle(
+                                  color: MediColors.textSecondary,
+                                  fontSize: 16)),
+                        ],
                       ),
                     ),
-                ],
-              ),
-            );
+                  ),
+              ],
+            ),
+          );
 
     if (widget.isTabBody) {
       return RefreshIndicator(

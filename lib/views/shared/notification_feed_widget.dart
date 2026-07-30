@@ -38,59 +38,61 @@ class NotificationFeedWidget extends ConsumerWidget {
                 side: const BorderSide(color: MediColors.border, width: 1),
               ),
               child: StreamBuilder<List<notif.NotificationModel>>(
-              stream: ref.read(firebaseServiceProvider).streamNotifications(facilityId),
-              builder: (context, snapshot) {
-                if (snapshot.connectionState == ConnectionState.waiting) {
-                  return const Center(child: CircularProgressIndicator());
-                }
+                stream: ref
+                    .read(firebaseServiceProvider)
+                    .streamNotifications(facilityId),
+                builder: (context, snapshot) {
+                  if (snapshot.connectionState == ConnectionState.waiting) {
+                    return const Center(child: CircularProgressIndicator());
+                  }
 
-                if (snapshot.hasError) {
-                  return const Center(
-                    child: Text('Error loading notifications.',
-                        style: TextStyle(color: MediColors.error)),
-                  );
-                }
-
-                final notifications = snapshot.data ?? [];
-
-                if (notifications.isEmpty) {
-                  return const Center(
-                    child: Text('No notifications yet.',
-                        style: TextStyle(color: MediColors.textSecondary)),
-                  );
-                }
-
-                return ListView.separated(
-                  padding: const EdgeInsets.symmetric(vertical: 8.0),
-                  itemCount: notifications.length,
-                  separatorBuilder: (context, index) => const Divider(
-                    height: 1,
-                    color: MediColors.border,
-                    indent: 16,
-                    endIndent: 16,
-                  ),
-                  itemBuilder: (context, index) {
-                    final item = notifications[index];
-                    return _NotificationTile(
-                      notification: item,
-                      onMarkRead: () {
-                        if (!item.isRead) {
-                          ref
-                              .read(firebaseServiceProvider)
-                              .markNotificationRead(facilityId, item.id);
-                        }
-                      },
+                  if (snapshot.hasError) {
+                    return const Center(
+                      child: Text('Error loading notifications.',
+                          style: TextStyle(color: MediColors.error)),
                     );
-                  },
-                );
-              },
+                  }
+
+                  final notifications = snapshot.data ?? [];
+
+                  if (notifications.isEmpty) {
+                    return const Center(
+                      child: Text('No notifications yet.',
+                          style: TextStyle(color: MediColors.textSecondary)),
+                    );
+                  }
+
+                  return ListView.separated(
+                    padding: const EdgeInsets.symmetric(vertical: 8.0),
+                    itemCount: notifications.length,
+                    separatorBuilder: (context, index) => const Divider(
+                      height: 1,
+                      color: MediColors.border,
+                      indent: 16,
+                      endIndent: 16,
+                    ),
+                    itemBuilder: (context, index) {
+                      final item = notifications[index];
+                      return _NotificationTile(
+                        notification: item,
+                        onMarkRead: () {
+                          if (!item.isRead) {
+                            ref
+                                .read(firebaseServiceProvider)
+                                .markNotificationRead(facilityId, item.id);
+                          }
+                        },
+                      );
+                    },
+                  );
+                },
+              ),
             ),
           ),
-        ),
-      ],
-    ),
-  );
-}
+        ],
+      ),
+    );
+  }
 }
 
 class _NotificationTile extends StatelessWidget {
@@ -105,7 +107,7 @@ class _NotificationTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isLowStock = notification.type == 'low_stock';
-    
+
     return InkWell(
       onTap: onMarkRead,
       child: Container(
@@ -125,7 +127,9 @@ class _NotificationTile extends StatelessWidget {
                 shape: BoxShape.circle,
               ),
               child: Icon(
-                isLowStock ? Icons.warning_amber_rounded : Icons.info_outline_rounded,
+                isLowStock
+                    ? Icons.warning_amber_rounded
+                    : Icons.info_outline_rounded,
                 color: isLowStock ? MediColors.error : MediColors.primary,
                 size: 20,
               ),
@@ -141,8 +145,9 @@ class _NotificationTile extends StatelessWidget {
                       color: notification.isRead
                           ? MediColors.textSecondary
                           : MediColors.textPrimary,
-                      fontWeight:
-                          notification.isRead ? FontWeight.normal : FontWeight.w500,
+                      fontWeight: notification.isRead
+                          ? FontWeight.normal
+                          : FontWeight.w500,
                       fontSize: 14,
                     ),
                   ),

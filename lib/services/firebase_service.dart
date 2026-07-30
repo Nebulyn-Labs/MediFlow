@@ -426,7 +426,8 @@ class FirebaseService {
 
   // --- NOTIFICATIONS ---
 
-  Stream<List<import_notification.NotificationModel>> streamNotifications(String facilityId) {
+  Stream<List<import_notification.NotificationModel>> streamNotifications(
+      String facilityId) {
     return _firestore
         .collection('notifications')
         .doc(facilityId)
@@ -435,11 +436,13 @@ class FirebaseService {
         .limit(50)
         .snapshots()
         .map((snapshot) => snapshot.docs
-            .map((doc) => import_notification.NotificationModel.fromMap(doc.data(), doc.id))
+            .map((doc) => import_notification.NotificationModel.fromMap(
+                doc.data(), doc.id))
             .toList());
   }
 
-  Future<void> markNotificationRead(String facilityId, String notificationId) async {
+  Future<void> markNotificationRead(
+      String facilityId, String notificationId) async {
     await _firestore
         .collection('notifications')
         .doc(facilityId)

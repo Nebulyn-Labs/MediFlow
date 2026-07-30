@@ -182,20 +182,24 @@ class _SidebarLayoutState extends ConsumerState<SidebarLayout> {
 
                   // Nav Items
                   StreamBuilder<List<notif.NotificationModel>>(
-                    stream: widget.role == 'facility' && widget.facilityId != null
-                        ? ref.watch(firebaseServiceProvider).streamNotifications(widget.facilityId!)
-                        : Stream.value([]),
+                    stream:
+                        widget.role == 'facility' && widget.facilityId != null
+                            ? ref
+                                .watch(firebaseServiceProvider)
+                                .streamNotifications(widget.facilityId!)
+                            : Stream.value([]),
                     builder: (context, notifSnapshot) {
                       final notifications = notifSnapshot.data ?? [];
-                      final unreadCount = notifications.where((n) => !n.isRead).length;
+                      final unreadCount =
+                          notifications.where((n) => !n.isRead).length;
 
                       return StreamBuilder<List<InventoryItem>>(
-                        stream:
-                            widget.role == 'facility' && widget.facilityId != null
-                                ? ref
-                                    .watch(firebaseServiceProvider)
-                                    .streamInventory(widget.facilityId!)
-                                : Stream.value([]),
+                        stream: widget.role == 'facility' &&
+                                widget.facilityId != null
+                            ? ref
+                                .watch(firebaseServiceProvider)
+                                .streamInventory(widget.facilityId!)
+                            : Stream.value([]),
                         builder: (context, snapshot) {
                           final inventory = snapshot.data ?? [];
                           final hasAlerts = inventory.any((i) {

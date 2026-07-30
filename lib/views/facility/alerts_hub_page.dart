@@ -26,7 +26,8 @@ class AlertsHubPage extends ConsumerWidget {
                       color: MediColors.textPrimary)),
               const SizedBox(width: 12),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                 decoration: BoxDecoration(
                   color: MediColors.info.withValues(alpha: 0.12),
                   borderRadius: BorderRadius.circular(6),
@@ -47,8 +48,12 @@ class AlertsHubPage extends ConsumerWidget {
             unselectedLabelColor: MediColors.textSecondary,
             dividerColor: MediColors.border,
             tabs: [
-              Tab(text: 'Live Feed', icon: Icon(Icons.notifications_active_rounded)),
-              Tab(text: 'Inventory Health', icon: Icon(Icons.health_and_safety_rounded)),
+              Tab(
+                  text: 'Live Feed',
+                  icon: Icon(Icons.notifications_active_rounded)),
+              Tab(
+                  text: 'Inventory Health',
+                  icon: Icon(Icons.health_and_safety_rounded)),
             ],
           ),
         ),
@@ -63,7 +68,8 @@ class AlertsHubPage extends ConsumerWidget {
             Navigator.push(
                 context,
                 MaterialPageRoute(
-                    builder: (_) => const AIChatPage(role: "Facility Manager")));
+                    builder: (_) =>
+                        const AIChatPage(role: "Facility Manager")));
           },
           backgroundColor: const Color(0xFF1E3A8A),
           tooltip: 'Open MediFlow AI Assistant',
