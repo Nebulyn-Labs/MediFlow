@@ -127,11 +127,13 @@ graph TD
    ensures that redistribution is both efficient and equitable:
 
    $$OTS = (w_{dist} \cdot Proximity) + (w_{prior} \cdot RuralPriority) +
-   (w_{qty} \cdot QtyMatch)$$
+   (w_{qty} \cdot QtyMatch) + (w_{exp} \cdot NearExpiry)$$
 
-   - **Proximity:** Minimizes logistics cost and time.
-   - **Rural Priority:** A weight multiplier ensuring that remote facilities are
-     never starved by the algorithm.
+   - **Proximity:** Minimizes logistics cost and time (scored up to 200 points based on distance).
+   - **Rural Priority:** A flat +150 bonus ensuring remote facilities are prioritized.
+   - **Quantity Match:** A fulfillment bonus (+50 full, +25 partial) based on demand met.
+   - **Near Expiry:** A flat +100 bonus when the donor's soonest valid batch
+     expires within 90 days (excluding already-expired stock).
 
 3. **Geospatial Routing System:** Integrated with **flutter_map** and
    **OSRM/OpenRouteService**, our routing engine decodes complex polylines to

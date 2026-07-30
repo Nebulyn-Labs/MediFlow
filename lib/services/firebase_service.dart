@@ -9,6 +9,7 @@ import '../models/inventory_item.dart';
 import '../models/daily_usage_log.dart';
 import '../models/request.dart';
 import '../models/audit_log.dart';
+import '../models/notification.dart' as import_notification;
 import 'simulation_service.dart';
 
 final firebaseServiceProvider = Provider<FirebaseService>((ref) {
@@ -33,11 +34,18 @@ class FirebaseService {
   }
 
   Future<void> sendPasswordReset(String email) async {
-    await _auth.sendPasswordResetEmail(email: email);
+    String status = 'success';
+    try {
+      await _auth.sendPasswordResetEmail(email: email);
+    } catch (e) {
+      status = 'failure';
+      debugPrint('Failed to send password reset email: $e');
+    }
+
     try {
       final callable =
           FirebaseFunctions.instance.httpsCallable('logPasswordResetRequest');
-      await callable.call({'email': email});
+      await callable.call({'email': email, 'status': status});
     } catch (e) {
       debugPrint('Failed to log password reset request: $e');
     }
@@ -243,14 +251,27 @@ class FirebaseService {
             .toList());
   }
 
+  /// Returns daily usage logs for [facilityId] whose [date] falls within the
+  /// last [days] calendar days (i.e. `date >= now - days`).
+  ///
+  /// Unlike a plain `.limit(days)`, this is a true time-window query so
+  /// callers that expect "the last 30 days of data" receive exactly that,
+  /// regardless of how frequently the facility logs data.
+  ///
+  /// A safety cap of 500 documents is applied to avoid unbounded reads on
+  /// high-throughput facilities; raise it if a use-case genuinely needs more.
   Future<List<DailyUsageLog>> getRecentLogs(String facilityId,
       {int days = 30}) async {
+    final cutoff = Timestamp.fromDate(
+      DateTime.now().subtract(Duration(days: days)),
+    );
     final snapshot = await _firestore
         .collection('daily_usage_logs')
         .doc(facilityId)
         .collection('logs')
+        .where('date', isGreaterThanOrEqualTo: cutoff)
         .orderBy('date', descending: true)
-        .limit(days)
+        .limit(500)
         .get();
     return snapshot.docs
         .map((doc) => DailyUsageLog.fromMap(doc.data(), doc.id))
@@ -421,6 +442,33 @@ class FirebaseService {
         .where('facilityId', isEqualTo: facilityId)
         .get();
     return snapshot.docs.map((doc) => doc.data()).toList();
+  }
+
+  // --- NOTIFICATIONS ---
+
+  Stream<List<import_notification.NotificationModel>> streamNotifications(
+      String facilityId) {
+    return _firestore
+        .collection('notifications')
+        .doc(facilityId)
+        .collection('items')
+        .orderBy('createdAt', descending: true)
+        .limit(50)
+        .snapshots()
+        .map((snapshot) => snapshot.docs
+            .map((doc) => import_notification.NotificationModel.fromMap(
+                doc.data(), doc.id))
+            .toList());
+  }
+
+  Future<void> markNotificationRead(
+      String facilityId, String notificationId) async {
+    await _firestore
+        .collection('notifications')
+        .doc(facilityId)
+        .collection('items')
+        .doc(notificationId)
+        .update({'isRead': true});
   }
 
   // --- CLEANUP & SEEDING ---
