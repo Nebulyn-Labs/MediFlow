@@ -798,22 +798,37 @@ async function executeTool(name, args, authInfo) {
       });
       return { status: "success", system_inventory: systemStock };
     }
-    const facilitiesSnapshot = await db.collection("facilities").get();
-    const systemStock = {};
+    // Fetch facilities and all medicines in two parallel round-trips instead
+    // of one sequential read per facility (N+1). The collectionGroup query
+    // returns every document under any inventory/{facilityId}/medicines path
+    // in a single Firestore call.
+    const [facilitiesSnapshot, allMedicinesSnapshot] = await Promise.all([
+      db.collection("facilities").get(),
+      db.collectionGroup("medicines").get(),
+    ]);
+
+    // Build a facilityId → display-name lookup from the facilities fetch.
+    const facilityNames = {};
     for (const doc of facilitiesSnapshot.docs) {
-      const fac = doc.data();
-      const facId = doc.id;
-      const invSnapshot = await db.collection("inventory")
-        .doc(facId)
-        .collection("medicines")
-        .get();
-      systemStock[fac.name || facId] = invSnapshot.docs.map((medDoc) => {
-        const item = medDoc.data();
-        return {
-          name: item.medicineName,
-          remaining: item.remainingQuantity,
-          initial: item.initialQuantity,
-        };
+      facilityNames[doc.id] = doc.data().name || doc.id;
+    }
+
+    // Group medicine documents by their parent facilityId.
+    // Path structure: inventory/{facilityId}/medicines/{medicineId}
+    const systemStock = {};
+    for (const medDoc of allMedicinesSnapshot.docs) {
+      const pathSegments = medDoc.ref.path.split("/");
+      // pathSegments: ["inventory", facId, "medicines", medId]
+      const facId = pathSegments[1];
+      const facName = facilityNames[facId] || facId;
+      if (!systemStock[facName]) {
+        systemStock[facName] = [];
+      }
+      const item = medDoc.data();
+      systemStock[facName].push({
+        name: item.medicineName,
+        remaining: item.remainingQuantity,
+        initial: item.initialQuantity,
       });
     }
     return { status: "success", system_inventory: systemStock };
