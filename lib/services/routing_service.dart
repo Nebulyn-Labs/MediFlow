@@ -30,10 +30,10 @@ final routingServiceProvider = Provider((ref) => RoutingService());
 ///   known placeholder coordinates (`(0, 0)` or `(-1, -1)`, used
 ///   elsewhere in the codebase to mean "location not set"). This avoids
 ///   wasting external API calls on facilities with incomplete geodata.
-/// - **No caching/retries:** each segment is fetched independently and
-///   only once; a failed segment falls back to a straight line rather than
-///   being retried, so a multi-stop route can mix real road polylines and
-///   straight-line segments.
+/// - **Route caching:** routes are stored in an in-memory cache bounded to
+///   100 entries (`_maxCacheSize`). When a cache miss occurs, failed segment
+///   requests fall back to a straight line without retries, so a multi-stop
+///   route can mix real road polylines and straight-line segments.
 class RoutingService {
   static const String _osrmBaseUrl =
       'https://router.project-osrm.org/route/v1/driving';
