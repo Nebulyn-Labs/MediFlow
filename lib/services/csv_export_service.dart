@@ -193,4 +193,32 @@ class CsvExportService {
       bytes: bytes,
     );
   }
+
+  /// Exports the wastage report data as a CSV file and prompts the user to save it.
+  static Future<String?> exportWastageReport(
+    List<Map<String, dynamic>> wastageData, {
+    String? facilityName,
+  }) async {
+    final rows = <List<dynamic>>[
+      [
+        'Medicine Name',
+        'Expired Units',
+        'Near Expiry Units (<= 30 days)',
+        'Estimated Cost (\$) (Assumed \$1.50/unit)',
+      ],
+    ];
+
+    for (final data in wastageData) {
+      rows.add([
+        data['medicineName'],
+        data['expiredUnits'],
+        data['nearExpiryUnits'],
+        data['estimatedCost'],
+      ]);
+    }
+
+    final fileName =
+        'wastage_report_${_slug(facilityName)}${_stampFmt.format(DateTime.now())}.csv';
+    return _saveCsv(rows, fileName);
+  }
 }

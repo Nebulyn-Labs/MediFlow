@@ -6,6 +6,7 @@ import '../models/daily_usage_log.dart';
 import '../models/request.dart';
 import '../models/facility.dart';
 import '../models/inventory_item.dart';
+import '../constants/inventory_thresholds.dart';
 
 final aiServiceProvider = Provider<AIService>((ref) {
   return AIService(ref);
@@ -27,6 +28,11 @@ class AIService {
     }
     return true;
   }
+
+  /// Public read-only view of fallback state, so UI (e.g. AIChatPage)
+  /// can accurately reflect whether responses are coming from Gemini
+  /// or the local rule-based engine.
+  bool get isLocalFallbackActive => _shouldUseLocal;
 
   void _handleQuotaError(String errorMsg) {
     if (errorMsg.contains('quota') ||
@@ -221,8 +227,11 @@ class AIService {
         final rem = item['remainingQuantity'] ?? 0;
         final tot = item['initialQuantity'] ?? 0;
         final name = item['medicineName'] ?? 'Unknown';
-        final status =
-            (tot > 0 && rem / tot < 0.2) ? "⚠️ CRITICAL" : "✅ STABLE";
+        final status = (tot > 0 &&
+                (rem / tot <= InventoryThresholds.lowStockPercentage ||
+                    rem <= InventoryThresholds.lowStockAbsolute))
+            ? "⚠️ CRITICAL"
+            : "✅ STABLE";
         buffer.writeln("• **$name**: $rem/$tot units ($status)");
       }
     } else {
@@ -371,7 +380,6 @@ Output JSON only.
     }
   }
 
-  // ─── MULTI-MODAL VISION ─────────────────────────────────────────
   Future<String> parseImageWithVision(
       Uint8List imageBytes, String prompt) async {
     final imageBase64 = base64Encode(imageBytes);
@@ -399,5 +407,33 @@ Output JSON only.
       };
     }
     return results;
+  }
+
+  // ─── WASTAGE REPORT ─────────────────────────────────────────────
+  Future<String> getWastageRecommendations(
+      List<Map<String, dynamic>> wastageData) async {
+    if (_shouldUseLocal || wastageData.isEmpty) {
+      return "Local analysis suggests prioritizing stock redistribution before expiry and optimizing future indent quantities to match actual burn rates.";
+    }
+
+    try {
+      final payload = wastageData
+          .map((w) =>
+              "${w['medicineName']}: ${w['expiredUnits']} expired, ${w['nearExpiryUnits']} expiring soon. Est. cost impact: \$${w['estimatedCost']}")
+          .join('\n');
+          
+      final prompt = '''
+Analyze the following wastage report for a healthcare facility:
+$payload
+
+Provide 3 actionable recommendations to prevent future wastage and minimize financial impact. Keep it concise, practical, and formatted as a numbered list.
+''';
+
+      final responseText = await _callGeminiBackend(prompt);
+      return responseText.trim();
+    } catch (e) {
+      _handleQuotaError(e.toString());
+      return "Local analysis suggests prioritizing stock redistribution before expiry and optimizing future indent quantities to match actual burn rates.";
+    }
   }
 }
