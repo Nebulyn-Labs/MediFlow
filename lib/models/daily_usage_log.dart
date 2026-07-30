@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'inventory_item.dart';
 
 class MedicineUsage {
   final String medicineName;
@@ -67,6 +68,20 @@ class PaginatedLogsResult {
 
   PaginatedLogsResult({
     required this.logs,
+    required this.lastDocument,
+    required this.hasMore,
+  });
+}
+
+/// Holds one page of medicines from the global collectionGroup plus a cursor
+/// for fetching the next page. Mirrors [PaginatedLogsResult] for consistency.
+class PaginatedMedicinesResult {
+  final List<InventoryItem> medicines;
+  final DocumentSnapshot? lastDocument;
+  final bool hasMore;
+
+  PaginatedMedicinesResult({
+    required this.medicines,
     required this.lastDocument,
     required this.hasMore,
   });
