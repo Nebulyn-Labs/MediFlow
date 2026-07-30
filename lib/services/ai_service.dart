@@ -421,7 +421,7 @@ Output JSON only.
           .map((w) =>
               "${w['medicineName']}: ${w['expiredUnits']} expired, ${w['nearExpiryUnits']} expiring soon. Est. cost impact: \$${w['estimatedCost']}")
           .join('\n');
-          
+
       final prompt = '''
 Analyze the following wastage report for a healthcare facility:
 $payload
