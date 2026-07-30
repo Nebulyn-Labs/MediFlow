@@ -33,11 +33,18 @@ class FirebaseService {
   }
 
   Future<void> sendPasswordReset(String email) async {
-    await _auth.sendPasswordResetEmail(email: email);
+    String status = 'success';
+    try {
+      await _auth.sendPasswordResetEmail(email: email);
+    } catch (e) {
+      status = 'failure';
+      debugPrint('Failed to send password reset email: $e');
+    }
+
     try {
       final callable =
           FirebaseFunctions.instance.httpsCallable('logPasswordResetRequest');
-      await callable.call({'email': email});
+      await callable.call({'email': email, 'status': status});
     } catch (e) {
       debugPrint('Failed to log password reset request: $e');
     }
