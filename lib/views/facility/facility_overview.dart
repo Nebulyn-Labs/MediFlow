@@ -217,18 +217,10 @@ class _FacilityOverviewState extends ConsumerState<FacilityOverview> {
               ),
             ],
           ),
-          body: RefreshIndicator(
-            onRefresh: () => ref
-                .read(firebaseServiceProvider)
-                .getInventoryOnce(widget.facilityId),
-            color: MediColors.primary,
-            backgroundColor: MediColors.surface,
-            strokeWidth: 2.5,
-            displacement: 48,
-            child: SingleChildScrollView(
-              physics: const AlwaysScrollableScrollPhysics(),
-              padding: const EdgeInsets.all(28),
-              child: Column(
+          body: SingleChildScrollView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            padding: const EdgeInsets.all(28),
+            child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   // Greeting
