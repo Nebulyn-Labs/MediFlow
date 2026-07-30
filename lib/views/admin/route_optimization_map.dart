@@ -92,7 +92,7 @@ class _RouteOptimizationMapState extends ConsumerState<RouteOptimizationMap> {
         requests: requests,
       );
 
-      // 2. Fetch road-accurate routes for each multi-stop route
+      // 2. Fetch road-accurate routes for each multi-stop route and leg
       Map<String, RouteResult> routes = {};
       for (var mr in multiRoutes) {
         if (mr.stops.isEmpty) continue;
@@ -100,6 +100,14 @@ class _RouteOptimizationMapState extends ConsumerState<RouteOptimizationMap> {
             mr.stops.map((f) => LatLng(f.latitude, f.longitude)).toList();
         final result = await router.getMultiStopRoute(stopsCoords);
         routes[mr.transfers.first.donor.id] = result;
+
+        for (var rec in mr.transfers) {
+          final legResult = await router.getRoute(
+            LatLng(rec.donor.latitude, rec.donor.longitude),
+            LatLng(rec.recipient.latitude, rec.recipient.longitude),
+          );
+          routes['${rec.donor.id}_${rec.recipient.id}'] = legResult;
+        }
       }
 
       // 3. Generate AI Summary
@@ -612,32 +620,37 @@ class _RouteOptimizationMapState extends ConsumerState<RouteOptimizationMap> {
     /// Named here as a constant so it is easy to find and change (#252).
     const double kFallbackSpeedKmh = 40.0;
 
-    // Prefer road distance/duration from the routing API response if present.
-    final donorId = rec.donor.id;
-    final routeResult = _roadRoutes[donorId];
+    // Prefer road distance/duration for this specific transfer leg if present,
+    // falling back to whole-tour donor route metadata.
+    final legKey = '${rec.donor.id}_${rec.recipient.id}';
+    final routeResult = _roadRoutes[legKey] ?? _roadRoutes[rec.donor.id];
 
     // Road distance and duration from the API (null when straight-line
-    // fallback was used or the donor's route has not been fetched yet).
+    // fallback was used or the route has not been fetched yet).
     final double? roadDistKm = routeResult?.distanceKm;
     final double? roadDurationSeconds = routeResult?.durationSeconds;
 
     // Straight-line haversine distance — used only as a fallback.
-    final Distance distanceCalc = const Distance();
-    final double straightLineDistKm =
-        distanceCalc(LatLng(rec.donor.latitude, rec.donor.longitude),
-                LatLng(rec.recipient.latitude, rec.recipient.longitude)) /
-            1000;
+    const Distance distanceCalc = Distance();
+    final double straightLineDistKm = distanceCalc(
+          LatLng(rec.donor.latitude, rec.donor.longitude),
+          LatLng(rec.recipient.latitude, rec.recipient.longitude),
+        ) /
+        1000;
 
     // Resolved display values: prefer road data, fall back to straight-line.
-    final bool usingRoadData = roadDistKm != null && roadDurationSeconds != null;
-    final double displayDistKm = usingRoadData ? roadDistKm : straightLineDistKm;
+    final bool usingRoadData =
+        roadDistKm != null && roadDurationSeconds != null;
+    final double displayDistKm =
+        usingRoadData ? roadDistKm : straightLineDistKm;
     final int displayTimeMinutes = usingRoadData
         ? (roadDurationSeconds / 60).round()
         : (straightLineDistKm / kFallbackSpeedKmh * 60).round();
 
     // Label shown next to the ETA so users know what it's based on.
-    final String etaLabel =
-        usingRoadData ? 'est.' : 'est. (straight-line @ ${kFallbackSpeedKmh.toInt()} km/h)';
+    final String etaLabel = usingRoadData
+        ? 'est.'
+        : 'est. (straight-line @ ${kFallbackSpeedKmh.toInt()} km/h)';
 
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
