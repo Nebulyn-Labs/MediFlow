@@ -125,6 +125,12 @@ class _RouteOptimizationMapState extends ConsumerState<RouteOptimizationMap> {
   }
 
   @override
+  void dispose() {
+    _mapController.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     if (_isLoading) {
       return const Scaffold(
