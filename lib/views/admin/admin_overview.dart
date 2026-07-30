@@ -83,6 +83,7 @@ class _AdminOverviewState extends ConsumerState<AdminOverview> {
         _medicinesHasMore = true;
         _medicinesError = null;
         _medicinesRequestId++;
+        _medicinesLoading = false;
       });
     }
 
