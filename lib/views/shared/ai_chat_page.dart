@@ -6,7 +6,8 @@ import '../../services/firebase_service.dart';
 import 'package:med_supply_prototype/constants/colors.dart';
 import '../../models/inventory_item.dart';
 
-List<Map<String, dynamic>> buildInventoryContextList(List<InventoryItem> inventory) {
+List<Map<String, dynamic>> buildInventoryContextList(
+    List<InventoryItem> inventory) {
   return inventory
       .map((i) => {
             "medicineName": i.medicineName,
