@@ -718,22 +718,30 @@ class _RouteOptimizationMapState extends ConsumerState<RouteOptimizationMap> {
             spacing: 8.0,
             runSpacing: 4.0,
             children: [
-              Row(children: [
-                const Icon(Icons.route_rounded,
-                    size: 14, color: MediColors.textMuted),
-                const SizedBox(width: 4),
-                Text('${displayDistKm.toStringAsFixed(1)} km',
-                    style: const TextStyle(
-                        color: MediColors.textMuted, fontSize: 12))
-              ]),
-              Row(children: [
-                const Icon(Icons.schedule_rounded,
-                    size: 14, color: MediColors.textMuted),
-                const SizedBox(width: 4),
-                Text('${displayTimeMinutes}m $etaLabel',
-                    style: const TextStyle(
-                        color: MediColors.textMuted, fontSize: 12))
-              ]),
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(Icons.route_rounded,
+                      size: 14, color: MediColors.textMuted),
+                  const SizedBox(width: 4),
+                  Text('${displayDistKm.toStringAsFixed(1)} km',
+                      style: const TextStyle(
+                          color: MediColors.textMuted, fontSize: 12)),
+                ],
+              ),
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(Icons.schedule_rounded,
+                      size: 14, color: MediColors.textMuted),
+                  const SizedBox(width: 4),
+                  Flexible(
+                    child: Text('${displayTimeMinutes}m $etaLabel',
+                        style: const TextStyle(
+                            color: MediColors.textMuted, fontSize: 12)),
+                  ),
+                ],
+              ),
             ],
           ),
         ],
