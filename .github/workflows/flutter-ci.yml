@@ -63,7 +63,6 @@ jobs:
   functions_ci:
     name: Cloud Functions CI
     runs-on: ubuntu-latest
-    # Run only if files in functions/ have changed to avoid unnecessary runs
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
@@ -75,6 +74,15 @@ jobs:
           filters: |
             functions:
               - 'functions/**'
+              - 'firestore.rules'
+              - '.github/workflows/flutter-ci.yml'
+
+      - name: Set up JDK 21
+        if: steps.filter.outputs.functions == 'true'
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
 
       - name: Set up Node.js
         if: steps.filter.outputs.functions == 'true'
@@ -89,12 +97,16 @@ jobs:
         working-directory: functions
         run: npm ci
 
+      - name: Install Firebase CLI
+        if: steps.filter.outputs.functions == 'true'
+        run: npm install -g firebase-tools
+
       - name: Run Linter
         if: steps.filter.outputs.functions == 'true'
         working-directory: functions
         run: npm run lint
 
-      - name: Run Tests
+      - name: Run Tests with Firestore Emulator
         if: steps.filter.outputs.functions == 'true'
         working-directory: functions
-        run: npm test
+        run: firebase emulators:exec --only firestore --project mediflow-test 'node --test test/*.test.js'
