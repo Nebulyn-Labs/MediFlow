@@ -556,8 +556,7 @@ void main() {
     // -----------------------------------------------------------------------
     // Issue #271 – Near-Expiry Scoring
     // -----------------------------------------------------------------------
-    test(
-        'near-expiry donor is preferred when distance and quantity are equal',
+    test('near-expiry donor is preferred when distance and quantity are equal',
         () {
       // Two donors at the exact same coordinates (identical distance score)
       // and identical surplus. The ONLY difference is how soon their stock
@@ -617,4 +616,4 @@ void main() {
       );
     });
   });
-}
+}
