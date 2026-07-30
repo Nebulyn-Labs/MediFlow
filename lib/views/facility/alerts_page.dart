@@ -32,7 +32,10 @@ class _InventoryAlert {
 
 class AlertsPage extends ConsumerStatefulWidget {
   final String facilityId;
-  const AlertsPage({super.key, required this.facilityId});
+  final bool isTabBody;
+
+  const AlertsPage(
+      {super.key, required this.facilityId, this.isTabBody = false});
 
   @override
   ConsumerState<AlertsPage> createState() => _AlertsPageState();
@@ -193,6 +196,63 @@ class _AlertsPageState extends ConsumerState<AlertsPage> {
     final expiryAlerts =
         _alerts.where((a) => a.kind == _AlertKind.expiringSoon).toList();
 
+    // App bar and scaffold moved below
+    final body = _isLoading
+        ? const AlertsSkeleton()
+        : SingleChildScrollView(
+            padding: const EdgeInsets.all(28),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                if (expiredAlerts.isNotEmpty) ...[
+                  _sectionHeader('Expired Medicines'),
+                  const SizedBox(height: 16),
+                  ...expiredAlerts.map(_buildAlertCard),
+                  const SizedBox(height: 32),
+                ],
+                if (stockAlerts.isNotEmpty) ...[
+                  _sectionHeader('Stock Action Alerts'),
+                  const SizedBox(height: 16),
+                  ...stockAlerts.map(_buildAlertCard),
+                  const SizedBox(height: 32),
+                ],
+                if (expiryAlerts.isNotEmpty) ...[
+                  _sectionHeader('Expiry Watch'),
+                  const SizedBox(height: 16),
+                  ...expiryAlerts.map(_buildAlertCard),
+                ],
+                if (_alerts.isEmpty)
+                  Center(
+                    child: Padding(
+                      padding: const EdgeInsets.only(top: 96),
+                      child: Column(
+                        children: [
+                          ExcludeSemantics(
+                            child: Icon(Icons.check_circle_rounded,
+                                size: 64,
+                                color:
+                                    MediColors.success.withValues(alpha: 0.8)),
+                          ),
+                          const SizedBox(height: 16),
+                          const Text('No active alerts detected.',
+                              style: TextStyle(
+                                  color: MediColors.textSecondary,
+                                  fontSize: 16)),
+                        ],
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          );
+
+    if (widget.isTabBody) {
+      return RefreshIndicator(
+        onRefresh: _loadAlerts,
+        child: body,
+      );
+    }
+
     return Scaffold(
       backgroundColor: MediColors.bg,
       appBar: AppBar(
@@ -239,54 +299,7 @@ class _AlertsPageState extends ConsumerState<AlertsPage> {
         tooltip: 'Open MediFlow AI Assistant',
         child: const Icon(Icons.auto_awesome, color: Colors.white),
       ),
-      body: _isLoading
-          ? const AlertsSkeleton()
-          : SingleChildScrollView(
-              padding: const EdgeInsets.all(28),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  if (expiredAlerts.isNotEmpty) ...[
-                    _sectionHeader('Expired Medicines'),
-                    const SizedBox(height: 16),
-                    ...expiredAlerts.map(_buildAlertCard),
-                    const SizedBox(height: 32),
-                  ],
-                  if (stockAlerts.isNotEmpty) ...[
-                    _sectionHeader('Stock Action Alerts'),
-                    const SizedBox(height: 16),
-                    ...stockAlerts.map(_buildAlertCard),
-                    const SizedBox(height: 32),
-                  ],
-                  if (expiryAlerts.isNotEmpty) ...[
-                    _sectionHeader('Expiry Watch'),
-                    const SizedBox(height: 16),
-                    ...expiryAlerts.map(_buildAlertCard),
-                  ],
-                  if (_alerts.isEmpty)
-                    Center(
-                      child: Padding(
-                        padding: const EdgeInsets.only(top: 96),
-                        child: Column(
-                          children: [
-                            ExcludeSemantics(
-                              child: Icon(Icons.check_circle_rounded,
-                                  size: 64,
-                                  color: MediColors.success
-                                      .withValues(alpha: 0.8)),
-                            ),
-                            const SizedBox(height: 16),
-                            const Text('No active alerts detected.',
-                                style: TextStyle(
-                                    color: MediColors.textSecondary,
-                                    fontSize: 16)),
-                          ],
-                        ),
-                      ),
-                    ),
-                ],
-              ),
-            ),
+      body: body,
     );
   }
 
