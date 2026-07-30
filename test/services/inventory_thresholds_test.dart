@@ -8,7 +8,8 @@ void main() {
   group('Inventory Thresholds Synchronization Tests', () {
     test('Dart thresholds match backend JSON source of truth', () {
       final jsonFile = File('functions/helpers/inventory_thresholds.json');
-      expect(jsonFile.existsSync(), isTrue, reason: 'Source of truth JSON file must exist.');
+      expect(jsonFile.existsSync(), isTrue,
+          reason: 'Source of truth JSON file must exist.');
 
       final jsonContent = jsonFile.readAsStringSync();
       final Map<String, dynamic> thresholds = jsonDecode(jsonContent);
