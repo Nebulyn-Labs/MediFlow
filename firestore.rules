@@ -81,6 +81,17 @@ service cloud.firestore {
       allow write: if isAdmin();
     }
 
+    // Notifications collection
+    match /notifications/{facilityId} {
+      allow read: if isAdmin() || isFacilityUser(facilityId);
+      
+      match /items/{notificationId} {
+        allow read: if isAdmin() || isFacilityUser(facilityId);
+        allow update: if isFacilityUser(facilityId) && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['isRead']);
+        allow write: if isAdmin();
+      }
+    }
+
     // Users collection (RBAC)
     match /users/{userId} {
       allow read: if isAdmin() || (isAuthenticated() && request.auth.uid == userId);
