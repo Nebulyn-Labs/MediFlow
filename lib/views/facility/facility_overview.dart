@@ -426,8 +426,7 @@ class _FacilityOverviewState extends ConsumerState<FacilityOverview> {
                 ],
               ),
             ),
-          ),
-        );
+          );
       },
     );
   }
