@@ -221,8 +221,8 @@ class _FacilityOverviewState extends ConsumerState<FacilityOverview> {
             physics: const AlwaysScrollableScrollPhysics(),
             padding: const EdgeInsets.all(28),
             child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
                   // Greeting
                   Wrap(
                     spacing: 16,
@@ -423,10 +423,10 @@ class _FacilityOverviewState extends ConsumerState<FacilityOverview> {
                   ),
                   const SizedBox(height: 36),
                   _buildInventoryTable(context, ref, inventory),
-                ],
-              ),
+              ],
             ),
-          );
+          ),
+        );
       },
     );
   }
