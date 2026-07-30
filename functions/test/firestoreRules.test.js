@@ -16,6 +16,8 @@
 
 'use strict';
 
+const { describe, it, test, before, after, beforeEach } = require('node:test');
+const assert = require('node:assert/strict');
 const {
   initializeTestEnvironment,
   assertFails,
@@ -48,7 +50,7 @@ function authedDb(uid, email) {
 
 // ─── Setup / Teardown ─────────────────────────────────────────────────────────
 
-beforeAll(async () => {
+before(async () => {
   testEnv = await initializeTestEnvironment({
     projectId: PROJECT_ID,
     firestore: {
@@ -63,7 +65,7 @@ beforeAll(async () => {
   });
 });
 
-afterAll(async () => {
+after(async () => {
   await testEnv.cleanup();
 });
 
