@@ -20,6 +20,7 @@ jobs:
       - name: Set up Flutter
         uses: subosito/flutter-action@v2
         with:
+          flutter-version: '3.41.0'
           channel: 'stable'
           cache: true
           pub-cache: true
@@ -28,6 +29,11 @@ jobs:
         run: flutter pub get
 
       - name: Verify Code Formatting
+        id: format
+        run: dart format --output=none --set-exit-if-changed .
+
+      - name: Apply Code Formatting
+        if: failure() && steps.format.outcome == 'failure'
         run: dart format .
 
       - name: Analyze Code

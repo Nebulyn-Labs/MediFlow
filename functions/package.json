@@ -1,14 +1,22 @@
 {
-  "name": "functions",
+  "name": "mediflow-functions",
   "version": "1.0.0",
-  "description": "",
+  "description": "Firebase Cloud Functions for the MediFlow medical supply-chain platform.",
+  "author": "Nebulyn Labs",
+  "keywords": [
+    "mediflow",
+    "firebase",
+    "cloud-functions",
+    "medical-supply"
+  ],
   "main": "index.js",
+  "engines": {
+    "node": "20"
+  },
   "scripts": {
     "lint": "eslint .",
     "test": "node --test test/*.test.js"
   },
-  "keywords": [],
-  "author": "",
   "license": "ISC",
   "type": "commonjs",
   "dependencies": {

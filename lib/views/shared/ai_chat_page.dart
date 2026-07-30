@@ -18,6 +18,7 @@ class _AIChatPageState extends ConsumerState<AIChatPage> {
   final ScrollController _scrollController = ScrollController();
   final List<Map<String, String>> _messages = [];
   bool _isTyping = false;
+  bool _isLocalMode = false;
   Map<String, dynamic> _activeContext = {};
 
   @override
@@ -91,6 +92,7 @@ class _AIChatPageState extends ConsumerState<AIChatPage> {
         setState(() {
           _messages.add({'role': 'ai', 'content': response});
           _isTyping = false;
+          _isLocalMode = ref.read(aiServiceProvider).isLocalFallbackActive;
         });
         _scrollToBottom();
       }
@@ -115,13 +117,15 @@ class _AIChatPageState extends ConsumerState<AIChatPage> {
       appBar: AppBar(
         title: Row(
           children: [
-            Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                  gradient: MediColors.primaryGradient,
-                  borderRadius: BorderRadius.circular(10)),
-              child: const Icon(Icons.smart_toy_rounded,
-                  color: Colors.white, size: 18),
+            ExcludeSemantics(
+              child: Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                    gradient: MediColors.primaryGradient,
+                    borderRadius: BorderRadius.circular(10)),
+                child: const Icon(Icons.smart_toy_rounded,
+                    color: Colors.white, size: 18),
+              ),
             ),
             const SizedBox(width: 12),
             Column(
@@ -132,9 +136,10 @@ class _AIChatPageState extends ConsumerState<AIChatPage> {
                         fontSize: 16,
                         fontWeight: FontWeight.w700,
                         color: MediColors.textPrimary)),
-                const Text(
-                  'gemini-flash-lite-latest',
-                  style: TextStyle(fontSize: 11, color: MediColors.textMuted),
+                Text(
+                  _isLocalMode ? 'Local Assistant Mode' : 'Powered by Gemini',
+                  style: const TextStyle(
+                      fontSize: 11, color: MediColors.textMuted),
                 ),
               ],
             ),
@@ -193,6 +198,7 @@ class _AIChatPageState extends ConsumerState<AIChatPage> {
                       borderRadius: BorderRadius.circular(14)),
                   child: IconButton(
                     onPressed: _isTyping ? null : _sendMessage,
+                    tooltip: 'Send message',
                     icon: const Icon(Icons.send_rounded,
                         color: Colors.white, size: 20),
                   ),
@@ -284,32 +290,40 @@ class _AIChatPageState extends ConsumerState<AIChatPage> {
 
   Widget _buildBubble(String role, String text) {
     final isUser = role == 'user';
-    return Align(
-      alignment: isUser ? Alignment.centerRight : Alignment.centerLeft,
-      child: Container(
-        margin: const EdgeInsets.only(bottom: 14),
-        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
-        constraints:
-            BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.6),
-        decoration: BoxDecoration(
-          gradient: isUser ? MediColors.primaryGradient : null,
-          color: isUser ? null : MediColors.surface,
-          borderRadius: BorderRadius.only(
-            topLeft: const Radius.circular(18),
-            topRight: const Radius.circular(18),
-            bottomLeft:
-                isUser ? const Radius.circular(18) : const Radius.circular(4),
-            bottomRight:
-                isUser ? const Radius.circular(4) : const Radius.circular(18),
-          ),
-          border: isUser ? null : Border.all(color: MediColors.border),
-        ),
-        child: SelectableText(
-          text,
-          style: TextStyle(
-            color: isUser ? Colors.white : MediColors.textPrimary,
-            fontSize: 14,
-            height: 1.5,
+    final sender = isUser ? 'You' : 'MediFlow AI';
+    return Semantics(
+      label: '$sender said: $text',
+      child: ExcludeSemantics(
+        child: Align(
+          alignment: isUser ? Alignment.centerRight : Alignment.centerLeft,
+          child: Container(
+            margin: const EdgeInsets.only(bottom: 14),
+            padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
+            constraints: BoxConstraints(
+                maxWidth: MediaQuery.of(context).size.width * 0.6),
+            decoration: BoxDecoration(
+              gradient: isUser ? MediColors.primaryGradient : null,
+              color: isUser ? null : MediColors.surface,
+              borderRadius: BorderRadius.only(
+                topLeft: const Radius.circular(18),
+                topRight: const Radius.circular(18),
+                bottomLeft: isUser
+                    ? const Radius.circular(18)
+                    : const Radius.circular(4),
+                bottomRight: isUser
+                    ? const Radius.circular(4)
+                    : const Radius.circular(18),
+              ),
+              border: isUser ? null : Border.all(color: MediColors.border),
+            ),
+            child: SelectableText(
+              text,
+              style: TextStyle(
+                color: isUser ? Colors.white : MediColors.textPrimary,
+                fontSize: 14,
+                height: 1.5,
+              ),
+            ),
           ),
         ),
       ),
@@ -317,29 +331,35 @@ class _AIChatPageState extends ConsumerState<AIChatPage> {
   }
 
   Widget _buildTypingIndicator() {
-    return Align(
-      alignment: Alignment.centerLeft,
-      child: Container(
-        margin: const EdgeInsets.only(bottom: 14),
-        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
-        decoration: BoxDecoration(
-          color: MediColors.surface,
-          borderRadius: const BorderRadius.only(
-            topLeft: Radius.circular(18),
-            topRight: Radius.circular(18),
-            bottomRight: Radius.circular(18),
-            bottomLeft: Radius.circular(4),
+    return Semantics(
+      label: 'MediFlow AI is typing',
+      liveRegion: true,
+      child: ExcludeSemantics(
+        child: Align(
+          alignment: Alignment.centerLeft,
+          child: Container(
+            margin: const EdgeInsets.only(bottom: 14),
+            padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
+            decoration: BoxDecoration(
+              color: MediColors.surface,
+              borderRadius: const BorderRadius.only(
+                topLeft: Radius.circular(18),
+                topRight: Radius.circular(18),
+                bottomRight: Radius.circular(18),
+                bottomLeft: Radius.circular(4),
+              ),
+              border: Border.all(color: MediColors.border),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: List.generate(
+                  3,
+                  (i) => Padding(
+                        padding: EdgeInsets.only(right: i < 2 ? 6 : 0),
+                        child: _BouncingDot(delay: i * 150),
+                      )),
+            ),
           ),
-          border: Border.all(color: MediColors.border),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: List.generate(
-              3,
-              (i) => Padding(
-                    padding: EdgeInsets.only(right: i < 2 ? 6 : 0),
-                    child: _BouncingDot(delay: i * 150),
-                  )),
         ),
       ),
     );

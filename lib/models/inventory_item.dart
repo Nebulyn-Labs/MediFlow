@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import '../constants/inventory_thresholds.dart';
 
 class InventoryItem {
   final String id;
@@ -35,7 +36,8 @@ class InventoryItem {
   ///  - fewer than 500 units remain in absolute terms (safety floor for
   ///    small initial batches where the percentage check alone is too loose).
   bool get isLowStock =>
-      remainingPercentage <= 0.20 || remainingQuantity <= 500;
+      remainingPercentage <= InventoryThresholds.lowStockPercentage ||
+      remainingQuantity <= InventoryThresholds.lowStockAbsolute;
 
   factory InventoryItem.fromMap(Map<String, dynamic> map, String id,
       {String? facilityId}) {

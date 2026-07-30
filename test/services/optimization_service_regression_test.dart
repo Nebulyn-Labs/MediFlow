@@ -36,7 +36,11 @@ InventoryItem inventory(
     medicineName: medicine,
     batchId: 'batch-1',
     arrivalDate: date,
-    expiryDate: date.add(const Duration(days: 180)),
+    // Use DateTime.now() + 180 d so this batch is always outside the 90-day
+    // near-expiry window, regardless of when the test suite runs. A fixed
+    // anchor (e.g. _testDate + 180 d = 2027-01-18) would fall inside the
+    // window after 2026-10-20 and silently inflate scores.
+    expiryDate: DateTime.now().add(const Duration(days: 180)),
     initialQuantity: initial,
     remainingQuantity: remaining,
     unit: 'units',
