@@ -9,7 +9,7 @@ const { BigQuery } = require("@google-cloud/bigquery");
 const { checkRateLimit, LIMITS } = require("./helpers/rateLimiter");
 const { createBigQueryRecovery } = require("./helpers/bigQueryRecovery");
 const { createLowStockService } = require("./helpers/lowStock");
-const { handleCspReport } = require("./helpers/cspReport");
+const { handleCspReport, getClientIp } = require("./helpers/cspReport");
 
 admin.initializeApp();
 
@@ -813,20 +813,39 @@ exports.logPasswordResetRequest = onCall(async (request) => {
 
   email = email.trim().toLowerCase();
 
-  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || email.length > 1500) {
+  if (email.length > 254 || Buffer.byteLength(email, "utf8") > 1500) {
+    throw new HttpsError("invalid-argument", "Invalid email format");
+  }
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
     throw new HttpsError("invalid-argument", "Invalid email format");
   }
 
-  const clientIp = request.rawRequest?.ip || "unknown";
+  const clientIp = getClientIp(request.rawRequest);
+  if (!clientIp || clientIp === "unknown") {
+    throw new HttpsError("unauthenticated", "Unable to determine client IP");
+  }
 
   await checkRateLimit(
     clientIp,
-    "logPasswordResetRequest",
-    LIMITS.GENERAL
+    "logPasswordResetRequest_ip",
+    LIMITS.PASSWORD_RESET_IP
+  );
+  await checkRateLimit(
+    email,
+    "logPasswordResetRequest_email",
+    LIMITS.PASSWORD_RESET_EMAIL
   );
 
   const eventId = `pwd_reset_${Date.now()}`;
-  const requestStatus = status === "failure" ? "failure" : "success";
+  
+  let requestStatus = "success";
+  let resourceId = email;
+  try {
+    const userRecord = await admin.auth().getUserByEmail(email);
+    resourceId = userRecord.uid;
+  } catch (e) {
+    requestStatus = "failure";
+  }
 
   // Log to admin dashboard via audit_logs
   const db = admin.firestore();
@@ -835,7 +854,7 @@ exports.logPasswordResetRequest = onCall(async (request) => {
     timestamp: admin.firestore.FieldValue.serverTimestamp(),
     action: "password_reset_requested",
     resourceType: "user",
-    resourceId: email,
+    resourceId: resourceId,
     metadata: { email, ip: clientIp },
     status: requestStatus
   });
@@ -844,7 +863,7 @@ exports.logPasswordResetRequest = onCall(async (request) => {
     eventId,
     action: "password_reset_requested",
     entityType: "user",
-    entityId: email,
+    entityId: resourceId,
     actorId: "system",
     metadata: { email, status: requestStatus, ip: clientIp }
   });

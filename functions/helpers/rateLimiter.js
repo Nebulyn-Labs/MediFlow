@@ -7,6 +7,14 @@ const LIMITS = {
     windowMs: 60 * 60 * 1000, // 1 hour
   },
   GENERAL: {
+    limit: 100,
+    windowMs: 60 * 60 * 1000, // 1 hour
+  },
+  PASSWORD_RESET_IP: {
+    limit: 20,
+    windowMs: 60 * 60 * 1000, // 1 hour
+  },
+  PASSWORD_RESET_EMAIL: {
     limit: 5,
     windowMs: 60 * 60 * 1000, // 1 hour
   },
