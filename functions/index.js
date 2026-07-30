@@ -9,7 +9,7 @@ const { BigQuery } = require("@google-cloud/bigquery");
 const { checkRateLimit, LIMITS } = require("./helpers/rateLimiter");
 const { createBigQueryRecovery } = require("./helpers/bigQueryRecovery");
 const { createLowStockService } = require("./helpers/lowStock");
-const { handleCspReport } = require("./helpers/cspReport");
+const { handleCspReport, getClientIp } = require("./helpers/cspReport");
 
 admin.initializeApp();
 
@@ -805,16 +805,47 @@ async function executeTool(name, args, authInfo) {
  * Explicit audit hook for password reset requests.
  */
 exports.logPasswordResetRequest = onCall(async (request) => {
-  const { email } = request.data;
-  if (!email) throw new HttpsError("invalid-argument", "Email is required");
+  let { email, status } = request.data;
+  
+  if (!email || typeof email !== "string") {
+    throw new HttpsError("invalid-argument", "Email is required and must be a string");
+  }
+
+  email = email.trim().toLowerCase();
+
+  if (email.length > 254 || Buffer.byteLength(email, "utf8") > 1500) {
+    throw new HttpsError("invalid-argument", "Invalid email format");
+  }
+  if (!/^[^\s@/]+@[^\s@/]+\.[^\s@/]+$/.test(email)) {
+    throw new HttpsError("invalid-argument", "Invalid email format");
+  }
+
+  const clientIp = getClientIp(request.rawRequest);
+  if (!clientIp || clientIp === "unknown") {
+    throw new HttpsError("unauthenticated", "Unable to determine client IP");
+  }
 
   await checkRateLimit(
+    clientIp,
+    "logPasswordResetRequest_ip",
+    LIMITS.PASSWORD_RESET_IP
+  );
+  await checkRateLimit(
     email,
-    "logPasswordResetRequest",
-    LIMITS.GENERAL
+    "logPasswordResetRequest_email",
+    LIMITS.PASSWORD_RESET_EMAIL
   );
 
   const eventId = `pwd_reset_${Date.now()}`;
+  
+  let requestStatus = "success";
+  let resourceId = email;
+  try {
+    const userRecord = await admin.auth().getUserByEmail(email);
+    resourceId = userRecord.uid;
+  } catch (e) {
+    requestStatus = "failure";
+  }
 
   // Log to admin dashboard via audit_logs
   const db = admin.firestore();
@@ -823,18 +854,18 @@ exports.logPasswordResetRequest = onCall(async (request) => {
     timestamp: admin.firestore.FieldValue.serverTimestamp(),
     action: "password_reset_requested",
     resourceType: "user",
-    resourceId: email,
-    metadata: { email },
-    status: "success"
+    resourceId: resourceId,
+    metadata: { email, ip: clientIp },
+    status: requestStatus
   });
 
   await auditEvent({
     eventId,
     action: "password_reset_requested",
     entityType: "user",
-    entityId: email,
+    entityId: resourceId,
     actorId: "system",
-    metadata: { email }
+    metadata: { email, status: requestStatus, ip: clientIp }
   });
 
   return { ok: true };
