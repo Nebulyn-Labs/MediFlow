@@ -84,7 +84,16 @@ service cloud.firestore {
     // Users collection (RBAC)
     match /users/{userId} {
       allow read: if isAdmin() || (isAuthenticated() && request.auth.uid == userId);
-      allow create: if isAdmin() || (isAuthenticated() && request.auth.uid == userId && request.resource.data.role == 'facility_head');
+      // Self-registration is allowed only when the facilityId the user claims is provably
+      // owned by them: the facility document's email must match the caller's verified Auth email.
+      allow create: if isAdmin() ||
+        (isAuthenticated()
+         && request.auth.uid == userId
+         && request.resource.data.role == 'facility_head'
+         && request.resource.data.facilityId != null
+         && exists(/databases/$(database)/documents/facilities/$(request.resource.data.facilityId))
+         && get(/databases/$(database)/documents/facilities/$(request.resource.data.facilityId)).data.email.lower()
+            == request.auth.token.email.lower());
       allow update: if isAdmin();
       allow delete: if isAdmin();
     }
