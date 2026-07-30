@@ -247,56 +247,55 @@ class _FacilityOverviewState extends ConsumerState<FacilityOverview> {
                       OutlinedButton.icon(
                         onPressed: _isSimulating
                             ? null
-                              : () async {
-                                  setState(() => _isSimulating = true);
+                            : () async {
+                                setState(() => _isSimulating = true);
 
+                                if (context.mounted) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                      const SnackBar(
+                                          content: Text(
+                                              'Simulating 30 days of usage data...')));
+                                }
+                                try {
+                                  final firebase =
+                                      ref.read(firebaseServiceProvider);
+                                  final fac = await firebase
+                                      .getFacility(widget.facilityId);
+                                  if (fac == null) {
+                                    if (context.mounted) {
+                                      ScaffoldMessenger.of(context)
+                                          .showSnackBar(const SnackBar(
+                                        content: Text(
+                                            'Simulation failed. Please try again.'),
+                                        backgroundColor: MediColors.error,
+                                      ));
+                                    }
+                                    if (mounted) {
+                                      setState(() => _isSimulating = false);
+                                    }
+                                    return;
+                                  }
+
+                                  await ref
+                                      .read(simulationServiceProvider)
+                                      .runFullSimulation(
+                                          widget.facilityId, fac.type);
                                   if (context.mounted) {
                                     ScaffoldMessenger.of(context).showSnackBar(
                                         const SnackBar(
                                             content: Text(
-                                                'Simulating 30 days of usage data...')));
+                                                'Simulation complete! Analytics ready.')));
                                   }
-                                  try {
-                                    final firebase =
-                                        ref.read(firebaseServiceProvider);
-                                    final fac = await firebase
-                                        .getFacility(widget.facilityId);
-                                    if (fac == null) {
-                                      if (context.mounted) {
-                                        ScaffoldMessenger.of(context)
-                                            .showSnackBar(const SnackBar(
-                                          content: Text(
-                                              'Simulation failed. Please try again.'),
-                                          backgroundColor: MediColors.error,
-                                        ));
-                                      }
-                                      if (mounted) {
-                                        setState(
-                                            () => _isSimulating = false);
-                                      }
-                                      return;
-                                    }
-
-                                    await ref
-                                        .read(simulationServiceProvider)
-                                        .runFullSimulation(
-                                            widget.facilityId, fac.type);
-                                    if (context.mounted) {
-                                      ScaffoldMessenger.of(context).showSnackBar(
-                                          const SnackBar(
-                                              content: Text(
-                                                  'Simulation complete! Analytics ready.')));
-                                    }
-                                  } catch (_) {
-                                    if (context.mounted) {
-                                      ScaffoldMessenger.of(context).showSnackBar(
-                                          const SnackBar(
-                                            content: Text(
-                                                'Simulation failed. Please try again.'),
-                                            backgroundColor: MediColors.error,
-                                          ));
-                                    }
+                                } catch (_) {
+                                  if (context.mounted) {
+                                    ScaffoldMessenger.of(context)
+                                        .showSnackBar(const SnackBar(
+                                      content: Text(
+                                          'Simulation failed. Please try again.'),
+                                      backgroundColor: MediColors.error,
+                                    ));
                                   }
+                                }
                                 if (mounted) {
                                   setState(() => _isSimulating = false);
                                 }
@@ -306,8 +305,7 @@ class _FacilityOverviewState extends ConsumerState<FacilityOverview> {
                                 width: 18,
                                 height: 18,
                                 child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                    color: MediColors.primary))
+                                    strokeWidth: 2, color: MediColors.primary))
                             : const Icon(Icons.analytics_outlined),
                         label: Text(_isSimulating
                             ? 'Running...'
@@ -384,8 +382,7 @@ class _FacilityOverviewState extends ConsumerState<FacilityOverview> {
                               Icons.health_and_safety_rounded,
                               stockHealthColor,
                               stockHealthGradient, () {
-                            context.go(
-                                '/facility/${widget.facilityId}/alerts');
+                            context.go('/facility/${widget.facilityId}/alerts');
                           }),
                           _buildKpiCard(
                               'Expired',
@@ -396,8 +393,7 @@ class _FacilityOverviewState extends ConsumerState<FacilityOverview> {
                                 Color(0xFF3D1519),
                                 Color(0xFF1E293B)
                               ]), () {
-                            context.go(
-                                '/facility/${widget.facilityId}/alerts');
+                            context.go('/facility/${widget.facilityId}/alerts');
                           }),
                           _buildKpiCard(
                               'Wastage Risk',
@@ -408,8 +404,7 @@ class _FacilityOverviewState extends ConsumerState<FacilityOverview> {
                                 Color(0xFF3D2E0A),
                                 Color(0xFF1E293B)
                               ]), () {
-                            context.go(
-                                '/facility/${widget.facilityId}/alerts');
+                            context.go('/facility/${widget.facilityId}/alerts');
                           }),
                           _buildKpiCard(
                               'Low Stock',
@@ -420,8 +415,7 @@ class _FacilityOverviewState extends ConsumerState<FacilityOverview> {
                                 Color(0xFF3D1519),
                                 Color(0xFF1E293B)
                               ]), () {
-                            context.go(
-                                '/facility/${widget.facilityId}/alerts');
+                            context.go('/facility/${widget.facilityId}/alerts');
                           }),
                         ],
                       );
@@ -441,8 +435,9 @@ class _FacilityOverviewState extends ConsumerState<FacilityOverview> {
   Future<void> _exportInventoryCsv(BuildContext context, WidgetRef ref,
       List<InventoryItem> inventory) async {
     try {
-      final fac =
-          await ref.read(firebaseServiceProvider).getFacility(widget.facilityId);
+      final fac = await ref
+          .read(firebaseServiceProvider)
+          .getFacility(widget.facilityId);
       await CsvExportService.exportInventory(inventory,
           facilityName: fac?.name);
       if (context.mounted) {
