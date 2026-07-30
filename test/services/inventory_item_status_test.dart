@@ -96,6 +96,19 @@ void main() {
       expect(item.status, ItemStatus.lowStock);
     });
 
+    test(
+        'item nearing expiry with low stock quantity prioritizes expiringSoon status',
+        () {
+      final item = _item(
+        daysUntilExpiry: 10,
+        initialQuantity: 1000,
+        remainingQuantity: 150, // 15 % -> low stock AND expiring soon
+      );
+      expect(item.isLowStock, isTrue);
+      expect(item.isExpiringSoon, isTrue);
+      expect(item.status, ItemStatus.expiringSoon);
+    });
+
     test('expired item is not counted in expiringSoon bucket', () {
       // This is the core regression guard for issue #237.
       final expiredItem = _item(daysUntilExpiry: -3);

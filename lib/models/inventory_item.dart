@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import '../constants/inventory_thresholds.dart';
 
 /// Canonical stock-status categories for a single inventory item.
 ///
@@ -8,16 +9,16 @@ enum ItemStatus {
   /// Stock levels and expiry are both acceptable.
   healthy,
 
+  /// Remaining stock has dropped to or below [kLowStockPercentage] of the
+  /// initial quantity, **or** fewer than [kLowStockAbsolute] units remain.
+  lowStock,
+
   /// More than 70 % of stock remains but expiry is within [kExpiringSoonDays].
   wastageRisk,
 
   /// Expiry is within [kExpiringSoonDays] days but the item is **not** yet
-  /// expired (days-to-expiry in `[1, kExpiringSoonDays]`).
+  /// expired (days-to-expiry in `[0, kExpiringSoonDays]`).
   expiringSoon,
-
-  /// Remaining stock has dropped to or below [kLowStockPercentage] of the
-  /// initial quantity, **or** fewer than [kLowStockAbsolute] units remain.
-  lowStock,
 
   /// The expiry date has passed (days-to-expiry < 0).
   expired,
@@ -56,12 +57,13 @@ class InventoryItem {
 
   /// Items at or below this fraction of their initial quantity are flagged as
   /// [ItemStatus.lowStock].
-  static const double kLowStockPercentage = 0.20;
+  static const double kLowStockPercentage =
+      InventoryThresholds.lowStockPercentage;
 
   /// Items at or below this absolute unit count are flagged as
   /// [ItemStatus.lowStock] regardless of percentage (safety floor for small
   /// initial batches where the percentage check alone is too loose).
-  static const int kLowStockAbsolute = 500;
+  static const int kLowStockAbsolute = InventoryThresholds.lowStockAbsolute;
 
   /// Fraction of stock remaining (0.0–1.0). Safe against divide-by-zero.
   double get remainingPercentage =>
@@ -84,19 +86,21 @@ class InventoryItem {
 
   /// Single source of truth for wastage risk detection (high stock nearing expiry).
   bool get isWastageRisk =>
-      !isExpired && !isLowStock && daysToExpiry <= kExpiringSoonDays && remainingPercentage >= 0.70;
+      !isExpired &&
+      daysToExpiry <= kExpiringSoonDays &&
+      remainingPercentage >= 0.70;
 
-  /// Single source of truth for expiring-soon detection (nearing expiry, not expired/low/wastageRisk).
+  /// Single source of truth for expiring-soon detection (nearing expiry, not expired/wastageRisk).
   bool get isExpiringSoon =>
-      !isExpired && !isLowStock && !isWastageRisk && daysToExpiry <= kExpiringSoonDays;
+      !isExpired && !isWastageRisk && daysToExpiry <= kExpiringSoonDays;
 
   /// Single source of truth for the canonical stock-status of this item.
   ///
   /// Priority (highest to lowest):
   /// 1. [ItemStatus.expired]      — expiry date has passed.
-  /// 2. [ItemStatus.lowStock]     — quantity is critically low.
-  /// 3. [ItemStatus.wastageRisk]  — high stock + close to expiry.
-  /// 4. [ItemStatus.expiringSoon] — close to expiry but stock is not high.
+  /// 2. [ItemStatus.wastageRisk]  — high stock + close to expiry.
+  /// 3. [ItemStatus.expiringSoon] — close to expiry but stock is not high.
+  /// 4. [ItemStatus.lowStock]     — quantity is critically low.
   /// 5. [ItemStatus.healthy]      — everything is fine.
   ///
   /// Note: "expiring soon" explicitly excludes already-expired items so
@@ -104,9 +108,9 @@ class InventoryItem {
   /// and [ItemStatus.expiringSoon].
   ItemStatus get status {
     if (isExpired) return ItemStatus.expired;
-    if (isLowStock) return ItemStatus.lowStock;
     if (isWastageRisk) return ItemStatus.wastageRisk;
     if (isExpiringSoon) return ItemStatus.expiringSoon;
+    if (isLowStock) return ItemStatus.lowStock;
     return ItemStatus.healthy;
   }
 

@@ -548,7 +548,8 @@ class _FacilityOverviewState extends ConsumerState<FacilityOverview> {
                       DataColumn(label: Text('Status')),
                       DataColumn(label: Text('Expiry Date')),
                       DataColumn(label: Text('Time Left')),
-                    ],                     rows: inventory.map((item) {
+                    ],
+                    rows: inventory.map((item) {
                       final pct = item.remainingPercentage;
                       final daysToExpiry = item.daysToExpiry;
                       // Use centralized status — single source of truth.
