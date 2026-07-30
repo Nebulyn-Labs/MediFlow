@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -247,55 +247,56 @@ class _FacilityOverviewState extends ConsumerState<FacilityOverview> {
                     OutlinedButton.icon(
                       onPressed: _isSimulating
                           ? null
-                          : () async {
-                              setState(() => _isSimulating = true);
+                            : () async {
+                                setState(() => _isSimulating = true);
 
-                              if (context.mounted) {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                    const SnackBar(
-                                        content: Text(
-                                            'Simulating 30 days of usage data...')));
-                              }
-                              try {
-                                final firebase =
-                                    ref.read(firebaseServiceProvider);
-                                final fac = await firebase
-                                    .getFacility(widget.facilityId);
-                                if (fac == null) {
-                                  if (context.mounted) {
-                                    ScaffoldMessenger.of(context)
-                                        .showSnackBar(const SnackBar(
-                                      content: Text(
-                                          'Simulation failed. Please try again.'),
-                                      backgroundColor: MediColors.error,
-                                    ));
-                                  }
-                                  if (mounted) {
-                                    setState(() => _isSimulating = false);
-                                  }
-                                  return;
-                                }
-
-                                await ref
-                                    .read(simulationServiceProvider)
-                                    .runFullSimulation(
-                                        widget.facilityId, fac.type);
                                 if (context.mounted) {
                                   ScaffoldMessenger.of(context).showSnackBar(
                                       const SnackBar(
                                           content: Text(
-                                              'Simulation complete! Analytics ready.')));
+                                              'Simulating 30 days of usage data...')));
                                 }
-                              } catch (_) {
-                                if (context.mounted) {
-                                  ScaffoldMessenger.of(context)
-                                      .showSnackBar(const SnackBar(
-                                    content: Text(
-                                        'Simulation failed. Please try again.'),
-                                    backgroundColor: MediColors.error,
-                                  ));
+                                try {
+                                  final firebase =
+                                      ref.read(firebaseServiceProvider);
+                                  final fac = await firebase
+                                      .getFacility(widget.facilityId);
+                                  if (fac == null) {
+                                    if (context.mounted) {
+                                      ScaffoldMessenger.of(context)
+                                          .showSnackBar(const SnackBar(
+                                        content: Text(
+                                            'Simulation failed. Please try again.'),
+                                        backgroundColor: MediColors.error,
+                                      ));
+                                    }
+                                    if (mounted) {
+                                      setState(
+                                          () => _isSimulating = false);
+                                    }
+                                    return;
+                                  }
+
+                                  await ref
+                                      .read(simulationServiceProvider)
+                                      .runFullSimulation(
+                                          widget.facilityId, fac.type);
+                                  if (context.mounted) {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                        const SnackBar(
+                                            content: Text(
+                                                'Simulation complete! Analytics ready.')));
+                                  }
+                                } catch (_) {
+                                  if (context.mounted) {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                        const SnackBar(
+                                          content: Text(
+                                              'Simulation failed. Please try again.'),
+                                          backgroundColor: MediColors.error,
+                                        ));
+                                  }
                                 }
-                              }
                               if (mounted) {
                                 setState(() => _isSimulating = false);
                               }
@@ -327,14 +328,16 @@ class _FacilityOverviewState extends ConsumerState<FacilityOverview> {
                   builder: (context) {
                     final expired = inventory
                         .where((i) =>
-                            i.expiryDate.difference(DateTime.now()).inDays < 0)
+                            i.expiryDate.difference(DateTime.now()).inDays <
+                            0)
                         .length;
                     final wastageRisk = inventory.where((i) {
                       final pct = i.initialQuantity > 0
                           ? (i.remainingQuantity / i.initialQuantity)
                           : 1.0;
                       return pct >= 0.70 &&
-                          i.expiryDate.difference(DateTime.now()).inDays <= 30;
+                          i.expiryDate.difference(DateTime.now()).inDays <=
+                              30;
                     }).length;
                     final unhealthy = inventory.where((i) {
                       final pct = i.initialQuantity > 0
@@ -352,8 +355,9 @@ class _FacilityOverviewState extends ConsumerState<FacilityOverview> {
                     final stockHealthText = inventory.isEmpty
                         ? 'No stock'
                         : '$healthy / ${inventory.length} healthy';
-                    final stockHealthColor =
-                        unhealthy == 0 ? MediColors.success : MediColors.warning;
+                    final stockHealthColor = unhealthy == 0
+                        ? MediColors.success
+                        : MediColors.warning;
                     final stockHealthGradient = unhealthy == 0
                         ? const LinearGradient(
                             colors: [Color(0xFF0A3D2E), Color(0xFF1E293B)])
@@ -442,7 +446,7 @@ class _FacilityOverviewState extends ConsumerState<FacilityOverview> {
           facilityName: fac?.name);
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Inventory CSV exported ✓')));
+            const SnackBar(content: Text('Inventory CSV exported Γ£ô')));
       }
     } catch (e) {
       if (context.mounted) {
