@@ -14,13 +14,13 @@ class IndentCreationPage extends ConsumerStatefulWidget {
   const IndentCreationPage({super.key, required this.facilityId});
 
   @override
-  ConsumerState<IndentCreationPage> createState() => _IndentCreationPageState();
+  ConsumerState createState() => _IndentCreationPageState();
 }
 
 class _IndentCreationPageState extends ConsumerState<IndentCreationPage> {
   List<InventoryItem> _inventory = [];
-  final Map<String, int?> _forecasts = {};
-  final Map<String, String?> _reasoning = {};
+  final Map<String, dynamic> _forecasts = {};
+  final Map<String, String> _reasoning = {};
   final Map<String, bool> _forecastLoading = {};
   final Map<String, TextEditingController> _controllers = {};
 
@@ -88,17 +88,10 @@ class _IndentCreationPageState extends ConsumerState<IndentCreationPage> {
     // Run forecasts concurrently in chunks of [_kForecastConcurrency] to
     // avoid both serialising N round-trips and flooding the API (#238).
     for (int i = 0; i < _inventory.length; i += _kForecastConcurrency) {
-      final chunk = _inventory.sublist(
-        i,
-        (i + _kForecastConcurrency).clamp(0, _inventory.length),
-      );
-
+      final chunk = _inventory.sublist(i, (i + _kForecastConcurrency).clamp(0, _inventory.length));
       await Future.wait(chunk.map((item) async {
         try {
-          final dynamic result = await aiService.forecastDemand(
-              item.medicineName, logs, _selectedPeriod,
-              facilityId: widget.facilityId);
-
+          final dynamic result = await aiService.forecastDemand(item.medicineName, logs, _selectedPeriod, facilityId: widget.facilityId);
           if (!mounted) return;
           setState(() {
             dynamic predRaw;
@@ -135,10 +128,7 @@ class _IndentCreationPageState extends ConsumerState<IndentCreationPage> {
                     (available > predicted && expiringSoon))) {
               suggestedQty = available - (predicted * 1.2).round();
               if (suggestedQty < 0) suggestedQty = 0;
-            } else {
-              suggestedQty = 0;
             }
-
             _controllers[item.id]?.text = suggestedQty.toString();
             _forecastLoading[item.id] = false;
           });
@@ -160,6 +150,7 @@ class _IndentCreationPageState extends ConsumerState<IndentCreationPage> {
     return hasSurplus ? RequestType.surplus : RequestType.regularIndent;
   }
 
+  // CHANGE: Updated to use atomic batch save, show detailed error counts, and reset fields on success
   Future<void> _submitIndent() async {
     final itemsToSubmit = _inventory.where((item) {
       final qty = int.tryParse(_controllers[item.id]?.text ?? '0') ?? 0;
@@ -167,13 +158,13 @@ class _IndentCreationPageState extends ConsumerState<IndentCreationPage> {
     }).toList();
 
     if (itemsToSubmit.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-          content: Text('Please enter quantities for at least one medicine.')));
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please enter quantities for at least one medicine.')));
       return;
     }
 
     setState(() => _isSubmitting = true);
     try {
+      final requestsToSave = <MedRequest>[];
       for (var item in itemsToSubmit) {
         final qty = int.tryParse(_controllers[item.id]?.text ?? '0') ?? 0;
 
@@ -197,12 +188,26 @@ class _IndentCreationPageState extends ConsumerState<IndentCreationPage> {
           notes:
               'AI predicted usage: ${_forecasts[item.id] ?? "N/A"} for $_selectedPeriod days.',
         );
-        await ref.read(firebaseServiceProvider).addRequest(req);
+        requestsToSave.add(req);
       }
+
+      final result = await ref.read(firebaseServiceProvider).saveDraftRequests(requestsToSave);
+      
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Requests saved as drafts! ✓')));
-        context.go('/facility/${widget.facilityId}/active-indents');
+        if (result['error'] == null) {
+          // Reset quantity fields after successful save to prevent duplicate submissions
+          for (var item in itemsToSubmit) {
+            _controllers[item.id]?.text = '0';
+          }
+          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Requests saved as drafts! ✓')));
+          context.go('/facility/${widget.facilityId}/active-indents');
+        } else {
+          final successCount = result['successCount'] as int;
+          final failedCount = result['failedCount'] as int;
+          showRetrySnackBar(context,
+              message: 'Saved $successCount, failed $failedCount: ${result['error']}', 
+              onRetry: _submitIndent);
+        }
       }
     } catch (e) {
       if (mounted) {
@@ -263,7 +268,7 @@ class _IndentCreationPageState extends ConsumerState<IndentCreationPage> {
                               borderRadius: BorderRadius.circular(12),
                             ),
                             child: DropdownButtonHideUnderline(
-                              child: DropdownButton<int>(
+                              child: DropdownButton(
                                 value: _selectedPeriod,
                                 dropdownColor: MediColors.surface,
                                 items: [30, 60, 90].map((int value) {
@@ -328,12 +333,8 @@ class _IndentCreationPageState extends ConsumerState<IndentCreationPage> {
                           shrinkWrap: true,
                           physics: const NeverScrollableScrollPhysics(),
                           itemCount: _inventory.length,
-                          separatorBuilder: (context, index) =>
-                              const Divider(height: 1),
-                          itemBuilder: (context, index) {
-                            final item = _inventory[index];
-                            return _buildTableRow(item);
-                          },
+                          separatorBuilder: (context, index) => const Divider(height: 1),
+                          itemBuilder: (context, index) => _buildTableRow(_inventory[index]),
                         ),
                       ],
                     ),

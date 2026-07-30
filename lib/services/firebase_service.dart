@@ -11,7 +11,7 @@ import '../models/request.dart';
 import '../models/audit_log.dart';
 import 'simulation_service.dart';
 
-final firebaseServiceProvider = Provider<FirebaseService>((ref) {
+final firebaseServiceProvider = Provider((ref) {
   return FirebaseService(
       FirebaseFirestore.instance, auth.FirebaseAuth.instance);
 });
@@ -23,16 +23,20 @@ class FirebaseService {
 
   FirebaseService(this._firestore, this._auth) {
     _simulation = SimulationService(_firestore);
+    _firestore.settings = const Settings(
+      persistenceEnabled: true,
+      cacheSizeBytes: Settings.CACHE_SIZE_UNLIMITED,
+    );
   }
 
   // --- AUTH & FACILITY ---
 
-  Future<auth.UserCredential> login(String email, String password) async {
+  Future login(String email, String password) async {
     return await _auth.signInWithEmailAndPassword(
         email: email, password: password);
   }
 
-  Future<void> sendPasswordReset(String email) async {
+  Future sendPasswordReset(String email) async {
     await _auth.sendPasswordResetEmail(email: email);
     try {
       final callable =
@@ -43,7 +47,7 @@ class FirebaseService {
     }
   }
 
-  Future<void> signUpFacility({
+  Future signUpFacility({
     required String name,
     required String email,
     required String password,
@@ -120,7 +124,7 @@ class FirebaseService {
     return Facility.fromMap(doc.data()!, doc.id);
   }
 
-  Future<void> updateFacility(String id, Map<String, dynamic> data) async {
+  Future updateFacility(String id, Map<String, dynamic> data) async {
     await _firestore.collection('facilities').doc(id).update(data);
   }
 
@@ -159,8 +163,7 @@ class FirebaseService {
     });
   }
 
-  Future<void> restock(
-      String facilityId, String medicineName, int quantity) async {
+  Future restock(String facilityId, String medicineName, int quantity) async {
     final medicineId = medicineName.toLowerCase().replaceAll(' ', '_');
     final invRef = _firestore
         .collection('inventory')
@@ -174,7 +177,7 @@ class FirebaseService {
         int current = invDoc.data()?['remainingQuantity'] ?? 0;
         transaction.update(invRef, {
           'remainingQuantity': current + quantity,
-          'lastUpdated': Timestamp.now(),
+          'lastUpdated': Timestamp.now()
         });
       } else {
         throw Exception(
@@ -212,25 +215,15 @@ class FirebaseService {
         .toList();
   }
 
-  /// Fetches one page of daily usage logs ordered by date descending, using
-  /// Firestore's document-cursor pagination (startAfterDocument) instead of
-  /// a flat limit. Pass the previous page's lastDocument as [startAfter] to
-  /// fetch the next page.
-  Future<PaginatedLogsResult> getPaginatedLogs(
-    String facilityId, {
-    int pageSize = 15,
-    DocumentSnapshot? startAfter,
-  }) async {
+  Future<PaginatedLogsResult> getPaginatedLogs(String facilityId,
+      {int pageSize = 15, DocumentSnapshot? startAfter}) async {
     Query query = _firestore
         .collection('daily_usage_logs')
         .doc(facilityId)
         .collection('logs')
         .orderBy('date', descending: true)
         .limit(pageSize);
-
-    if (startAfter != null) {
-      query = query.startAfterDocument(startAfter);
-    }
+    if (startAfter != null) query = query.startAfterDocument(startAfter);
 
     final snapshot = await query.get();
     final logs = snapshot.docs
@@ -239,21 +232,19 @@ class FirebaseService {
         .toList();
 
     return PaginatedLogsResult(
-      logs: logs,
-      lastDocument: snapshot.docs.isNotEmpty ? snapshot.docs.last : null,
-      hasMore: snapshot.docs.length == pageSize,
-    );
+        logs: logs,
+        lastDocument: snapshot.docs.isNotEmpty ? snapshot.docs.last : null,
+        hasMore: snapshot.docs.length == pageSize);
   }
 
   // --- LOGGING ---
 
-  Future<void> logUsage({
-    required String facilityId,
-    required DateTime date,
-    required String medicineName,
-    required int quantity,
-    required int patients,
-  }) async {
+  Future logUsage(
+      {required String facilityId,
+      required DateTime date,
+      required String medicineName,
+      required int quantity,
+      required int patients}) async {
     final dateStr =
         "${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}";
     final logRef = _firestore
@@ -281,16 +272,14 @@ class FirebaseService {
       int actualDeduction = min(quantity, remaining);
       transaction.update(invRef, {
         'remainingQuantity': remaining - actualDeduction,
-        'lastUpdated': Timestamp.now(),
+        'lastUpdated': Timestamp.now()
       });
 
       // 2. Update Daily Log
       final logDoc = await transaction.get(logRef);
       if (logDoc.exists) {
-        List medicines = logDoc.data()?['medicines'] ?? [];
+        List<dynamic> medicines = logDoc.data()?['medicines'] ?? [];
         int totalPatients = logDoc.data()?['totalPatients'] ?? 0;
-
-        // Update existing medicine usage or add new
         int index =
             medicines.indexWhere((m) => m['medicineName'] == medicineName);
         if (index >= 0) {
@@ -299,18 +288,15 @@ class FirebaseService {
           medicines.add(
               {'medicineName': medicineName, 'unitsDistributed': quantity});
         }
-
-        transaction.update(logRef, {
-          'medicines': medicines,
-          'totalPatients': totalPatients + patients,
-        });
+        transaction.update(logRef,
+            {'medicines': medicines, 'totalPatients': totalPatients + patients});
       } else {
         transaction.set(logRef, {
           'date': Timestamp.fromDate(date),
           'medicines': [
             {'medicineName': medicineName, 'unitsDistributed': quantity}
           ],
-          'totalPatients': patients,
+          'totalPatients': patients
         });
       }
     });
@@ -319,9 +305,10 @@ class FirebaseService {
   Stream<List<MedRequest>> streamRequests(String? facilityId) {
     var query = _firestore.collection('requests');
     if (facilityId != null) {
-      // Note: Requests are still top-level as they involve cross-facility matching
-      return query.where('facilityId', isEqualTo: facilityId).snapshots().map(
-          (snapshot) => snapshot.docs
+      return query
+          .where('facilityId', isEqualTo: facilityId)
+          .snapshots()
+          .map((snapshot) => snapshot.docs
               .map((doc) => MedRequest.fromMap(doc.data(), doc.id))
               .toList());
     }
@@ -330,42 +317,40 @@ class FirebaseService {
         .toList());
   }
 
-  Future<void> addRequest(MedRequest request) async {
+  Future addRequest(MedRequest request) async {
     await _firestore.collection('requests').add(request.toMap());
   }
 
-  Future<void> updateRequestStatus(
-      String requestId, RequestStatus status) async {
-    await _firestore.collection('requests').doc(requestId).update({
-      'status': status.name,
-    });
+  Future updateRequestStatus(String requestId, RequestStatus status) async {
+    await _firestore
+        .collection('requests')
+        .doc(requestId)
+        .update({'status': status.name});
   }
 
-  Future<void> updateRequestQuantity(String requestId, int quantity) async {
-    await _firestore.collection('requests').doc(requestId).update({
-      'quantity': quantity,
-    });
+  Future updateRequestQuantity(String requestId, int quantity) async {
+    await _firestore
+        .collection('requests')
+        .doc(requestId)
+        .update({'quantity': quantity});
   }
 
-  Future<void> deleteRequest(String requestId) async {
+  Future deleteRequest(String requestId) async {
     await _firestore.collection('requests').doc(requestId).delete();
   }
 
-  Future<void> disposeInventory(String facilityId, String medicineName) async {
+  Future disposeInventory(String facilityId, String medicineName) async {
     final medicineId = medicineName.toLowerCase().replaceAll(' ', '_');
     final invRef = _firestore
         .collection('inventory')
         .doc(facilityId)
         .collection('medicines')
         .doc(medicineId);
-
     await _firestore.runTransaction((transaction) async {
       final invDoc = await transaction.get(invRef);
       if (invDoc.exists) {
-        transaction.update(invRef, {
-          'remainingQuantity': 0,
-          'lastUpdated': Timestamp.now(),
-        });
+        transaction.update(invRef,
+            {'remainingQuantity': 0, 'lastUpdated': Timestamp.now()});
       }
     });
   }
@@ -380,54 +365,37 @@ class FirebaseService {
 
   // --- CLEANUP & SEEDING ---
 
-  Future<void> clearDatabase() async {
-    // Note: This is for demo purposes to provide a clean state.
-    // In production, you would never wipe collections like this.
-
+  Future clearDatabase() async {
     final collections = [
       'facilities',
       'inventory',
       'daily_usage_logs',
       'requests'
     ];
-
     for (var collection in collections) {
       final snapshot = await _firestore.collection(collection).get();
       List<Future> deleteFutures = [];
-
       for (var doc in snapshot.docs) {
-        // For hierarchical collections, we need to delete sub-collections too
         if (collection == 'inventory') {
           final meds = await doc.reference.collection('medicines').get();
-          for (var med in meds.docs) {
-            deleteFutures.add(med.reference.delete());
-          }
+          for (var med in meds.docs) deleteFutures.add(med.reference.delete());
         } else if (collection == 'daily_usage_logs') {
           final logs = await doc.reference.collection('logs').get();
-          for (var log in logs.docs) {
-            deleteFutures.add(log.reference.delete());
-          }
+          for (var log in logs.docs) deleteFutures.add(log.reference.delete());
         } else if (collection == 'facilities') {
-          // Cleanup legacy sub-collections from old schema
           final stocks = await doc.reference.collection('stocks').get();
-          for (var s in stocks.docs) {
-            deleteFutures.add(s.reference.delete());
-          }
+          for (var s in stocks.docs) deleteFutures.add(s.reference.delete());
           final logs = await doc.reference.collection('usage_logs').get();
-          for (var l in logs.docs) {
-            deleteFutures.add(l.reference.delete());
-          }
+          for (var l in logs.docs) deleteFutures.add(l.reference.delete());
         }
         if (collection == 'facilities' || collection == 'requests') {
-          final callable = FirebaseFunctions.instance.httpsCallable('adminDeleteResource');
-          deleteFutures.add(callable.call({
-            'resourceType': collection,
-            'resourceId': doc.id,
-          }));
+          final callable = FirebaseFunctions.instance
+              .httpsCallable('adminDeleteResource');
+          deleteFutures.add(
+              callable.call({'resourceType': collection, 'resourceId': doc.id}));
         } else {
           deleteFutures.add(doc.reference.delete());
         }
-
         if (deleteFutures.length >= 50) {
           await Future.wait(deleteFutures);
           deleteFutures = [];
@@ -439,7 +407,6 @@ class FirebaseService {
 
   Future<String?> seedDemoData() async {
     try {
-      // 1. Seed/Login Admin first to ensure authorization for database clearing/seeding
       try {
         await _auth.createUserWithEmailAndPassword(
             email: 'admin@mediflow.com', password: 'password123');
@@ -447,8 +414,8 @@ class FirebaseService {
         try {
           await _auth.signInWithEmailAndPassword(
               email: 'admin@mediflow.com', password: 'password123');
-        } catch (loginError) {
-          debugPrint('Admin login failed during seed: $loginError');
+        } catch (e) {
+          debugPrint('Admin login failed: $e');
         }
       }
 
@@ -457,14 +424,11 @@ class FirebaseService {
         await _firestore.collection('users').doc(adminUid).set({
           'email': 'admin@mediflow.com',
           'role': 'admin',
-          'createdAt': FieldValue.serverTimestamp(),
+          'createdAt': FieldValue.serverTimestamp()
         });
       }
-
-      // 2. Clear old data to avoid duplicates and schema conflicts
       await clearDatabase();
 
-      // 3. Seed new facilities
       final List<Map<String, dynamic>> demoFacilities = [
         {
           'name': 'PHC Rampur',
@@ -543,23 +507,19 @@ class FirebaseService {
       for (var f in demoFacilities) {
         try {
           await signUpFacility(
-            name: f['name']!,
-            email: f['email']!,
-            password: f['password']!,
-            type: f['type'],
-            fixedLat: f['lat'],
-            fixedLng: f['lng'],
-            fixedRegion: f['region'],
-          );
-          // Delay to avoid auth rate limits
+              name: f['name']!,
+              email: f['email']!,
+              password: f['password']!,
+              type: f['type'],
+              fixedLat: f['lat'],
+              fixedLng: f['lng'],
+              fixedRegion: f['region']);
           await Future.delayed(const Duration(milliseconds: 1500));
         } catch (e) {
-          debugPrint('Error seeding $f: $e');
           return 'Failed at ${f['name']}: $e';
         }
       }
 
-      // Sign back in as admin to have global access to create requests for different facilities
       try {
         await _auth.signInWithEmailAndPassword(
             email: 'admin@mediflow.com', password: 'password123');
@@ -567,29 +527,27 @@ class FirebaseService {
         debugPrint('Failed to sign back in as admin: $e');
       }
 
-      // 4. Seed sample requests for Admin Dashboard KPIs & Route Optimization
       final String f1Id = demoFacilities[0]['email']!
           .toLowerCase()
           .replaceAll('@', '_')
-          .replaceAll('.', '_'); // Rampur (Rural)
+          .replaceAll('.', '_');
       final String f2Id = demoFacilities[1]['email']!
           .toLowerCase()
           .replaceAll('@', '_')
-          .replaceAll('.', '_'); // Modinagar (Urban)
+          .replaceAll('.', '_');
       final String f3Id = demoFacilities[2]['email']!
           .toLowerCase()
           .replaceAll('@', '_')
-          .replaceAll('.', '_'); // Loni (Urban)
+          .replaceAll('.', '_');
       final String f4Id = demoFacilities[3]['email']!
           .toLowerCase()
           .replaceAll('@', '_')
-          .replaceAll('.', '_'); // Ghaziabad (Urban)
+          .replaceAll('.', '_');
       final String f5Id = demoFacilities[4]['email']!
           .toLowerCase()
           .replaceAll('@', '_')
-          .replaceAll('.', '_'); // Bhojpur (Rural)
+          .replaceAll('.', '_');
 
-      // Match 1: ORS (Rampur Rural Needs, Modinagar Urban Surplus)
       await addRequest(MedRequest(
           id: '',
           facilityId: f1Id,
@@ -599,7 +557,6 @@ class FirebaseService {
           requestDate: DateTime.now(),
           status: RequestStatus.pending,
           notes: 'Critical shortage predicted by AI for summer spike.'));
-
       await addRequest(MedRequest(
           id: '',
           facilityId: f2Id,
@@ -609,8 +566,6 @@ class FirebaseService {
           requestDate: DateTime.now(),
           status: RequestStatus.pending,
           notes: 'Excess stock identified. Available for redistribution.'));
-
-      // Match 2: Antibiotics (Bhojpur Rural Needs, Ghaziabad Urban Surplus)
       await addRequest(MedRequest(
           id: '',
           facilityId: f5Id,
@@ -620,7 +575,6 @@ class FirebaseService {
           requestDate: DateTime.now(),
           status: RequestStatus.approved,
           notes: 'Post-monsoon surge in infections.'));
-
       await addRequest(MedRequest(
           id: '',
           facilityId: f4Id,
@@ -630,19 +584,16 @@ class FirebaseService {
           requestDate: DateTime.now(),
           status: RequestStatus.pending,
           notes: 'Surplus stock optimization.'));
-
-      // Unmatched: Paracetamol (Just for variety)
       await addRequest(MedRequest(
-        id: '',
-        facilityId: f3Id,
-        medicineName: 'Paracetamol',
-        type: RequestType.regularIndent,
-        quantity: 1200,
-        requestDate: DateTime.now(),
-        status: RequestStatus.pending,
-      ));
+          id: '',
+          facilityId: f3Id,
+          medicineName: 'Paracetamol',
+          type: RequestType.regularIndent,
+          quantity: 1200,
+          requestDate: DateTime.now(),
+          status: RequestStatus.pending));
 
-      return null; // Success
+      return null;
     } catch (e) {
       return 'Critical error: $e';
     }
@@ -650,40 +601,81 @@ class FirebaseService {
 
   // --- AUDIT LOGS ---
 
-  Future<PaginatedAuditLogsResult> getPaginatedAuditLogs({
-    int pageSize = 20,
-    DocumentSnapshot? startAfter,
-    String? actionFilter,
-  }) async {
+  Future<PaginatedAuditLogsResult> getPaginatedAuditLogs(
+      {int pageSize = 20,
+      DocumentSnapshot? startAfter,
+      String? actionFilter}) async {
     try {
       Query query = _firestore.collection('audit_logs');
-      
-      if (actionFilter != null && actionFilter.isNotEmpty && actionFilter != 'All') {
+      if (actionFilter != null &&
+          actionFilter.isNotEmpty &&
+          actionFilter != 'All') {
         query = query.where('action', isEqualTo: actionFilter);
       }
-      
       query = query.orderBy('timestamp', descending: true).limit(pageSize);
-
-      if (startAfter != null) {
-        query = query.startAfterDocument(startAfter);
-      }
+      if (startAfter != null) query = query.startAfterDocument(startAfter);
 
       final snapshot = await query.get();
       final logs = snapshot.docs
           .map((doc) =>
               AuditLog.fromMap(doc.data() as Map<String, dynamic>, doc.id))
           .toList();
-
-      final hasMore = snapshot.docs.length == pageSize;
-      final lastDocument = snapshot.docs.isNotEmpty ? snapshot.docs.last : null;
-
       return PaginatedAuditLogsResult(
-        logs: logs,
-        lastDocument: lastDocument,
-        hasMore: hasMore,
-      );
+          logs: logs,
+          lastDocument: snapshot.docs.isNotEmpty ? snapshot.docs.last : null,
+          hasMore: snapshot.docs.length == pageSize);
     } catch (e) {
       throw Exception('Error fetching audit logs: $e');
+    }
+  }
+
+  // --- OFFLINE SYNC UTILITIES ---
+
+  Stream<bool> get hasPendingWritesStream {
+    return _firestore
+        .collection('daily_usage_logs')
+        .limit(1)
+        .snapshots(includeMetadataChanges: true)
+        .map((snapshot) => snapshot.metadata.hasPendingWrites);
+  }
+
+  Future<void> forceSyncPendingWrites() async {
+    try {
+      await _firestore.enableNetwork();
+      await _firestore.waitForPendingWrites();
+    } catch (e) {
+      debugPrint('Force sync failed or no pending writes: $e');
+    }
+  }
+
+  // Added atomic batch save method to prevent partial failures and duplicate requests on retry
+  Future<Map<String, dynamic>> saveDraftRequests(
+      List<MedRequest> requests) async {
+    if (requests.isEmpty) {
+      return {'successCount': 0, 'failedCount': 0, 'error': null};
+    }
+
+    final batch = _firestore.batch();
+    for (final req in requests) {
+      final docRef = _firestore.collection('requests').doc();
+      final map = req.toMap();
+      map['id'] = docRef.id; // Assign the generated document ID to the map
+      batch.set(docRef, map);
+    }
+
+    try {
+      await batch.commit();
+      return {
+        'successCount': requests.length,
+        'failedCount': 0,
+        'error': null
+      };
+    } catch (e) {
+      return {
+        'successCount': 0,
+        'failedCount': requests.length,
+        'error': e.toString()
+      };
     }
   }
 }
