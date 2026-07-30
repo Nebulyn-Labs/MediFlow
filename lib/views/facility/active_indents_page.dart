@@ -459,8 +459,7 @@ class _ActiveIndentsPageState extends ConsumerState<ActiveIndentsPage> {
             ),
             Text(
               '$visibleCount of $totalCount requests shown',
-              style:
-                  const TextStyle(color: MediColors.textMuted, fontSize: 12),
+              style: const TextStyle(color: MediColors.textMuted, fontSize: 12),
             ),
           ],
         ),
