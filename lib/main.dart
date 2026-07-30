@@ -1,41 +1,46 @@
 import 'dart:ui';
-import 'package:flutter/material.dart';
+
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
-
 import 'package:med_supply_prototype/constants/colors.dart';
+import 'package:med_supply_prototype/views/shared/not_found_page.dart';
+
 import 'services/firebase_setup.dart';
-import 'views/auth/role_selection_screen.dart';
-import 'views/auth/login_screen.dart';
-import 'views/shared/sidebar_layout.dart';
-import 'views/shared/help_page.dart';
-import 'views/auth/forgot_password_page.dart';
-
-// Facility Pages
-import 'views/facility/facility_overview.dart';
-import 'views/facility/ai_forecast_page.dart';
-import 'views/facility/active_indents_page.dart';
-import 'views/facility/daily_logging_page.dart';
-import 'views/facility/alerts_page.dart';
-import 'views/facility/wastage_report_page.dart';
-import 'views/facility/facility_profile_page.dart';
-
-// Admin Pages
-import 'views/admin/admin_overview.dart';
 import 'views/admin/admin_indent_approval_page.dart';
 import 'views/admin/admin_indent_status_page.dart';
-import 'views/admin/route_optimization_map.dart';
+// Admin Pages
+import 'views/admin/admin_overview.dart';
 import 'views/admin/audit_trail_page.dart';
+import 'views/admin/route_optimization_map.dart';
+import 'views/auth/forgot_password_page.dart';
+import 'views/auth/login_screen.dart';
+import 'views/auth/role_selection_screen.dart';
+import 'views/facility/active_indents_page.dart';
+import 'views/facility/ai_forecast_page.dart';
+import 'views/facility/daily_logging_page.dart';
+import 'views/facility/facility_overview.dart';
+import 'views/facility/wastage_report_page.dart';
+import 'views/facility/facility_profile_page.dart';
+import 'views/facility/alerts_hub_page.dart';
 import 'views/shared/ai_chat_page.dart';
+import 'views/shared/help_page.dart';
+import 'views/shared/sidebar_layout.dart';
 
 final GlobalKey<NavigatorState> _rootNavigatorKey = GlobalKey<NavigatorState>();
 final GlobalKey<NavigatorState> _facilityShellNavigatorKey =
     GlobalKey<NavigatorState>();
 final GlobalKey<NavigatorState> _adminShellNavigatorKey =
     GlobalKey<NavigatorState>();
+
+void _handleGlobalError(Object error, StackTrace? stack) {
+  debugPrint('Global Error Caught: $error');
+  if (stack != null) debugPrint(stack.toString());
+}
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -50,20 +55,63 @@ void main() async {
 
   FlutterError.onError = (details) {
     FlutterError.presentError(details);
-    debugPrint('FlutterError: ${details.exceptionAsString()}');
+    _handleGlobalError(details.exception, details.stack);
   };
 
   PlatformDispatcher.instance.onError = (error, stack) {
-    debugPrint('PlatformDispatcher error: $error\n$stack');
+    _handleGlobalError(error, stack);
     return true;
   };
-
+  ErrorWidget.builder = (FlutterErrorDetails details) {
+    return Material(
+      child: Scaffold(
+        backgroundColor: MediColors.bg,
+        body: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(24.0),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Icon(Icons.error_outline,
+                    size: 64, color: MediColors.error),
+                const SizedBox(height: 16),
+                const Text(
+                  'Something went wrong',
+                  style: TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                      color: MediColors.textPrimary),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  kDebugMode
+                      ? details.exceptionAsString()
+                      : 'An unexpected error occurred. Our team has been notified.',
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                      color: MediColors.textMuted, fontSize: 13),
+                ),
+                const SizedBox(height: 24),
+                ElevatedButton(
+                  onPressed: () {
+                    _router.go('/');
+                  },
+                  child: const Text('Go Home'),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  };
   runApp(const ProviderScope(child: MediFlowApp()));
 }
 
 final _router = GoRouter(
   navigatorKey: _rootNavigatorKey,
   initialLocation: '/',
+  errorBuilder: (context, state) => const NotFoundPage(),
   redirect: (context, state) {
     final isLoggedIn = FirebaseAuth.instance.currentUser != null;
     final isAuthRoute = state.uri.toString() == '/' ||
@@ -81,6 +129,9 @@ final _router = GoRouter(
       path: '/login/:role',
       builder: (context, state) {
         final role = state.pathParameters['role']!;
+        if (!['facility', 'admin'].contains(role)) {
+          return const NotFoundPage();
+        }
         return LoginScreen(role: role);
       },
     ),
@@ -119,7 +170,7 @@ final _router = GoRouter(
         GoRoute(
             path: '/facility/:id/alerts',
             builder: (context, state) =>
-                AlertsPage(facilityId: state.pathParameters['id']!)),
+                AlertsHubPage(facilityId: state.pathParameters['id']!)),
         GoRoute(
             path: '/facility/:id/wastage',
             builder: (context, state) =>
@@ -130,8 +181,8 @@ final _router = GoRouter(
                 facilityId: state.pathParameters['id']!, role: 'facility')),
         GoRoute(
             path: '/facility/:id/profile',
-            builder: (context, state) => FacilityProfilePage(
-                facilityId: state.pathParameters['id']!)),
+            builder: (context, state) =>
+                FacilityProfilePage(facilityId: state.pathParameters['id']!)),
         GoRoute(
             path: '/facility/:id/help',
             builder: (context, state) => HelpPage(role: 'facility')),

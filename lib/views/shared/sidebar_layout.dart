@@ -7,6 +7,7 @@ import 'package:med_supply_prototype/constants/colors.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'confirm_logout_dialog.dart';
 import 'scroll_to_top_button.dart';
+import '../../models/notification.dart' as notif;
 
 class SidebarLayout extends ConsumerStatefulWidget {
   final Widget child;
@@ -180,33 +181,48 @@ class _SidebarLayoutState extends ConsumerState<SidebarLayout> {
                   ),
 
                   // Nav Items
-                  StreamBuilder<List<InventoryItem>>(
+                  StreamBuilder<List<notif.NotificationModel>>(
                     stream:
                         widget.role == 'facility' && widget.facilityId != null
                             ? ref
                                 .watch(firebaseServiceProvider)
+                                .streamNotifications(widget.facilityId!)
+                            : Stream.value([]),
+                    builder: (context, notifSnapshot) {
+                      final notifications = notifSnapshot.data ?? [];
+                      final unreadCount =
+                          notifications.where((n) => !n.isRead).length;
+
+                      return StreamBuilder<List<InventoryItem>>(
+                        stream: widget.role == 'facility' &&
+                                widget.facilityId != null
+                            ? ref
+                                .watch(firebaseServiceProvider)
                                 .streamInventory(widget.facilityId!)
                             : Stream.value([]),
-                    builder: (context, snapshot) {
-                      final inventory = snapshot.data ?? [];
-                      final hasAlerts = inventory.any((i) {
-                        final daysLeft =
-                            i.expiryDate.difference(DateTime.now()).inDays;
-                        return i.isLowStock || daysLeft <= 30;
-                      });
+                        builder: (context, snapshot) {
+                          final inventory = snapshot.data ?? [];
+                          final hasAlerts = inventory.any((i) {
+                            final daysLeft =
+                                i.expiryDate.difference(DateTime.now()).inDays;
+                            return i.isLowStock || daysLeft <= 30;
+                          });
 
-                      return Column(
-                        children: List.generate(items.length, (i) {
-                          final isSelected = i == selectedIndex;
-                          final isAlertTab = widget.role == 'facility' &&
-                              i == 3; // Alerts index
-                          return _buildNavItem(
-                            items[i],
-                            isSelected,
-                            () => _onItemTapped(i, context),
-                            showBadge: isAlertTab && hasAlerts,
+                          return Column(
+                            children: List.generate(items.length, (i) {
+                              final isSelected = i == selectedIndex;
+                              final isAlertTab = widget.role == 'facility' &&
+                                  i == 3; // Alerts index
+                              return _buildNavItem(
+                                items[i],
+                                isSelected,
+                                () => _onItemTapped(i, context),
+                                showBadge: isAlertTab && hasAlerts,
+                                badgeCount: isAlertTab ? unreadCount : 0,
+                              );
+                            }),
                           );
-                        }),
+                        },
                       );
                     },
                   ),
@@ -254,6 +270,9 @@ class _SidebarLayoutState extends ConsumerState<SidebarLayout> {
                     right: 24,
                     child: ScrollToTopButton(controller: _mainScrollController),
                   ),
+                  if (widget.role == 'facility' && widget.facilityId != null)
+                    // (Removed floating bell icon)
+                    Container(), // Placeholder since we removed the stack element
                 ],
               ),
             ),
@@ -264,7 +283,7 @@ class _SidebarLayoutState extends ConsumerState<SidebarLayout> {
   }
 
   Widget _buildNavItem(_NavItem item, bool isSelected, VoidCallback onTap,
-      {bool isLogout = false, bool showBadge = false}) {
+      {bool isLogout = false, bool showBadge = false, int badgeCount = 0}) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
       child: Material(
@@ -307,7 +326,29 @@ class _SidebarLayoutState extends ConsumerState<SidebarLayout> {
                           ),
                         ),
                       ),
-                      if (showBadge)
+                      if (badgeCount > 0)
+                        Positioned(
+                          right: -4,
+                          top: -4,
+                          child: Container(
+                            padding: const EdgeInsets.all(3),
+                            decoration: const BoxDecoration(
+                              color: MediColors.error,
+                              shape: BoxShape.circle,
+                            ),
+                            child: Text(
+                              badgeCount > 99 ? '99+' : badgeCount.toString(),
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 9,
+                                fontWeight: FontWeight.bold,
+                                height: 1.0,
+                              ),
+                              textAlign: TextAlign.center,
+                            ),
+                          ),
+                        )
+                      else if (showBadge)
                         Positioned(
                           right: -2,
                           top: -2,
