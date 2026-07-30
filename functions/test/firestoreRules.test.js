@@ -22,6 +22,8 @@ const {
 } = require('@firebase/rules-unit-testing');
 const { readFileSync } = require('fs');
 const { resolve } = require('path');
+const { describe, it, test, before, after, beforeEach } = require('node:test');
+const assert = require('node:assert/strict');
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -44,7 +46,7 @@ function authedDb(uid, email) {
 
 // ─── Setup / Teardown ─────────────────────────────────────────────────────────
 
-beforeAll(async () => {
+before(async () => {
   testEnv = await initializeTestEnvironment({
     projectId: PROJECT_ID,
     firestore: {
@@ -59,7 +61,7 @@ beforeAll(async () => {
   });
 });
 
-afterAll(async () => {
+after(async () => {
   await testEnv.cleanup();
 });
 
