@@ -251,14 +251,27 @@ class FirebaseService {
             .toList());
   }
 
+  /// Returns daily usage logs for [facilityId] whose [date] falls within the
+  /// last [days] calendar days (i.e. `date >= now - days`).
+  ///
+  /// Unlike a plain `.limit(days)`, this is a true time-window query so
+  /// callers that expect "the last 30 days of data" receive exactly that,
+  /// regardless of how frequently the facility logs data.
+  ///
+  /// A safety cap of 500 documents is applied to avoid unbounded reads on
+  /// high-throughput facilities; raise it if a use-case genuinely needs more.
   Future<List<DailyUsageLog>> getRecentLogs(String facilityId,
       {int days = 30}) async {
+    final cutoff = Timestamp.fromDate(
+      DateTime.now().subtract(Duration(days: days)),
+    );
     final snapshot = await _firestore
         .collection('daily_usage_logs')
         .doc(facilityId)
         .collection('logs')
+        .where('date', isGreaterThanOrEqualTo: cutoff)
         .orderBy('date', descending: true)
-        .limit(days)
+        .limit(500)
         .get();
     return snapshot.docs
         .map((doc) => DailyUsageLog.fromMap(doc.data(), doc.id))
