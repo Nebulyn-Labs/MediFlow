@@ -380,8 +380,8 @@ class _FacilityOverviewState extends ConsumerState<FacilityOverview> {
                             Icons.health_and_safety_rounded,
                             stockHealthColor,
                             stockHealthGradient, () {
-                          context
-                              .go('/facility/${widget.facilityId}/alerts');
+                          context.go(
+                              '/facility/${widget.facilityId}/alerts');
                         }),
                         _buildKpiCard(
                             'Expired',
@@ -392,8 +392,8 @@ class _FacilityOverviewState extends ConsumerState<FacilityOverview> {
                               Color(0xFF3D1519),
                               Color(0xFF1E293B)
                             ]), () {
-                          context
-                              .go('/facility/${widget.facilityId}/alerts');
+                          context.go(
+                              '/facility/${widget.facilityId}/alerts');
                         }),
                         _buildKpiCard(
                             'Wastage Risk',
@@ -404,8 +404,8 @@ class _FacilityOverviewState extends ConsumerState<FacilityOverview> {
                               Color(0xFF3D2E0A),
                               Color(0xFF1E293B)
                             ]), () {
-                          context
-                              .go('/facility/${widget.facilityId}/alerts');
+                          context.go(
+                              '/facility/${widget.facilityId}/alerts');
                         }),
                         _buildKpiCard(
                             'Low Stock',
@@ -416,8 +416,8 @@ class _FacilityOverviewState extends ConsumerState<FacilityOverview> {
                               Color(0xFF3D1519),
                               Color(0xFF1E293B)
                             ]), () {
-                          context
-                              .go('/facility/${widget.facilityId}/alerts');
+                          context.go(
+                              '/facility/${widget.facilityId}/alerts');
                         }),
                       ],
                     );
@@ -436,9 +436,8 @@ class _FacilityOverviewState extends ConsumerState<FacilityOverview> {
   Future<void> _exportInventoryCsv(BuildContext context, WidgetRef ref,
       List<InventoryItem> inventory) async {
     try {
-      final fac = await ref
-          .read(firebaseServiceProvider)
-          .getFacility(widget.facilityId);
+      final fac =
+          await ref.read(firebaseServiceProvider).getFacility(widget.facilityId);
       await CsvExportService.exportInventory(inventory,
           facilityName: fac?.name);
       if (context.mounted) {
