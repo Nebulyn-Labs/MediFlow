@@ -84,13 +84,15 @@ class InventoryItem {
       remainingPercentage <= kLowStockPercentage ||
       remainingQuantity <= kLowStockAbsolute;
 
-  /// Single source of truth for wastage risk detection (high stock nearing expiry).
+  /// Single source of truth for wastage risk detection
+  /// (high stock nearing expiry).
   bool get isWastageRisk =>
       !isExpired &&
       daysToExpiry <= kExpiringSoonDays &&
       remainingPercentage >= 0.70;
 
-  /// Single source of truth for expiring-soon detection (nearing expiry, not expired/wastageRisk).
+  /// Single source of truth for expiring-soon detection
+  /// (nearing expiry, not expired/wastageRisk).
   bool get isExpiringSoon =>
       !isExpired && !isWastageRisk && daysToExpiry <= kExpiringSoonDays;
 

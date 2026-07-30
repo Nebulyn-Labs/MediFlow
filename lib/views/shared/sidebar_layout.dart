@@ -200,11 +200,11 @@ class _SidebarLayoutState extends ConsumerState<SidebarLayout> {
                                 .watch(firebaseServiceProvider)
                                 .streamInventory(widget.facilityId!)
                             : Stream.value([]),
-                    builder: (context, snapshot) {
-                      final inventory = snapshot.data ?? [];
-                      // Use the centralized hasAlert getter from InventoryItem
-                      // to avoid duplicating threshold logic.
-                      final hasAlerts = inventory.any((i) => i.hasAlert);
+                        builder: (context, snapshot) {
+                          final inventory = snapshot.data ?? [];
+                          // Use the centralized hasAlert getter from InventoryItem
+                          // to avoid duplicating threshold logic.
+                          final hasAlerts = inventory.any((i) => i.hasAlert);
 
                           return Column(
                             children: List.generate(items.length, (i) {

@@ -553,19 +553,13 @@ class _FacilityOverviewState extends ConsumerState<FacilityOverview> {
                       final pct = item.remainingPercentage;
                       final daysToExpiry = item.daysToExpiry;
                       // Use centralized status — single source of truth.
-                      Color statusColor;
-                      switch (item.status) {
-                        case ItemStatus.expired:
-                          statusColor = MediColors.error;
-                        case ItemStatus.wastageRisk:
-                          statusColor = const Color(0xFFF59E0B);
-                        case ItemStatus.lowStock:
-                          statusColor = MediColors.error;
-                        case ItemStatus.expiringSoon:
-                          statusColor = MediColors.warning;
-                        case ItemStatus.healthy:
-                          statusColor = MediColors.success;
-                      }
+                      final statusColor = switch (item.status) {
+                        ItemStatus.expired => MediColors.error,
+                        ItemStatus.wastageRisk => const Color(0xFFF59E0B),
+                        ItemStatus.lowStock => MediColors.error,
+                        ItemStatus.expiringSoon => MediColors.warning,
+                        ItemStatus.healthy => MediColors.success,
+                      };
                       final statusText = item.statusText;
 
                       return DataRow(cells: [

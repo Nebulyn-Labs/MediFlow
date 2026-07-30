@@ -96,9 +96,7 @@ void main() {
       expect(item.status, ItemStatus.lowStock);
     });
 
-    test(
-        'item nearing expiry with low stock quantity prioritizes expiringSoon status',
-        () {
+    test('expiring item with low stock prioritizes expiringSoon status', () {
       final item = _item(
         daysUntilExpiry: 10,
         initialQuantity: 1000,
