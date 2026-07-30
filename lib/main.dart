@@ -19,9 +19,9 @@ import 'views/facility/facility_overview.dart';
 import 'views/facility/ai_forecast_page.dart';
 import 'views/facility/active_indents_page.dart';
 import 'views/facility/daily_logging_page.dart';
-import 'views/facility/alerts_page.dart';
 import 'views/facility/wastage_report_page.dart';
 import 'views/facility/facility_profile_page.dart';
+import 'views/facility/alerts_hub_page.dart';
 
 // Admin Pages
 import 'views/admin/admin_overview.dart';
@@ -119,7 +119,7 @@ final _router = GoRouter(
         GoRoute(
             path: '/facility/:id/alerts',
             builder: (context, state) =>
-                AlertsPage(facilityId: state.pathParameters['id']!)),
+                AlertsHubPage(facilityId: state.pathParameters['id']!)),
         GoRoute(
             path: '/facility/:id/wastage',
             builder: (context, state) =>
