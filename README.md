@@ -3,8 +3,16 @@
 AI-powered medical logistics platform focused on smart resource allocation
 
 ![Flutter](https://img.shields.io/badge/Flutter-%2302569B.svg?style=for-the-badge&logo=Flutter&logoColor=white)
+![Dart](https://img.shields.io/badge/Dart-0175C2?style=for-the-badge&logo=Dart&logoColor=white)
 ![Firebase](https://img.shields.io/badge/Firebase-039BE5?style=for-the-badge&logo=Firebase&logoColor=white)
 ![Gemini AI](https://img.shields.io/badge/Gemini%20AI-8E75B2?style=for-the-badge&logo=google-gemini&logoColor=white)
+
+![License](https://img.shields.io/github/license/Nebulyn-Labs/MediFlow?style=for-the-badge)
+![Stars](https://img.shields.io/github/stars/Nebulyn-Labs/MediFlow?style=for-the-badge&logo=github&logoColor=white)
+![Forks](https://img.shields.io/github/forks/Nebulyn-Labs/MediFlow?style=for-the-badge&logo=github&logoColor=white)
+![Contributors](https://img.shields.io/github/contributors/Nebulyn-Labs/MediFlow?style=for-the-badge&logo=github&logoColor=white)
+![Open Issues](https://img.shields.io/github/issues/Nebulyn-Labs/MediFlow?style=for-the-badge)
+![Open PRs](https://img.shields.io/github/issues-pr/Nebulyn-Labs/MediFlow?style=for-the-badge)
 
 ---
 
@@ -145,7 +153,9 @@ and demo data algorithms, see
 For a detailed walkthrough of how the AI chat assistant flows from the
 client to Gemini and on to backend actions, including authorization checks,
 see [AI Tool-Calling Architecture](docs/ai-tool-calling.md). For the
-BigQuery data pipeline, see [BigQuery Integration](docs/bigquery.md).
+BigQuery data pipeline, see [BigQuery Integration](docs/bigquery.md). For
+the public Content Security Policy reporting endpoint, see
+[CSP Reporting](docs/csp-reporting.md).
 
 ---
 
@@ -232,6 +242,17 @@ high-concurrency performance:
 > If the dashboard appears empty, use the **"Seed DB"** button on the
 > Login/Role Selection screen to populate the database with demo records.
 
+### How to Use the Demo
+
+1. **Log in** with one of the demo credentials above.
+2. **Choose a role** on the Role Selection screen:
+   - **CMS Admin** — approve redistribution plans, inspect regional
+     analytics, and run route optimization.
+   - **Facility Head** — log daily medicine usage, review AI demand
+     forecasts, file restock indents, and chat with the AI assistant.
+3. **(Optional) Seed the database** with the **"Seed DB"** button if no
+   data is shown.
+
 ---
 
 ## Development & Setup Guide
@@ -269,7 +290,7 @@ high-concurrency performance:
    No additional client configuration is required.
 
    For Flutter Web, see **Step 6** for configuring the
-  `RECAPTCHA_SITE_KEY` using `--dart-define`.
+   `RECAPTCHA_SITE_KEY` using `--dart-define`.
 
    If you are modifying Cloud Functions, configure the required Firebase
    Secrets as described in the Troubleshooting section.
