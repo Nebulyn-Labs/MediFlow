@@ -234,81 +234,81 @@ class _AuditTrailPageState extends ConsumerState<AuditTrailPage> {
                     ),
                   )
                 : _logs.isEmpty && !_isLoading
-                ? const Center(
-                    child: Text(
-                      'No audit logs found.',
-                      style: TextStyle(
-                        color: MediColors.textSecondary,
-                        fontSize: 16,
-                      ),
-                    ),
-                  )
-                : ListView.separated(
-                    controller: _scrollController,
-                    padding: const EdgeInsets.all(24),
-                    itemCount:
-                        _logs.length +
-                        (_hasMore || _loadMoreError != null ? 1 : 0),
-                    separatorBuilder: (context, index) =>
-                        const SizedBox(height: 12),
-                    itemBuilder: (context, index) {
-                      if (index == _logs.length) {
-                        // Updated pagination footer to show inline error and Retry button instead of permanent spinner
-                        if (_loadMoreError != null) {
-                          return Center(
-                            child: Padding(
-                              padding: const EdgeInsets.all(16.0),
-                              child: Column(
-                                children: [
-                                  Text(
-                                    _loadMoreError!,
-                                    style: const TextStyle(
-                                      color: MediColors.error,
-                                      fontSize: 14,
-                                    ),
-                                    textAlign: TextAlign.center,
-                                  ),
-                                  const SizedBox(height: 12),
-                                  ElevatedButton.icon(
-                                    onPressed: () {
-                                      setState(() {
-                                        _loadMoreError = null;
-                                        _hasMore = true; // Allow retry
-                                      });
-                                      _loadMoreData();
-                                    },
-                                    icon: const Icon(Icons.refresh, size: 18),
-                                    label: const Text('Retry'),
-                                    style: ElevatedButton.styleFrom(
-                                      backgroundColor: MediColors.primary,
-                                      foregroundColor: Colors.white,
-                                      padding: const EdgeInsets.symmetric(
-                                        horizontal: 24,
-                                        vertical: 12,
+                    ? const Center(
+                        child: Text(
+                          'No audit logs found.',
+                          style: TextStyle(
+                            color: MediColors.textSecondary,
+                            fontSize: 16,
+                          ),
+                        ),
+                      )
+                    : ListView.separated(
+                        controller: _scrollController,
+                        padding: const EdgeInsets.all(24),
+                        itemCount: _logs.length +
+                            (_hasMore || _loadMoreError != null ? 1 : 0),
+                        separatorBuilder: (context, index) =>
+                            const SizedBox(height: 12),
+                        itemBuilder: (context, index) {
+                          if (index == _logs.length) {
+                            // Updated pagination footer to show inline error and Retry button instead of permanent spinner
+                            if (_loadMoreError != null) {
+                              return Center(
+                                child: Padding(
+                                  padding: const EdgeInsets.all(16.0),
+                                  child: Column(
+                                    children: [
+                                      Text(
+                                        _loadMoreError!,
+                                        style: const TextStyle(
+                                          color: MediColors.error,
+                                          fontSize: 14,
+                                        ),
+                                        textAlign: TextAlign.center,
                                       ),
-                                    ),
+                                      const SizedBox(height: 12),
+                                      ElevatedButton.icon(
+                                        onPressed: () {
+                                          setState(() {
+                                            _loadMoreError = null;
+                                            _hasMore = true; // Allow retry
+                                          });
+                                          _loadMoreData();
+                                        },
+                                        icon:
+                                            const Icon(Icons.refresh, size: 18),
+                                        label: const Text('Retry'),
+                                        style: ElevatedButton.styleFrom(
+                                          backgroundColor: MediColors.primary,
+                                          foregroundColor: Colors.white,
+                                          padding: const EdgeInsets.symmetric(
+                                            horizontal: 24,
+                                            vertical: 12,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
                                   ),
-                                ],
-                              ),
-                            ),
-                          );
-                        }
-                        if (_isLoading) {
-                          return const Center(
-                            child: Padding(
-                              padding: EdgeInsets.all(16.0),
-                              child: CircularProgressIndicator(
-                                color: MediColors.primary,
-                              ),
-                            ),
-                          );
-                        }
-                        return const SizedBox.shrink();
-                      }
-                      final log = _logs[index];
-                      return _buildLogCard(log);
-                    },
-                  ),
+                                ),
+                              );
+                            }
+                            if (_isLoading) {
+                              return const Center(
+                                child: Padding(
+                                  padding: EdgeInsets.all(16.0),
+                                  child: CircularProgressIndicator(
+                                    color: MediColors.primary,
+                                  ),
+                                ),
+                              );
+                            }
+                            return const SizedBox.shrink();
+                          }
+                          final log = _logs[index];
+                          return _buildLogCard(log);
+                        },
+                      ),
           ),
         ],
       ),
