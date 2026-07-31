@@ -5,7 +5,6 @@ AI-powered medical logistics platform focused on smart resource allocation
 ![Flutter](https://img.shields.io/badge/Flutter-%2302569B.svg?style=for-the-badge&logo=Flutter&logoColor=white)
 ![Firebase](https://img.shields.io/badge/Firebase-039BE5?style=for-the-badge&logo=Firebase&logoColor=white)
 ![Gemini AI](https://img.shields.io/badge/Gemini%20AI-8E75B2?style=for-the-badge&logo=google-gemini&logoColor=white)
-![ORS](https://img.shields.io/badge/OpenRouteService-3E3E3E?style=for-the-badge&logo=openstreetmap&logoColor=white)
 
 ---
 
@@ -31,7 +30,7 @@ AI-powered medical logistics platform focused on smart resource allocation
 
 **MediFlow** is an enterprise-grade medical logistics platform engineered to
 solve the "Last Mile" medical supply crisis. By combining **Generative AI** for
-demand forecasting with **Heuristic Heuristics**, we optimize redistribution of
+demand forecasting with **heuristic optimization**, we optimize redistribution of
 medical supplies across a network of urban and rural healthcare facilities.
 
 ---
@@ -128,15 +127,25 @@ graph TD
    ensures that redistribution is both efficient and equitable:
 
    $$OTS = (w_{dist} \cdot Proximity) + (w_{prior} \cdot RuralPriority) +
-   (w_{qty} \cdot QtyMatch)$$
+   (w_{qty} \cdot QtyMatch) + (w_{exp} \cdot NearExpiry)$$
 
-   - **Proximity:** Minimizes logistics cost and time.
-   - **Rural Priority:** A weight multiplier ensuring that remote facilities are
-     never starved by the algorithm.
+   - **Proximity:** Minimizes logistics cost and time (scored up to 200 points based on distance).
+   - **Rural Priority:** A flat +150 bonus ensuring remote facilities are prioritized.
+   - **Quantity Match:** A fulfillment bonus (+50 full, +25 partial) based on demand met.
+   - **Near Expiry:** A flat +100 bonus when the donor's soonest valid batch
+     expires within 90 days (excluding already-expired stock).
 
 3. **Geospatial Routing System:** Integrated with **flutter_map** and
    **OSRM/OpenRouteService**, our routing engine decodes complex polylines to
    provide precise, road-accurate delivery paths.
+
+For a developer-oriented breakdown of the redistribution matching, routing,
+and demo data algorithms, see
+[Optimization, Routing & Simulation Algorithms](docs/optimization-simulation-algorithms.md).
+For a detailed walkthrough of how the AI chat assistant flows from the
+client to Gemini and on to backend actions, including authorization checks,
+see [AI Tool-Calling Architecture](docs/ai-tool-calling.md). For the
+BigQuery data pipeline, see [BigQuery Integration](docs/bigquery.md).
 
 ---
 
@@ -156,7 +165,6 @@ lib/
 │
 ├── services/                   # Business Logic & Intelligence Layer
 │   ├── ai_service.dart         # Gemini-1.5-Flash forecasting & reasoning
-│   ├── chat_service.dart       # NLP pipeline for the AI Assistant
 │   ├── firebase_service.dart   # Firestore infrastructure & transactions
 │   ├── optimization_service.dart # OTS heuristic & matching algorithm
 │   ├── routing_service.dart    # Geospatial OSRM/ORS pathfinding logic
@@ -235,8 +243,6 @@ high-concurrency performance:
 - [Node.js](https://nodejs.org/) (for Firebase Cloud Functions deployment)
 - Firebase Project configured on
   [Firebase Console](https://console.firebase.google.com/)
-- Google AI Studio API Key (for Gemini)
-- OpenRouteService API Key (for route calculations)
 
 ### Local Setup Steps
 
@@ -253,16 +259,20 @@ high-concurrency performance:
    flutter pub get
    ```
 
-3. **Configure the Environment:**
+   > [!NOTE]
+   > No `.env` file is required for local development. Firebase client
+   > configuration is already included through `lib/firebase_options.dart`.
+   > Cloud Functions use Firebase Secrets instead of environment files.
 
-   Create a `.env` file in the root of the project (and copy from
-   `.env.example` if needed):
+3. **Firebase Configuration**
 
-   ```ini
-   GEMINI_API_KEY=your_gemini_api_key
-   ORS_API_KEY=your_openroute_service_key
-   FIREBASE_PROJECT_ID=mediflow-92e6f
-   ```
+   No additional client configuration is required.
+
+   For Flutter Web, see **Step 6** for configuring the
+  `RECAPTCHA_SITE_KEY` using `--dart-define`.
+
+   If you are modifying Cloud Functions, configure the required Firebase
+   Secrets as described in the Troubleshooting section.
 
 4. **Initialize Firebase CLI (if modifying functions):**
 
@@ -304,20 +314,7 @@ high-concurrency performance:
 
 ## Troubleshooting
 
-### 1. `asset_does_not_exist` Error for `.env`
-
-If compilation fails with an error indicating `.env` does not exist:
-
-- Make sure you created a `.env` file in the root folder.
-- If you don't have API keys yet, you can create a placeholder `.env` with
-  dummy values:
-
-  ```ini
-  GEMINI_API_KEY=dummy_key
-  ORS_API_KEY=dummy_key
-  ```
-
-### 2. Web Map Fails to Render (CORS or Rendering mode)
+### 1. Web Map Fails to Render (CORS or Rendering mode)
 
 If the map does not display in your web browser:
 
@@ -327,7 +324,7 @@ If the map does not display in your web browser:
 - Verify that your OpenRouteService API key is valid and has not exceeded its
   request limit.
 
-### 3. Cloud Functions Authentication Errors
+### 2. Cloud Functions Authentication Errors
 
 If calling Gemini forecasts yields an authentication error:
 

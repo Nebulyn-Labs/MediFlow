@@ -8,6 +8,8 @@ import '../models/facility.dart';
 import '../models/inventory_item.dart';
 import '../models/daily_usage_log.dart';
 import '../models/request.dart';
+import '../models/audit_log.dart';
+import '../models/notification.dart' as import_notification;
 import 'simulation_service.dart';
 
 final firebaseServiceProvider = Provider<FirebaseService>((ref) {
@@ -29,6 +31,24 @@ class FirebaseService {
   Future<auth.UserCredential> login(String email, String password) async {
     return await _auth.signInWithEmailAndPassword(
         email: email, password: password);
+  }
+
+  Future<void> sendPasswordReset(String email) async {
+    String status = 'success';
+    try {
+      await _auth.sendPasswordResetEmail(email: email);
+    } catch (e) {
+      status = 'failure';
+      debugPrint('Failed to send password reset email: $e');
+    }
+
+    try {
+      final callable =
+          FirebaseFunctions.instance.httpsCallable('logPasswordResetRequest');
+      await callable.call({'email': email, 'status': status});
+    } catch (e) {
+      debugPrint('Failed to log password reset request: $e');
+    }
   }
 
   Future<void> signUpFacility({
@@ -108,6 +128,10 @@ class FirebaseService {
     return Facility.fromMap(doc.data()!, doc.id);
   }
 
+  Future<void> updateFacility(String id, Map<String, dynamic> data) async {
+    await _firestore.collection('facilities').doc(id).update(data);
+  }
+
   // --- INVENTORY ---
 
   Stream<List<InventoryItem>> streamInventory(String facilityId) {
@@ -132,15 +156,60 @@ class FirebaseService {
         .toList();
   }
 
+  /// Streams the entire collectionGroup of medicines across all facilities.
+  /// Used for map overlays where live updates of all facilities are needed.
   Stream<List<InventoryItem>> streamAllMedicines() {
-    return _firestore.collectionGroup('medicines').snapshots().map((snapshot) {
-      return snapshot.docs.map((doc) {
-        // Path is inventory/{facilityId}/medicines/{medicineId}
-        final pathSegments = doc.reference.path.split('/');
-        final facId = pathSegments.length >= 2 ? pathSegments[1] : '';
-        return InventoryItem.fromMap(doc.data(), doc.id, facilityId: facId);
-      }).toList();
-    });
+    return _firestore
+        .collectionGroup('medicines')
+        .snapshots()
+        .map((snapshot) => snapshot.docs.map((doc) {
+              final pathSegments = doc.reference.path.split('/');
+              final facId = pathSegments.length >= 2 ? pathSegments[1] : '';
+              return InventoryItem.fromMap(
+                doc.data(),
+                doc.id,
+                facilityId: facId,
+              );
+            }).toList());
+  }
+
+  /// Fetches one page of medicines from the global collectionGroup, ordered
+  /// by medicineName ascending, using startAfterDocument cursor pagination.
+  /// Pass the previous page's [lastDocument] as [startAfter] to get the next
+  /// page. Mirrors [getPaginatedLogs] in structure.
+  Future<PaginatedMedicinesResult> getPaginatedMedicines({
+    int pageSize = 20,
+    DocumentSnapshot? startAfter,
+  }) async {
+    // Note: Firestore orderBy() automatically excludes documents missing the 'medicineName' field.
+    // In our schema, 'medicineName' is a required field for all inventory items,
+    // so this is intentional and safe. Documents without medicineName represent malformed data.
+    Query query = _firestore
+        .collectionGroup('medicines')
+        .orderBy('medicineName')
+        .limit(pageSize);
+
+    if (startAfter != null) {
+      query = query.startAfterDocument(startAfter);
+    }
+
+    final snapshot = await query.get();
+    final medicines = snapshot.docs.map((doc) {
+      // Path is inventory/{facilityId}/medicines/{medicineId}
+      final pathSegments = doc.reference.path.split('/');
+      final facId = pathSegments.length >= 2 ? pathSegments[1] : '';
+      return InventoryItem.fromMap(
+        doc.data() as Map<String, dynamic>,
+        doc.id,
+        facilityId: facId,
+      );
+    }).toList();
+
+    return PaginatedMedicinesResult(
+      medicines: medicines,
+      lastDocument: snapshot.docs.isNotEmpty ? snapshot.docs.last : null,
+      hasMore: snapshot.docs.length == pageSize,
+    );
   }
 
   Future<void> restock(
@@ -161,7 +230,8 @@ class FirebaseService {
           'lastUpdated': Timestamp.now(),
         });
       } else {
-        throw Exception('Inventory document not found for medicine: $medicineName');
+        throw Exception(
+            'Inventory document not found for medicine: $medicineName');
       }
     });
   }
@@ -181,14 +251,27 @@ class FirebaseService {
             .toList());
   }
 
+  /// Returns daily usage logs for [facilityId] whose [date] falls within the
+  /// last [days] calendar days (i.e. `date >= now - days`).
+  ///
+  /// Unlike a plain `.limit(days)`, this is a true time-window query so
+  /// callers that expect "the last 30 days of data" receive exactly that,
+  /// regardless of how frequently the facility logs data.
+  ///
+  /// A safety cap of 500 documents is applied to avoid unbounded reads on
+  /// high-throughput facilities; raise it if a use-case genuinely needs more.
   Future<List<DailyUsageLog>> getRecentLogs(String facilityId,
       {int days = 30}) async {
+    final cutoff = Timestamp.fromDate(
+      DateTime.now().subtract(Duration(days: days)),
+    );
     final snapshot = await _firestore
         .collection('daily_usage_logs')
         .doc(facilityId)
         .collection('logs')
+        .where('date', isGreaterThanOrEqualTo: cutoff)
         .orderBy('date', descending: true)
-        .limit(days)
+        .limit(500)
         .get();
     return snapshot.docs
         .map((doc) => DailyUsageLog.fromMap(doc.data(), doc.id))
@@ -256,7 +339,8 @@ class FirebaseService {
       // 1. Update Inventory
       final invDoc = await transaction.get(invRef);
       if (!invDoc.exists) {
-        throw Exception('Inventory document not found for medicine: $medicineName');
+        throw Exception(
+            'Inventory document not found for medicine: $medicineName');
       }
 
       int remaining = invDoc.data()?['remainingQuantity'] ?? 0;
@@ -360,6 +444,33 @@ class FirebaseService {
     return snapshot.docs.map((doc) => doc.data()).toList();
   }
 
+  // --- NOTIFICATIONS ---
+
+  Stream<List<import_notification.NotificationModel>> streamNotifications(
+      String facilityId) {
+    return _firestore
+        .collection('notifications')
+        .doc(facilityId)
+        .collection('items')
+        .orderBy('createdAt', descending: true)
+        .limit(50)
+        .snapshots()
+        .map((snapshot) => snapshot.docs
+            .map((doc) => import_notification.NotificationModel.fromMap(
+                doc.data(), doc.id))
+            .toList());
+  }
+
+  Future<void> markNotificationRead(
+      String facilityId, String notificationId) async {
+    await _firestore
+        .collection('notifications')
+        .doc(facilityId)
+        .collection('items')
+        .doc(notificationId)
+        .update({'isRead': true});
+  }
+
   // --- CLEANUP & SEEDING ---
 
   Future<void> clearDatabase() async {
@@ -401,7 +512,8 @@ class FirebaseService {
           }
         }
         if (collection == 'facilities' || collection == 'requests') {
-          final callable = FirebaseFunctions.instance.httpsCallable('adminDeleteResource');
+          final callable =
+              FirebaseFunctions.instance.httpsCallable('adminDeleteResource');
           deleteFutures.add(callable.call({
             'resourceType': collection,
             'resourceId': doc.id,
@@ -425,7 +537,7 @@ class FirebaseService {
       try {
         await _auth.createUserWithEmailAndPassword(
             email: 'admin@mediflow.com', password: 'password123');
-      } catch (e) {
+      } catch (_) {
         try {
           await _auth.signInWithEmailAndPassword(
               email: 'admin@mediflow.com', password: 'password123');
@@ -627,6 +739,47 @@ class FirebaseService {
       return null; // Success
     } catch (e) {
       return 'Critical error: $e';
+    }
+  }
+
+  // --- AUDIT LOGS ---
+
+  Future<PaginatedAuditLogsResult> getPaginatedAuditLogs({
+    int pageSize = 20,
+    DocumentSnapshot? startAfter,
+    String? actionFilter,
+  }) async {
+    try {
+      Query query = _firestore.collection('audit_logs');
+
+      if (actionFilter != null &&
+          actionFilter.isNotEmpty &&
+          actionFilter != 'All') {
+        query = query.where('action', isEqualTo: actionFilter);
+      }
+
+      query = query.orderBy('timestamp', descending: true).limit(pageSize);
+
+      if (startAfter != null) {
+        query = query.startAfterDocument(startAfter);
+      }
+
+      final snapshot = await query.get();
+      final logs = snapshot.docs
+          .map((doc) =>
+              AuditLog.fromMap(doc.data() as Map<String, dynamic>, doc.id))
+          .toList();
+
+      final hasMore = snapshot.docs.length == pageSize;
+      final lastDocument = snapshot.docs.isNotEmpty ? snapshot.docs.last : null;
+
+      return PaginatedAuditLogsResult(
+        logs: logs,
+        lastDocument: lastDocument,
+        hasMore: hasMore,
+      );
+    } catch (e) {
+      throw Exception('Error fetching audit logs: $e');
     }
   }
 }

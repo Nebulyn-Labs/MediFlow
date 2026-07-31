@@ -8,6 +8,8 @@ import '../../models/inventory_item.dart';
 import 'package:med_supply_prototype/constants/colors.dart';
 import '../shared/skeleton_loaders.dart';
 
+enum _IndentSortOption { newestFirst, oldestFirst }
+
 class ActiveIndentsPage extends ConsumerStatefulWidget {
   final String facilityId;
   const ActiveIndentsPage({super.key, required this.facilityId});
@@ -35,6 +37,8 @@ class _ActiveIndentsPageState extends ConsumerState<ActiveIndentsPage> {
   bool _isSubmitting = false;
   bool _isExportingHistoryCsv = false;
   int _selectedPeriod = 30;
+  RequestStatus? _selectedHistoryStatus;
+  _IndentSortOption _selectedHistorySort = _IndentSortOption.newestFirst;
 
   @override
   void initState() {
@@ -77,43 +81,67 @@ class _ActiveIndentsPageState extends ConsumerState<ActiveIndentsPage> {
     }
   }
 
+  /// Maximum number of forecast requests that may run concurrently.
+  ///
+  /// A value of 5 keeps total in-flight requests bounded while still
+  /// providing a large speed-up over fully-sequential execution (#238).
+  static const int _kForecastConcurrency = 5;
+
   // ---------- AI Forecast ----------
   Future<void> _getAIForecast() async {
     final aiService = ref.read(aiServiceProvider);
     final firebaseService = ref.read(firebaseServiceProvider);
+    // Fetch logs once, shared across all concurrent forecast calls.
     final logs =
         await firebaseService.getRecentLogs(widget.facilityId, days: 90);
-    for (var item in _inventory) {
-      setState(() => _forecastLoading[item.id] = true);
-      try {
-        final dynamic result = await aiService.forecastDemand(
-            item.medicineName, logs, _selectedPeriod,
-            facilityId: widget.facilityId);
-        setState(() {
-          dynamic predRaw;
-          dynamic reasonRaw;
-          if (result != null && result is Map) {
-            predRaw = result['prediction'];
-            reasonRaw = result['reasoning'];
-          }
-          int predicted = 0;
-          if (predRaw is num) {
-            predicted = predRaw.toInt();
-          } else if (predRaw is String) {
-            predicted = double.tryParse(predRaw)?.toInt() ?? 0;
-          }
-          _forecasts[item.id] = predicted;
-          _reasoning[item.id] =
-              reasonRaw?.toString() ?? "Calculated based on demand.";
 
-          _analysisControllers[item.id]?.text =
-              _suggestedQuantity(item, predicted).toString();
-        });
-      } catch (e) {
-        debugPrint('Forecast error for ${item.medicineName}: $e');
-      } finally {
-        setState(() => _forecastLoading[item.id] = false);
+    // Mark every item as loading before starting any futures.
+    setState(() {
+      for (final item in _inventory) {
+        _forecastLoading[item.id] = true;
       }
+    });
+
+    // Run forecasts concurrently in chunks of [_kForecastConcurrency] to
+    // avoid both serialising N round-trips and flooding the API (#238).
+    for (int i = 0; i < _inventory.length; i += _kForecastConcurrency) {
+      final chunk = _inventory.sublist(
+        i,
+        (i + _kForecastConcurrency).clamp(0, _inventory.length),
+      );
+
+      await Future.wait(chunk.map((item) async {
+        try {
+          final dynamic result = await aiService.forecastDemand(
+              item.medicineName, logs, _selectedPeriod,
+              facilityId: widget.facilityId);
+          if (!mounted) return;
+          setState(() {
+            dynamic predRaw;
+            dynamic reasonRaw;
+            if (result != null && result is Map) {
+              predRaw = result['prediction'];
+              reasonRaw = result['reasoning'];
+            }
+            int predicted = 0;
+            if (predRaw is num) {
+              predicted = predRaw.toInt();
+            } else if (predRaw is String) {
+              predicted = double.tryParse(predRaw)?.toInt() ?? 0;
+            }
+            _forecasts[item.id] = predicted;
+            _reasoning[item.id] =
+                reasonRaw?.toString() ?? "Calculated based on demand.";
+
+            _analysisControllers[item.id]?.text =
+                _suggestedQuantity(item, predicted).toString();
+            _forecastLoading[item.id] = false;
+          });
+        } catch (e) {
+          debugPrint('Forecast error for ${item.medicineName}: $e');
+          if (mounted) setState(() => _forecastLoading[item.id] = false);
+        }
+      }));
     }
   }
 
@@ -287,8 +315,8 @@ class _ActiveIndentsPageState extends ConsumerState<ActiveIndentsPage> {
         facilityName: facility?.name,
       );
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-            content: Text('Transfer requests CSV exported ✓')));
+        ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Transfer requests CSV exported ✓')));
       }
     } catch (e) {
       if (mounted) {
@@ -332,6 +360,138 @@ class _ActiveIndentsPageState extends ConsumerState<ActiveIndentsPage> {
           fontSize: 18,
           fontWeight: FontWeight.w700,
           color: MediColors.textPrimary));
+
+  String _statusLabel(RequestStatus? status) {
+    if (status == null) return 'All statuses';
+    return status.name[0].toUpperCase() + status.name.substring(1);
+  }
+
+  String _sortLabel(_IndentSortOption sort) {
+    switch (sort) {
+      case _IndentSortOption.newestFirst:
+        return 'Newest first';
+      case _IndentSortOption.oldestFirst:
+        return 'Oldest first';
+    }
+  }
+
+  List<MedRequest> _filterAndSortHistory(List<MedRequest> requests) {
+    final filtered = requests
+        .where((request) =>
+            request.status != RequestStatus.draft &&
+            (_selectedHistoryStatus == null ||
+                request.status == _selectedHistoryStatus))
+        .toList();
+
+    filtered.sort((a, b) {
+      switch (_selectedHistorySort) {
+        case _IndentSortOption.newestFirst:
+          return b.requestDate.compareTo(a.requestDate);
+        case _IndentSortOption.oldestFirst:
+          return a.requestDate.compareTo(b.requestDate);
+      }
+    });
+
+    return filtered;
+  }
+
+  Widget _historyControls(int visibleCount, int totalCount) {
+    final statuses = RequestStatus.values
+        .where((status) => status != RequestStatus.draft)
+        .toList();
+
+    InputDecoration controlDecoration(String label, IconData icon) {
+      return InputDecoration(
+        labelText: label,
+        prefixIcon: Icon(icon, size: 18),
+        isDense: true,
+        filled: true,
+        fillColor: MediColors.surfaceLight,
+        contentPadding:
+            const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: const BorderSide(color: MediColors.border),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: const BorderSide(color: MediColors.border),
+        ),
+      );
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Wrap(
+          spacing: 12,
+          runSpacing: 12,
+          crossAxisAlignment: WrapCrossAlignment.center,
+          children: [
+            SizedBox(
+              width: 220,
+              child: DropdownButtonFormField<RequestStatus?>(
+                initialValue: _selectedHistoryStatus,
+                dropdownColor: MediColors.surface,
+                decoration:
+                    controlDecoration('Filter by status', Icons.filter_list),
+                hint: const Text('All statuses'),
+                style: const TextStyle(color: MediColors.textPrimary),
+                items: [
+                  const DropdownMenuItem<RequestStatus?>(
+                    value: null,
+                    child: Text('All statuses'),
+                  ),
+                  ...statuses.map(
+                    (status) => DropdownMenuItem<RequestStatus?>(
+                      value: status,
+                      child: Text(_statusLabel(status)),
+                    ),
+                  ),
+                ],
+                onChanged: (status) =>
+                    setState(() => _selectedHistoryStatus = status),
+              ),
+            ),
+            SizedBox(
+              width: 210,
+              child: DropdownButtonFormField<_IndentSortOption>(
+                initialValue: _selectedHistorySort,
+                dropdownColor: MediColors.surface,
+                decoration: controlDecoration('Sort by date', Icons.sort),
+                style: const TextStyle(color: MediColors.textPrimary),
+                items: _IndentSortOption.values
+                    .map(
+                      (sort) => DropdownMenuItem<_IndentSortOption>(
+                        value: sort,
+                        child: Text(_sortLabel(sort)),
+                      ),
+                    )
+                    .toList(),
+                onChanged: (sort) {
+                  if (sort != null) {
+                    setState(() => _selectedHistorySort = sort);
+                  }
+                },
+              ),
+            ),
+            Text(
+              '$visibleCount of $totalCount requests shown',
+              style: const TextStyle(color: MediColors.textMuted, fontSize: 12),
+            ),
+          ],
+        ),
+        if (_selectedHistoryStatus != null) ...[
+          const SizedBox(height: 8),
+          TextButton.icon(
+            onPressed: () => setState(() => _selectedHistoryStatus = null),
+            icon: const Icon(Icons.clear, size: 16),
+            label: const Text('Clear status filter'),
+          ),
+        ],
+      ],
+    );
+  }
 
   // ----- AI Table -----
   Widget _analysisHeader() {
@@ -787,12 +947,12 @@ class _ActiveIndentsPageState extends ConsumerState<ActiveIndentsPage> {
         if (snapshot.hasError || snapshot.data == null) {
           return const SizedBox.shrink();
         }
-        final history = snapshot.data!
-            .where((r) => r.status != RequestStatus.draft)
-            .toList()
-          ..sort((a, b) => b.requestDate.compareTo(a.requestDate));
+        final allHistory = snapshot.data!
+            .where((request) => request.status != RequestStatus.draft)
+            .toList();
+        final history = _filterAndSortHistory(snapshot.data!);
 
-        if (history.isEmpty) {
+        if (allHistory.isEmpty) {
           return const SizedBox.shrink();
         }
 
@@ -807,7 +967,7 @@ class _ActiveIndentsPageState extends ConsumerState<ActiveIndentsPage> {
               children: [
                 _sectionHeader('Request History'),
                 OutlinedButton.icon(
-                  onPressed: _isExportingHistoryCsv
+                  onPressed: _isExportingHistoryCsv || history.isEmpty
                       ? null
                       : () => _exportRequestHistoryCsv(history),
                   icon: _isExportingHistoryCsv
@@ -828,6 +988,27 @@ class _ActiveIndentsPageState extends ConsumerState<ActiveIndentsPage> {
               ],
             ),
             const SizedBox(height: 12),
+            _historyControls(history.length, allHistory.length),
+            const SizedBox(height: 12),
+            if (history.isEmpty)
+              Card(
+                child: Padding(
+                  padding: const EdgeInsets.all(24),
+                  child: Row(
+                    children: [
+                      Icon(Icons.search_off_rounded,
+                          color: MediColors.textMuted.withValues(alpha: 0.8)),
+                      const SizedBox(width: 12),
+                      const Expanded(
+                        child: Text(
+                          'No requests match the selected filter.',
+                          style: TextStyle(color: MediColors.textSecondary),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
             ListView.builder(
               shrinkWrap: true,
               physics: const NeverScrollableScrollPhysics(),
@@ -858,7 +1039,8 @@ class _ActiveIndentsPageState extends ConsumerState<ActiveIndentsPage> {
                 String resolutionText = '';
                 if (hasResolution) {
                   final resDate = req.resolvedAt!;
-                  resolutionText = 'Resolved: ${resDate.day}/${resDate.month}/${resDate.year} ${resDate.hour.toString().padLeft(2, '0')}:${resDate.minute.toString().padLeft(2, '0')}';
+                  resolutionText =
+                      'Resolved: ${resDate.day}/${resDate.month}/${resDate.year} ${resDate.hour.toString().padLeft(2, '0')}:${resDate.minute.toString().padLeft(2, '0')}';
                 }
 
                 final requestInfo = Column(
@@ -882,7 +1064,9 @@ class _ActiveIndentsPageState extends ConsumerState<ActiveIndentsPage> {
                               color: MediColors.textSecondary,
                               fontWeight: FontWeight.w500)),
                     ],
-                    if (isRejected && req.rejectionReason != null && req.rejectionReason!.isNotEmpty) ...[
+                    if (isRejected &&
+                        req.rejectionReason != null &&
+                        req.rejectionReason!.isNotEmpty) ...[
                       const SizedBox(height: 8),
                       Container(
                         padding: const EdgeInsets.all(10),
@@ -890,7 +1074,8 @@ class _ActiveIndentsPageState extends ConsumerState<ActiveIndentsPage> {
                         decoration: BoxDecoration(
                           color: MediColors.errorOverlay,
                           borderRadius: BorderRadius.circular(8),
-                          border: Border.all(color: MediColors.error.withValues(alpha: 0.3)),
+                          border: Border.all(
+                              color: MediColors.error.withValues(alpha: 0.3)),
                         ),
                         child: Text(
                           'Rejection Reason: ${req.rejectionReason}',
@@ -942,11 +1127,13 @@ class _ActiveIndentsPageState extends ConsumerState<ActiveIndentsPage> {
                 );
 
                 final statusBadge = Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                   decoration: BoxDecoration(
                     color: statusColor.withValues(alpha: 0.12),
                     borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: statusColor.withValues(alpha: 0.25)),
+                    border:
+                        Border.all(color: statusColor.withValues(alpha: 0.25)),
                   ),
                   child: Text(
                     req.status.name.toUpperCase(),
@@ -971,7 +1158,8 @@ class _ActiveIndentsPageState extends ConsumerState<ActiveIndentsPage> {
                               requestInfo,
                               const SizedBox(height: 16),
                               Row(
-                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                mainAxisAlignment:
+                                    MainAxisAlignment.spaceBetween,
                                 children: [
                                   Text(
                                     'Quantity: ${req.quantity}',
