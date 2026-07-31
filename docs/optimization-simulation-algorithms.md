@@ -16,6 +16,8 @@ facility, and pending/approved `MedRequest`s.
 
 `Facility.type` is modeled as a `FacilityType` enum in the app and mapped
 to/from a lowercase Firestore string at the persistence boundary.
+Tests, fixtures, and UI logic should use `FacilityType.rural` and
+`FacilityType.urban` directly instead of comparing raw strings.
 
 **Outputs:** `TransferRecommendation`s (donor, recipient, medicine,
 quantity, score, reasoning) and `MultiStopRoute`s (transfers grouped by

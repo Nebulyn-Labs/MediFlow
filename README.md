@@ -158,7 +158,7 @@ lib/
 │
 ├── models/                     # Immutable Data Domain
 │   ├── daily_usage_log.dart    # Atomic snapshots of medicine consumption
-│   ├── facility.dart           # Metadata & Geospatial profiles for nodes
+│   ├── facility.dart           # Metadata, FacilityType enum, and geospatial profiles
 │   ├── inventory_item.dart     # Stock tracking & expiry metadata
 │   ├── request.dart            # Ledger for redistribution & restock flows
 │   └── usage_log.dart          # Helper models for analytics visualization
@@ -206,12 +206,18 @@ lib/
 MediFlow utilizes a hierarchical Firestore schema designed for
 high-concurrency performance:
 
-- **`/facilities`**: Metadata, `FacilityType` (`rural` / `urban` in code,
-  stored as a lowercase string in Firestore), and geospatial coordinates.
+- **`/facilities`**: Metadata, `FacilityType` in application code
+  (`FacilityType.rural` / `FacilityType.urban`), stored as a lowercase
+  string in Firestore at the persistence boundary, plus geospatial
+  coordinates.
 - **`/inventory/{fac_id}/medicines`**: Sub-collection tracking individual
   batches and live stock levels.
 - **`/requests`**: Global collection for tracking movement, status
   (Pending/Approved/Fulfilled), and manifest details.
+
+> Facility comparisons in the app should use `FacilityType` directly.
+> Firestore documents remain lowercase strings for compatibility with the
+> existing schema, and `lib/models/facility.dart` handles the conversion.
 
 ---
 
