@@ -168,7 +168,7 @@ class _RoleSelectionScreenState extends State<RoleSelectionScreen>
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    const Text(
+                    Text(
                       'Welcome Back',
                       style: TextStyle(
                           fontSize: 32,
@@ -176,7 +176,7 @@ class _RoleSelectionScreenState extends State<RoleSelectionScreen>
                           color: MediColors.textPrimary),
                     ),
                     const SizedBox(height: 8),
-                    const Text(
+                    Text(
                       'Choose your portal to continue',
                       style: TextStyle(
                           fontSize: 15, color: MediColors.textSecondary),
@@ -247,13 +247,13 @@ class _RoleSelectionScreenState extends State<RoleSelectionScreen>
     return Column(
       children: [
         Text(top,
-            style: const TextStyle(
+            style: TextStyle(
                 fontSize: 14,
                 fontWeight: FontWeight.w700,
                 color: MediColors.primary)),
         const SizedBox(height: 4),
         Text(bottom,
-            style: const TextStyle(fontSize: 12, color: MediColors.textMuted)),
+            style: TextStyle(fontSize: 12, color: MediColors.textMuted)),
       ],
     );
   }
@@ -314,13 +314,13 @@ class _RoleSelectionScreenState extends State<RoleSelectionScreen>
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(title,
-                        style: const TextStyle(
+                        style: TextStyle(
                             fontSize: 18,
                             fontWeight: FontWeight.w700,
                             color: MediColors.textPrimary)),
                     const SizedBox(height: 4),
                     Text(subtitle,
-                        style: const TextStyle(
+                        style: TextStyle(
                             fontSize: 13, color: MediColors.textSecondary)),
                   ],
                 ),

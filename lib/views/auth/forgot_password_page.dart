@@ -72,13 +72,13 @@ class _ForgotPasswordPageState extends ConsumerState<ForgotPasswordPage> {
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                const Icon(
+                Icon(
                   Icons.lock_reset_rounded,
                   size: 56,
                   color: MediColors.primary,
                 ),
                 const SizedBox(height: 24),
-                const Text(
+                Text(
                   'Reset Password',
                   textAlign: TextAlign.center,
                   style: TextStyle(
@@ -88,7 +88,7 @@ class _ForgotPasswordPageState extends ConsumerState<ForgotPasswordPage> {
                   ),
                 ),
                 const SizedBox(height: 8),
-                const Text(
+                Text(
                   'Enter your email address and we\'ll send you a link to reset your password.',
                   textAlign: TextAlign.center,
                   style: TextStyle(
@@ -100,7 +100,7 @@ class _ForgotPasswordPageState extends ConsumerState<ForgotPasswordPage> {
                 TextField(
                   controller: _emailController,
                   keyboardType: TextInputType.emailAddress,
-                  style: const TextStyle(color: MediColors.textPrimary),
+                  style: TextStyle(color: MediColors.textPrimary),
                   decoration: InputDecoration(
                     labelText: 'Email Address',
                     prefixIcon: Icon(Icons.email_outlined,

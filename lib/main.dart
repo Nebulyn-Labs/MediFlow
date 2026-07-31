@@ -8,7 +8,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:med_supply_prototype/constants/colors.dart';
+import 'package:med_supply_prototype/constants/theme_controller.dart';
 import 'package:med_supply_prototype/views/shared/not_found_page.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import 'services/firebase_setup.dart';
 import 'views/admin/admin_indent_approval_page.dart';
@@ -53,6 +55,18 @@ void main() async {
     cacheSizeBytes: Settings.CACHE_SIZE_UNLIMITED,
   );
 
+  // Restore the user's saved theme preference before the app starts.
+  ThemeMode initialThemeMode = ThemeMode.dark;
+  try {
+    final prefs = await SharedPreferences.getInstance();
+    final saved = prefs.getString(kThemeModePrefsKey);
+    if (saved == ThemeMode.light.name) {
+      initialThemeMode = ThemeMode.light;
+    }
+  } catch (e) {
+    debugPrint('Failed to read theme preference: $e');
+  }
+
   FlutterError.onError = (details) {
     FlutterError.presentError(details);
     _handleGlobalError(details.exception, details.stack);
@@ -72,10 +86,10 @@ void main() async {
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                const Icon(Icons.error_outline,
+                Icon(Icons.error_outline,
                     size: 64, color: MediColors.error),
                 const SizedBox(height: 16),
-                const Text(
+                Text(
                   'Something went wrong',
                   style: TextStyle(
                       fontSize: 20,
@@ -88,7 +102,7 @@ void main() async {
                       ? details.exceptionAsString()
                       : 'An unexpected error occurred. Our team has been notified.',
                   textAlign: TextAlign.center,
-                  style: const TextStyle(
+                  style: TextStyle(
                       color: MediColors.textMuted, fontSize: 13),
                 ),
                 const SizedBox(height: 24),
@@ -105,7 +119,14 @@ void main() async {
       ),
     );
   };
-  runApp(const ProviderScope(child: MediFlowApp()));
+  runApp(
+    ProviderScope(
+      overrides: [
+        initialThemeModeProvider.overrideWithValue(initialThemeMode),
+      ],
+      child: const MediFlowApp(),
+    ),
+  );
 }
 
 final _router = GoRouter(
@@ -230,140 +251,166 @@ class AppScrollBehavior extends MaterialScrollBehavior {
       };
 }
 
-class MediFlowApp extends StatelessWidget {
+class MediFlowApp extends ConsumerWidget {
   const MediFlowApp({super.key});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final themeMode = ref.watch(themeControllerProvider);
+    final activePalette =
+        themeMode == ThemeMode.light ? MediColors.light : MediColors.dark;
+    MediColors.setActivePalette(activePalette);
+
     return MaterialApp.router(
       title: 'MediFlow',
       debugShowCheckedModeBanner: false,
       scrollBehavior: AppScrollBehavior(),
-      theme: ThemeData(
-        useMaterial3: true,
-        brightness: Brightness.dark,
-        scaffoldBackgroundColor: MediColors.bg,
-        colorScheme: ColorScheme.dark(
-          surface: MediColors.surface,
-          primary: MediColors.primary,
-          secondary: MediColors.cyan,
-          error: MediColors.error,
-          onSurface: MediColors.textPrimary,
-          onPrimary: Colors.white,
-          outline: MediColors.border,
-        ),
-        textTheme: GoogleFonts.interTextTheme(
-          ThemeData.dark().textTheme,
-        ),
-        cardTheme: CardThemeData(
-          color: MediColors.surface,
-          elevation: 0,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
-            side: BorderSide(color: MediColors.border),
-          ),
-        ),
-        appBarTheme: const AppBarTheme(
-          backgroundColor: Colors.transparent,
-          elevation: 0,
-          centerTitle: false,
-          titleTextStyle: TextStyle(
-            fontSize: 20,
-            fontWeight: FontWeight.w700,
-            color: MediColors.textPrimary,
-          ),
-          iconTheme: IconThemeData(color: MediColors.textSecondary),
-        ),
-        inputDecorationTheme: InputDecorationTheme(
-          filled: true,
-          fillColor: MediColors.surfaceLight,
-          border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12),
-            borderSide: BorderSide(color: MediColors.border),
-          ),
-          enabledBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12),
-            borderSide: BorderSide(color: MediColors.border),
-          ),
-          focusedBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12),
-            borderSide: const BorderSide(color: MediColors.primary, width: 2),
-          ),
-          labelStyle: const TextStyle(color: MediColors.textSecondary),
-          hintStyle: const TextStyle(color: MediColors.textMuted),
-        ),
-        filledButtonTheme: FilledButtonThemeData(
-          style: FilledButton.styleFrom(
-            backgroundColor: MediColors.primary,
-            foregroundColor: Colors.white,
-            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-            shape:
-                RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-            textStyle:
-                const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
-          ),
-        ),
-        outlinedButtonTheme: OutlinedButtonThemeData(
-          style: OutlinedButton.styleFrom(
-            foregroundColor: MediColors.primary,
-            side: const BorderSide(color: MediColors.border),
-            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-            shape:
-                RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-          ),
-        ),
-        dividerTheme:
-            const DividerThemeData(color: MediColors.border, thickness: 1),
-        snackBarTheme: SnackBarThemeData(
-          backgroundColor: MediColors.surfaceLight,
-          contentTextStyle: const TextStyle(color: MediColors.textPrimary),
-          shape:
-              RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-          behavior: SnackBarBehavior.floating,
-        ),
-        popupMenuTheme: PopupMenuThemeData(
-          color: MediColors.surfaceLight,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-            side: BorderSide(color: MediColors.border),
-          ),
-        ),
-        dialogTheme: DialogThemeData(
-          backgroundColor: MediColors.surface,
-          shape:
-              RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-          titleTextStyle: const TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.w700,
-              color: MediColors.textPrimary),
-        ),
-        tabBarTheme: TabBarThemeData(
-          labelColor: MediColors.primary,
-          unselectedLabelColor: MediColors.textMuted,
-          indicatorColor: MediColors.primary,
-          dividerColor: MediColors.border,
-        ),
-        dataTableTheme: DataTableThemeData(
-          headingTextStyle: const TextStyle(
-              fontWeight: FontWeight.w600,
-              color: MediColors.textSecondary,
-              fontSize: 13),
-          dataTextStyle:
-              const TextStyle(color: MediColors.textPrimary, fontSize: 13),
-          headingRowColor: WidgetStateProperty.all(MediColors.surfaceLight),
-          dataRowColor: WidgetStateProperty.resolveWith((states) {
-            if (states.contains(WidgetState.hovered)) {
-              return MediColors.surfaceHover;
-            }
-            return Colors.transparent;
-          }),
-          dividerThickness: 1,
-          decoration: const BoxDecoration(
-              border: Border(
-                  bottom: BorderSide(color: MediColors.border, width: 0.5))),
+      theme: _buildTheme(Brightness.light, MediColors.light),
+      darkTheme: _buildTheme(Brightness.dark, MediColors.dark),
+      themeMode: themeMode,
+      routerConfig: _router,
+    );
+  }
+
+  ThemeData _buildTheme(Brightness brightness, MediPalette palette) {
+    final isDark = brightness == Brightness.dark;
+    final colorScheme = isDark
+        ? ColorScheme.dark(
+            surface: palette.surface,
+            primary: palette.primary,
+            secondary: palette.cyan,
+            error: palette.error,
+            onSurface: palette.textPrimary,
+            onPrimary: Colors.white,
+            outline: palette.border,
+          )
+        : ColorScheme.light(
+            surface: palette.surface,
+            primary: palette.primary,
+            secondary: palette.cyan,
+            error: palette.error,
+            onSurface: palette.textPrimary,
+            onPrimary: Colors.white,
+            outline: palette.border,
+          );
+
+    return ThemeData(
+      useMaterial3: true,
+      brightness: brightness,
+      scaffoldBackgroundColor: palette.bg,
+      colorScheme: colorScheme,
+      textTheme: GoogleFonts.interTextTheme(
+        isDark ? ThemeData.dark().textTheme : ThemeData.light().textTheme,
+      ),
+      cardTheme: CardThemeData(
+        color: palette.surface,
+        elevation: 0,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+          side: BorderSide(color: palette.border),
         ),
       ),
-      routerConfig: _router,
+      appBarTheme: AppBarTheme(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        centerTitle: false,
+        titleTextStyle: TextStyle(
+          fontSize: 20,
+          fontWeight: FontWeight.w700,
+          color: palette.textPrimary,
+        ),
+        iconTheme: IconThemeData(color: palette.textSecondary),
+      ),
+      inputDecorationTheme: InputDecorationTheme(
+        filled: true,
+        fillColor: palette.surfaceLight,
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide(color: palette.border),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide(color: palette.border),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide(color: palette.primary, width: 2),
+        ),
+        labelStyle: TextStyle(color: palette.textSecondary),
+        hintStyle: TextStyle(color: palette.textMuted),
+      ),
+      filledButtonTheme: FilledButtonThemeData(
+        style: FilledButton.styleFrom(
+          backgroundColor: palette.primary,
+          foregroundColor: Colors.white,
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          textStyle:
+              const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
+        ),
+      ),
+      outlinedButtonTheme: OutlinedButtonThemeData(
+        style: OutlinedButton.styleFrom(
+          foregroundColor: palette.primary,
+          side: BorderSide(color: palette.border),
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        ),
+      ),
+      dividerTheme: DividerThemeData(color: palette.border, thickness: 1),
+      snackBarTheme: SnackBarThemeData(
+        backgroundColor: palette.surfaceLight,
+        contentTextStyle: TextStyle(color: palette.textPrimary),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        behavior: SnackBarBehavior.floating,
+      ),
+      popupMenuTheme: PopupMenuThemeData(
+        color: palette.surfaceLight,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+          side: BorderSide(color: palette.border),
+        ),
+      ),
+      dialogTheme: DialogThemeData(
+        backgroundColor: palette.surface,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20),
+        ),
+        titleTextStyle: TextStyle(
+          fontSize: 18,
+          fontWeight: FontWeight.w700,
+          color: palette.textPrimary,
+        ),
+      ),
+      tabBarTheme: TabBarThemeData(
+        labelColor: palette.primary,
+        unselectedLabelColor: palette.textMuted,
+        indicatorColor: palette.primary,
+        dividerColor: palette.border,
+      ),
+      dataTableTheme: DataTableThemeData(
+        headingTextStyle: TextStyle(
+          fontWeight: FontWeight.w600,
+          color: palette.textSecondary,
+          fontSize: 13,
+        ),
+        dataTextStyle: TextStyle(color: palette.textPrimary, fontSize: 13),
+        headingRowColor: WidgetStateProperty.all(palette.surfaceLight),
+        dataRowColor: WidgetStateProperty.resolveWith((states) {
+          if (states.contains(WidgetState.hovered)) {
+            return palette.surfaceHover;
+          }
+          return Colors.transparent;
+        }),
+        dividerThickness: 1,
+        decoration: BoxDecoration(
+          border: Border(
+            bottom: BorderSide(color: palette.border, width: 0.5),
+          ),
+        ),
+      ),
     );
   }
 }

@@ -235,7 +235,7 @@ class _AlertsPageState extends ConsumerState<AlertsPage> {
                                     MediColors.success.withValues(alpha: 0.8)),
                           ),
                           const SizedBox(height: 16),
-                          const Text('No active alerts detected.',
+                          Text('No active alerts detected.',
                               style: TextStyle(
                                   color: MediColors.textSecondary,
                                   fontSize: 16)),
@@ -259,7 +259,7 @@ class _AlertsPageState extends ConsumerState<AlertsPage> {
       appBar: AppBar(
         title: Row(
           children: [
-            const Text('Alerts',
+            Text('Alerts',
                 style: TextStyle(
                     fontWeight: FontWeight.w800,
                     color: MediColors.textPrimary)),
@@ -272,7 +272,7 @@ class _AlertsPageState extends ConsumerState<AlertsPage> {
               ),
               child: Text(
                 widget.facilityId.replaceAll('_', ' ').toUpperCase(),
-                style: const TextStyle(
+                style: TextStyle(
                     fontSize: 12,
                     color: MediColors.info,
                     fontWeight: FontWeight.w600),
@@ -282,7 +282,7 @@ class _AlertsPageState extends ConsumerState<AlertsPage> {
         ),
         actions: [
           IconButton(
-            icon: const Icon(Icons.refresh_rounded,
+            icon: Icon(Icons.refresh_rounded,
                 color: MediColors.textSecondary),
             onPressed: _loadAlerts,
             tooltip: 'Refresh',
@@ -306,7 +306,7 @@ class _AlertsPageState extends ConsumerState<AlertsPage> {
 
   Widget _sectionHeader(String title) {
     return Text(title,
-        style: const TextStyle(
+        style: TextStyle(
             fontSize: 18,
             fontWeight: FontWeight.w800,
             color: MediColors.textPrimary));
@@ -356,12 +356,12 @@ class _AlertsPageState extends ConsumerState<AlertsPage> {
                       runSpacing: 6,
                       children: [
                         Text(alert.item.medicineName,
-                            style: const TextStyle(
+                            style: TextStyle(
                                 fontWeight: FontWeight.w800,
                                 fontSize: 17,
                                 color: MediColors.textPrimary)),
                         Text(alert.item.batchId,
-                            style: const TextStyle(
+                            style: TextStyle(
                                 fontSize: 12,
                                 color: MediColors.textMuted,
                                 fontWeight: FontWeight.w600)),
@@ -370,13 +370,13 @@ class _AlertsPageState extends ConsumerState<AlertsPage> {
                     ),
                     const SizedBox(height: 8),
                     Text(alert.reason,
-                        style: const TextStyle(
+                        style: TextStyle(
                             color: MediColors.textPrimary,
                             fontSize: 14,
                             fontWeight: FontWeight.w600)),
                     const SizedBox(height: 4),
                     Text(alert.detail,
-                        style: const TextStyle(
+                        style: TextStyle(
                             color: MediColors.textSecondary, fontSize: 14)),
                     const SizedBox(height: 16),
                     isExpired

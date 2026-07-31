@@ -20,7 +20,7 @@ class AlertsHubPage extends ConsumerWidget {
         appBar: AppBar(
           title: Row(
             children: [
-              const Text('Alerts & Notifications',
+              Text('Alerts & Notifications',
                   style: TextStyle(
                       fontWeight: FontWeight.w800,
                       color: MediColors.textPrimary)),
@@ -34,7 +34,7 @@ class AlertsHubPage extends ConsumerWidget {
                 ),
                 child: Text(
                   facilityId.replaceAll('_', ' ').toUpperCase(),
-                  style: const TextStyle(
+                  style: TextStyle(
                       fontSize: 12,
                       color: MediColors.info,
                       fontWeight: FontWeight.w600),
@@ -42,7 +42,7 @@ class AlertsHubPage extends ConsumerWidget {
               ),
             ],
           ),
-          bottom: const TabBar(
+          bottom: TabBar(
             indicatorColor: MediColors.primary,
             labelColor: MediColors.primary,
             unselectedLabelColor: MediColors.textSecondary,

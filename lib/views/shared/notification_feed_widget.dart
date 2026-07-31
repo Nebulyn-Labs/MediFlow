@@ -20,7 +20,7 @@ class NotificationFeedWidget extends ConsumerWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
+          Text(
             'Notifications',
             style: TextStyle(
               fontSize: 32,
@@ -35,7 +35,7 @@ class NotificationFeedWidget extends ConsumerWidget {
               margin: EdgeInsets.zero,
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(16),
-                side: const BorderSide(color: MediColors.border, width: 1),
+                side: BorderSide(color: MediColors.border, width: 1),
               ),
               child: StreamBuilder<List<notif.NotificationModel>>(
                 stream: ref
@@ -47,7 +47,7 @@ class NotificationFeedWidget extends ConsumerWidget {
                   }
 
                   if (snapshot.hasError) {
-                    return const Center(
+                    return Center(
                       child: Text('Error loading notifications.',
                           style: TextStyle(color: MediColors.error)),
                     );
@@ -56,7 +56,7 @@ class NotificationFeedWidget extends ConsumerWidget {
                   final notifications = snapshot.data ?? [];
 
                   if (notifications.isEmpty) {
-                    return const Center(
+                    return Center(
                       child: Text('No notifications yet.',
                           style: TextStyle(color: MediColors.textSecondary)),
                     );
@@ -65,7 +65,7 @@ class NotificationFeedWidget extends ConsumerWidget {
                   return ListView.separated(
                     padding: const EdgeInsets.symmetric(vertical: 8.0),
                     itemCount: notifications.length,
-                    separatorBuilder: (context, index) => const Divider(
+                    separatorBuilder: (context, index) => Divider(
                       height: 1,
                       color: MediColors.border,
                       indent: 16,
@@ -154,7 +154,7 @@ class _NotificationTile extends StatelessWidget {
                   const SizedBox(height: 4),
                   Text(
                     DateFormat.yMd().add_jm().format(notification.createdAt),
-                    style: const TextStyle(
+                    style: TextStyle(
                       color: MediColors.textMuted,
                       fontSize: 12,
                     ),
@@ -167,7 +167,7 @@ class _NotificationTile extends StatelessWidget {
                 margin: const EdgeInsets.only(top: 8),
                 width: 8,
                 height: 8,
-                decoration: const BoxDecoration(
+                decoration: BoxDecoration(
                   color: MediColors.primary,
                   shape: BoxShape.circle,
                 ),

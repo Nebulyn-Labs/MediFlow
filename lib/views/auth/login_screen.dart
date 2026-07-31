@@ -148,7 +148,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                             ? 'Manage daily logs, track inventory, and forecast indents using AI.'
                             : 'Monitor global stock levels and optimize redistribution routes.',
                         textAlign: TextAlign.center,
-                        style: const TextStyle(
+                        style: TextStyle(
                             color: MediColors.textSecondary,
                             fontSize: 14,
                             height: 1.6),
@@ -175,7 +175,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    const Text(
+                    Text(
                       'Sign In',
                       style: TextStyle(
                           fontSize: 28,
@@ -183,7 +183,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                           color: MediColors.textPrimary),
                     ),
                     const SizedBox(height: 8),
-                    const Text(
+                    Text(
                       'Enter your credentials to continue',
                       style: TextStyle(
                           color: MediColors.textSecondary, fontSize: 14),
@@ -192,7 +192,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     TextField(
                       controller: _emailController,
                       keyboardType: TextInputType.emailAddress,
-                      style: const TextStyle(color: MediColors.textPrimary),
+                      style: TextStyle(color: MediColors.textPrimary),
                       decoration: InputDecoration(
                         labelText: 'Email Address',
                         prefixIcon: Icon(Icons.email_outlined,
@@ -203,7 +203,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     TextField(
                       controller: _passwordController,
                       obscureText: _obscurePassword,
-                      style: const TextStyle(color: MediColors.textPrimary),
+                      style: TextStyle(color: MediColors.textPrimary),
                       decoration: InputDecoration(
                         labelText: 'Password',
                         prefixIcon: Icon(Icons.lock_outline_rounded,

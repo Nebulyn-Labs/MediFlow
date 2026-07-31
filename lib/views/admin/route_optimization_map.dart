@@ -143,7 +143,7 @@ class _RouteOptimizationMapState extends ConsumerState<RouteOptimizationMap> {
   @override
   Widget build(BuildContext context) {
     if (_isLoading) {
-      return const Scaffold(
+      return Scaffold(
         backgroundColor: MediColors.bg,
         body: RouteOptimizationMapSkeleton(),
       );
@@ -159,13 +159,13 @@ class _RouteOptimizationMapState extends ConsumerState<RouteOptimizationMap> {
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                const Icon(Icons.error_outline_rounded,
+                Icon(Icons.error_outline_rounded,
                     size: 64, color: MediColors.textMuted),
                 const SizedBox(height: 20),
                 Text(
                   _errorMessage!,
                   textAlign: TextAlign.center,
-                  style: const TextStyle(
+                  style: TextStyle(
                       fontSize: 16, color: MediColors.textSecondary),
                 ),
                 const SizedBox(height: 24),
@@ -223,13 +223,13 @@ class _RouteOptimizationMapState extends ConsumerState<RouteOptimizationMap> {
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              const Text('Transfer Manifest',
+                              Text('Transfer Manifest',
                                   style: TextStyle(
                                       fontSize: 20,
                                       fontWeight: FontWeight.w700,
                                       color: MediColors.textPrimary)),
                               const SizedBox(height: 8),
-                              const Text(
+                              Text(
                                   'Smart-scored redistribution paths factoring in rural priority and expiry risks.',
                                   style: TextStyle(
                                       color: MediColors.textSecondary,
@@ -246,7 +246,7 @@ class _RouteOptimizationMapState extends ConsumerState<RouteOptimizationMap> {
                                           color: MediColors.primary
                                               .withValues(alpha: 0.2))),
                                   child: Text(_aiSummary,
-                                      style: const TextStyle(
+                                      style: TextStyle(
                                           color: MediColors.primaryLight,
                                           fontStyle: FontStyle.italic,
                                           fontSize: 13)),
@@ -321,7 +321,7 @@ class _RouteOptimizationMapState extends ConsumerState<RouteOptimizationMap> {
                                   child: TextButton(
                                     onPressed: () =>
                                         setState(() => _showRoutes = false),
-                                    child: const Center(
+                                    child: Center(
                                         child: Text('Clear Map',
                                             style: TextStyle(
                                                 color: MediColors.textMuted))),
@@ -333,7 +333,7 @@ class _RouteOptimizationMapState extends ConsumerState<RouteOptimizationMap> {
                         const Divider(height: 1),
                         Expanded(
                           child: !_showRoutes
-                              ? const Center(
+                              ? Center(
                                   child: Column(
                                   mainAxisAlignment: MainAxisAlignment.center,
                                   children: [
@@ -462,7 +462,7 @@ class _RouteOptimizationMapState extends ConsumerState<RouteOptimizationMap> {
                                           ),
                                           child: Text(
                                             f.name,
-                                            style: const TextStyle(
+                                            style: TextStyle(
                                                 fontSize: 9,
                                                 fontWeight: FontWeight.bold,
                                                 color: MediColors.textPrimary),
@@ -512,7 +512,7 @@ class _RouteOptimizationMapState extends ConsumerState<RouteOptimizationMap> {
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                const Text('Optimization Legend',
+                                Text('Optimization Legend',
                                     style: TextStyle(
                                         fontWeight: FontWeight.bold,
                                         color: MediColors.textPrimary)),
@@ -573,7 +573,7 @@ class _RouteOptimizationMapState extends ConsumerState<RouteOptimizationMap> {
               decoration: BoxDecoration(color: color, shape: BoxShape.circle)),
           const SizedBox(width: 8),
           Text(label,
-              style: const TextStyle(
+              style: TextStyle(
                   color: MediColors.textSecondary, fontSize: 11)),
         ],
       ),
@@ -595,13 +595,13 @@ class _RouteOptimizationMapState extends ConsumerState<RouteOptimizationMap> {
         children: [
           Row(
             children: [
-              const Icon(Icons.local_shipping_outlined,
+              Icon(Icons.local_shipping_outlined,
                   color: MediColors.primary),
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
                     'Multi-Stop Route: ${mr.transfers.first.donor.name}',
-                    style: const TextStyle(
+                    style: TextStyle(
                         fontWeight: FontWeight.w800,
                         color: MediColors.textPrimary,
                         fontSize: 16)),
@@ -673,7 +673,7 @@ class _RouteOptimizationMapState extends ConsumerState<RouteOptimizationMap> {
                     color: MediColors.primaryOverlay,
                     borderRadius: BorderRadius.circular(6)),
                 child: Text('Score: ${rec.score.toInt()}',
-                    style: const TextStyle(
+                    style: TextStyle(
                         color: MediColors.primaryLight,
                         fontWeight: FontWeight.bold,
                         fontSize: 12)),
@@ -699,11 +699,11 @@ class _RouteOptimizationMapState extends ConsumerState<RouteOptimizationMap> {
             const SizedBox(width: 8),
             Expanded(
                 child: Text(rec.donor.name,
-                    style: const TextStyle(
+                    style: TextStyle(
                         fontWeight: FontWeight.w600,
                         color: MediColors.textPrimary))),
           ]),
-          const Padding(
+          Padding(
               padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
               child: Icon(Icons.arrow_downward_rounded,
                   color: MediColors.textMuted, size: 16)),
@@ -712,22 +712,22 @@ class _RouteOptimizationMapState extends ConsumerState<RouteOptimizationMap> {
             const SizedBox(width: 8),
             Expanded(
                 child: Text(rec.recipient.name,
-                    style: const TextStyle(
+                    style: TextStyle(
                         fontWeight: FontWeight.w600,
                         color: MediColors.textPrimary))),
           ]),
           const Divider(height: 32),
           Text(rec.medicine,
-              style: const TextStyle(
+              style: TextStyle(
                   fontWeight: FontWeight.w800,
                   color: MediColors.textPrimary,
                   fontSize: 15)),
           Text('${rec.quantity} Units requested',
               style:
-                  const TextStyle(color: MediColors.textMuted, fontSize: 13)),
+                  TextStyle(color: MediColors.textMuted, fontSize: 13)),
           const SizedBox(height: 12),
           Text(rec.reasoning,
-              style: const TextStyle(
+              style: TextStyle(
                   color: MediColors.primaryLight,
                   fontSize: 11,
                   fontStyle: FontStyle.italic)),

@@ -39,6 +39,7 @@ dependencies:
   firebase_app_check: ^0.3.2+10
   vector_math: ^2.2.0
   connectivity_plus: ^7.3.1
+  shared_preferences: ^2.5.5
   flutter_markdown_plus: ^1.0.6
 
 dev_dependencies:

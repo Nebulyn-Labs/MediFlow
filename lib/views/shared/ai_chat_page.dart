@@ -155,14 +155,14 @@ class _AIChatPageState extends ConsumerState<AIChatPage> {
             Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text('MediFlow AI',
+                Text('MediFlow AI',
                     style: TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.w700,
                         color: MediColors.textPrimary)),
                 Text(
                   _isLocalMode ? 'Local Assistant Mode' : 'Powered by Gemini',
-                  style: const TextStyle(
+                  style: TextStyle(
                       fontSize: 11, color: MediColors.textMuted),
                 ),
               ],
@@ -201,7 +201,7 @@ class _AIChatPageState extends ConsumerState<AIChatPage> {
                 Expanded(
                   child: TextField(
                     controller: _controller,
-                    style: const TextStyle(color: MediColors.textPrimary),
+                    style: TextStyle(color: MediColors.textPrimary),
                     decoration: InputDecoration(
                       hintText: 'Ask about inventory, forecasts, alerts...',
                       filled: true,

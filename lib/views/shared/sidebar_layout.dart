@@ -4,6 +4,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import '../../services/firebase_service.dart';
 import '../../models/inventory_item.dart';
 import 'package:med_supply_prototype/constants/colors.dart';
+import 'package:med_supply_prototype/constants/theme_controller.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'confirm_logout_dialog.dart';
 import 'scroll_to_top_button.dart';
@@ -236,6 +237,18 @@ class _SidebarLayoutState extends ConsumerState<SidebarLayout> {
                     ),
                   ),
 
+                  const Spacer(),
+
+                  // Theme toggle
+                  ThemeToggleNavItem(
+                    isDark: ref.watch(themeControllerProvider) ==
+                        ThemeMode.dark,
+                    isExpanded: _isExpanded,
+                    onTap: () =>
+                        ref.read(themeControllerProvider.notifier).toggle(),
+                  ),
+                  const SizedBox(height: 8),
+
                   // Logout
                   _buildNavItem(
                     _NavItem(Icons.logout_rounded, 'Logout'),
@@ -339,7 +352,7 @@ class _SidebarLayoutState extends ConsumerState<SidebarLayout> {
                           top: -4,
                           child: Container(
                             padding: const EdgeInsets.all(3),
-                            decoration: const BoxDecoration(
+                            decoration: BoxDecoration(
                               color: MediColors.error,
                               shape: BoxShape.circle,
                             ),
@@ -362,7 +375,7 @@ class _SidebarLayoutState extends ConsumerState<SidebarLayout> {
                           child: Container(
                             width: 10,
                             height: 10,
-                            decoration: const BoxDecoration(
+                            decoration: BoxDecoration(
                               color: MediColors.error,
                               shape: BoxShape.circle,
                             ),
@@ -407,4 +420,76 @@ class _NavItem {
   final IconData icon;
   final String label;
   _NavItem(this.icon, this.label);
+}
+
+/// Sidebar entry that toggles between the dark and light theme.
+class ThemeToggleNavItem extends StatelessWidget {
+  const ThemeToggleNavItem({
+    super.key,
+    required this.isDark,
+    required this.isExpanded,
+    required this.onTap,
+  });
+
+  final bool isDark;
+  final bool isExpanded;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final icon =
+        isDark ? Icons.light_mode_outlined : Icons.dark_mode_outlined;
+    final label = isDark ? 'Light Mode' : 'Dark Mode';
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(12),
+          hoverColor: MediColors.surfaceHover,
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 200),
+            padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 12),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: ClipRect(
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  SizedBox(
+                    width: 24,
+                    child: Center(
+                      child: Icon(
+                        icon,
+                        size: 22,
+                        color: MediColors.textMuted,
+                      ),
+                    ),
+                  ),
+                  if (isExpanded) ...[
+                    const SizedBox(width: 14),
+                    Expanded(
+                      child: Text(
+                        label,
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w500,
+                          color: MediColors.textSecondary,
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                        maxLines: 1,
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
 }

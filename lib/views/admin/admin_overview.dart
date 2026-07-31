@@ -301,7 +301,7 @@ class _AdminOverviewState extends ConsumerState<AdminOverview> {
     return Column(
       children: [
         if (filtered.isEmpty && !_medicinesLoading)
-          const Padding(
+          Padding(
             padding: EdgeInsets.symmetric(vertical: 24),
             // Note: Intentional scalability trade-off - filtering only searches
             // currently loaded pages to avoid excessive reads or complex
@@ -333,7 +333,7 @@ class _AdminOverviewState extends ConsumerState<AdminOverview> {
                       flex: 2,
                       child: Text(item.medicineName,
                           overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
+                          style: TextStyle(
                               fontWeight: FontWeight.w700,
                               color: MediColors.textPrimary)),
                     ),
@@ -342,12 +342,12 @@ class _AdminOverviewState extends ConsumerState<AdminOverview> {
                           '${item.remainingQuantity}/${item.initialQuantity} ${item.unit}',
                           overflow: TextOverflow.ellipsis,
                           style:
-                              const TextStyle(color: MediColors.textSecondary)),
+                              TextStyle(color: MediColors.textSecondary)),
                     ),
                     Flexible(
                       child: Text(status,
                           overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
+                          style: TextStyle(
                               fontWeight: FontWeight.w700,
                               color: MediColors.info)),
                     ),
@@ -421,14 +421,14 @@ class _AdminOverviewState extends ConsumerState<AdminOverview> {
       ),
       child: Row(
         children: [
-          const Icon(Icons.warning_amber_rounded,
+          Icon(Icons.warning_amber_rounded,
               color: MediColors.warning, size: 20),
           const SizedBox(width: 12),
           Expanded(
             child: Text(
               'Some facility data could not be loaded: '
               '${_failedFacilities.join(", ")}.',
-              style: const TextStyle(
+              style: TextStyle(
                 color: MediColors.warning,
                 fontSize: 13,
               ),
@@ -530,7 +530,7 @@ class _AdminOverviewState extends ConsumerState<AdminOverview> {
             Icon(Icons.cloud_off_rounded,
                 size: 64, color: MediColors.textMuted),
             const SizedBox(height: 24),
-            const Text(
+            Text(
               'Unable to load dashboard data.',
               style: TextStyle(
                 fontSize: 18,
@@ -542,7 +542,7 @@ class _AdminOverviewState extends ConsumerState<AdminOverview> {
             const SizedBox(height: 12),
             Text(
               _errorMessage!,
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 14,
                 color: MediColors.textSecondary,
                 height: 1.5,
@@ -593,7 +593,7 @@ class _AdminOverviewState extends ConsumerState<AdminOverview> {
               children: [
                 Expanded(
                     child: Text(title,
-                        style: const TextStyle(
+                        style: TextStyle(
                             fontSize: 11,
                             fontWeight: FontWeight.w700,
                             color: MediColors.textSecondary,
@@ -605,7 +605,7 @@ class _AdminOverviewState extends ConsumerState<AdminOverview> {
             ),
             const SizedBox(height: 16),
             Text(value,
-                style: const TextStyle(
+                style: TextStyle(
                     fontSize: 28,
                     fontWeight: FontWeight.w800,
                     color: MediColors.textPrimary)),
@@ -619,7 +619,7 @@ class _AdminOverviewState extends ConsumerState<AdminOverview> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text('Facility Health Overview',
+        Text('Facility Health Overview',
             style: TextStyle(
                 fontSize: 16,
                 fontWeight: FontWeight.w700,
@@ -667,7 +667,7 @@ class _AdminOverviewState extends ConsumerState<AdminOverview> {
             children: [
               Expanded(
                   child: Text(facility.name,
-                      style: const TextStyle(
+                      style: TextStyle(
                           fontWeight: FontWeight.w700,
                           fontSize: 15,
                           color: MediColors.textPrimary),
@@ -678,7 +678,7 @@ class _AdminOverviewState extends ConsumerState<AdminOverview> {
                     color: MediColors.surfaceLight,
                     borderRadius: BorderRadius.circular(20)),
                 child: Text(facility.type,
-                    style: const TextStyle(
+                    style: TextStyle(
                         fontSize: 10,
                         color: MediColors.textSecondary,
                         fontWeight: FontWeight.w700)),
@@ -689,7 +689,7 @@ class _AdminOverviewState extends ConsumerState<AdminOverview> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text('Stock Health',
+              Text('Stock Health',
                   style:
                       TextStyle(fontSize: 12, color: MediColors.textSecondary)),
               Text('${health.round()}%',
@@ -728,11 +728,11 @@ class _AdminOverviewState extends ConsumerState<AdminOverview> {
               if (alerts > 0)
                 Row(
                   children: [
-                    const Icon(Icons.notifications_active_rounded,
+                    Icon(Icons.notifications_active_rounded,
                         color: MediColors.error, size: 14),
                     const SizedBox(width: 4),
                     Text('$alerts',
-                        style: const TextStyle(
+                        style: TextStyle(
                             color: MediColors.error,
                             fontSize: 12,
                             fontWeight: FontWeight.w700)),
@@ -766,7 +766,7 @@ class _AdminOverviewState extends ConsumerState<AdminOverview> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text('Top Medicines by Total Units Across All Facilities',
+          Text('Top Medicines by Total Units Across All Facilities',
               style: TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.w700,
@@ -786,7 +786,7 @@ class _AdminOverviewState extends ConsumerState<AdminOverview> {
                       Container(
                         width: 24,
                         height: 150 * heightFactor,
-                        decoration: const BoxDecoration(
+                        decoration: BoxDecoration(
                           color: MediColors.info,
                           borderRadius:
                               BorderRadius.vertical(top: Radius.circular(4)),
@@ -795,7 +795,7 @@ class _AdminOverviewState extends ConsumerState<AdminOverview> {
                       const SizedBox(height: 12),
                       Text(
                         e.key,
-                        style: const TextStyle(
+                        style: TextStyle(
                             fontSize: 10, color: MediColors.textSecondary),
                         textAlign: TextAlign.center,
                         maxLines: 2,

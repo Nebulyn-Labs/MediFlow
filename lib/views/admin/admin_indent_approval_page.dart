@@ -99,7 +99,7 @@ class _AdminIndentApprovalPageState
               [];
 
           if (pending.isEmpty) {
-            return const Center(
+            return Center(
                 child: Text('No pending requests.',
                     style: TextStyle(color: MediColors.textMuted)));
           }
@@ -130,7 +130,7 @@ class _AdminIndentApprovalPageState
                               Row(
                                 children: [
                                   Text(req.medicineName,
-                                      style: const TextStyle(
+                                      style: TextStyle(
                                           fontSize: 18,
                                           fontWeight: FontWeight.bold,
                                           color: MediColors.textPrimary)),
@@ -162,7 +162,7 @@ class _AdminIndentApprovalPageState
                               const SizedBox(height: 4),
                               Text(
                                   'Facility: ${req.facilityId.replaceAll('_', ' ').toUpperCase()}',
-                                  style: const TextStyle(
+                                  style: TextStyle(
                                       color: MediColors.primaryLight,
                                       fontWeight: FontWeight.w600,
                                       fontSize: 12)),
@@ -175,7 +175,7 @@ class _AdminIndentApprovalPageState
                                 color: MediColors.surfaceLight,
                                 borderRadius: BorderRadius.circular(8)),
                             child: Text('${req.quantity} Units',
-                                style: const TextStyle(
+                                style: TextStyle(
                                     fontSize: 16,
                                     fontWeight: FontWeight.w800,
                                     color: MediColors.textPrimary)),
@@ -185,7 +185,7 @@ class _AdminIndentApprovalPageState
                       const SizedBox(height: 16),
                       if (req.notes != null)
                         Text('Facility Notes: ${req.notes}',
-                            style: const TextStyle(
+                            style: TextStyle(
                                 color: MediColors.textSecondary,
                                 fontSize: 13,
                                 fontStyle: FontStyle.italic)),
@@ -212,7 +212,7 @@ class _AdminIndentApprovalPageState
                                         .withValues(alpha: 0.3)),
                           ),
                           child: Text(suggestion,
-                              style: const TextStyle(
+                              style: TextStyle(
                                   color: MediColors.textPrimary,
                                   fontWeight: FontWeight.w500)),
                         ),

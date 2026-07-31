@@ -235,7 +235,7 @@ class _IndentCreationPageState extends ConsumerState<IndentCreationPage> {
               ),
               child: Text(
                 widget.facilityId.replaceAll('_', ' ').toUpperCase(),
-                style: const TextStyle(
+                style: TextStyle(
                     fontSize: 11,
                     color: MediColors.primary,
                     fontWeight: FontWeight.bold),
@@ -274,7 +274,7 @@ class _IndentCreationPageState extends ConsumerState<IndentCreationPage> {
                                   return DropdownMenuItem<int>(
                                     value: value,
                                     child: Text('$value days',
-                                        style: const TextStyle(
+                                        style: TextStyle(
                                             color: MediColors.textPrimary)),
                                   );
                                 }).toList(),
@@ -289,7 +289,7 @@ class _IndentCreationPageState extends ConsumerState<IndentCreationPage> {
                           const SizedBox(width: 20),
                           Text(
                             '${_inventory.length} medicines in inventory',
-                            style: const TextStyle(
+                            style: TextStyle(
                                 color: MediColors.textSecondary, fontSize: 14),
                           ),
                         ],
@@ -368,7 +368,7 @@ class _IndentCreationPageState extends ConsumerState<IndentCreationPage> {
   Widget _buildSectionHeader(String title) {
     return Text(
       title,
-      style: const TextStyle(
+      style: TextStyle(
           fontSize: 18,
           fontWeight: FontWeight.w700,
           color: MediColors.textPrimary),
@@ -378,11 +378,11 @@ class _IndentCreationPageState extends ConsumerState<IndentCreationPage> {
   Widget _buildTableHeader() {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-      decoration: const BoxDecoration(
+      decoration: BoxDecoration(
         color: MediColors.surfaceLight,
         borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
       ),
-      child: const Row(
+      child: Row(
         children: [
           SizedBox(
               width: 40,
@@ -478,24 +478,24 @@ class _IndentCreationPageState extends ConsumerState<IndentCreationPage> {
                   onChanged: (v) {},
                   activeColor: MediColors.surfaceLight,
                   checkColor: MediColors.textPrimary,
-                  side: const BorderSide(color: MediColors.textMuted))),
+                  side: BorderSide(color: MediColors.textMuted))),
           Expanded(
             flex: 3,
             child:
                 Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               Text(item.medicineName,
-                  style: const TextStyle(
+                  style: TextStyle(
                       fontWeight: FontWeight.w600,
                       color: MediColors.textPrimary)),
               Text(item.batchId,
-                  style: const TextStyle(
+                  style: TextStyle(
                       color: MediColors.textSecondary, fontSize: 12)),
             ]),
           ),
           Expanded(
             flex: 2,
             child: Text(available.toString(),
-                style: const TextStyle(
+                style: TextStyle(
                     color: MediColors.textPrimary,
                     fontWeight: FontWeight.bold)),
           ),
@@ -524,7 +524,7 @@ class _IndentCreationPageState extends ConsumerState<IndentCreationPage> {
                         ),
                         if (forecast != null) ...[
                           const SizedBox(width: 6),
-                          const Icon(Icons.info_outline,
+                          Icon(Icons.info_outline,
                               color: MediColors.primaryLight, size: 14),
                         ]
                       ],
@@ -565,7 +565,7 @@ class _IndentCreationPageState extends ConsumerState<IndentCreationPage> {
                       controller: _controllers[item.id],
                       keyboardType: TextInputType.number,
                       textAlign: TextAlign.center,
-                      style: const TextStyle(
+                      style: TextStyle(
                           fontSize: 14, color: MediColors.textPrimary),
                       decoration: const InputDecoration(
                         border: InputBorder.none,
@@ -576,7 +576,7 @@ class _IndentCreationPageState extends ConsumerState<IndentCreationPage> {
                   Padding(
                     padding: const EdgeInsets.only(right: 12.0),
                     child: Text(item.unit,
-                        style: const TextStyle(
+                        style: TextStyle(
                             color: MediColors.textMuted, fontSize: 11)),
                   ),
                 ])),

@@ -93,13 +93,13 @@ class OfflineBanner extends ConsumerWidget {
               color: MediColors.warning.withValues(alpha: 0.12),
               child: Row(
                 children: [
-                  const Icon(Icons.wifi_off_rounded,
+                  Icon(Icons.wifi_off_rounded,
                       color: MediColors.warning, size: 18),
                   const SizedBox(width: 12),
                   Expanded(
                     child: Text(
                       message,
-                      style: const TextStyle(
+                      style: TextStyle(
                         color: MediColors.warning,
                         fontSize: 13,
                         fontWeight: FontWeight.w500,

@@ -181,7 +181,7 @@ class _AuditTrailPageState extends ConsumerState<AuditTrailPage> {
       backgroundColor: MediColors.bg,
       appBar: AppBar(
         backgroundColor: MediColors.surface,
-        title: const Text(
+        title: Text(
           'Audit Trail',
           style: TextStyle(
             color: MediColors.textPrimary,
@@ -190,7 +190,7 @@ class _AuditTrailPageState extends ConsumerState<AuditTrailPage> {
         ),
         elevation: 1,
         shadowColor: Colors.black12,
-        iconTheme: const IconThemeData(color: MediColors.textPrimary),
+        iconTheme: IconThemeData(color: MediColors.textPrimary),
       ),
       body: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -234,7 +234,7 @@ class _AuditTrailPageState extends ConsumerState<AuditTrailPage> {
                     ),
                   )
                 : _logs.isEmpty && !_isLoading
-                    ? const Center(
+                    ? Center(
                         child: Text(
                           'No audit logs found.',
                           style: TextStyle(
@@ -332,7 +332,7 @@ class _AuditTrailPageState extends ConsumerState<AuditTrailPage> {
               Expanded(
                 child: Text(
                   log.action.replaceAll('_', ' ').toUpperCase(),
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontWeight: FontWeight.bold,
                     fontSize: 14,
                     color: MediColors.primary,
@@ -343,7 +343,7 @@ class _AuditTrailPageState extends ConsumerState<AuditTrailPage> {
               const SizedBox(width: 8),
               Text(
                 DateFormat('MMM dd, yyyy - HH:mm').format(log.timestamp),
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 12,
                   color: MediColors.textSecondary,
                 ),
@@ -378,7 +378,7 @@ class _AuditTrailPageState extends ConsumerState<AuditTrailPage> {
           ),
           if (log.metadata != null && log.metadata!.isNotEmpty) ...[
             const SizedBox(height: 8),
-            const Text(
+            Text(
               'Details:',
               style: TextStyle(
                 fontWeight: FontWeight.w600,

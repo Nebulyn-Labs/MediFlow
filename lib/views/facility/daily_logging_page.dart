@@ -114,7 +114,7 @@ class _DailyLoggingPageState extends ConsumerState<DailyLoggingPage>
   bool _ensureOnline() {
     if (ref.read(isOnlineProvider)) return true;
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
+      SnackBar(
         content: Text(
             'You are offline. This action needs an internet connection — try '
             'again once you reconnect.'),
@@ -592,13 +592,13 @@ class _DailyLoggingPageState extends ConsumerState<DailyLoggingPage>
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text('Log Medicine Usage',
+                Text('Log Medicine Usage',
                     style: TextStyle(
                         fontSize: 20,
                         fontWeight: FontWeight.w700,
                         color: MediColors.textPrimary)),
                 const SizedBox(height: 6),
-                const Text('Feeds into AI forecasting model',
+                Text('Feeds into AI forecasting model',
                     style:
                         TextStyle(color: MediColors.textMuted, fontSize: 13)),
                 const SizedBox(height: 28),
@@ -609,16 +609,16 @@ class _DailyLoggingPageState extends ConsumerState<DailyLoggingPage>
                   type: MaterialType.transparency,
                   child: ListTile(
                     contentPadding: EdgeInsets.zero,
-                    title: const Text('Date',
+                    title: Text('Date',
                         style: TextStyle(
                             color: MediColors.textSecondary, fontSize: 13)),
                     subtitle: Text(
                         '${_selectedDate.day}/${_selectedDate.month}/${_selectedDate.year}',
-                        style: const TextStyle(
+                        style: TextStyle(
                             color: MediColors.textPrimary,
                             fontSize: 16,
                             fontWeight: FontWeight.w600)),
-                    trailing: const Icon(Icons.calendar_today_rounded,
+                    trailing: Icon(Icons.calendar_today_rounded,
                         color: MediColors.textMuted),
                     onTap: () async {
                       final date = await showDatePicker(
@@ -646,7 +646,7 @@ class _DailyLoggingPageState extends ConsumerState<DailyLoggingPage>
                           color: MediColors.error.withValues(alpha: 0.08),
                           borderRadius: BorderRadius.circular(10)),
                       child: Text(_inventoryError!,
-                          style: const TextStyle(
+                          style: TextStyle(
                               color: MediColors.error, fontSize: 13)))
                 else if (_availableMedicines.isEmpty)
                   Container(
@@ -654,7 +654,7 @@ class _DailyLoggingPageState extends ConsumerState<DailyLoggingPage>
                       decoration: BoxDecoration(
                           color: MediColors.warning.withValues(alpha: 0.08),
                           borderRadius: BorderRadius.circular(10)),
-                      child: const Text('No active inventory found.',
+                      child: Text('No active inventory found.',
                           style: TextStyle(
                               color: MediColors.warning, fontSize: 13)))
                 else
@@ -662,7 +662,7 @@ class _DailyLoggingPageState extends ConsumerState<DailyLoggingPage>
                     decoration: const InputDecoration(labelText: 'Medicine'),
                     dropdownColor: MediColors.surfaceLight,
                     initialValue: _medName,
-                    style: const TextStyle(color: MediColors.textPrimary),
+                    style: TextStyle(color: MediColors.textPrimary),
                     items: _availableMedicines
                         .map((m) => DropdownMenuItem(value: m, child: Text(m)))
                         .toList(),
@@ -674,7 +674,7 @@ class _DailyLoggingPageState extends ConsumerState<DailyLoggingPage>
                     decoration:
                         const InputDecoration(labelText: 'Units Distributed'),
                     keyboardType: TextInputType.number,
-                    style: const TextStyle(color: MediColors.textPrimary),
+                    style: TextStyle(color: MediColors.textPrimary),
                     validator: (v) => (int.tryParse(v ?? '') == null)
                         ? 'Enter valid number'
                         : null,
@@ -684,7 +684,7 @@ class _DailyLoggingPageState extends ConsumerState<DailyLoggingPage>
                     decoration:
                         const InputDecoration(labelText: 'Patients Served'),
                     keyboardType: TextInputType.number,
-                    style: const TextStyle(color: MediColors.textPrimary),
+                    style: TextStyle(color: MediColors.textPrimary),
                     validator: (v) => (int.tryParse(v ?? '') == null)
                         ? 'Enter valid number'
                         : null,
@@ -735,17 +735,17 @@ class _DailyLoggingPageState extends ConsumerState<DailyLoggingPage>
                   decoration: BoxDecoration(
                       color: MediColors.teal.withValues(alpha: 0.12),
                       borderRadius: BorderRadius.circular(10)),
-                  child: const Icon(Icons.upload_file_rounded,
+                  child: Icon(Icons.upload_file_rounded,
                       color: MediColors.teal, size: 22)),
               const SizedBox(width: 12),
-              const Text('Bulk CSV Import',
+              Text('Bulk CSV Import',
                   style: TextStyle(
                       fontWeight: FontWeight.w700,
                       fontSize: 18,
                       color: MediColors.teal)),
             ]),
             const SizedBox(height: 12),
-            const Text(
+            Text(
                 'Columns: MedicineName, UnitsDistributed, PatientsServed',
                 style: TextStyle(color: MediColors.textMuted, fontSize: 13)),
             const SizedBox(height: 16),
@@ -763,12 +763,12 @@ class _DailyLoggingPageState extends ConsumerState<DailyLoggingPage>
                   color: MediColors.successSubtle,
                   borderRadius: BorderRadius.circular(10)),
               child: Row(children: [
-                const Icon(Icons.check_circle_rounded,
+                Icon(Icons.check_circle_rounded,
                     color: MediColors.success, size: 18),
                 const SizedBox(width: 10),
                 Expanded(
                     child: Text(_csvStatus!,
-                        style: const TextStyle(
+                        style: TextStyle(
                             color: MediColors.success, fontSize: 13)))
               ])),
         ],
@@ -798,7 +798,7 @@ class _DailyLoggingPageState extends ConsumerState<DailyLoggingPage>
                                 DataCell(Text(item['quantity'].toString())),
                                 DataCell(Text(item['patients'].toString())),
                                 DataCell(IconButton(
-                                    icon: const Icon(Icons.close_rounded,
+                                    icon: Icon(Icons.close_rounded,
                                         color: MediColors.error, size: 18),
                                     onPressed: () => setState(
                                         () => _csvItems.remove(item)))),
@@ -840,21 +840,21 @@ class _DailyLoggingPageState extends ConsumerState<DailyLoggingPage>
           child: Center(
             child: _isScanning
                 ? Column(mainAxisSize: MainAxisSize.min, children: [
-                    const SizedBox(
+                    SizedBox(
                         width: 56,
                         height: 56,
                         child: CircularProgressIndicator(
                             color: MediColors.success, strokeWidth: 3)),
                     const SizedBox(height: 16),
-                    const Text('Scanning...',
+                    Text('Scanning...',
                         style:
                             TextStyle(color: MediColors.success, fontSize: 15)),
                   ])
                 : Column(mainAxisSize: MainAxisSize.min, children: [
-                    const Icon(Icons.qr_code_scanner_rounded,
+                    Icon(Icons.qr_code_scanner_rounded,
                         size: 64, color: MediColors.textMuted),
                     const SizedBox(height: 16),
-                    const Text('Point camera at batch QR',
+                    Text('Point camera at batch QR',
                         style: TextStyle(color: MediColors.textMuted)),
                     const SizedBox(height: 20),
                     Container(
@@ -873,7 +873,7 @@ class _DailyLoggingPageState extends ConsumerState<DailyLoggingPage>
         ),
         if (_scannedItems.isNotEmpty) ...[
           const SizedBox(height: 24),
-          const Text('Scanned Items',
+          Text('Scanned Items',
               style: TextStyle(
                   fontSize: 17,
                   fontWeight: FontWeight.w700,
@@ -903,7 +903,7 @@ class _DailyLoggingPageState extends ConsumerState<DailyLoggingPage>
                                 DataCell(Text(item['quantity'].toString())),
                                 DataCell(Text(item['patients'].toString())),
                                 DataCell(IconButton(
-                                    icon: const Icon(Icons.close_rounded,
+                                    icon: Icon(Icons.close_rounded,
                                         color: MediColors.error, size: 18),
                                     onPressed: () => setState(
                                         () => _scannedItems.remove(item)))),
@@ -958,10 +958,10 @@ class _DailyLoggingPageState extends ConsumerState<DailyLoggingPage>
                   decoration: BoxDecoration(
                       color: MediColors.violet.withValues(alpha: 0.12),
                       borderRadius: BorderRadius.circular(10)),
-                  child: const Icon(Icons.image_rounded,
+                  child: Icon(Icons.image_rounded,
                       color: MediColors.violet, size: 22)),
               const SizedBox(width: 12),
-              const Text('AI Image Parsing',
+              Text('AI Image Parsing',
                   style: TextStyle(
                       fontWeight: FontWeight.w700,
                       fontSize: 18,
@@ -973,11 +973,11 @@ class _DailyLoggingPageState extends ConsumerState<DailyLoggingPage>
                     ? 'Upload a photo of medicine records for AI-powered extraction'
                     : 'AI extraction needs an internet connection. Reconnect to parse images.',
                 style:
-                    const TextStyle(color: MediColors.textMuted, fontSize: 13)),
+                    TextStyle(color: MediColors.textMuted, fontSize: 13)),
             const SizedBox(height: 16),
             OutlinedButton.icon(
                 icon: _isParsingImage
-                    ? const SizedBox(
+                    ? SizedBox(
                         width: 18,
                         height: 18,
                         child: CircularProgressIndicator(
@@ -998,21 +998,21 @@ class _DailyLoggingPageState extends ConsumerState<DailyLoggingPage>
                   border: Border.all(
                       color: MediColors.error.withValues(alpha: 0.2))),
               child: Row(children: [
-                const Icon(Icons.error_outline_rounded,
+                Icon(Icons.error_outline_rounded,
                     color: MediColors.error, size: 20),
                 const SizedBox(width: 12),
                 Expanded(
                     child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                      const Text('Parsing Failed',
+                      Text('Parsing Failed',
                           style: TextStyle(
                               color: MediColors.error,
                               fontWeight: FontWeight.w600,
                               fontSize: 14)),
                       const SizedBox(height: 4),
                       Text(_imageParseError!,
-                          style: const TextStyle(
+                          style: TextStyle(
                               color: MediColors.textMuted, fontSize: 12),
                           maxLines: 3,
                           overflow: TextOverflow.ellipsis),
@@ -1032,13 +1032,13 @@ class _DailyLoggingPageState extends ConsumerState<DailyLoggingPage>
                   color: MediColors.successSubtle,
                   borderRadius: BorderRadius.circular(10)),
               child: Row(children: [
-                const Icon(Icons.check_circle_rounded,
+                Icon(Icons.check_circle_rounded,
                     color: MediColors.success, size: 18),
                 const SizedBox(width: 10),
                 Expanded(
                     child: Text(
                         'Extracted ${_imageItems.length} entries from image. Review and edit before submitting.',
-                        style: const TextStyle(
+                        style: TextStyle(
                             color: MediColors.success, fontSize: 13)))
               ])),
           const SizedBox(height: 16),
@@ -1083,7 +1083,7 @@ class _DailyLoggingPageState extends ConsumerState<DailyLoggingPage>
                                         color: MediColors.error
                                             .withValues(alpha: 0.3)),
                                   ),
-                                  child: const Row(
+                                  child: Row(
                                     mainAxisSize: MainAxisSize.min,
                                     children: [
                                       Icon(Icons.warning_amber_rounded,
@@ -1182,7 +1182,7 @@ class _DailyLoggingPageState extends ConsumerState<DailyLoggingPage>
                             ),
                           )),
                           DataCell(IconButton(
-                            icon: const Icon(Icons.close_rounded,
+                            icon: Icon(Icons.close_rounded,
                                 color: MediColors.error, size: 18),
                             onPressed: () =>
                                 setState(() => _imageItems.remove(item)),
@@ -1220,7 +1220,7 @@ class _DailyLoggingPageState extends ConsumerState<DailyLoggingPage>
         if (_imageParseResult != null) ...[
           const SizedBox(height: 16),
           ExpansionTile(
-            title: const Text('View Raw AI Output',
+            title: Text('View Raw AI Output',
                 style: TextStyle(fontSize: 13, color: MediColors.textMuted)),
             children: [
               Container(
@@ -1232,7 +1232,7 @@ class _DailyLoggingPageState extends ConsumerState<DailyLoggingPage>
                 ),
                 child: Text(
                   _imageParseResult!,
-                  style: const TextStyle(
+                  style: TextStyle(
                     color: MediColors.textSecondary,
                     fontSize: 12,
                     fontFamily: 'monospace',
@@ -1269,7 +1269,7 @@ class _DailyLoggingPageState extends ConsumerState<DailyLoggingPage>
                     : 'History is unavailable while offline. It will load '
                         'automatically once you reconnect.',
                 textAlign: TextAlign.center,
-                style: const TextStyle(color: MediColors.textMuted)),
+                style: TextStyle(color: MediColors.textMuted)),
             const SizedBox(height: 16),
             OutlinedButton.icon(
               icon: const Icon(Icons.refresh_rounded),
@@ -1285,7 +1285,7 @@ class _DailyLoggingPageState extends ConsumerState<DailyLoggingPage>
       return RefreshIndicator(
         onRefresh: _fetchHistoryFirstPage,
         child: ListView(
-          children: const [
+          children: [
             SizedBox(height: 120),
             Icon(Icons.history_rounded, size: 48, color: MediColors.textMuted),
             SizedBox(height: 12),
@@ -1306,7 +1306,7 @@ class _DailyLoggingPageState extends ConsumerState<DailyLoggingPage>
         itemBuilder: (context, index) {
           if (index == _historyLogs.length) {
             if (!_historyHasMore) {
-              return const Padding(
+              return Padding(
                 padding: EdgeInsets.symmetric(vertical: 20),
                 child: Center(
                   child: Text('No more logs',
@@ -1349,14 +1349,14 @@ class _DailyLoggingPageState extends ConsumerState<DailyLoggingPage>
                   children: [
                     Text(
                       '${log.date.day}/${log.date.month}/${log.date.year}',
-                      style: const TextStyle(
+                      style: TextStyle(
                           fontWeight: FontWeight.w700,
                           fontSize: 15,
                           color: MediColors.textPrimary),
                     ),
                     Text(
                       '${log.totalPatients} patients',
-                      style: const TextStyle(
+                      style: TextStyle(
                           color: MediColors.textMuted, fontSize: 12),
                     ),
                   ],
@@ -1375,7 +1375,7 @@ class _DailyLoggingPageState extends ConsumerState<DailyLoggingPage>
                             ),
                             child: Text(
                               '${m.medicineName} × ${m.unitsDistributed}',
-                              style: const TextStyle(
+                              style: TextStyle(
                                   color: MediColors.teal, fontSize: 12),
                             ),
                           ))

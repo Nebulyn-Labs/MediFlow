@@ -92,7 +92,7 @@ class _AdminIndentStatusPageState extends ConsumerState<AdminIndentStatusPage> {
           final requests = _buildVisibleRequests(snapshot.data);
 
           if (requests.isEmpty) {
-            return const Center(
+            return Center(
                 child: Text('No supply requests found.',
                     style: TextStyle(color: MediColors.textMuted)));
           }
@@ -118,7 +118,7 @@ class _AdminIndentStatusPageState extends ConsumerState<AdminIndentStatusPage> {
                     label: const Text('Export CSV'),
                     style: OutlinedButton.styleFrom(
                       foregroundColor: MediColors.textSecondary,
-                      side: const BorderSide(color: MediColors.border),
+                      side: BorderSide(color: MediColors.border),
                       shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(10)),
                     ),
@@ -154,11 +154,11 @@ class _AdminIndentStatusPageState extends ConsumerState<AdminIndentStatusPage> {
   Widget _buildTableHeader() {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-      decoration: const BoxDecoration(
+      decoration: BoxDecoration(
         color: MediColors.surfaceLight,
         borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
       ),
-      child: const Row(
+      child: Row(
         children: [
           Expanded(
               flex: 2,
@@ -217,18 +217,18 @@ class _AdminIndentStatusPageState extends ConsumerState<AdminIndentStatusPage> {
           Expanded(
               flex: 2,
               child: Text('${req.requestDate.day}/${req.requestDate.month}',
-                  style: const TextStyle(color: MediColors.textSecondary))),
+                  style: TextStyle(color: MediColors.textSecondary))),
           Expanded(
               flex: 3,
               child: Text(req.facilityId.replaceAll('_', ' ').toUpperCase(),
-                  style: const TextStyle(
+                  style: TextStyle(
                       fontWeight: FontWeight.w600,
                       color: MediColors.textPrimary,
                       fontSize: 13))),
           Expanded(
               flex: 3,
               child: Text(req.medicineName,
-                  style: const TextStyle(color: MediColors.textPrimary))),
+                  style: TextStyle(color: MediColors.textPrimary))),
           Expanded(
               flex: 2,
               child: Text(req.quantity.toString(),
@@ -270,14 +270,14 @@ class _AdminIndentStatusPageState extends ConsumerState<AdminIndentStatusPage> {
                       ),
                     ),
                   )
-                : const Center(
+                : Center(
                     child: Text('—',
                         style: TextStyle(color: MediColors.textMuted))),
           ),
           Expanded(
             flex: 1,
             child: PopupMenuButton<RequestStatus>(
-              icon: const Icon(Icons.more_vert_rounded,
+              icon: Icon(Icons.more_vert_rounded,
                   color: MediColors.textMuted, size: 20),
               onSelected: (status) => _updateStatus(req.id, status),
               itemBuilder: (context) => RequestStatus.values

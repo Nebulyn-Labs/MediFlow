@@ -171,7 +171,7 @@ class _FacilityProfilePageState extends ConsumerState<FacilityProfilePage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text(
+            Text(
               'Profile & Settings',
               style: TextStyle(
                 fontSize: 28,
@@ -279,7 +279,7 @@ class _FacilityProfilePageState extends ConsumerState<FacilityProfilePage> {
           width: 140,
           child: Text(
             label,
-            style: const TextStyle(
+            style: TextStyle(
               color: MediColors.textSecondary,
               fontWeight: FontWeight.w500,
             ),
@@ -288,7 +288,7 @@ class _FacilityProfilePageState extends ConsumerState<FacilityProfilePage> {
         Expanded(
           child: Text(
             value,
-            style: const TextStyle(
+            style: TextStyle(
               color: MediColors.textPrimary,
               fontWeight: FontWeight.w500,
             ),

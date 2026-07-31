@@ -343,7 +343,7 @@ class _ActiveIndentsPageState extends ConsumerState<ActiveIndentsPage> {
 
   // ---------- UI Helpers ----------
   Widget _sectionHeader(String title) => Text(title,
-      style: const TextStyle(
+      style: TextStyle(
           fontSize: 18,
           fontWeight: FontWeight.w700,
           color: MediColors.textPrimary));
@@ -398,11 +398,11 @@ class _ActiveIndentsPageState extends ConsumerState<ActiveIndentsPage> {
             const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: MediColors.border),
+          borderSide: BorderSide(color: MediColors.border),
         ),
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: MediColors.border),
+          borderSide: BorderSide(color: MediColors.border),
         ),
       );
     }
@@ -423,7 +423,7 @@ class _ActiveIndentsPageState extends ConsumerState<ActiveIndentsPage> {
                 decoration:
                     controlDecoration('Filter by status', Icons.filter_list),
                 hint: const Text('All statuses'),
-                style: const TextStyle(color: MediColors.textPrimary),
+                style: TextStyle(color: MediColors.textPrimary),
                 items: [
                   const DropdownMenuItem<RequestStatus?>(
                     value: null,
@@ -446,7 +446,7 @@ class _ActiveIndentsPageState extends ConsumerState<ActiveIndentsPage> {
                 initialValue: _selectedHistorySort,
                 dropdownColor: MediColors.surface,
                 decoration: controlDecoration('Sort by date', Icons.sort),
-                style: const TextStyle(color: MediColors.textPrimary),
+                style: TextStyle(color: MediColors.textPrimary),
                 items: _IndentSortOption.values
                     .map(
                       (sort) => DropdownMenuItem<_IndentSortOption>(
@@ -464,7 +464,7 @@ class _ActiveIndentsPageState extends ConsumerState<ActiveIndentsPage> {
             ),
             Text(
               '$visibleCount of $totalCount requests shown',
-              style: const TextStyle(color: MediColors.textMuted, fontSize: 12),
+              style: TextStyle(color: MediColors.textMuted, fontSize: 12),
             ),
           ],
         ),
@@ -484,10 +484,10 @@ class _ActiveIndentsPageState extends ConsumerState<ActiveIndentsPage> {
   Widget _analysisHeader() {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-      decoration: const BoxDecoration(
+      decoration: BoxDecoration(
           color: MediColors.surfaceLight,
           borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
-      child: const Row(
+      child: Row(
         children: [
           SizedBox(
               width: 40,
@@ -582,18 +582,18 @@ class _ActiveIndentsPageState extends ConsumerState<ActiveIndentsPage> {
                   onChanged: (v) {},
                   activeColor: MediColors.surfaceLight,
                   checkColor: MediColors.textPrimary,
-                  side: const BorderSide(color: MediColors.textMuted))),
+                  side: BorderSide(color: MediColors.textMuted))),
           Expanded(
             flex: 3,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(item.medicineName,
-                    style: const TextStyle(
+                    style: TextStyle(
                         fontWeight: FontWeight.w600,
                         color: MediColors.textPrimary)),
                 Text(item.batchId,
-                    style: const TextStyle(
+                    style: TextStyle(
                         color: MediColors.textSecondary, fontSize: 12)),
               ],
             ),
@@ -601,7 +601,7 @@ class _ActiveIndentsPageState extends ConsumerState<ActiveIndentsPage> {
           Expanded(
               flex: 2,
               child: Text(available.toString(),
-                  style: const TextStyle(
+                  style: TextStyle(
                       color: MediColors.textPrimary,
                       fontWeight: FontWeight.bold))),
           Expanded(
@@ -628,7 +628,7 @@ class _ActiveIndentsPageState extends ConsumerState<ActiveIndentsPage> {
                         ),
                         if (forecast != null) ...[
                           const SizedBox(width: 6),
-                          const Icon(Icons.info_outline,
+                          Icon(Icons.info_outline,
                               color: MediColors.primaryLight, size: 14)
                         ],
                       ],
@@ -673,7 +673,7 @@ class _ActiveIndentsPageState extends ConsumerState<ActiveIndentsPage> {
                       controller: _analysisControllers[item.id],
                       keyboardType: TextInputType.number,
                       textAlign: TextAlign.center,
-                      style: const TextStyle(
+                      style: TextStyle(
                           fontSize: 14, color: MediColors.textPrimary),
                       decoration: const InputDecoration(
                           border: InputBorder.none,
@@ -683,7 +683,7 @@ class _ActiveIndentsPageState extends ConsumerState<ActiveIndentsPage> {
                   Padding(
                       padding: const EdgeInsets.only(right: 12.0),
                       child: Text(item.unit,
-                          style: const TextStyle(
+                          style: TextStyle(
                               color: MediColors.textMuted, fontSize: 11))),
                 ],
               ),
@@ -712,7 +712,7 @@ class _ActiveIndentsPageState extends ConsumerState<ActiveIndentsPage> {
         if (snapshot.hasError) {
           return Center(
               child: Text('Error: ${snapshot.error}',
-                  style: const TextStyle(color: MediColors.error)));
+                  style: TextStyle(color: MediColors.error)));
         }
         final drafts = snapshot.data
                 ?.where((r) => r.status == RequestStatus.draft)
@@ -729,13 +729,13 @@ class _ActiveIndentsPageState extends ConsumerState<ActiveIndentsPage> {
                       size: 72,
                       color: MediColors.textMuted.withValues(alpha: 0.5)),
                   const SizedBox(height: 20),
-                  const Text('No Active Indents',
+                  Text('No Active Indents',
                       style: TextStyle(
                           color: MediColors.textPrimary,
                           fontSize: 18,
                           fontWeight: FontWeight.w700)),
                   const SizedBox(height: 8),
-                  const Padding(
+                  Padding(
                     padding: EdgeInsets.symmetric(horizontal: 32),
                     child: Text(
                       'You have no active supply requests right now. '
@@ -775,19 +775,19 @@ class _ActiveIndentsPageState extends ConsumerState<ActiveIndentsPage> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(draft.medicineName,
-                        style: const TextStyle(
+                        style: TextStyle(
                             fontSize: 16,
                             fontWeight: FontWeight.bold,
                             color: MediColors.textPrimary)),
                     const SizedBox(height: 4),
                     Text(
                         'Created: ${draft.requestDate.day}/${draft.requestDate.month}/${draft.requestDate.year}',
-                        style: const TextStyle(
+                        style: TextStyle(
                             fontSize: 12, color: MediColors.textMuted)),
                     if (draft.notes != null) ...[
                       const SizedBox(height: 8),
                       Text(draft.notes!,
-                          style: const TextStyle(
+                          style: TextStyle(
                               fontSize: 12,
                               color: MediColors.info,
                               fontStyle: FontStyle.italic)),
@@ -839,7 +839,7 @@ class _ActiveIndentsPageState extends ConsumerState<ActiveIndentsPage> {
                       child: Text('Request Qty: ',
                           overflow: TextOverflow.ellipsis,
                           style:
-                              const TextStyle(color: MediColors.textSecondary)),
+                              TextStyle(color: MediColors.textSecondary)),
                     ),
                     const SizedBox(width: 8),
                     SizedBox(
@@ -867,7 +867,7 @@ class _ActiveIndentsPageState extends ConsumerState<ActiveIndentsPage> {
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     IconButton(
-                        icon: const Icon(Icons.delete_outline_rounded,
+                        icon: Icon(Icons.delete_outline_rounded,
                             color: MediColors.error),
                         onPressed: _isDraftActionInProgress
                             ? null
@@ -971,7 +971,7 @@ class _ActiveIndentsPageState extends ConsumerState<ActiveIndentsPage> {
                   label: const Text('Export CSV'),
                   style: OutlinedButton.styleFrom(
                     foregroundColor: MediColors.textSecondary,
-                    side: const BorderSide(color: MediColors.border),
+                    side: BorderSide(color: MediColors.border),
                     shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(10)),
                   ),
@@ -990,7 +990,7 @@ class _ActiveIndentsPageState extends ConsumerState<ActiveIndentsPage> {
                       Icon(Icons.search_off_rounded,
                           color: MediColors.textMuted.withValues(alpha: 0.8)),
                       const SizedBox(width: 12),
-                      const Expanded(
+                      Expanded(
                         child: Text(
                           'No requests match the selected filter.',
                           style: TextStyle(color: MediColors.textSecondary),
@@ -1038,19 +1038,19 @@ class _ActiveIndentsPageState extends ConsumerState<ActiveIndentsPage> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(req.medicineName,
-                        style: const TextStyle(
+                        style: TextStyle(
                             fontSize: 16,
                             fontWeight: FontWeight.bold,
                             color: MediColors.textPrimary)),
                     const SizedBox(height: 4),
                     Text(
                         'Submitted: ${req.requestDate.day}/${req.requestDate.month}/${req.requestDate.year}',
-                        style: const TextStyle(
+                        style: TextStyle(
                             fontSize: 12, color: MediColors.textMuted)),
                     if (hasResolution) ...[
                       const SizedBox(height: 2),
                       Text(resolutionText,
-                          style: const TextStyle(
+                          style: TextStyle(
                               fontSize: 12,
                               color: MediColors.textSecondary,
                               fontWeight: FontWeight.w500)),
@@ -1070,7 +1070,7 @@ class _ActiveIndentsPageState extends ConsumerState<ActiveIndentsPage> {
                         ),
                         child: Text(
                           'Rejection Reason: ${req.rejectionReason}',
-                          style: const TextStyle(
+                          style: TextStyle(
                               fontSize: 12,
                               color: MediColors.error,
                               fontWeight: FontWeight.w600),
@@ -1154,7 +1154,7 @@ class _ActiveIndentsPageState extends ConsumerState<ActiveIndentsPage> {
                                 children: [
                                   Text(
                                     'Quantity: ${req.quantity}',
-                                    style: const TextStyle(
+                                    style: TextStyle(
                                         fontSize: 14,
                                         fontWeight: FontWeight.bold,
                                         color: MediColors.textPrimary),
@@ -1172,7 +1172,7 @@ class _ActiveIndentsPageState extends ConsumerState<ActiveIndentsPage> {
                               flex: 2,
                               child: Text(
                                 'Quantity: ${req.quantity}',
-                                style: const TextStyle(
+                                style: TextStyle(
                                     fontSize: 15,
                                     fontWeight: FontWeight.bold,
                                     color: MediColors.textPrimary),
@@ -1228,7 +1228,7 @@ class _ActiveIndentsPageState extends ConsumerState<ActiveIndentsPage> {
                                 .map((int v) => DropdownMenuItem<int>(
                                     value: v,
                                     child: Text('$v days',
-                                        style: const TextStyle(
+                                        style: TextStyle(
                                             color: MediColors.textPrimary))))
                                 .toList(),
                             onChanged: (val) => setState(

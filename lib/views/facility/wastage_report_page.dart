@@ -97,7 +97,7 @@ class _WastageReportPageState extends ConsumerState<WastageReportPage> {
       context: context,
       builder: (context) {
         return AlertDialog(
-          title: const Row(
+          title: Row(
             children: [
               Icon(Icons.auto_awesome, color: MediColors.primary),
               SizedBox(width: 8),
@@ -208,7 +208,7 @@ class _WastageReportPageState extends ConsumerState<WastageReportPage> {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      const Text(
+                      Text(
                         'Wastage Breakdown',
                         style: TextStyle(
                             fontSize: 18,
@@ -246,11 +246,11 @@ class _WastageReportPageState extends ConsumerState<WastageReportPage> {
                       alignment: Alignment.center,
                       child: Column(
                         children: [
-                          const Icon(Icons.error_outline,
+                          Icon(Icons.error_outline,
                               size: 64, color: MediColors.error),
                           const SizedBox(height: 16),
                           Text('Failed to load wastage data: $_error',
-                              style: const TextStyle(
+                              style: TextStyle(
                                   color: MediColors.error, fontSize: 16)),
                         ],
                       ),
@@ -259,7 +259,7 @@ class _WastageReportPageState extends ConsumerState<WastageReportPage> {
                     Container(
                       padding: const EdgeInsets.all(40),
                       alignment: Alignment.center,
-                      child: const Column(
+                      child: Column(
                         children: [
                           Icon(Icons.check_circle_outline,
                               size: 64, color: MediColors.success),
@@ -382,7 +382,7 @@ class _WastageReportPageState extends ConsumerState<WastageReportPage> {
               const SizedBox(width: 12),
               Expanded(
                 child: Text(title,
-                    style: const TextStyle(
+                    style: TextStyle(
                         fontSize: 13,
                         fontWeight: FontWeight.w600,
                         color: MediColors.textSecondary)),
@@ -396,7 +396,7 @@ class _WastageReportPageState extends ConsumerState<WastageReportPage> {
           if (subtitle != null) ...[
             const SizedBox(height: 4),
             Text(subtitle,
-                style: const TextStyle(
+                style: TextStyle(
                     fontSize: 11, color: MediColors.textSecondary)),
           ],
         ],

@@ -22,7 +22,7 @@ class HelpPage extends StatelessWidget {
               isAdmin
                   ? 'Central Management System'
                   : 'MediFlow Facility Portal',
-              style: const TextStyle(
+              style: TextStyle(
                   fontSize: 28,
                   fontWeight: FontWeight.w800,
                   color: MediColors.textPrimary),
@@ -32,11 +32,11 @@ class HelpPage extends StatelessWidget {
               isAdmin
                   ? 'Manage logistics and optimize redistribution across all facilities.'
                   : 'Track inventory, predict demand with AI, and request supplies.',
-              style: const TextStyle(
+              style: TextStyle(
                   color: MediColors.textSecondary, fontSize: 15, height: 1.6),
             ),
             const SizedBox(height: 40),
-            const Text('How It Works',
+            Text('How It Works',
                 style: TextStyle(
                     fontSize: 20,
                     fontWeight: FontWeight.w700,
@@ -98,11 +98,11 @@ class HelpPage extends StatelessWidget {
                     decoration: BoxDecoration(
                         color: MediColors.warning.withValues(alpha: 0.12),
                         borderRadius: BorderRadius.circular(12)),
-                    child: const Icon(Icons.lightbulb_rounded,
+                    child: Icon(Icons.lightbulb_rounded,
                         color: MediColors.warning, size: 22),
                   ),
                   const SizedBox(width: 16),
-                  const Expanded(
+                  Expanded(
                     child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
@@ -160,13 +160,13 @@ class HelpPage extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(title,
-                        style: const TextStyle(
+                        style: TextStyle(
                             fontSize: 16,
                             fontWeight: FontWeight.w700,
                             color: MediColors.textPrimary)),
                     const SizedBox(height: 4),
                     Text(desc,
-                        style: const TextStyle(
+                        style: TextStyle(
                             color: MediColors.textSecondary,
                             fontSize: 13,
                             height: 1.5)),
