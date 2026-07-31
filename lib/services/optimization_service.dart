@@ -342,8 +342,8 @@ class OptimizationService {
             recipient: recipientFac,
             medicine: medicine,
             quantity: qtyTaken,
-            score: bestDonorMatch['score'],
-            reasoning: bestDonorMatch['reasoning'],
+            score: (bestDonorMatch['score'] as num?)?.toDouble() ?? 0.0,
+            reasoning: bestDonorMatch['reasoning']?.toString() ?? '',
           ));
 
           // Update state

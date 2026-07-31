@@ -122,25 +122,34 @@ class RoutingService {
             await http.get(Uri.parse(url)).timeout(const Duration(seconds: 5));
 
         if (response.statusCode == 200) {
-          final data = jsonDecode(response.body);
+          final rawData = jsonDecode(response.body);
+          if (rawData is Map<String, dynamic>) {
+            final features = rawData['features'];
+            if (features is List && features.isNotEmpty) {
+              final firstFeature = features[0];
+              if (firstFeature is Map) {
+                final geometry = firstFeature['geometry'];
+                if (geometry is Map && geometry['coordinates'] is List) {
+                  final List<dynamic> coords = geometry['coordinates'] as List;
 
-          if (data['features'] != null && data['features'].isNotEmpty) {
-            final List<dynamic> coords =
-                data['features'][0]['geometry']['coordinates'];
+                  debugPrint(
+                    'RoutingService: ORS Success. ${coords.length} points found.',
+                  );
 
-            debugPrint(
-              'RoutingService: ORS Success. ${coords.length} points found.',
-            );
+                  final route = coords
+                      .whereType<List>()
+                      .map((c) => LatLng(
+                          (c[1] as num).toDouble(), (c[0] as num).toDouble()))
+                      .toList();
 
-            final route = coords
-                .map((c) => LatLng(c[1].toDouble(), c[0].toDouble()))
-                .toList();
+                  _cacheRoute(cacheKey, route);
 
-            _cacheRoute(cacheKey, route);
+                  debugPrint('RoutingService: Route cached (ORS).');
 
-            debugPrint('RoutingService: Route cached (ORS).');
-
-            return route;
+                  return route;
+                }
+              }
+            }
           }
         } else {
           debugPrint(
@@ -164,25 +173,34 @@ class RoutingService {
           await http.get(Uri.parse(url)).timeout(const Duration(seconds: 5));
 
       if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
+        final rawData = jsonDecode(response.body);
+        if (rawData is Map<String, dynamic>) {
+          final routes = rawData['routes'];
+          if (routes is List && routes.isNotEmpty) {
+            final firstRoute = routes[0];
+            if (firstRoute is Map) {
+              final geometry = firstRoute['geometry'];
+              if (geometry is Map && geometry['coordinates'] is List) {
+                final List<dynamic> coords = geometry['coordinates'] as List;
 
-        if (data['routes'] != null && data['routes'].isNotEmpty) {
-          final List<dynamic> coords =
-              data['routes'][0]['geometry']['coordinates'];
+                debugPrint(
+                  'RoutingService: OSRM Success. ${coords.length} points found.',
+                );
 
-          debugPrint(
-            'RoutingService: OSRM Success. ${coords.length} points found.',
-          );
+                final route = coords
+                    .whereType<List>()
+                    .map((c) => LatLng(
+                        (c[1] as num).toDouble(), (c[0] as num).toDouble()))
+                    .toList();
 
-          final route = coords
-              .map((c) => LatLng(c[1].toDouble(), c[0].toDouble()))
-              .toList();
+                _cacheRoute(cacheKey, route);
 
-          _cacheRoute(cacheKey, route);
+                debugPrint('RoutingService: Route cached (OSRM).');
 
-          debugPrint('RoutingService: Route cached (OSRM).');
-
-          return route;
+                return route;
+              }
+            }
+          }
         }
       } else {
         debugPrint(
