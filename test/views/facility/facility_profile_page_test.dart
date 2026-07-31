@@ -65,7 +65,9 @@ void main() {
       expect(find.text('Failed to load facility'), findsNothing);
     });
 
-    testWidgets('renders "Facility not found" when facility is null without error', (tester) async {
+    testWidgets(
+        'renders "Facility not found" when facility is null without error',
+        (tester) async {
       final service = TestFirebaseService(facilityToReturn: null);
 
       await tester.pumpWidget(createWidgetUnderTest(service));
@@ -75,8 +77,11 @@ void main() {
       expect(find.text('Failed to load facility'), findsNothing);
     });
 
-    testWidgets('renders visually distinct error state with message when exception is thrown', (tester) async {
-      final service = TestFirebaseService(errorToThrow: Exception('Connection timeout'));
+    testWidgets(
+        'renders visually distinct error state with message when exception is thrown',
+        (tester) async {
+      final service =
+          TestFirebaseService(errorToThrow: Exception('Connection timeout'));
 
       await tester.pumpWidget(createWidgetUnderTest(service));
       await tester.pumpAndSettle();
@@ -88,8 +93,11 @@ void main() {
       expect(find.text('Facility not found'), findsNothing);
     });
 
-    testWidgets('tapping Retry button re-runs load and displays profile on success', (tester) async {
-      final service = TestFirebaseService(errorToThrow: Exception('Network error'));
+    testWidgets(
+        'tapping Retry button re-runs load and displays profile on success',
+        (tester) async {
+      final service =
+          TestFirebaseService(errorToThrow: Exception('Network error'));
 
       await tester.pumpWidget(createWidgetUnderTest(service));
       await tester.pumpAndSettle();
