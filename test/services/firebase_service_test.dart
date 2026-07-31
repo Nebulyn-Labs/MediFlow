@@ -92,6 +92,29 @@ void main() {
       expect(doc.data()?['region'], 'Updated Region');
       expect(doc.data()?['email'], 'test@test.com');
     });
+
+    test('streamAlerts emits real-time updates when alerts collection changes',
+        () async {
+      const facilityId = 'facility_123';
+      final alertRef = fakeFirestore.collection('alerts').doc('facility_123_med_1');
+
+      final stream = firebaseService.streamAlerts(facilityId);
+      final initialAlerts = await stream.first;
+      expect(initialAlerts, isEmpty);
+
+      await alertRef.set({
+        'facilityId': facilityId,
+        'medicineName': 'Paracetamol',
+        'type': 'low_stock',
+        'qtyRemaining': 5,
+        'initialQuantity': 100,
+      });
+
+      final updatedAlerts = await stream.first;
+      expect(updatedAlerts.length, 1);
+      expect(updatedAlerts.first['medicineName'], 'Paracetamol');
+      expect(updatedAlerts.first['type'], 'low_stock');
+    });
   });
 
   group('FirebaseService - getPaginatedMedicines', () {
