@@ -14,7 +14,8 @@ void main() {
     });
 
     // Helpers to create entities easily
-    Facility createFacility(String id, String type, double lat, double lng) {
+    Facility createFacility(
+        String id, FacilityType type, double lat, double lng) {
       return Facility(
         id: id,
         name: 'Facility $id',
@@ -84,8 +85,8 @@ void main() {
     });
 
     test('returns empty recommendations when no donor has surplus', () {
-      final donor = createFacility('d1', 'urban', 28.6, 77.2);
-      final recipient = createFacility('r1', 'rural', 28.7, 77.3);
+      final donor = createFacility('d1', FacilityType.urban, 28.6, 77.2);
+      final recipient = createFacility('r1', FacilityType.rural, 28.7, 77.3);
       final inventory = createInventory(
           donor.id, 'Paracetamol', 100, 30); // 30 is exactly 30%, no surplus
       final request = createRequest(
@@ -103,8 +104,8 @@ void main() {
     });
 
     test('returns empty recommendations when empty inventories', () {
-      final donor = createFacility('d1', 'urban', 28.6, 77.2);
-      final recipient = createFacility('r1', 'rural', 28.7, 77.3);
+      final donor = createFacility('d1', FacilityType.urban, 28.6, 77.2);
+      final recipient = createFacility('r1', FacilityType.rural, 28.7, 77.3);
       final request = createRequest(
           'req1', recipient.id, 'Paracetamol', RequestType.shortage, 20);
 
@@ -118,8 +119,8 @@ void main() {
     });
 
     test('returns empty recommendations when medicine mismatch', () {
-      final donor = createFacility('d1', 'urban', 28.6, 77.2);
-      final recipient = createFacility('r1', 'rural', 28.7, 77.3);
+      final donor = createFacility('d1', FacilityType.urban, 28.6, 77.2);
+      final recipient = createFacility('r1', FacilityType.rural, 28.7, 77.3);
       final inventory = createInventory(donor.id, 'Ibuprofen', 100, 100);
       final request = createRequest(
           'req1', recipient.id, 'Paracetamol', RequestType.shortage, 20);
@@ -137,9 +138,11 @@ void main() {
 
     test('rural requests are prioritized over urban requests', () {
       // Setup one donor with limited surplus, and two requests (rural and urban).
-      final donor = createFacility('d1', 'urban', 28.6, 77.2);
-      final recipientUrban = createFacility('r_urban', 'urban', 28.7, 77.3);
-      final recipientRural = createFacility('r_rural', 'rural', 28.7, 77.3);
+        final donor = createFacility('d1', FacilityType.urban, 28.6, 77.2);
+        final recipientUrban =
+          createFacility('r_urban', FacilityType.urban, 28.7, 77.3);
+        final recipientRural =
+          createFacility('r_rural', FacilityType.rural, 28.7, 77.3);
 
       // Donor has 50 surplus
       final inventory = createInventory(donor.id, 'ORS', 100, 80);
@@ -162,11 +165,11 @@ void main() {
     });
 
     test('distance prioritization chooses closer donor', () {
-      final donorClose = createFacility(
-          'd_close', 'urban', 28.61, 77.21); // Close to recipient
+        final donorClose = createFacility(
+          'd_close', FacilityType.urban, 28.61, 77.21); // Close to recipient
       final donorFar =
-          createFacility('d_far', 'urban', 29.0, 78.0); // Far from recipient
-      final recipient = createFacility('r1', 'urban', 28.6, 77.2);
+          createFacility('d_far', FacilityType.urban, 29.0, 78.0); // Far from recipient
+        final recipient = createFacility('r1', FacilityType.urban, 28.6, 77.2);
 
       final invClose =
           createInventory(donorClose.id, 'ORS', 100, 100); // 70 surplus
@@ -191,10 +194,11 @@ void main() {
 
     test('quantity matching chooses full fulfillment over partial fulfillment',
         () {
-      final donorPartial = createFacility('d_partial', 'urban', 28.61, 77.21);
+        final donorPartial =
+          createFacility('d_partial', FacilityType.urban, 28.61, 77.21);
       final donorFull = createFacility(
-          'd_full', 'urban', 28.62, 77.22); // Slightly further but full qty
-      final recipient = createFacility('r1', 'urban', 28.6, 77.2);
+          'd_full', FacilityType.urban, 28.62, 77.22); // Slightly further but full qty
+        final recipient = createFacility('r1', FacilityType.urban, 28.6, 77.2);
 
       final invPartial =
           createInventory(donorPartial.id, 'ORS', 100, 50); // 20 surplus
@@ -219,9 +223,9 @@ void main() {
     });
 
     test('multiple recommendations generated to fulfill large request', () {
-      final donor1 = createFacility('d1', 'urban', 28.61, 77.21);
-      final donor2 = createFacility('d2', 'urban', 28.62, 77.22);
-      final recipient = createFacility('r1', 'urban', 28.6, 77.2);
+      final donor1 = createFacility('d1', FacilityType.urban, 28.61, 77.21);
+      final donor2 = createFacility('d2', FacilityType.urban, 28.62, 77.22);
+      final recipient = createFacility('r1', FacilityType.urban, 28.6, 77.2);
 
       final inv1 = createInventory(donor1.id, 'ORS', 100, 50); // 20 surplus
       final inv2 = createInventory(donor2.id, 'ORS', 100, 60); // 30 surplus
@@ -246,8 +250,8 @@ void main() {
     });
 
     test('explicit surplus offers take precedence or add to surplus', () {
-      final donor = createFacility('d1', 'urban', 28.6, 77.2);
-      final recipient = createFacility('r1', 'rural', 28.7, 77.3);
+      final donor = createFacility('d1', FacilityType.urban, 28.6, 77.2);
+      final recipient = createFacility('r1', FacilityType.rural, 28.7, 77.3);
       final inventory =
           createInventory(donor.id, 'Paracetamol', 100, 30); // 0 live surplus
 
@@ -270,7 +274,7 @@ void main() {
     });
 
     test('ignores self transfers', () {
-      final facility = createFacility('f1', 'urban', 28.6, 77.2);
+      final facility = createFacility('f1', FacilityType.urban, 28.6, 77.2);
       final inventory =
           createInventory(facility.id, 'Paracetamol', 100, 100); // 70 surplus
       final request = createRequest(
@@ -291,7 +295,7 @@ void main() {
       final f1 = Facility(
           id: 'd1',
           name: 'Donor 1',
-          type: 'hospital',
+          type: FacilityType.urban,
           latitude: 0,
           longitude: 0,
           email: 'test@example.com',
@@ -300,7 +304,7 @@ void main() {
       final f2 = Facility(
           id: 'r1',
           name: 'Rec 1',
-          type: 'clinic',
+          type: FacilityType.rural,
           latitude: 10,
           longitude: 10,
           email: 'test@example.com',
@@ -309,7 +313,7 @@ void main() {
       final f3 = Facility(
           id: 'r2',
           name: 'Rec 2',
-          type: 'clinic',
+          type: FacilityType.rural,
           latitude: 1,
           longitude: 1,
           email: 'test@example.com',
@@ -382,7 +386,7 @@ void main() {
       final d1 = Facility(
           id: 'd1',
           name: 'Donor 1',
-          type: 'hospital',
+          type: FacilityType.urban,
           latitude: 0,
           longitude: 0,
           email: 'test@example.com',
@@ -391,7 +395,7 @@ void main() {
       final d2 = Facility(
           id: 'd2',
           name: 'Donor 2',
-          type: 'hospital',
+          type: FacilityType.urban,
           latitude: 5,
           longitude: 5,
           email: 'test@example.com',
@@ -400,7 +404,7 @@ void main() {
       final r1 = Facility(
           id: 'r1',
           name: 'Rec 1',
-          type: 'clinic',
+          type: FacilityType.rural,
           latitude: 10,
           longitude: 10,
           email: 'test@example.com',
@@ -409,7 +413,7 @@ void main() {
       final r2 = Facility(
           id: 'r2',
           name: 'Rec 2',
-          type: 'clinic',
+          type: FacilityType.rural,
           latitude: 1,
           longitude: 1,
           email: 'test@example.com',
@@ -486,7 +490,7 @@ void main() {
         id: 'facility-donor',
         name: 'Urban District Hospital',
         email: 'donor@mediflow.com',
-        type: 'urban',
+        type: FacilityType.urban,
         region: 'UP',
         latitude: 28.6149,
         longitude: 77.2100,
@@ -497,7 +501,7 @@ void main() {
         id: 'facility-recipient',
         name: 'Rural PHC',
         email: 'recipient@mediflow.com',
-        type: 'rural',
+        type: FacilityType.rural,
         region: 'UP',
         latitude: 28.6139,
         longitude: 77.2090,
@@ -574,10 +578,11 @@ void main() {
       const double lat = 28.6;
       const double lng = 77.2;
 
-      final donorFresh = createFacility('d_fresh', 'urban', lat, lng + 0.1);
+        final donorFresh =
+          createFacility('d_fresh', FacilityType.urban, lat, lng + 0.1);
       final donorExpiring =
-          createFacility('d_expiring', 'urban', lat, lng + 0.1);
-      final recipient = createFacility('r1', 'urban', lat, lng);
+          createFacility('d_expiring', FacilityType.urban, lat, lng + 0.1);
+        final recipient = createFacility('r1', FacilityType.urban, lat, lng);
 
       // Both donors have 70 units of surplus
       // (100 initial, 100 remaining → surplus = 100 − 30% × 100 = 70).

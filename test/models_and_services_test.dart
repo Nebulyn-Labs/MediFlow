@@ -23,7 +23,7 @@ void main() {
       final facility = Facility.fromMap(map, 'facility_1');
       expect(facility.id, 'facility_1');
       expect(facility.name, 'Rampur PHC');
-      expect(facility.type, 'rural');
+      expect(facility.type, FacilityType.rural);
       expect(facility.latitude, 28.1234);
       expect(facility.longitude, 77.5678);
 
@@ -40,7 +40,7 @@ void main() {
         id: 'clinic_rural',
         name: 'Rural PHC',
         email: 'rural@mediflow.com',
-        type: 'rural',
+        type: FacilityType.rural,
         region: 'UP',
         latitude: 28.6139,
         longitude: 77.2090,
@@ -51,7 +51,7 @@ void main() {
         id: 'hosp_urban',
         name: 'Urban District Hospital',
         email: 'urban@mediflow.com',
-        type: 'urban',
+        type: FacilityType.urban,
         region: 'UP',
         latitude: 28.6149, // 1.1 km away
         longitude: 77.2100,
