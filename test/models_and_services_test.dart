@@ -1,5 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:latlong2/latlong.dart';
 import 'package:med_supply_prototype/models/facility.dart';
 import 'package:med_supply_prototype/models/inventory_item.dart';
 import 'package:med_supply_prototype/models/request.dart';
@@ -68,13 +69,15 @@ void main() {
         status: RequestStatus.pending,
       );
 
-      // Urban hospital has surplus inventory (remaining > 30% initial)
+      // Urban hospital has surplus inventory (remaining > 30% initial).
+      // Expiry is set to 180 days to sit unambiguously outside the 90-day
+      // near-expiry window, so the +100 bonus is not expected.
       final surplusInventory = InventoryItem(
         id: 'inv_1',
         medicineName: 'Paracetamol',
         batchId: 'batch_xyz',
         arrivalDate: DateTime.now(),
-        expiryDate: DateTime.now().add(const Duration(days: 90)),
+        expiryDate: DateTime.now().add(const Duration(days: 180)),
         initialQuantity: 10000,
         remainingQuantity: 6000, // 30% of initial is 3000, so 3000 is surplus
         unit: 'tablets',
@@ -97,9 +100,24 @@ void main() {
       expect(rec.recipient.id, 'clinic_rural');
       expect(rec.medicine, 'Paracetamol');
       expect(rec.quantity, 1000);
-      expect(rec.score, greaterThan(0));
-      expect(rec.reasoning, contains('Rural Priority'));
-      expect(rec.reasoning, contains('Proximity'));
+
+      // Pin exact expected score derived from documented weights:
+      // Distance score: (200 - distKm)
+      // Rural Priority: +150
+      // Full Fulfillment: +50
+      // Near Expiry (180d > 90d): +0 (unambiguously outside 90-day window)
+      final distKm = const Distance().call(
+            LatLng(urbanHospital.latitude, urbanHospital.longitude),
+            LatLng(ruralClinic.latitude, ruralClinic.longitude),
+          ) /
+          1000;
+      final expectedScore = (200 - distKm) + 150 + 50;
+
+      expect(rec.score, expectedScore);
+      expect(
+        rec.reasoning,
+        'Proximity (${distKm.toStringAsFixed(1)}km) + Rural Priority + Full Fulfillment',
+      );
     });
   });
 }
