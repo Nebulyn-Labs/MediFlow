@@ -6,6 +6,7 @@ import '../models/daily_usage_log.dart';
 import '../models/request.dart';
 import '../models/facility.dart';
 import '../models/inventory_item.dart';
+import '../constants/inventory_thresholds.dart';
 
 typedef GeminiCaller = Future<String> Function(
   String prompt, {
@@ -40,6 +41,11 @@ class AIService {
     }
     return true;
   }
+
+  /// Public read-only view of fallback state, so UI (e.g. AIChatPage)
+  /// can accurately reflect whether responses are coming from Gemini
+  /// or the local rule-based engine.
+  bool get isLocalFallbackActive => _shouldUseLocal;
 
   void _handleQuotaError(String errorMsg) {
     if (errorMsg.contains('quota') ||
@@ -238,11 +244,13 @@ class AIService {
         query.toLowerCase().contains("inventory")) {
       buffer.writeln("### 📦 System Stock Analysis");
       for (var item in inventory) {
-        final rem = item['remainingQuantity'] ?? 0;
-        final tot = item['initialQuantity'] ?? 0;
-        final name = item['medicineName'] ?? 'Unknown';
-        final status =
-            (tot > 0 && rem / tot < 0.2) ? "⚠️ CRITICAL" : "✅ STABLE";
+        final rem = (item['remainingQuantity'] as num?)?.toInt() ?? 0;
+        final tot = (item['initialQuantity'] as num?)?.toInt() ?? 0;
+        final name = item['medicineName']?.toString() ?? 'Unknown';
+        final isLow = tot > 0 &&
+            (rem / tot <= InventoryThresholds.lowStockPercentage ||
+                rem <= InventoryThresholds.lowStockAbsolute);
+        final status = isLow ? "⚠️ CRITICAL" : "✅ STABLE";
         buffer.writeln("• **$name**: $rem/$tot units ($status)");
       }
     } else {
@@ -256,32 +264,38 @@ class AIService {
   // ─── SMART ALERTS ──────────────────────────────────────────────
   Future<List<Map<String, dynamic>>> generateSmartAlerts(
       List<InventoryItem> inventory) async {
-    final local = inventory
-        .where((i) => i.isLowStock)
-        .map((i) => {
-              "type": "low_stock",
-              "severity": "red",
-              "title": i.medicineName,
-              "batchId": i.batchId,
-              "remainingQuantity": i.remainingQuantity,
-              "remainingPercentage":
-                  ((i.remainingQuantity / i.initialQuantity) * 100).round(),
-              "burnRate": "24/day",
-              "depletesInDays": (i.remainingQuantity / 24).round(),
-            })
-        .toList();
-
-    final now = DateTime.now();
+    final local = <Map<String, dynamic>>[];
     for (var i in inventory) {
-      final daysToExpiry = i.expiryDate.difference(now).inDays;
-      if (daysToExpiry <= 90) {
+      if (i.status == ItemStatus.expired) {
         local.add({
-          "type": "expiry",
-          "severity": daysToExpiry <= 30 ? "red" : "yellow",
+          "type": "expired",
+          "severity": "red",
           "title": i.medicineName,
           "batchId": i.batchId,
           "remainingQuantity": i.remainingQuantity,
-          "expiresInDays": daysToExpiry,
+          "expiresInDays": i.daysToExpiry,
+        });
+      } else if (i.status == ItemStatus.lowStock) {
+        local.add({
+          "type": "low_stock",
+          "severity": "red",
+          "title": i.medicineName,
+          "batchId": i.batchId,
+          "remainingQuantity": i.remainingQuantity,
+          "remainingPercentage": (i.remainingPercentage * 100).round(),
+          "burnRate": "24/day",
+          "depletesInDays": (i.remainingQuantity / 24).round(),
+        });
+      } else if (i.status == ItemStatus.expiringSoon ||
+          i.status == ItemStatus.wastageRisk) {
+        local.add({
+          "type":
+              i.status == ItemStatus.wastageRisk ? "wastage_risk" : "expiry",
+          "severity": "yellow",
+          "title": i.medicineName,
+          "batchId": i.batchId,
+          "remainingQuantity": i.remainingQuantity,
+          "expiresInDays": i.daysToExpiry,
         });
       }
     }
@@ -391,7 +405,6 @@ Output JSON only.
     }
   }
 
-  // ─── MULTI-MODAL VISION ─────────────────────────────────────────
   Future<String> parseImageWithVision(
       Uint8List imageBytes, String prompt) async {
     final imageBase64 = base64Encode(imageBytes);
@@ -419,5 +432,33 @@ Output JSON only.
       };
     }
     return results;
+  }
+
+  // ─── WASTAGE REPORT ─────────────────────────────────────────────
+  Future<String> getWastageRecommendations(
+      List<Map<String, dynamic>> wastageData) async {
+    if (_shouldUseLocal || wastageData.isEmpty) {
+      return "Local analysis suggests prioritizing stock redistribution before expiry and optimizing future indent quantities to match actual burn rates.";
+    }
+
+    try {
+      final payload = wastageData
+          .map((w) =>
+              "${w['medicineName']}: ${w['expiredUnits']} expired, ${w['nearExpiryUnits']} expiring soon. Est. cost impact: \$${w['estimatedCost']}")
+          .join('\n');
+
+      final prompt = '''
+Analyze the following wastage report for a healthcare facility:
+$payload
+
+Provide 3 actionable recommendations to prevent future wastage and minimize financial impact. Keep it concise, practical, and formatted as a numbered list.
+''';
+
+      final responseText = await _callGeminiBackend(prompt);
+      return responseText.trim();
+    } catch (e) {
+      _handleQuotaError(e.toString());
+      return "Local analysis suggests prioritizing stock redistribution before expiry and optimizing future indent quantities to match actual burn rates.";
+    }
   }
 }

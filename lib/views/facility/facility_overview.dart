@@ -10,14 +10,21 @@ import 'package:med_supply_prototype/constants/colors.dart';
 import '../shared/confirm_logout_dialog.dart';
 import '../shared/skeleton_loaders.dart';
 
-class FacilityOverview extends ConsumerWidget {
+class FacilityOverview extends ConsumerStatefulWidget {
   final String facilityId;
   const FacilityOverview({super.key, required this.facilityId});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<FacilityOverview> createState() => _FacilityOverviewState();
+}
+
+class _FacilityOverviewState extends ConsumerState<FacilityOverview> {
+  bool _isSimulating = false;
+
+  @override
+  Widget build(BuildContext context) {
     final inventoryStream =
-        ref.watch(firebaseServiceProvider).streamInventory(facilityId);
+        ref.watch(firebaseServiceProvider).streamInventory(widget.facilityId);
 
     return StreamBuilder<List<InventoryItem>>(
       stream: inventoryStream,
@@ -29,10 +36,7 @@ class FacilityOverview extends ConsumerWidget {
           );
         }
         final inventory = snapshot.data ?? [];
-        final expiringSoon = inventory
-            .where((i) => i.expiryDate.difference(DateTime.now()).inDays <= 30)
-            .length;
-        final lowStock = inventory.where((i) => i.isLowStock).length;
+        final alertCount = inventory.where((i) => i.hasAlert).length;
 
         return Scaffold(
           backgroundColor: MediColors.bg,
@@ -46,7 +50,7 @@ class FacilityOverview extends ConsumerWidget {
                   children: [
                     const Icon(Icons.notifications_outlined,
                         color: MediColors.textSecondary),
-                    if (lowStock + expiringSoon > 0)
+                    if (alertCount > 0)
                       Positioned(
                         top: -2,
                         right: -2,
@@ -56,7 +60,7 @@ class FacilityOverview extends ConsumerWidget {
                           decoration: const BoxDecoration(
                               color: MediColors.error, shape: BoxShape.circle),
                           child: Center(
-                              child: Text('${lowStock + expiringSoon}',
+                              child: Text('$alertCount',
                                   style: const TextStyle(
                                       fontSize: 9,
                                       color: Colors.white,
@@ -77,11 +81,16 @@ class FacilityOverview extends ConsumerWidget {
                                 color: MediColors.textPrimary))),
                     const PopupMenuDivider(),
                   ];
-                  final lowItems =
-                      inventory.where((i) => i.isLowStock).toList();
+                  final lowItems = inventory
+                      .where((i) => i.status == ItemStatus.lowStock)
+                      .toList();
+                  // Expiring-soon popup: only items that are truly expiring
+                  // soon, NOT already expired (those are listed separately).
                   final expiringItems = inventory
                       .where((i) =>
-                          i.expiryDate.difference(DateTime.now()).inDays <= 30)
+                          i.status == ItemStatus.expiringSoon ||
+                          i.status == ItemStatus.wastageRisk ||
+                          i.status == ItemStatus.expired)
                       .toList();
                   for (var item in lowItems) {
                     alerts.add(PopupMenuItem<String>(
@@ -99,7 +108,7 @@ class FacilityOverview extends ConsumerWidget {
                             onPressed: () async {
                               try {
                                 await ref.read(firebaseServiceProvider).restock(
-                                    facilityId, item.medicineName, 500);
+                                    widget.facilityId, item.medicineName, 500);
                                 if (context.mounted) {
                                   ScaffoldMessenger.of(context).showSnackBar(
                                       SnackBar(
@@ -211,8 +220,9 @@ class FacilityOverview extends ConsumerWidget {
             ],
           ),
           body: RefreshIndicator(
-            onRefresh: () =>
-                ref.read(firebaseServiceProvider).getInventoryOnce(facilityId),
+            onRefresh: () => ref
+                .read(firebaseServiceProvider)
+                .getInventoryOnce(widget.facilityId),
             color: MediColors.primary,
             backgroundColor: MediColors.surface,
             strokeWidth: 2.5,
@@ -245,30 +255,71 @@ class FacilityOverview extends ConsumerWidget {
                         ],
                       ),
                       OutlinedButton.icon(
-                        onPressed: () async {
-                          final firebase = ref.read(firebaseServiceProvider);
-                          final fac = await firebase.getFacility(facilityId);
-                          if (fac != null) {
-                            // Show loading
-                            if (context.mounted) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(
+                        onPressed: _isSimulating
+                            ? null
+                            : () async {
+                                setState(() => _isSimulating = true);
+
+                                if (context.mounted) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                      const SnackBar(
+                                          content: Text(
+                                              'Simulating 30 days of usage data...')));
+                                }
+                                try {
+                                  final firebase =
+                                      ref.read(firebaseServiceProvider);
+                                  final fac = await firebase
+                                      .getFacility(widget.facilityId);
+                                  if (fac == null) {
+                                    if (context.mounted) {
+                                      ScaffoldMessenger.of(context)
+                                          .showSnackBar(const SnackBar(
+                                        content: Text(
+                                            'Simulation failed. Please try again.'),
+                                        backgroundColor: MediColors.error,
+                                      ));
+                                    }
+                                    if (mounted) {
+                                      setState(() => _isSimulating = false);
+                                    }
+                                    return;
+                                  }
+
+                                  await ref
+                                      .read(simulationServiceProvider)
+                                      .runFullSimulation(
+                                          widget.facilityId, fac.type);
+                                  if (context.mounted) {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                        const SnackBar(
+                                            content: Text(
+                                                'Simulation complete! Analytics ready.')));
+                                  }
+                                } catch (_) {
+                                  if (context.mounted) {
+                                    ScaffoldMessenger.of(context)
+                                        .showSnackBar(const SnackBar(
                                       content: Text(
-                                          'Simulating 30 days of usage data...')));
-                            }
-                            await ref
-                                .read(simulationServiceProvider)
-                                .runFullSimulation(facilityId, fac.type);
-                            if (context.mounted) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(
-                                      content: Text(
-                                          'Simulation complete! Analytics ready.')));
-                            }
-                          }
-                        },
-                        icon: const Icon(Icons.analytics_outlined),
-                        label: const Text('Simulate Analytics'),
+                                          'Simulation failed. Please try again.'),
+                                      backgroundColor: MediColors.error,
+                                    ));
+                                  }
+                                }
+                                if (mounted) {
+                                  setState(() => _isSimulating = false);
+                                }
+                              },
+                        icon: _isSimulating
+                            ? const SizedBox(
+                                width: 18,
+                                height: 18,
+                                child: CircularProgressIndicator(
+                                    strokeWidth: 2, color: MediColors.primary))
+                            : const Icon(Icons.analytics_outlined),
+                        label: Text(_isSimulating
+                            ? 'Running...'
+                            : 'Simulate Analytics'),
                         style: OutlinedButton.styleFrom(
                           foregroundColor: MediColors.primary,
                           side: const BorderSide(color: MediColors.primary),
@@ -283,30 +334,19 @@ class FacilityOverview extends ConsumerWidget {
                   // KPI Cards
                   Builder(
                     builder: (context) {
+                      // All counts now derived from the centralized
+                      // ItemStatus getter — no inline threshold duplication.
                       final expired = inventory
-                          .where((i) =>
-                              i.expiryDate.difference(DateTime.now()).inDays <
-                              0)
+                          .where((i) => i.status == ItemStatus.expired)
                           .length;
-                      final wastageRisk = inventory.where((i) {
-                        final pct = i.initialQuantity > 0
-                            ? (i.remainingQuantity / i.initialQuantity)
-                            : 1.0;
-                        return pct >= 0.70 &&
-                            i.expiryDate.difference(DateTime.now()).inDays <=
-                                30;
-                      }).length;
-                      final unhealthy = inventory.where((i) {
-                        final pct = i.initialQuantity > 0
-                            ? i.remainingQuantity / i.initialQuantity
-                            : 0.0;
-                        final daysLeft =
-                            i.expiryDate.difference(DateTime.now()).inDays;
-                        return daysLeft < 0 ||
-                            daysLeft <= 30 ||
-                            pct >= 0.70 && daysLeft <= 30 ||
-                            i.isLowStock;
-                      }).length;
+                      final wastageRisk = inventory
+                          .where((i) => i.status == ItemStatus.wastageRisk)
+                          .length;
+                      final lowStock = inventory
+                          .where((i) => i.status == ItemStatus.lowStock)
+                          .length;
+                      final unhealthy =
+                          inventory.where((i) => i.hasAlert).length;
                       final healthy = (inventory.length - unhealthy)
                           .clamp(0, inventory.length);
                       final stockHealthText = inventory.isEmpty
@@ -341,7 +381,7 @@ class FacilityOverview extends ConsumerWidget {
                               Icons.health_and_safety_rounded,
                               stockHealthColor,
                               stockHealthGradient, () {
-                            context.go('/facility/$facilityId/alerts');
+                            context.go('/facility/${widget.facilityId}/alerts');
                           }),
                           _buildKpiCard(
                               'Expired',
@@ -352,7 +392,7 @@ class FacilityOverview extends ConsumerWidget {
                                 Color(0xFF3D1519),
                                 Color(0xFF1E293B)
                               ]), () {
-                            context.go('/facility/$facilityId/alerts');
+                            context.go('/facility/${widget.facilityId}/alerts');
                           }),
                           _buildKpiCard(
                               'Wastage Risk',
@@ -363,7 +403,7 @@ class FacilityOverview extends ConsumerWidget {
                                 Color(0xFF3D2E0A),
                                 Color(0xFF1E293B)
                               ]), () {
-                            context.go('/facility/$facilityId/alerts');
+                            context.go('/facility/${widget.facilityId}/alerts');
                           }),
                           _buildKpiCard(
                               'Low Stock',
@@ -374,7 +414,7 @@ class FacilityOverview extends ConsumerWidget {
                                 Color(0xFF3D1519),
                                 Color(0xFF1E293B)
                               ]), () {
-                            context.go('/facility/$facilityId/alerts');
+                            context.go('/facility/${widget.facilityId}/alerts');
                           }),
                         ],
                       );
@@ -394,8 +434,9 @@ class FacilityOverview extends ConsumerWidget {
   Future<void> _exportInventoryCsv(BuildContext context, WidgetRef ref,
       List<InventoryItem> inventory) async {
     try {
-      final fac =
-          await ref.read(firebaseServiceProvider).getFacility(facilityId);
+      final fac = await ref
+          .read(firebaseServiceProvider)
+          .getFacility(widget.facilityId);
       await CsvExportService.exportInventory(inventory,
           facilityName: fac?.name);
       if (context.mounted) {
@@ -508,26 +549,17 @@ class FacilityOverview extends ConsumerWidget {
                       DataColumn(label: Text('Time Left')),
                     ],
                     rows: inventory.map((item) {
-                      final pct = item.initialQuantity > 0
-                          ? (item.remainingQuantity / item.initialQuantity)
-                          : 1.0;
-                      final daysToExpiry =
-                          item.expiryDate.difference(DateTime.now()).inDays;
-                      Color statusColor;
-                      String statusText;
-                      if (daysToExpiry < 0) {
-                        statusColor = MediColors.error;
-                        statusText = 'Expired';
-                      } else if (pct >= 0.70 && daysToExpiry <= 30) {
-                        statusColor = const Color(0xFFF59E0B); // Amber
-                        statusText = 'Wastage Risk';
-                      } else if (item.isLowStock) {
-                        statusColor = MediColors.error;
-                        statusText = 'Low Stock';
-                      } else {
-                        statusColor = MediColors.success;
-                        statusText = 'Healthy';
-                      }
+                      final pct = item.remainingPercentage;
+                      final daysToExpiry = item.daysToExpiry;
+                      // Use centralized status — single source of truth.
+                      final statusColor = switch (item.status) {
+                        ItemStatus.expired => MediColors.error,
+                        ItemStatus.wastageRisk => const Color(0xFFF59E0B),
+                        ItemStatus.lowStock => MediColors.error,
+                        ItemStatus.expiringSoon => MediColors.warning,
+                        ItemStatus.healthy => MediColors.success,
+                      };
+                      final statusText = item.statusText;
 
                       return DataRow(cells: [
                         DataCell(Row(children: [
