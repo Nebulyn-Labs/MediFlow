@@ -240,8 +240,7 @@ class _FacilityOverviewState extends ConsumerState<FacilityOverview> {
                         const SizedBox(height: 4),
                         Text('Real-time inventory monitoring and insights',
                             style: const TextStyle(
-                                color: MediColors.textSecondary,
-                                fontSize: 14)),
+                                color: MediColors.textSecondary, fontSize: 14)),
                       ],
                     ),
                     OutlinedButton.icon(
@@ -305,12 +304,10 @@ class _FacilityOverviewState extends ConsumerState<FacilityOverview> {
                               width: 18,
                               height: 18,
                               child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                  color: MediColors.primary))
+                                  strokeWidth: 2, color: MediColors.primary))
                           : const Icon(Icons.analytics_outlined),
-                      label: Text(_isSimulating
-                          ? 'Running...'
-                          : 'Simulate Analytics'),
+                      label: Text(
+                          _isSimulating ? 'Running...' : 'Simulate Analytics'),
                       style: OutlinedButton.styleFrom(
                         foregroundColor: MediColors.primary,
                         side: const BorderSide(color: MediColors.primary),
@@ -327,16 +324,14 @@ class _FacilityOverviewState extends ConsumerState<FacilityOverview> {
                   builder: (context) {
                     final expired = inventory
                         .where((i) =>
-                            i.expiryDate.difference(DateTime.now()).inDays <
-                            0)
+                            i.expiryDate.difference(DateTime.now()).inDays < 0)
                         .length;
                     final wastageRisk = inventory.where((i) {
                       final pct = i.initialQuantity > 0
                           ? (i.remainingQuantity / i.initialQuantity)
                           : 1.0;
                       return pct >= 0.70 &&
-                          i.expiryDate.difference(DateTime.now()).inDays <=
-                              30;
+                          i.expiryDate.difference(DateTime.now()).inDays <= 30;
                     }).length;
                     final unhealthy = inventory.where((i) {
                       final pct = i.initialQuantity > 0
@@ -372,10 +367,8 @@ class _FacilityOverviewState extends ConsumerState<FacilityOverview> {
                             '${inventory.length}',
                             Icons.medication_rounded,
                             MediColors.info,
-                            const LinearGradient(colors: [
-                              Color(0xFF1E3A5F),
-                              Color(0xFF1E293B)
-                            ]),
+                            const LinearGradient(
+                                colors: [Color(0xFF1E3A5F), Color(0xFF1E293B)]),
                             () {}),
                         _buildKpiCard(
                             'Stock Health',
@@ -383,44 +376,37 @@ class _FacilityOverviewState extends ConsumerState<FacilityOverview> {
                             Icons.health_and_safety_rounded,
                             stockHealthColor,
                             stockHealthGradient, () {
-                          context.go(
-                              '/facility/${widget.facilityId}/alerts');
+                          context.go('/facility/${widget.facilityId}/alerts');
                         }),
                         _buildKpiCard(
                             'Expired',
                             '$expired',
                             Icons.error_outline_rounded,
                             MediColors.error,
-                            const LinearGradient(colors: [
-                              Color(0xFF3D1519),
-                              Color(0xFF1E293B)
-                            ]), () {
-                          context.go(
-                              '/facility/${widget.facilityId}/alerts');
+                            const LinearGradient(
+                                colors: [Color(0xFF3D1519), Color(0xFF1E293B)]),
+                            () {
+                          context.go('/facility/${widget.facilityId}/alerts');
                         }),
                         _buildKpiCard(
                             'Wastage Risk',
                             '$wastageRisk',
                             Icons.warning_amber_rounded,
                             const Color(0xFFF59E0B),
-                            const LinearGradient(colors: [
-                              Color(0xFF3D2E0A),
-                              Color(0xFF1E293B)
-                            ]), () {
-                          context.go(
-                              '/facility/${widget.facilityId}/alerts');
+                            const LinearGradient(
+                                colors: [Color(0xFF3D2E0A), Color(0xFF1E293B)]),
+                            () {
+                          context.go('/facility/${widget.facilityId}/alerts');
                         }),
                         _buildKpiCard(
                             'Low Stock',
                             '$lowStock',
                             Icons.trending_down_rounded,
                             MediColors.error,
-                            const LinearGradient(colors: [
-                              Color(0xFF3D1519),
-                              Color(0xFF1E293B)
-                            ]), () {
-                          context.go(
-                              '/facility/${widget.facilityId}/alerts');
+                            const LinearGradient(
+                                colors: [Color(0xFF3D1519), Color(0xFF1E293B)]),
+                            () {
+                          context.go('/facility/${widget.facilityId}/alerts');
                         }),
                       ],
                     );
@@ -439,8 +425,9 @@ class _FacilityOverviewState extends ConsumerState<FacilityOverview> {
   Future<void> _exportInventoryCsv(BuildContext context, WidgetRef ref,
       List<InventoryItem> inventory) async {
     try {
-      final fac =
-          await ref.read(firebaseServiceProvider).getFacility(widget.facilityId);
+      final fac = await ref
+          .read(firebaseServiceProvider)
+          .getFacility(widget.facilityId);
       await CsvExportService.exportInventory(inventory,
           facilityName: fac?.name);
       if (context.mounted) {
