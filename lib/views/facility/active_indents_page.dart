@@ -1177,10 +1177,14 @@ class _ActiveIndentsPageState extends ConsumerState<ActiveIndentsPage> {
                                             onPressed: _isDraftActionInProgress
                                                 ? null
                                                 : () => _withdrawRequest(req.id),
-                                            icon: const Icon(Icons.cancel_outlined, size: 16),
+                                            icon: const Icon(
+                                              Icons.cancel_outlined,
+                                              size: 16,
+                                            ),
                                             label: const Text('Withdraw'),
                                             style: TextButton.styleFrom(
-                                                foregroundColor: MediColors.error),
+                                              foregroundColor: MediColors.error,
+                                            ),
                                           ),
                                         ),
                                       statusBadge,
@@ -1211,10 +1215,14 @@ class _ActiveIndentsPageState extends ConsumerState<ActiveIndentsPage> {
                                   onPressed: _isDraftActionInProgress
                                       ? null
                                       : () => _withdrawRequest(req.id),
-                                  icon: const Icon(Icons.cancel_outlined, size: 16),
+                                  icon: const Icon(
+                                    Icons.cancel_outlined,
+                                    size: 16,
+                                  ),
                                   label: const Text('Withdraw'),
                                   style: TextButton.styleFrom(
-                                      foregroundColor: MediColors.error),
+                                    foregroundColor: MediColors.error,
+                                  ),
                                 ),
                               ),
                             statusBadge,
