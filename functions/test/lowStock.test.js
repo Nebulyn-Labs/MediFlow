@@ -108,6 +108,15 @@ describe("stockStatus", () => {
     assert.equal(stockStatus(data), "low_stock");
   });
 
+  it("prioritizes expiring_soon over low_stock when an item is nearing expiry and low in stock", () => {
+    const expiryDate = new Date(Date.now() + 10 * 86400000); // 10 days left
+    const data = {
+      ...medicine({ initialQuantity: 1000, remainingQuantity: 100 }), // 10% remaining -> low_stock & expiring_soon
+      expiryDate,
+    };
+    assert.equal(stockStatus(data), "expiring_soon");
+  });
+
   it("reports healthy when well above both thresholds", () => {
     const data = medicine({ initialQuantity: 10000, remainingQuantity: 8000 });
     assert.equal(stockStatus(data), "healthy");

@@ -220,14 +220,22 @@ class _AdminOverviewState extends ConsumerState<AdminOverview> {
 
   // ---- status + filtering logic (Sprint 5) ----
   String _getStockStatus(InventoryItem item) {
-    final daysToExpiry = item.expiryDate.difference(DateTime.now()).inDays;
-    if (daysToExpiry <= 90) return 'Expiring Soon';
-
-    if (item.initialQuantity == 0) return 'Healthy';
-    if (item.isLowStock) return 'Low Stock';
-    final ratio = item.remainingQuantity / item.initialQuantity;
-    if (ratio > 0.8) return 'Surplus';
-    return 'Healthy';
+    switch (item.status) {
+      case ItemStatus.expired:
+        return 'Expired';
+      case ItemStatus.lowStock:
+        return 'Low Stock';
+      case ItemStatus.wastageRisk:
+        return 'Wastage Risk';
+      case ItemStatus.expiringSoon:
+        return 'Expiring Soon';
+      case ItemStatus.healthy:
+        if (item.initialQuantity > 0 &&
+            (item.remainingQuantity / item.initialQuantity) > 0.8) {
+          return 'Surplus';
+        }
+        return 'Healthy';
+    }
   }
 
   List<InventoryItem> _applyFilters(List<InventoryItem> items) {
