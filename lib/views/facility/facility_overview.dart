@@ -22,7 +22,7 @@ class _FacilityOverviewState extends ConsumerState<FacilityOverview> {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      ref.read(firebaseServiceProvider).registerFcmToken(widget.facilityId);
+      ref.read(firebaseServiceProvider).registerFcmToken();
     });
   }
 

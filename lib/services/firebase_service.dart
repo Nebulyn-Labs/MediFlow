@@ -32,8 +32,10 @@ class FirebaseService {
         email: email, password: password);
   }
 
-  Future<void> registerFcmToken(String facilityId) async {
+  Future<void> registerFcmToken() async {
     if (kIsWeb) return; // FCM token logic might need web setup, skip for now if web
+    final userId = _auth.currentUser?.uid;
+    if (userId == null) return;
     try {
       final messaging = FirebaseMessaging.instance;
       final settings = await messaging.requestPermission(
@@ -45,10 +47,10 @@ class FirebaseService {
       if (settings.authorizationStatus == AuthorizationStatus.authorized) {
         String? token = await messaging.getToken();
         if (token != null) {
-          await _firestore.collection('facilities').doc(facilityId).update({
-            'fcmTokens': FieldValue.arrayUnion([token])
+          await _firestore.collection('users').doc(userId).update({
+            'fcmToken': token
           });
-          debugPrint('FCM token registered for facility $facilityId');
+          debugPrint('FCM token registered for user $userId');
         }
       }
     } catch (e) {
