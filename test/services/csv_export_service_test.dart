@@ -103,10 +103,16 @@ void main() {
           medicines: [
             MedicineUsage(medicineName: 'Paracetamol', unitsDistributed: 10)
           ],
+        ),
+        DailyUsageLog(
+          id: 'log-2',
+          date: DateTime(2026, 7, 25),
+          totalPatients: 20,
+          medicines: [],
         )
       ];
       final rows = CsvExportService.buildUsageLogRows(logs);
-      expect(rows.length, 2);
+      expect(rows.length, 3);
       expect(rows.first, [
         'Date',
         'Medicine Name',
@@ -114,6 +120,7 @@ void main() {
         'Total Patients (day)',
       ]);
       expect(rows[1], ['2026-07-24', 'Paracetamol', 10, 50]);
+      expect(rows[2], ['2026-07-25', '', 0, 20]);
     });
 
     test('buildTransferRequestsRows', () {
@@ -138,7 +145,23 @@ void main() {
         'Status',
         'Global Optimization',
       ]);
-      expect(rows[1], ['2026-07-24', 'FAC 1', 'Paracetamol', 10, 'APPROVED', 'Optimize Routes']);
+      expect(rows[1], [
+        '2026-07-24',
+        'FAC 1',
+        'Paracetamol',
+        10,
+        'APPROVED',
+        'Optimize Routes',
+      ]);
+    });
+    test('buildFilenameSlug coverage', () {
+      expect(CsvExportService.buildFilenameSlug(null), '');
+      expect(CsvExportService.buildFilenameSlug(''), '');
+      expect(CsvExportService.buildFilenameSlug('   '), '');
+      expect(CsvExportService.buildFilenameSlug('My Facility Name'),
+          'my_facility_name_');
+      expect(CsvExportService.buildFilenameSlug('Test-Facility, Inc.'),
+          'test_facility_inc_');
     });
   });
 }

@@ -27,7 +27,7 @@ class CsvExportService {
   }) async {
     final rows = buildInventoryRows(inventory);
     final fileName =
-        'inventory_${_slug(facilityName)}${_stampFmt.format(DateTime.now())}.csv';
+        'inventory_${buildFilenameSlug(facilityName)}${_stampFmt.format(DateTime.now())}.csv';
     return _saveCsv(rows, fileName);
   }
 
@@ -71,7 +71,7 @@ class CsvExportService {
   }) async {
     final rows = buildUsageLogRows(logs);
     final fileName =
-        'usage_logs_${_slug(facilityName)}${_stampFmt.format(DateTime.now())}.csv';
+        'usage_logs_${buildFilenameSlug(facilityName)}${_stampFmt.format(DateTime.now())}.csv';
     return _saveCsv(rows, fileName);
   }
 
@@ -111,7 +111,7 @@ class CsvExportService {
   }) async {
     final rows = buildTransferRequestHistoryRows(requests);
     final fileName =
-        'transfer_requests_${_slug(facilityName)}${_stampFmt.format(DateTime.now())}.csv';
+        'transfer_requests_${buildFilenameSlug(facilityName)}${_stampFmt.format(DateTime.now())}.csv';
     return _saveCsv(rows, fileName);
   }
 
@@ -156,7 +156,8 @@ class CsvExportService {
     return _saveCsv(rows, fileName);
   }
 
-  static List<List<dynamic>> buildTransferRequestsRows(List<MedRequest> requests) {
+  static List<List<dynamic>> buildTransferRequestsRows(
+      List<MedRequest> requests) {
     final rows = <List<dynamic>>[
       [
         'Date',
@@ -185,7 +186,7 @@ class CsvExportService {
     return rows;
   }
 
-  static String _slug(String? name) {
+  static String buildFilenameSlug(String? name) {
     if (name == null || name.trim().isEmpty) return '';
     final cleaned =
         name.trim().toLowerCase().replaceAll(RegExp(r'[^a-z0-9]+'), '_');
