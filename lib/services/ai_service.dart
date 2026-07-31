@@ -224,14 +224,13 @@ class AIService {
         query.toLowerCase().contains("inventory")) {
       buffer.writeln("### 📦 System Stock Analysis");
       for (var item in inventory) {
-        final rem = item['remainingQuantity'] ?? 0;
-        final tot = item['initialQuantity'] ?? 0;
-        final name = item['medicineName'] ?? 'Unknown';
-        final status = (tot > 0 &&
-                (rem / tot <= InventoryThresholds.lowStockPercentage ||
-                    rem <= InventoryThresholds.lowStockAbsolute))
-            ? "⚠️ CRITICAL"
-            : "✅ STABLE";
+        final rem = (item['remainingQuantity'] as num?)?.toInt() ?? 0;
+        final tot = (item['initialQuantity'] as num?)?.toInt() ?? 0;
+        final name = item['medicineName']?.toString() ?? 'Unknown';
+        final isLow = tot > 0 &&
+            (rem / tot <= InventoryThresholds.lowStockPercentage ||
+                rem <= InventoryThresholds.lowStockAbsolute);
+        final status = isLow ? "⚠️ CRITICAL" : "✅ STABLE";
         buffer.writeln("• **$name**: $rem/$tot units ($status)");
       }
     } else {

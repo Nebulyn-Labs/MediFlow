@@ -43,21 +43,21 @@ class InventoryItem {
       {String? facilityId}) {
     return InventoryItem(
       id: id,
-      medicineName: map['medicineName'] ?? '',
-      batchId: map['batchId'] ?? '',
-      arrivalDate: map['arrivalDate'] != null
+      medicineName: map['medicineName']?.toString() ?? '',
+      batchId: map['batchId']?.toString() ?? '',
+      arrivalDate: map['arrivalDate'] is Timestamp
           ? (map['arrivalDate'] as Timestamp).toDate()
           : DateTime.now(),
-      expiryDate: map['expiryDate'] != null
+      expiryDate: map['expiryDate'] is Timestamp
           ? (map['expiryDate'] as Timestamp).toDate()
           : DateTime.now(),
-      initialQuantity: map['initialQuantity']?.toInt() ?? 0,
-      remainingQuantity: map['remainingQuantity']?.toInt() ?? 0,
-      unit: map['unit'] ?? 'units',
-      lastUpdated: map['lastUpdated'] != null
+      initialQuantity: (map['initialQuantity'] as num?)?.toInt() ?? 0,
+      remainingQuantity: (map['remainingQuantity'] as num?)?.toInt() ?? 0,
+      unit: map['unit']?.toString() ?? 'units',
+      lastUpdated: map['lastUpdated'] is Timestamp
           ? (map['lastUpdated'] as Timestamp).toDate()
           : DateTime.now(),
-      facilityId: facilityId ?? map['facilityId'],
+      facilityId: facilityId ?? map['facilityId']?.toString(),
     );
   }
 
