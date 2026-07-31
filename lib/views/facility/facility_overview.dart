@@ -345,9 +345,8 @@ class _FacilityOverviewState extends ConsumerState<FacilityOverview> {
                       final lowStock = inventory
                           .where((i) => i.status == ItemStatus.lowStock)
                           .length;
-                      final unhealthy = inventory
-                          .where((i) => i.hasAlert)
-                          .length;
+                      final unhealthy =
+                          inventory.where((i) => i.hasAlert).length;
                       final healthy = (inventory.length - unhealthy)
                           .clamp(0, inventory.length);
                       final stockHealthText = inventory.isEmpty
