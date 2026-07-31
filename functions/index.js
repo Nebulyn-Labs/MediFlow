@@ -8,9 +8,15 @@ const { GoogleGenerativeAI } = require("@google/generative-ai");
 const { BigQuery } = require("@google-cloud/bigquery");
 const { checkRateLimit, LIMITS } = require("./helpers/rateLimiter");
 const { createBigQueryRecovery } = require("./helpers/bigQueryRecovery");
-const { handleCspReport } = require("./helpers/cspReport");
+const { createLowStockService } = require("./helpers/lowStock");
+const { handleCspReport, getClientIp } = require("./helpers/cspReport");
 
 admin.initializeApp();
+
+const lowStockService = createLowStockService({
+  serverTimestamp: () => admin.firestore.FieldValue.serverTimestamp(),
+});
+const { stockStatus } = lowStockService;
 
 const GEMINI_API_KEY = defineSecret("GEMINI_API_KEY");
 
@@ -96,7 +102,8 @@ const BQ_LOCATION = process.env.BQ_LOCATION || "US";
 // NOTE: GEMINI_API_KEY must be set in Firebase Secrets
 // Use: firebase functions:secrets:set GEMINI_API_KEY
 function getGenAI() {
-  return new GoogleGenerativeAI(GEMINI_API_KEY.value());
+  const key = process.env.GEMINI_API_KEY || (typeof GEMINI_API_KEY !== "undefined" && GEMINI_API_KEY.value ? GEMINI_API_KEY.value() : "");
+  return new GoogleGenerativeAI(key);
 }
 
 const BIGQUERY_TABLES = {
@@ -197,20 +204,6 @@ function toIsoTimestamp(value) {
 function toBigQueryDate(value) {
   const iso = toIsoTimestamp(value);
   return iso ? iso.substring(0, 10) : null;
-}
-
-function stockStatus(data) {
-  const initial = Number(data.initialQuantity || 0);
-  const remaining = Number(data.remainingQuantity || 0);
-  const pct = initial > 0 ? remaining / initial : 0;
-  const expiry = toIsoTimestamp(data.expiryDate);
-  const daysLeft = expiry ? Math.ceil((new Date(expiry).getTime() - Date.now()) / 86400000) : null;
-
-  if (daysLeft !== null && daysLeft < 0) return "expired";
-  if (pct >= 0.7 && daysLeft !== null && daysLeft <= 30) return "wastage_risk";
-  if (pct <= 0.2 || remaining <= 500) return "low_stock";
-  if (daysLeft !== null && daysLeft <= 30) return "expiring_soon";
-  return "healthy";
 }
 
 const bigQueryRecovery = createBigQueryRecovery({
@@ -445,43 +438,6 @@ exports.mirrorRequestToBigQuery = onDocumentWritten("requests/{requestId}", asyn
   }
 });
 
-async function syncAlertForMedicine(db, facilityId, medicineId, data) {
-  const alertId = `${facilityId}_${medicineId}`;
-  const alertRef = db.collection("alerts").doc(alertId);
-
-  if (!data) {
-    await alertRef.delete();
-    return;
-  }
-
-  const status = stockStatus(data);
-  if (status === "healthy") {
-    await alertRef.delete();
-  } else {
-    const facilityDoc = await db.collection("facilities").doc(facilityId).get();
-    const facilityName = facilityDoc.exists ? (facilityDoc.data().name || "") : "";
-
-    const alertDoc = await alertRef.get();
-    const alertData = {
-      facilityId,
-      facilityName,
-      stockId: medicineId,
-      medicineName: data.medicineName || "",
-      qtyRemaining: Number(data.remainingQuantity || 0),
-      initialQuantity: Number(data.initialQuantity || 0),
-      batchId: data.batchId || "",
-      unit: data.unit || "units",
-      expiryDate: data.expiryDate,
-      type: status,
-      isRead: false
-    };
-    if (!alertDoc.exists) {
-      alertData.createdAt = admin.firestore.FieldValue.serverTimestamp();
-    }
-    await alertRef.set(alertData, { merge: true });
-  }
-}
-
 exports.onUserWritten = onDocumentWritten("users/{userId}", async (event) => {
   const change = event.data;
   const before = change.before.exists ? change.before.data() : null;
@@ -516,7 +472,9 @@ exports.mirrorInventoryToBigQuery = onDocumentWritten("inventory/{facilityId}/me
   const action = !before && after ? "created" : before && after ? "updated" : "deleted";
 
   const db = admin.firestore();
-  await syncAlertForMedicine(db, facilityId, medicineId, after);
+  await lowStockService.syncAlertForMedicine(db, facilityId, medicineId, after, null, async (token, notification) => {
+    await admin.messaging().send({ token, notification });
+  });
 
   await insertBigQuery("inventory_snapshots", {
     snapshot_id: `${facilityId}_${medicineId}_${Date.now()}`,
@@ -594,50 +552,12 @@ exports.retryFailedBigQueryInsertions = onSchedule("every 5 minutes", async () =
  */
 exports.checkLowStock = onSchedule("every 24 hours", async () => {
   const db = admin.firestore();
-  const facilities = await db.collection("facilities").get();
-
-  for (const facilityDoc of facilities.docs) {
-    const medicinesSnapshot = await db.collection("inventory")
-      .doc(facilityDoc.id)
-      .collection("medicines")
-      .get();
-
-    for (const medDoc of medicinesSnapshot.docs) {
-      const data = medDoc.data();
-      const status = stockStatus(data);
-      const { existed } = await createOrUpdateAlert(
-        db,
-        facilityDoc.id,
-        facilityDoc.data().name || "",
-        medDoc.id,
-        data,
-        status
-      );
-
-      // Trigger FCM Notification for low stock if it's new
-      if (status === "low_stock" && !existed) {
-        const userQuery = await db.collection("users")
-          .where("facilityId", "==", facilityDoc.id)
-          .where("role", "==", "facility_head")
-          .limit(1)
-          .get();
-
-        if (!userQuery.empty) {
-          const user = userQuery.docs[0].data();
-          if (user.fcmToken) {
-            await admin.messaging().send({
-              token: user.fcmToken,
-              notification: {
-                title: "Low Stock Alert",
-                body: `${data.medicineName} is below reorder level (${data.remainingQuantity} left).`
-              }
-            });
-          }
-        }
-      }
-    }
-  }
-  return null;
+  return lowStockService.runLowStockSweep({
+    db,
+    sendNotification: async (token, notification) => {
+      await admin.messaging().send({ token, notification });
+    },
+  });
 });
 
 /**
@@ -742,6 +662,7 @@ exports.onIndentApproved = onDocumentUpdated("requests/{requestId}", async (even
           }
 
           transaction.update(event.data.after.ref, {
+            status: "fulfilled",
             resolvedAt: admin.firestore.FieldValue.serverTimestamp(),
           });
         });
@@ -803,6 +724,7 @@ exports.onIndentApproved = onDocumentUpdated("requests/{requestId}", async (even
           }
 
           transaction.update(event.data.after.ref, {
+            status: "fulfilled",
             resolvedAt: admin.firestore.FieldValue.serverTimestamp(),
           });
         });
@@ -811,6 +733,10 @@ exports.onIndentApproved = onDocumentUpdated("requests/{requestId}", async (even
         );
       } catch (err) {
         logger.error(`Stock update failed for request ${requestId}:`, err);
+        await event.data.after.ref.update({
+          status: "rejected",
+          rejectionReason: err.message,
+        });
       }
     }
   }
@@ -875,6 +801,78 @@ async function executeTool(name, args, authInfo) {
   }
   throw new Error(`Unknown function call: ${name}`);
 }
+
+/**
+ * 4. logPasswordResetRequest(email)
+ * Explicit audit hook for password reset requests.
+ */
+exports.logPasswordResetRequest = onCall(async (request) => {
+  let { email, status } = request.data;
+  
+  if (!email || typeof email !== "string") {
+    throw new HttpsError("invalid-argument", "Email is required and must be a string");
+  }
+
+  email = email.trim().toLowerCase();
+
+  if (email.length > 254 || Buffer.byteLength(email, "utf8") > 1500) {
+    throw new HttpsError("invalid-argument", "Invalid email format");
+  }
+  if (!/^[^\s@/]+@[^\s@/]+\.[^\s@/]+$/.test(email)) {
+    throw new HttpsError("invalid-argument", "Invalid email format");
+  }
+
+  const clientIp = getClientIp(request.rawRequest);
+  if (!clientIp || clientIp === "unknown") {
+    throw new HttpsError("unauthenticated", "Unable to determine client IP");
+  }
+
+  await checkRateLimit(
+    clientIp,
+    "logPasswordResetRequest_ip",
+    LIMITS.PASSWORD_RESET_IP
+  );
+  await checkRateLimit(
+    email,
+    "logPasswordResetRequest_email",
+    LIMITS.PASSWORD_RESET_EMAIL
+  );
+
+  const eventId = `pwd_reset_${Date.now()}`;
+  
+  let requestStatus = "success";
+  let resourceId = email;
+  try {
+    const userRecord = await admin.auth().getUserByEmail(email);
+    resourceId = userRecord.uid;
+  } catch (e) {
+    requestStatus = "failure";
+  }
+
+  // Log to admin dashboard via audit_logs
+  const db = admin.firestore();
+  await db.collection("audit_logs").add({
+    adminId: "system",
+    timestamp: admin.firestore.FieldValue.serverTimestamp(),
+    action: "password_reset_requested",
+    resourceType: "user",
+    resourceId: resourceId,
+    metadata: { email, ip: clientIp },
+    status: requestStatus
+  });
+
+  await auditEvent({
+    eventId,
+    action: "password_reset_requested",
+    entityType: "user",
+    entityId: resourceId,
+    actorId: "system",
+    metadata: { email, status: requestStatus, ip: clientIp }
+  });
+
+  return { ok: true };
+});
+
 
 exports.generateSmartAlertsSecure = onCall({ secrets: [GEMINI_API_KEY] }, async (request) => {
   if (!request.auth) throw new HttpsError('unauthenticated', 'User must log in');
@@ -1049,7 +1047,7 @@ exports.callGeminiSecure = onCall({ secrets: [GEMINI_API_KEY] }, async (request)
     return { text: result.response.text() };
   } catch (error) {
     logger.error("Gemini callGeminiSecure Error:", error);
-    throw new HttpsError('internal', 'AI generation failed');
+    throw new HttpsError('internal', `AI generation failed: ${error.message || error}`);
   }
 });
 
@@ -1118,5 +1116,3 @@ const cspReportLastSeen = new Map();
 exports.cspReport = onRequest(async (req, res) => {
   await handleCspReport(req, res, logger, cspReportLastSeen);
 });
-
-

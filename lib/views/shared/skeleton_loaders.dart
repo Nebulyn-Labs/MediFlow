@@ -53,10 +53,12 @@ class _SkeletonBoxState extends State<SkeletonBox>
           height: widget.height,
           margin: widget.margin,
           decoration: BoxDecoration(
-            color: MediColors.surfaceLight.withValues(alpha: _opacityAnimation.value),
+            color: MediColors.surfaceLight
+                .withValues(alpha: _opacityAnimation.value),
             borderRadius: BorderRadius.circular(widget.borderRadius),
             border: Border.all(
-              color: MediColors.border.withValues(alpha: _opacityAnimation.value * 0.5),
+              color: MediColors.border
+                  .withValues(alpha: _opacityAnimation.value * 0.5),
             ),
           ),
         );
@@ -480,10 +482,14 @@ class RouteOptimizationMapSkeleton extends StatelessWidget {
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                SkeletonBox(width: 320, height: double.infinity, borderRadius: 12),
+                SkeletonBox(
+                    width: 320, height: double.infinity, borderRadius: 12),
                 SizedBox(width: 20),
                 Expanded(
-                  child: SkeletonBox(width: double.infinity, height: double.infinity, borderRadius: 12),
+                  child: SkeletonBox(
+                      width: double.infinity,
+                      height: double.infinity,
+                      borderRadius: 12),
                 ),
               ],
             ),
@@ -508,7 +514,8 @@ class DailyLoggingSkeleton extends StatelessWidget {
         children: [
           const SkeletonHeader(),
           const SizedBox(height: 24),
-          const SkeletonBox(width: double.infinity, height: 60, borderRadius: 10),
+          const SkeletonBox(
+              width: double.infinity, height: 60, borderRadius: 10),
           const SizedBox(height: 24),
           for (int i = 0; i < 4; i++) const SkeletonTableRow(),
         ],

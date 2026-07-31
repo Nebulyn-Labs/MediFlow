@@ -8,9 +8,47 @@ import '../../models/daily_usage_log.dart';
 import '../../services/firebase_service.dart';
 import '../../services/csv_export_service.dart';
 import '../../services/ai_service.dart';
+import '../../services/connectivity_service.dart';
 import 'package:med_supply_prototype/constants/colors.dart';
+import '../shared/connectivity_indicator.dart';
 import '../shared/skeleton_loaders.dart';
 import '../../utils/retry_snackbar.dart';
+
+int _parseNumber(dynamic val) {
+  if (val == null) return 0;
+  final str = val.toString().trim();
+  final intVal = int.tryParse(str);
+  if (intVal != null) return intVal;
+  final doubleVal = double.tryParse(str);
+  if (doubleVal != null) return doubleVal.round();
+  return 0;
+}
+
+List<Map<String, dynamic>> parseVisionJson(String text) {
+  try {
+    int start = text.indexOf('[');
+    int end = text.lastIndexOf(']');
+    if (start != -1 && end != -1 && end > start) {
+      final jsonSub = text.substring(start, end + 1);
+      final decoded = jsonDecode(jsonSub);
+      if (decoded is List) {
+        return decoded.map<Map<String, dynamic>>((item) {
+          if (item is Map) {
+            return {
+              'medicine': item['medicine']?.toString().trim() ?? '',
+              'quantity': _parseNumber(item['quantity']),
+              'patients': _parseNumber(item['patients']),
+            };
+          }
+          return {'medicine': '', 'quantity': 0, 'patients': 0};
+        }).toList();
+      }
+    }
+  } catch (e) {
+    debugPrint('Error parsing vision JSON: $e');
+  }
+  return [];
+}
 
 class DailyLoggingPage extends ConsumerStatefulWidget {
   final String facilityId;
@@ -42,6 +80,8 @@ class _DailyLoggingPageState extends ConsumerState<DailyLoggingPage>
   bool _isParsingImage = false;
   String? _imageParseResult;
   String? _imageParseError;
+  List<Map<String, dynamic>> _imageItems = [];
+  bool _isSubmittingImage = false;
 
   // --- History tab state ---
   List<DailyUsageLog> _historyLogs = [];
@@ -65,6 +105,30 @@ class _DailyLoggingPageState extends ConsumerState<DailyLoggingPage>
     super.dispose();
   }
 
+  /// Guards network-dependent actions.
+  ///
+  /// Buttons are already disabled while offline, but connectivity can drop
+  /// between the tap and the request, so callers check here too and abort with
+  /// an explanation instead of failing with a raw error.
+  bool _ensureOnline() {
+    if (ref.read(isOnlineProvider)) return true;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text(
+            'You are offline. This action needs an internet connection — try '
+            'again once you reconnect.'),
+        backgroundColor: MediColors.warning,
+      ),
+    );
+    return false;
+  }
+
+  /// Reloads whatever failed to load while the device was offline.
+  void _handleReconnect() {
+    if (_inventoryError != null) _fetchInventory();
+    if (_historyError != null) _fetchHistoryFirstPage();
+  }
+
   Future<void> _fetchInventory() async {
     setState(() {
       _isLoadingInventory = true;
@@ -83,7 +147,7 @@ class _DailyLoggingPageState extends ConsumerState<DailyLoggingPage>
           _isLoadingInventory = false;
         });
       }
-    } catch (e) {
+    } catch (_) {
       if (mounted) {
         setState(() {
           _inventoryError = 'Failed to load inventory. Please try again.';
@@ -124,6 +188,7 @@ class _DailyLoggingPageState extends ConsumerState<DailyLoggingPage>
 
   Future<void> _fetchMoreHistory() async {
     if (!_historyHasMore || _isLoadingMoreHistory) return;
+    if (!_ensureOnline()) return;
     setState(() => _isLoadingMoreHistory = true);
     try {
       final result = await ref.read(firebaseServiceProvider).getPaginatedLogs(
@@ -150,6 +215,7 @@ class _DailyLoggingPageState extends ConsumerState<DailyLoggingPage>
 
   Future<void> _submitLog() async {
     if (!_formKey.currentState!.validate() || _medName == null) return;
+    if (!_ensureOnline()) return;
     _formKey.currentState!.save();
     setState(() => _isSubmitting = true);
     try {
@@ -177,6 +243,7 @@ class _DailyLoggingPageState extends ConsumerState<DailyLoggingPage>
   }
 
   Future<void> _exportUsageLogsCsv() async {
+    if (!_ensureOnline()) return;
     setState(() => _isExportingCsv = true);
     try {
       final firebase = ref.read(firebaseServiceProvider);
@@ -252,6 +319,7 @@ class _DailyLoggingPageState extends ConsumerState<DailyLoggingPage>
 
   Future<void> _submitCSVLogs() async {
     if (_csvItems.isEmpty) return;
+    if (!_ensureOnline()) return;
     setState(() => _isSubmittingCsv = true);
     try {
       for (var item in _csvItems) {
@@ -300,6 +368,7 @@ class _DailyLoggingPageState extends ConsumerState<DailyLoggingPage>
 
   Future<void> _submitScannedLogs() async {
     if (_scannedItems.isEmpty) return;
+    if (!_ensureOnline()) return;
     setState(() => _isSubmittingQr = true);
     try {
       for (var item in _scannedItems) {
@@ -327,6 +396,7 @@ class _DailyLoggingPageState extends ConsumerState<DailyLoggingPage>
   }
 
   Future<void> _parseImage() async {
+    if (!_ensureOnline()) return;
     try {
       final result = await FilePicker.pickFiles(
         type: FileType.image,
@@ -339,14 +409,21 @@ class _DailyLoggingPageState extends ConsumerState<DailyLoggingPage>
         _isParsingImage = true;
         _imageParseResult = null;
         _imageParseError = null;
+        _imageItems.clear();
       });
       final parsed = await ref.read(aiServiceProvider).parseImageWithVision(
           bytes,
           'Extract all medicine names, quantities, and patient counts from this image. Output JSON: [{"medicine": "string", "quantity": int, "patients": int}]');
       if (mounted) {
+        final extractedItems = parseVisionJson(parsed);
         setState(() {
           _imageParseResult = parsed;
+          _imageItems = extractedItems;
           _isParsingImage = false;
+          if (extractedItems.isEmpty) {
+            _imageParseError =
+                'Could not parse structured medicine data from the image output.';
+          }
         });
       }
     } catch (e) {
@@ -368,22 +445,91 @@ class _DailyLoggingPageState extends ConsumerState<DailyLoggingPage>
     }
   }
 
+  Future<void> _submitImageLogs() async {
+    if (_imageItems.isEmpty) return;
+    if (!_ensureOnline()) return;
+
+    final invalidItems = _imageItems.where((item) {
+      final med = item['medicine']?.toString() ?? '';
+      final qty = item['quantity'] as int? ?? 0;
+      final pat = item['patients'] as int? ?? 0;
+      return med.isEmpty ||
+          !_availableMedicines.contains(med) ||
+          qty <= 0 ||
+          pat < 0;
+    }).toList();
+
+    if (invalidItems.isNotEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Cannot submit: ${invalidItems.length} item(s) are invalid or not present in inventory. Please fix or remove them.',
+          ),
+          backgroundColor: MediColors.error,
+        ),
+      );
+      return;
+    }
+
+    setState(() => _isSubmittingImage = true);
+    try {
+      for (var item in _imageItems) {
+        await ref.read(firebaseServiceProvider).logUsage(
+            facilityId: widget.facilityId,
+            date: _selectedDate,
+            medicineName: item['medicine'],
+            quantity: item['quantity'],
+            patients: item['patients']);
+      }
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('${_imageItems.length} logs saved ✓')));
+        setState(() {
+          _imageItems.clear();
+          _imageParseResult = null;
+        });
+        _fetchHistoryFirstPage();
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('Error: $e')));
+      }
+    } finally {
+      if (mounted) setState(() => _isSubmittingImage = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
+    // Recover automatically once the connection comes back, so the user does
+    // not have to leave and re-enter the screen.
+    ref.listen<AsyncValue<bool>>(connectivityStatusProvider, (previous, next) {
+      if (previous?.value == false && next.value == true) {
+        _handleReconnect();
+      }
+    });
+    final isOnline = ref.watch(isOnlineProvider);
+
     return Scaffold(
       backgroundColor: MediColors.bg,
       appBar: AppBar(
         title: const Text('Daily Logging'),
         actions: [
+          const ConnectivityIndicator(),
+          const SizedBox(width: 8),
           IconButton(
-            tooltip: 'Export usage logs (CSV)',
+            tooltip: isOnline
+                ? 'Export usage logs (CSV)'
+                : 'Export unavailable while offline',
             icon: _isExportingCsv
                 ? const SizedBox(
                     width: 20,
                     height: 20,
                     child: CircularProgressIndicator(strokeWidth: 2))
                 : const Icon(Icons.file_download_outlined),
-            onPressed: _isExportingCsv ? null : _exportUsageLogsCsv,
+            onPressed:
+                (_isExportingCsv || !isOnline) ? null : _exportUsageLogsCsv,
           ),
           const SizedBox(width: 8),
         ],
@@ -399,20 +545,27 @@ class _DailyLoggingPageState extends ConsumerState<DailyLoggingPage>
           ],
         ),
       ),
-      body: TabBarView(
-        controller: _tabController,
+      body: Column(
         children: [
-          _buildManualTab(),
-          _buildCsvTab(),
-          _buildQrTab(),
-          _buildImageTab(),
-          _buildHistoryTab(),
+          const OfflineBanner(),
+          Expanded(
+            child: TabBarView(
+              controller: _tabController,
+              children: [
+                _buildManualTab(isOnline),
+                _buildCsvTab(isOnline),
+                _buildQrTab(isOnline),
+                _buildImageTab(isOnline),
+                _buildHistoryTab(isOnline),
+              ],
+            ),
+          ),
         ],
       ),
     );
   }
 
-  Widget _buildManualTab() {
+  Widget _buildManualTab(bool isOnline) {
     return Center(
       child: Container(
         width: 480,
@@ -439,27 +592,33 @@ class _DailyLoggingPageState extends ConsumerState<DailyLoggingPage>
                     style:
                         TextStyle(color: MediColors.textMuted, fontSize: 13)),
                 const SizedBox(height: 28),
-                ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  title: const Text('Date',
-                      style: TextStyle(
-                          color: MediColors.textSecondary, fontSize: 13)),
-                  subtitle: Text(
-                      '${_selectedDate.day}/${_selectedDate.month}/${_selectedDate.year}',
-                      style: const TextStyle(
-                          color: MediColors.textPrimary,
-                          fontSize: 16,
-                          fontWeight: FontWeight.w600)),
-                  trailing: const Icon(Icons.calendar_today_rounded,
-                      color: MediColors.textMuted),
-                  onTap: () async {
-                    final date = await showDatePicker(
-                        context: context,
-                        initialDate: _selectedDate,
-                        firstDate: DateTime(2020),
-                        lastDate: DateTime.now());
-                    if (date != null) setState(() => _selectedDate = date);
-                  },
+                // The surrounding Container paints its own background, which
+                // would swallow the tile's ink splash without a Material of
+                // its own.
+                Material(
+                  type: MaterialType.transparency,
+                  child: ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    title: const Text('Date',
+                        style: TextStyle(
+                            color: MediColors.textSecondary, fontSize: 13)),
+                    subtitle: Text(
+                        '${_selectedDate.day}/${_selectedDate.month}/${_selectedDate.year}',
+                        style: const TextStyle(
+                            color: MediColors.textPrimary,
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600)),
+                    trailing: const Icon(Icons.calendar_today_rounded,
+                        color: MediColors.textMuted),
+                    onTap: () async {
+                      final date = await showDatePicker(
+                          context: context,
+                          initialDate: _selectedDate,
+                          firstDate: DateTime(2020),
+                          lastDate: DateTime.now());
+                      if (date != null) setState(() => _selectedDate = date);
+                    },
+                  ),
                 ),
                 const SizedBox(height: 16),
                 if (_isLoadingInventory)
@@ -525,17 +684,19 @@ class _DailyLoggingPageState extends ConsumerState<DailyLoggingPage>
                     width: double.infinity,
                     height: 50,
                     child: FilledButton(
-                        onPressed:
-                            (_isSubmitting || _availableMedicines.isEmpty)
-                                ? null
-                                : _submitLog,
+                        onPressed: (_isSubmitting ||
+                                _availableMedicines.isEmpty ||
+                                !isOnline)
+                            ? null
+                            : _submitLog,
                         child: _isSubmitting
                             ? const SizedBox(
                                 width: 20,
                                 height: 20,
                                 child: CircularProgressIndicator(
                                     color: Colors.white, strokeWidth: 2))
-                            : const Text('Save Log'))),
+                            : Text(
+                                isOnline ? 'Save Log' : 'Save Log (offline)'))),
               ],
             ),
           ),
@@ -544,7 +705,7 @@ class _DailyLoggingPageState extends ConsumerState<DailyLoggingPage>
     );
   }
 
-  Widget _buildCsvTab() {
+  Widget _buildCsvTab(bool isOnline) {
     return SingleChildScrollView(
       padding: const EdgeInsets.all(28),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -644,14 +805,17 @@ class _DailyLoggingPageState extends ConsumerState<DailyLoggingPage>
                           height: 20,
                           child: CircularProgressIndicator(
                               color: Colors.white, strokeWidth: 2))
-                      : Text('Submit ${_csvItems.length} Logs'),
-                  onPressed: _isSubmittingCsv ? null : _submitCSVLogs)),
+                      : Text(isOnline
+                          ? 'Submit ${_csvItems.length} Logs'
+                          : 'Submit ${_csvItems.length} Logs (offline)'),
+                  onPressed:
+                      (_isSubmittingCsv || !isOnline) ? null : _submitCSVLogs)),
         ],
       ]),
     );
   }
 
-  Widget _buildQrTab() {
+  Widget _buildQrTab(bool isOnline) {
     return SingleChildScrollView(
       padding: const EdgeInsets.all(28),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -750,15 +914,19 @@ class _DailyLoggingPageState extends ConsumerState<DailyLoggingPage>
                             height: 20,
                             child: CircularProgressIndicator(
                                 color: Colors.white, strokeWidth: 2))
-                        : Text('Submit ${_scannedItems.length}'),
-                    onPressed: _isSubmittingQr ? null : _submitScannedLogs)),
+                        : Text(isOnline
+                            ? 'Submit ${_scannedItems.length}'
+                            : 'Submit ${_scannedItems.length} (offline)'),
+                    onPressed: (_isSubmittingQr || !isOnline)
+                        ? null
+                        : _submitScannedLogs)),
           ]),
         ],
       ]),
     );
   }
 
-  Widget _buildImageTab() {
+  Widget _buildImageTab(bool isOnline) {
     return SingleChildScrollView(
       padding: const EdgeInsets.all(28),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -788,9 +956,12 @@ class _DailyLoggingPageState extends ConsumerState<DailyLoggingPage>
                       color: MediColors.violet)),
             ]),
             const SizedBox(height: 12),
-            const Text(
-                'Upload a photo of medicine records for AI-powered extraction',
-                style: TextStyle(color: MediColors.textMuted, fontSize: 13)),
+            Text(
+                isOnline
+                    ? 'Upload a photo of medicine records for AI-powered extraction'
+                    : 'AI extraction needs an internet connection. Reconnect to parse images.',
+                style:
+                    const TextStyle(color: MediColors.textMuted, fontSize: 13)),
             const SizedBox(height: 16),
             OutlinedButton.icon(
                 icon: _isParsingImage
@@ -801,7 +972,7 @@ class _DailyLoggingPageState extends ConsumerState<DailyLoggingPage>
                             strokeWidth: 2, color: MediColors.violet))
                     : const Icon(Icons.photo_camera_rounded),
                 label: Text(_isParsingImage ? 'Parsing...' : 'Choose Image'),
-                onPressed: _isParsingImage ? null : _parseImage),
+                onPressed: (_isParsingImage || !isOnline) ? null : _parseImage),
           ]),
         ),
         if (_imageParseError != null) ...[
@@ -841,41 +1012,223 @@ class _DailyLoggingPageState extends ConsumerState<DailyLoggingPage>
                     onPressed: _parseImage),
               ])),
         ],
-        if (_imageParseResult != null) ...[
+        if (_imageItems.isNotEmpty) ...[
+          const SizedBox(height: 20),
+          Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                  color: MediColors.successSubtle,
+                  borderRadius: BorderRadius.circular(10)),
+              child: Row(children: [
+                const Icon(Icons.check_circle_rounded,
+                    color: MediColors.success, size: 18),
+                const SizedBox(width: 10),
+                Expanded(
+                    child: Text(
+                        'Extracted ${_imageItems.length} entries from image. Review and edit before submitting.',
+                        style: const TextStyle(
+                            color: MediColors.success, fontSize: 13)))
+              ])),
           const SizedBox(height: 16),
           Container(
               width: double.infinity,
-              padding: const EdgeInsets.all(14),
               decoration: BoxDecoration(
-                  color: MediColors.successSubtle,
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: MediColors.successBorder)),
-              child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Row(children: [
-                      Icon(Icons.check_circle_rounded,
-                          color: MediColors.success, size: 18),
-                      SizedBox(width: 10),
-                      Text('AI Extraction Result',
-                          style: TextStyle(
-                              color: MediColors.success,
-                              fontWeight: FontWeight.w600,
-                              fontSize: 14)),
-                    ]),
-                    const SizedBox(height: 10),
-                    Container(
-                        width: double.infinity,
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                            color: MediColors.surface,
-                            borderRadius: BorderRadius.circular(8)),
-                        child: Text(_imageParseResult!,
-                            style: const TextStyle(
-                                color: MediColors.textSecondary,
-                                fontSize: 13,
-                                fontFamily: 'monospace'))),
-                  ])),
+                  color: MediColors.surface,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: MediColors.border)),
+              child: SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: DataTable(
+                      columns: const [
+                        DataColumn(label: Text('Medicine')),
+                        DataColumn(label: Text('Units')),
+                        DataColumn(label: Text('Patients')),
+                        DataColumn(label: Text(''))
+                      ],
+                      rows: _imageItems.map((item) {
+                        final currentMed = item['medicine']?.toString() ?? '';
+                        final isMedValid =
+                            _availableMedicines.contains(currentMed);
+                        final dropdownItems =
+                            List<String>.from(_availableMedicines);
+                        if (!isMedValid && currentMed.isNotEmpty) {
+                          dropdownItems.add(currentMed);
+                        }
+
+                        return DataRow(key: ObjectKey(item), cells: [
+                          DataCell(Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              if (!isMedValid) ...[
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 6, vertical: 2),
+                                  decoration: BoxDecoration(
+                                    color: MediColors.error
+                                        .withValues(alpha: 0.12),
+                                    borderRadius: BorderRadius.circular(6),
+                                    border: Border.all(
+                                        color: MediColors.error
+                                            .withValues(alpha: 0.3)),
+                                  ),
+                                  child: const Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Icon(Icons.warning_amber_rounded,
+                                          color: MediColors.error, size: 14),
+                                      SizedBox(width: 4),
+                                      Text(
+                                        'Not in inventory',
+                                        style: TextStyle(
+                                          color: MediColors.error,
+                                          fontSize: 11,
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                              ],
+                              DropdownButton<String>(
+                                value: dropdownItems.contains(currentMed)
+                                    ? currentMed
+                                    : null,
+                                underline: const SizedBox(),
+                                isDense: true,
+                                style: TextStyle(
+                                  color: isMedValid
+                                      ? MediColors.textPrimary
+                                      : MediColors.error,
+                                  fontWeight: isMedValid
+                                      ? FontWeight.w600
+                                      : FontWeight.bold,
+                                  fontSize: 14,
+                                ),
+                                items: dropdownItems.map((med) {
+                                  final isValid =
+                                      _availableMedicines.contains(med);
+                                  return DropdownMenuItem<String>(
+                                    value: med,
+                                    child: Text(
+                                      med,
+                                      style: TextStyle(
+                                        color: isValid
+                                            ? MediColors.textPrimary
+                                            : MediColors.error,
+                                        fontWeight: isValid
+                                            ? FontWeight.normal
+                                            : FontWeight.bold,
+                                      ),
+                                    ),
+                                  );
+                                }).toList(),
+                                onChanged: (newVal) {
+                                  if (newVal != null) {
+                                    setState(() {
+                                      item['medicine'] = newVal;
+                                    });
+                                  }
+                                },
+                              ),
+                            ],
+                          )),
+                          DataCell(SizedBox(
+                            width: 75,
+                            child: TextFormField(
+                              initialValue: item['quantity'].toString(),
+                              keyboardType: TextInputType.number,
+                              decoration: InputDecoration(
+                                isDense: true,
+                                contentPadding: const EdgeInsets.symmetric(
+                                    horizontal: 8, vertical: 8),
+                                border: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(6)),
+                              ),
+                              onChanged: (val) {
+                                item['quantity'] = _parseNumber(val);
+                                setState(() {});
+                              },
+                            ),
+                          )),
+                          DataCell(SizedBox(
+                            width: 75,
+                            child: TextFormField(
+                              initialValue: item['patients'].toString(),
+                              keyboardType: TextInputType.number,
+                              decoration: InputDecoration(
+                                isDense: true,
+                                contentPadding: const EdgeInsets.symmetric(
+                                    horizontal: 8, vertical: 8),
+                                border: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(6)),
+                              ),
+                              onChanged: (val) {
+                                item['patients'] = _parseNumber(val);
+                                setState(() {});
+                              },
+                            ),
+                          )),
+                          DataCell(IconButton(
+                            icon: const Icon(Icons.close_rounded,
+                                color: MediColors.error, size: 18),
+                            onPressed: () =>
+                                setState(() => _imageItems.remove(item)),
+                          )),
+                        ]);
+                      }).toList()))),
+          const SizedBox(height: 20),
+          Row(children: [
+            Expanded(
+              child: OutlinedButton.icon(
+                icon: const Icon(Icons.photo_camera_rounded),
+                label: const Text('Parse Another Image'),
+                onPressed: (_isParsingImage || !isOnline) ? null : _parseImage,
+              ),
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: FilledButton.icon(
+                icon: const Icon(Icons.save_rounded),
+                label: _isSubmittingImage
+                    ? const SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(
+                            color: Colors.white, strokeWidth: 2))
+                    : Text(isOnline
+                        ? 'Submit ${_imageItems.length} Logs'
+                        : 'Submit ${_imageItems.length} Logs (offline)'),
+                onPressed:
+                    (_isSubmittingImage || !isOnline) ? null : _submitImageLogs,
+              ),
+            ),
+          ]),
+        ],
+        if (_imageParseResult != null) ...[
+          const SizedBox(height: 16),
+          ExpansionTile(
+            title: const Text('View Raw AI Output',
+                style: TextStyle(fontSize: 13, color: MediColors.textMuted)),
+            children: [
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: MediColors.surface,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(
+                  _imageParseResult!,
+                  style: const TextStyle(
+                    color: MediColors.textSecondary,
+                    fontSize: 12,
+                    fontFamily: 'monospace',
+                  ),
+                ),
+              ),
+            ],
+          ),
         ],
       ]),
     );
@@ -883,7 +1236,7 @@ class _DailyLoggingPageState extends ConsumerState<DailyLoggingPage>
 
   // --- History tab UI ---
 
-  Widget _buildHistoryTab() {
+  Widget _buildHistoryTab(bool isOnline) {
     if (_isLoadingHistory) {
       return const DailyLoggingSkeleton();
     }
@@ -893,17 +1246,23 @@ class _DailyLoggingPageState extends ConsumerState<DailyLoggingPage>
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(Icons.error_outline_rounded,
-                color: MediColors.error, size: 40),
+            Icon(
+                isOnline ? Icons.error_outline_rounded : Icons.wifi_off_rounded,
+                color: isOnline ? MediColors.error : MediColors.warning,
+                size: 40),
             const SizedBox(height: 12),
-            Text('Failed to load history: $_historyError',
+            Text(
+                isOnline
+                    ? 'Failed to load history: $_historyError'
+                    : 'History is unavailable while offline. It will load '
+                        'automatically once you reconnect.',
                 textAlign: TextAlign.center,
                 style: const TextStyle(color: MediColors.textMuted)),
             const SizedBox(height: 16),
             OutlinedButton.icon(
               icon: const Icon(Icons.refresh_rounded),
               label: const Text('Retry'),
-              onPressed: _fetchHistoryFirstPage,
+              onPressed: isOnline ? _fetchHistoryFirstPage : null,
             ),
           ],
         ),
@@ -947,13 +1306,15 @@ class _DailyLoggingPageState extends ConsumerState<DailyLoggingPage>
               padding: const EdgeInsets.symmetric(vertical: 16),
               child: Center(
                 child: OutlinedButton(
-                  onPressed: _isLoadingMoreHistory ? null : _fetchMoreHistory,
+                  onPressed: (_isLoadingMoreHistory || !isOnline)
+                      ? null
+                      : _fetchMoreHistory,
                   child: _isLoadingMoreHistory
                       ? const SizedBox(
                           width: 18,
                           height: 18,
                           child: CircularProgressIndicator(strokeWidth: 2))
-                      : const Text('Load More'),
+                      : Text(isOnline ? 'Load More' : 'Load More (offline)'),
                 ),
               ),
             );
