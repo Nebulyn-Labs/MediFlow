@@ -240,16 +240,17 @@ high-concurrency performance:
 
 > [!NOTE]
 > If the dashboard appears empty, use the **"Seed DB"** button on the
-> Login/Role Selection screen to populate the database with demo records.
+> Login screen to populate the database with demo records.
 
 ### How to Use the Demo
 
-1. **Log in** with one of the demo credentials above.
-2. **Choose a role** on the Role Selection screen:
+1. **Choose a role** on the Role Selection screen, which is the landing
+   page:
    - **CMS Admin** — approve redistribution plans, inspect regional
      analytics, and run route optimization.
    - **Facility Head** — log daily medicine usage, review AI demand
      forecasts, file restock indents, and chat with the AI assistant.
+2. **Log in** with the matching demo credentials above.
 3. **(Optional) Seed the database** with the **"Seed DB"** button if no
    data is shown.
 
