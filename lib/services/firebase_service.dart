@@ -88,11 +88,13 @@ class FirebaseService {
       id: facilityId,
       name: name,
       email: email,
-      type: type ?? profile['type'],
-      region: fixedRegion ?? profile['region'],
-      latitude: fixedLat ?? profile['latitude'],
-      longitude: fixedLng ?? profile['longitude'],
-      createdAt: (profile['createdAt'] as Timestamp).toDate(),
+      type: type ?? profile['type']?.toString() ?? 'urban',
+      region: fixedRegion ?? profile['region']?.toString() ?? '',
+      latitude: fixedLat ?? (profile['latitude'] as num?)?.toDouble() ?? 0.0,
+      longitude: fixedLng ?? (profile['longitude'] as num?)?.toDouble() ?? 0.0,
+      createdAt: profile['createdAt'] is Timestamp
+          ? (profile['createdAt'] as Timestamp).toDate()
+          : DateTime.now(),
     );
 
     await _firestore
@@ -224,7 +226,8 @@ class FirebaseService {
     await _firestore.runTransaction((transaction) async {
       final invDoc = await transaction.get(invRef);
       if (invDoc.exists) {
-        int current = invDoc.data()?['remainingQuantity'] ?? 0;
+        int current =
+            (invDoc.data()?['remainingQuantity'] as num?)?.toInt() ?? 0;
         transaction.update(invRef, {
           'remainingQuantity': current + quantity,
           'lastUpdated': Timestamp.now(),
@@ -251,14 +254,27 @@ class FirebaseService {
             .toList());
   }
 
+  /// Returns daily usage logs for [facilityId] whose [date] falls within the
+  /// last [days] calendar days (i.e. `date >= now - days`).
+  ///
+  /// Unlike a plain `.limit(days)`, this is a true time-window query so
+  /// callers that expect "the last 30 days of data" receive exactly that,
+  /// regardless of how frequently the facility logs data.
+  ///
+  /// A safety cap of 500 documents is applied to avoid unbounded reads on
+  /// high-throughput facilities; raise it if a use-case genuinely needs more.
   Future<List<DailyUsageLog>> getRecentLogs(String facilityId,
       {int days = 30}) async {
+    final cutoff = Timestamp.fromDate(
+      DateTime.now().subtract(Duration(days: days)),
+    );
     final snapshot = await _firestore
         .collection('daily_usage_logs')
         .doc(facilityId)
         .collection('logs')
+        .where('date', isGreaterThanOrEqualTo: cutoff)
         .orderBy('date', descending: true)
-        .limit(days)
+        .limit(500)
         .get();
     return snapshot.docs
         .map((doc) => DailyUsageLog.fromMap(doc.data(), doc.id))
@@ -330,7 +346,8 @@ class FirebaseService {
             'Inventory document not found for medicine: $medicineName');
       }
 
-      int remaining = invDoc.data()?['remainingQuantity'] ?? 0;
+      int remaining =
+          (invDoc.data()?['remainingQuantity'] as num?)?.toInt() ?? 0;
       int actualDeduction = min(quantity, remaining);
       transaction.update(invRef, {
         'remainingQuantity': remaining - actualDeduction,
@@ -340,8 +357,9 @@ class FirebaseService {
       // 2. Update Daily Log
       final logDoc = await transaction.get(logRef);
       if (logDoc.exists) {
-        List medicines = logDoc.data()?['medicines'] ?? [];
-        int totalPatients = logDoc.data()?['totalPatients'] ?? 0;
+        List<dynamic> medicines = (logDoc.data()?['medicines'] as List?) ?? [];
+        int totalPatients =
+            (logDoc.data()?['totalPatients'] as num?)?.toInt() ?? 0;
 
         // Update existing medicine usage or add new
         int index =
@@ -624,13 +642,13 @@ class FirebaseService {
       for (var f in demoFacilities) {
         try {
           await signUpFacility(
-            name: f['name']!,
-            email: f['email']!,
-            password: f['password']!,
-            type: f['type'],
-            fixedLat: f['lat'],
-            fixedLng: f['lng'],
-            fixedRegion: f['region'],
+            name: f['name']?.toString() ?? '',
+            email: f['email']?.toString() ?? '',
+            password: f['password']?.toString() ?? '',
+            type: f['type']?.toString(),
+            fixedLat: (f['lat'] as num?)?.toDouble(),
+            fixedLng: (f['lng'] as num?)?.toDouble(),
+            fixedRegion: f['region']?.toString(),
           );
           // Delay to avoid auth rate limits
           await Future.delayed(const Duration(milliseconds: 1500));
@@ -649,23 +667,23 @@ class FirebaseService {
       }
 
       // 4. Seed sample requests for Admin Dashboard KPIs & Route Optimization
-      final String f1Id = demoFacilities[0]['email']!
+      final String f1Id = (demoFacilities[0]['email']?.toString() ?? '')
           .toLowerCase()
           .replaceAll('@', '_')
           .replaceAll('.', '_'); // Rampur (Rural)
-      final String f2Id = demoFacilities[1]['email']!
+      final String f2Id = (demoFacilities[1]['email']?.toString() ?? '')
           .toLowerCase()
           .replaceAll('@', '_')
           .replaceAll('.', '_'); // Modinagar (Urban)
-      final String f3Id = demoFacilities[2]['email']!
+      final String f3Id = (demoFacilities[2]['email']?.toString() ?? '')
           .toLowerCase()
           .replaceAll('@', '_')
           .replaceAll('.', '_'); // Loni (Urban)
-      final String f4Id = demoFacilities[3]['email']!
+      final String f4Id = (demoFacilities[3]['email']?.toString() ?? '')
           .toLowerCase()
           .replaceAll('@', '_')
           .replaceAll('.', '_'); // Ghaziabad (Urban)
-      final String f5Id = demoFacilities[4]['email']!
+      final String f5Id = (demoFacilities[4]['email']?.toString() ?? '')
           .toLowerCase()
           .replaceAll('@', '_')
           .replaceAll('.', '_'); // Bhojpur (Rural)

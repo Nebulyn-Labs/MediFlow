@@ -88,7 +88,7 @@ class _AdminOverviewState extends ConsumerState<AdminOverview> {
     }
 
     // Load the first page of medicines (non-blocking alongside facility load)
-    _loadMedicinePage();
+    unawaited(_loadMedicinePage());
 
     List<Facility> facs = [];
     try {
