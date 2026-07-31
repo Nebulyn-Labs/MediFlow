@@ -18,13 +18,8 @@ function toIsoTimestamp(value) {
   return value;
 }
 
-/**
- * Single source of truth for backend stock-health classification.
- * The low_stock thresholds intentionally mirror InventoryItem.isLowStock in
- * lib/models/inventory_item.dart (<=20% remaining, or <=500 units in
- * absolute terms) so the app and backend never disagree about what counts
- * as low stock.
- */
+const thresholds = require("./inventory_thresholds.json");
+
 function stockStatus(data) {
   const initial = Number(data.initialQuantity || 0);
   const remaining = Number(data.remainingQuantity || 0);
@@ -36,7 +31,7 @@ function stockStatus(data) {
 
   if (daysLeft !== null && daysLeft < 0) return "expired";
   if (pct >= 0.7 && daysLeft !== null && daysLeft <= 30) return "wastage_risk";
-  if (pct <= 0.2 || remaining <= 500) return "low_stock";
+  if (pct <= thresholds.lowStockPercentage || remaining <= thresholds.lowStockAbsolute) return "low_stock";
   if (daysLeft !== null && daysLeft <= 30) return "expiring_soon";
   return "healthy";
 }
@@ -50,7 +45,7 @@ function createLowStockService({ serverTimestamp }) {
    * the scheduled sweep) use that to avoid re-notifying about a low_stock
    * alert that isn't new.
    */
-  async function syncAlertForMedicine(db, facilityId, medicineId, data, facilityName) {
+  async function syncAlertForMedicine(db, facilityId, medicineId, data, facilityName, sendNotification) {
     const alertId = `${facilityId}_${medicineId}`;
     const alertRef = db.collection("alerts").doc(alertId);
 
@@ -98,6 +93,41 @@ function createLowStockService({ serverTimestamp }) {
     }
 
     await alertRef.set(alertData, { merge: true });
+
+    if (status === "low_stock" && !existed) {
+      // Write to real-time notification feed subcollection
+      const notifRef = db
+        .collection("notifications")
+        .doc(facilityId)
+        .collection("items")
+        .doc();
+      
+      await notifRef.set({
+        facilityId: facilityId,
+        type: "low_stock",
+        message: `${data.medicineName} is below reorder level (${data.remainingQuantity} left).`,
+        isRead: false,
+        createdAt: serverTimestamp(),
+      });
+
+      const userQuery = await db
+        .collection("users")
+        .where("facilityId", "==", facilityId)
+        .where("role", "==", "facility_head")
+        .limit(1)
+        .get();
+
+      if (!userQuery.empty) {
+        const user = userQuery.docs[0].data();
+        if (user.fcmToken && sendNotification) {
+          await sendNotification(user.fcmToken, {
+            title: "Low Stock Alert",
+            body: `${data.medicineName} is below reorder level (${data.remainingQuantity} left).`,
+          });
+        }
+      }
+    }
+
     return { status, existed };
   }
 
@@ -126,27 +156,9 @@ function createLowStockService({ serverTimestamp }) {
           facilityDoc.id,
           medDoc.id,
           data,
-          facilityName
+          facilityName,
+          sendNotification
         );
-
-        if (status === "low_stock" && !existed) {
-          const userQuery = await db
-            .collection("users")
-            .where("facilityId", "==", facilityDoc.id)
-            .where("role", "==", "facility_head")
-            .limit(1)
-            .get();
-
-          if (!userQuery.empty) {
-            const user = userQuery.docs[0].data();
-            if (user.fcmToken && sendNotification) {
-              await sendNotification(user.fcmToken, {
-                title: "Low Stock Alert",
-                body: `${data.medicineName} is below reorder level (${data.remainingQuantity} left).`,
-              });
-            }
-          }
-        }
       }
     }
 

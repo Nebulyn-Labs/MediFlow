@@ -1,71 +1,179 @@
 (function () {
-  // Detect touch devices and skip the custom cursor entirely
-  const isTouchDevice = window.matchMedia('(pointer: coarse)').matches;
-  if (isTouchDevice) {
-    return;
+  const reducedMotionQuery = window.matchMedia('(prefers-reduced-motion: reduce)');
+  const coarsePointerQuery = window.matchMedia('(pointer: coarse)');
+
+  function shouldDisableCursor() {
+    return reducedMotionQuery.matches || coarsePointerQuery.matches;
   }
 
-  document.body.classList.add('custom-cursor-active');
-
-  const dot = document.createElement('div');
-  dot.className = 'cursor-dot';
-
-  const ring = document.createElement('div');
-  ring.className = 'cursor-ring';
-
-  document.body.appendChild(dot);
-  document.body.appendChild(ring);
-
+  let isInitialized = false;
+  let dot = null;
+  let ring = null;
   let mouseX = 0;
   let mouseY = 0;
   let ringX = 0;
   let ringY = 0;
+  let isAnimating = false;
+  let animationFrameId = null;
+  let hasMoved = false;
 
-  window.addEventListener('mousemove', function (e) {
+  const hoverSelector = 'a, button, input, textarea, select, label, [role="button"], flt-glass-pane';
+
+  function onMouseMove(e) {
     mouseX = e.clientX;
     mouseY = e.clientY;
 
-    // Dot follows instantly
-    dot.style.left = mouseX + 'px';
-    dot.style.top = mouseY + 'px';
-  });
+    if (dot) {
+      dot.style.left = mouseX + 'px';
+      dot.style.top = mouseY + 'px';
+    }
 
-  // Smoothly animate the ring toward the mouse position (lag/trail effect)
-  function animateRing() {
-    ringX += (mouseX - ringX) * 0.15;
-    ringY += (mouseY - ringY) * 0.15;
+    if (!hasMoved) {
+      hasMoved = true;
+      ringX = mouseX;
+      ringY = mouseY;
+      if (ring) {
+        ring.style.left = ringX + 'px';
+        ring.style.top = ringY + 'px';
+      }
+    }
 
-    ring.style.left = ringX + 'px';
-    ring.style.top = ringY + 'px';
-
-    requestAnimationFrame(animateRing);
+    if (!isAnimating) {
+      isAnimating = true;
+      animationFrameId = requestAnimationFrame(animateRing);
+    }
   }
-  requestAnimationFrame(animateRing);
 
-  // Click animation
-  window.addEventListener('mousedown', function () {
-    dot.classList.add('cursor-click');
-    ring.classList.add('cursor-click');
-  });
+  function animateRing() {
+    const dx = mouseX - ringX;
+    const dy = mouseY - ringY;
 
-  window.addEventListener('mouseup', function () {
-    dot.classList.remove('cursor-click');
-    ring.classList.remove('cursor-click');
-  });
-
-  // Hover animation for clickable elements
-  const hoverSelector = 'a, button, input, textarea, select, label, [role="button"], flt-glass-pane';
-  document.addEventListener('mouseover', function (e) {
-    if (e.target.closest && e.target.closest(hoverSelector)) {
-      dot.classList.add('cursor-hover');
-      ring.classList.add('cursor-hover');
+    if (Math.abs(dx) < 0.5 && Math.abs(dy) < 0.5) {
+      ringX = mouseX;
+      ringY = mouseY;
+      if (ring) {
+        ring.style.left = ringX + 'px';
+        ring.style.top = ringY + 'px';
+      }
+      isAnimating = false;
+      animationFrameId = null;
+      return;
     }
-  });
 
-  document.addEventListener('mouseout', function (e) {
-    if (e.target.closest && e.target.closest(hoverSelector)) {
-      dot.classList.remove('cursor-hover');
-      ring.classList.remove('cursor-hover');
+    ringX += dx * 0.15;
+    ringY += dy * 0.15;
+
+    if (ring) {
+      ring.style.left = ringX + 'px';
+      ring.style.top = ringY + 'px';
     }
-  });
-})();
+
+    animationFrameId = requestAnimationFrame(animateRing);
+  }
+
+  function onMouseDown() {
+    if (dot) dot.classList.add('cursor-click');
+    if (ring) ring.classList.add('cursor-click');
+  }
+
+  function onMouseUp() {
+    if (dot) dot.classList.remove('cursor-click');
+    if (ring) ring.classList.remove('cursor-click');
+  }
+
+  function onMouseOver(e) {
+    if (e.target && e.target.closest && e.target.closest(hoverSelector)) {
+      if (dot) dot.classList.add('cursor-hover');
+      if (ring) ring.classList.add('cursor-hover');
+    }
+  }
+
+  function onMouseOut(e) {
+    if (e.target && e.target.closest && e.target.closest(hoverSelector)) {
+      if (dot) dot.classList.remove('cursor-hover');
+      if (ring) ring.classList.remove('cursor-hover');
+    }
+  }
+
+  function initCursor() {
+    if (isInitialized || shouldDisableCursor()) {
+      return;
+    }
+
+    isInitialized = true;
+    hasMoved = false;
+
+    document.body.classList.add('custom-cursor-active');
+
+    dot = document.createElement('div');
+    dot.className = 'cursor-dot';
+
+    ring = document.createElement('div');
+    ring.className = 'cursor-ring';
+
+    document.body.appendChild(dot);
+    document.body.appendChild(ring);
+
+    window.addEventListener('mousemove', onMouseMove);
+    window.addEventListener('mousedown', onMouseDown);
+    window.addEventListener('mouseup', onMouseUp);
+    document.addEventListener('mouseover', onMouseOver);
+    document.addEventListener('mouseout', onMouseOut);
+  }
+
+  function destroyCursor() {
+    if (!isInitialized) {
+      return;
+    }
+
+    isInitialized = false;
+
+    document.body.classList.remove('custom-cursor-active');
+
+    if (animationFrameId !== null) {
+      cancelAnimationFrame(animationFrameId);
+      animationFrameId = null;
+    }
+    isAnimating = false;
+
+    window.removeEventListener('mousemove', onMouseMove);
+    window.removeEventListener('mousedown', onMouseDown);
+    window.removeEventListener('mouseup', onMouseUp);
+    document.removeEventListener('mouseover', onMouseOver);
+    document.removeEventListener('mouseout', onMouseOut);
+
+    if (dot) {
+      if (dot.remove) dot.remove();
+      else if (dot.parentNode) dot.parentNode.removeChild(dot);
+    }
+    if (ring) {
+      if (ring.remove) ring.remove();
+      else if (ring.parentNode) ring.parentNode.removeChild(ring);
+    }
+
+    dot = null;
+    ring = null;
+  }
+
+  function updateCursorState() {
+    if (shouldDisableCursor()) {
+      destroyCursor();
+    } else {
+      initCursor();
+    }
+  }
+
+  function listenMediaQuery(mq, callback) {
+    if (!mq) return;
+    if (mq.addEventListener) {
+      mq.addEventListener('change', callback);
+    } else if (mq.addListener) {
+      mq.addListener(callback);
+    }
+  }
+
+  listenMediaQuery(reducedMotionQuery, updateCursorState);
+  listenMediaQuery(coarsePointerQuery, updateCursorState);
+
+  updateCursorState();
+})();
