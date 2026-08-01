@@ -651,7 +651,8 @@ void main() {
       expect(find.text('Transfer Manifest'), findsOneWidget);
     });
 
-    testWidgets('displays road route distance and travel duration when available',
+    testWidgets(
+        'displays road route distance and travel duration when available',
         (WidgetTester tester) async {
       tester.view.physicalSize = const Size(1920, 1080);
       tester.view.devicePixelRatio = 1.0;
