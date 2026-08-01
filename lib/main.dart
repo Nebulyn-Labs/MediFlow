@@ -20,10 +20,8 @@ import 'views/facility/facility_overview.dart';
 import 'views/facility/ai_forecast_page.dart';
 import 'views/facility/active_indents_page.dart';
 import 'views/facility/daily_logging_page.dart';
-import 'views/facility/alerts_page.dart';
 import 'package:med_supply_prototype/views/shared/not_found_page.dart';
 
-import 'services/firebase_setup.dart';
 import 'views/admin/admin_indent_approval_page.dart';
 import 'views/admin/admin_indent_status_page.dart';
 // Admin Pages
@@ -31,18 +29,10 @@ import 'views/admin/admin_overview.dart';
 import 'views/admin/audit_trail_page.dart';
 import 'views/admin/route_optimization_map.dart';
 import 'views/auth/forgot_password_page.dart';
-import 'views/auth/login_screen.dart';
-import 'views/auth/role_selection_screen.dart';
-import 'views/facility/active_indents_page.dart';
-import 'views/facility/ai_forecast_page.dart';
-import 'views/facility/daily_logging_page.dart';
-import 'views/facility/facility_overview.dart';
 import 'views/facility/wastage_report_page.dart';
 import 'views/facility/facility_profile_page.dart';
 import 'views/facility/alerts_hub_page.dart';
 import 'views/shared/ai_chat_page.dart';
-import 'views/shared/help_page.dart';
-import 'views/shared/sidebar_layout.dart';
 
 final GlobalKey<NavigatorState> _rootNavigatorKey = GlobalKey<NavigatorState>();
 final GlobalKey<NavigatorState> _facilityShellNavigatorKey =

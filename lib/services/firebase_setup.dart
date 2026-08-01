@@ -2,7 +2,11 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_functions/cloud_functions.dart';
 import 'package:flutter/foundation.dart';
+import 'package:firebase_core/firebase_core.dart';
+export 'package:firebase_core/firebase_core.dart'; // Export it for main.dart
+import 'package:firebase_app_check/firebase_app_check.dart';
 import 'dart:io' show Platform;
+import '../firebase_options.dart';
 
 const useFirebaseEmulator = bool.fromEnvironment('USE_FIREBASE_EMULATOR');
 
@@ -20,10 +24,8 @@ Future<void> setupFirebaseEmulator() async {
     } catch (e) {
       debugPrint('Failed to connect to Firebase Emulators: $e');
     }
-import 'package:flutter/foundation.dart';
-import 'package:firebase_core/firebase_core.dart';
-import 'package:firebase_app_check/firebase_app_check.dart';
-import '../firebase_options.dart';
+  }
+}
 
 Future<void> initializeFirebaseServices() async {
   try {

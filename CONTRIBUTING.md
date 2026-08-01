@@ -104,7 +104,8 @@ If you plan to modify or deploy Cloud Functions or Firestore rules:
 
 ### Firebase Local Emulators
 
-For local development without affecting production data, you can use the Firebase Emulators (Auth, Firestore, Functions, and Emulator UI).
+For local development without affecting production data, you can use the Firebase
+Emulators (Auth, Firestore, Functions, and Emulator UI).
 
 1. Start the emulators:
 
@@ -121,7 +122,10 @@ For local development without affecting production data, you can use the Firebas
 
 ### Database Seeding (Demo Data)
 
-If you need initial data for testing, the application includes a built-in demo-data seeder. You can invoke the `FirebaseService.seedDemoData()` method to populate the database with facilities, inventory, and sample requests. This will clear existing data in the targeted collections.
+If you need initial data for testing, the application includes a built-in demo-data seeder.
+You can invoke the `FirebaseService.seedDemoData()` method to populate the database with
+facilities, inventory, and sample requests. This will clear existing data in the targeted
+collections.
 
 ---
 
