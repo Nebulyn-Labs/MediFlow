@@ -32,17 +32,18 @@ class MedRequest {
   factory MedRequest.fromMap(Map<String, dynamic> map, String id) {
     return MedRequest(
       id: id,
-      facilityId: map['facilityId'] ?? '',
-      medicineName: map['medicineName'] ?? '',
+      facilityId: map['facilityId']?.toString() ?? '',
+      medicineName: map['medicineName']?.toString() ?? '',
       type: RequestType.values.firstWhere((e) => e.name == map['type'],
           orElse: () => RequestType.regularIndent),
-      quantity: map['quantity']?.toInt() ?? 0,
-      requestDate: (map['requestDate'] as Timestamp).toDate(),
+      quantity: (map['quantity'] as num?)?.toInt() ?? 0,
+      requestDate:
+          (map['requestDate'] as Timestamp?)?.toDate() ?? DateTime.now(),
       status: RequestStatus.values.firstWhere((e) => e.name == map['status'],
           orElse: () => RequestStatus.pending),
-      notes: map['notes'],
-      rejectionReason: map['rejectionReason'],
-      resolvedAt: map['resolvedAt'] != null
+      notes: map['notes']?.toString(),
+      rejectionReason: map['rejectionReason']?.toString(),
+      resolvedAt: map['resolvedAt'] is Timestamp
           ? (map['resolvedAt'] as Timestamp).toDate()
           : null,
     );

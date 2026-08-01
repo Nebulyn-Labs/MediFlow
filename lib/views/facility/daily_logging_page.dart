@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
@@ -230,7 +231,7 @@ class _DailyLoggingPageState extends ConsumerState<DailyLoggingPage>
             .showSnackBar(const SnackBar(content: Text('Log saved ✓')));
         _formKey.currentState!.reset();
         // Keep the History tab fresh with the newly saved log.
-        _fetchHistoryFirstPage();
+        unawaited(_fetchHistoryFirstPage());
       }
     } catch (e) {
       if (mounted) {
@@ -326,9 +327,9 @@ class _DailyLoggingPageState extends ConsumerState<DailyLoggingPage>
         await ref.read(firebaseServiceProvider).logUsage(
             facilityId: widget.facilityId,
             date: _selectedDate,
-            medicineName: item['medicine'],
-            quantity: item['quantity'],
-            patients: item['patients']);
+            medicineName: item['medicine']?.toString() ?? '',
+            quantity: (item['quantity'] as num?)?.toInt() ?? 0,
+            patients: (item['patients'] as num?)?.toInt() ?? 0);
       }
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -337,7 +338,7 @@ class _DailyLoggingPageState extends ConsumerState<DailyLoggingPage>
           _csvItems.clear();
           _csvStatus = null;
         });
-        _fetchHistoryFirstPage();
+        unawaited(_fetchHistoryFirstPage());
       }
     } catch (e) {
       if (mounted) {
@@ -375,15 +376,15 @@ class _DailyLoggingPageState extends ConsumerState<DailyLoggingPage>
         await ref.read(firebaseServiceProvider).logUsage(
             facilityId: widget.facilityId,
             date: _selectedDate,
-            medicineName: item['medicine'],
-            quantity: item['quantity'],
-            patients: item['patients']);
+            medicineName: item['medicine']?.toString() ?? '',
+            quantity: (item['quantity'] as num?)?.toInt() ?? 0,
+            patients: (item['patients'] as num?)?.toInt() ?? 0);
       }
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(content: Text('${_scannedItems.length} logs saved ✓')));
         setState(() => _scannedItems.clear());
-        _fetchHistoryFirstPage();
+        unawaited(_fetchHistoryFirstPage());
       }
     } catch (e) {
       if (mounted) {
@@ -477,9 +478,9 @@ class _DailyLoggingPageState extends ConsumerState<DailyLoggingPage>
         await ref.read(firebaseServiceProvider).logUsage(
             facilityId: widget.facilityId,
             date: _selectedDate,
-            medicineName: item['medicine'],
-            quantity: item['quantity'],
-            patients: item['patients']);
+            medicineName: item['medicine']?.toString() ?? '',
+            quantity: (item['quantity'] as num?)?.toInt() ?? 0,
+            patients: (item['patients'] as num?)?.toInt() ?? 0);
       }
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -488,7 +489,7 @@ class _DailyLoggingPageState extends ConsumerState<DailyLoggingPage>
           _imageItems.clear();
           _imageParseResult = null;
         });
-        _fetchHistoryFirstPage();
+        unawaited(_fetchHistoryFirstPage());
       }
     } catch (e) {
       if (mounted) {
@@ -781,7 +782,8 @@ class _DailyLoggingPageState extends ConsumerState<DailyLoggingPage>
                       ],
                       rows: _csvItems
                           .map((item) => DataRow(cells: [
-                                DataCell(Text(item['medicine'],
+                                DataCell(Text(
+                                    item['medicine']?.toString() ?? '',
                                     style: const TextStyle(
                                         fontWeight: FontWeight.w600))),
                                 DataCell(Text(item['quantity'].toString())),
@@ -885,7 +887,8 @@ class _DailyLoggingPageState extends ConsumerState<DailyLoggingPage>
                       ],
                       rows: _scannedItems
                           .map((item) => DataRow(cells: [
-                                DataCell(Text(item['medicine'],
+                                DataCell(Text(
+                                    item['medicine']?.toString() ?? '',
                                     style: const TextStyle(
                                         fontWeight: FontWeight.w600))),
                                 DataCell(Text(item['quantity'].toString())),

@@ -36,10 +36,7 @@ class _FacilityOverviewState extends ConsumerState<FacilityOverview> {
           );
         }
         final inventory = snapshot.data ?? [];
-        final expiringSoon = inventory
-            .where((i) => i.expiryDate.difference(DateTime.now()).inDays <= 30)
-            .length;
-        final lowStock = inventory.where((i) => i.isLowStock).length;
+        final alertCount = inventory.where((i) => i.hasAlert).length;
 
         return Scaffold(
           backgroundColor: MediColors.bg,
@@ -53,7 +50,7 @@ class _FacilityOverviewState extends ConsumerState<FacilityOverview> {
                   children: [
                     const Icon(Icons.notifications_outlined,
                         color: MediColors.textSecondary),
-                    if (lowStock + expiringSoon > 0)
+                    if (alertCount > 0)
                       Positioned(
                         top: -2,
                         right: -2,
@@ -63,7 +60,7 @@ class _FacilityOverviewState extends ConsumerState<FacilityOverview> {
                           decoration: const BoxDecoration(
                               color: MediColors.error, shape: BoxShape.circle),
                           child: Center(
-                              child: Text('${lowStock + expiringSoon}',
+                              child: Text('$alertCount',
                                   style: const TextStyle(
                                       fontSize: 9,
                                       color: Colors.white,
@@ -84,11 +81,16 @@ class _FacilityOverviewState extends ConsumerState<FacilityOverview> {
                                 color: MediColors.textPrimary))),
                     const PopupMenuDivider(),
                   ];
-                  final lowItems =
-                      inventory.where((i) => i.isLowStock).toList();
+                  final lowItems = inventory
+                      .where((i) => i.status == ItemStatus.lowStock)
+                      .toList();
+                  // Expiring-soon popup: only items that are truly expiring
+                  // soon, NOT already expired (those are listed separately).
                   final expiringItems = inventory
                       .where((i) =>
-                          i.expiryDate.difference(DateTime.now()).inDays <= 30)
+                          i.status == ItemStatus.expiringSoon ||
+                          i.status == ItemStatus.wastageRisk ||
+                          i.status == ItemStatus.expired)
                       .toList();
                   for (var item in lowItems) {
                     alerts.add(PopupMenuItem<String>(
@@ -322,28 +324,18 @@ class _FacilityOverviewState extends ConsumerState<FacilityOverview> {
                 // KPI Cards
                 Builder(
                   builder: (context) {
+                    // All counts now derived from the centralized
+                    // ItemStatus getter — no inline threshold duplication.
                     final expired = inventory
-                        .where((i) =>
-                            i.expiryDate.difference(DateTime.now()).inDays < 0)
+                        .where((i) => i.status == ItemStatus.expired)
                         .length;
-                    final wastageRisk = inventory.where((i) {
-                      final pct = i.initialQuantity > 0
-                          ? (i.remainingQuantity / i.initialQuantity)
-                          : 1.0;
-                      return pct >= 0.70 &&
-                          i.expiryDate.difference(DateTime.now()).inDays <= 30;
-                    }).length;
-                    final unhealthy = inventory.where((i) {
-                      final pct = i.initialQuantity > 0
-                          ? i.remainingQuantity / i.initialQuantity
-                          : 0.0;
-                      final daysLeft =
-                          i.expiryDate.difference(DateTime.now()).inDays;
-                      return daysLeft < 0 ||
-                          daysLeft <= 30 ||
-                          pct >= 0.70 && daysLeft <= 30 ||
-                          i.isLowStock;
-                    }).length;
+                    final wastageRisk = inventory
+                        .where((i) => i.status == ItemStatus.wastageRisk)
+                        .length;
+                    final lowStock = inventory
+                        .where((i) => i.status == ItemStatus.lowStock)
+                        .length;
+                    final unhealthy = inventory.where((i) => i.hasAlert).length;
                     final healthy = (inventory.length - unhealthy)
                         .clamp(0, inventory.length);
                     final stockHealthText = inventory.isEmpty
@@ -540,26 +532,17 @@ class _FacilityOverviewState extends ConsumerState<FacilityOverview> {
                       DataColumn(label: Text('Time Left')),
                     ],
                     rows: inventory.map((item) {
-                      final pct = item.initialQuantity > 0
-                          ? (item.remainingQuantity / item.initialQuantity)
-                          : 1.0;
-                      final daysToExpiry =
-                          item.expiryDate.difference(DateTime.now()).inDays;
-                      Color statusColor;
-                      String statusText;
-                      if (daysToExpiry < 0) {
-                        statusColor = MediColors.error;
-                        statusText = 'Expired';
-                      } else if (pct >= 0.70 && daysToExpiry <= 30) {
-                        statusColor = const Color(0xFFF59E0B); // Amber
-                        statusText = 'Wastage Risk';
-                      } else if (item.isLowStock) {
-                        statusColor = MediColors.error;
-                        statusText = 'Low Stock';
-                      } else {
-                        statusColor = MediColors.success;
-                        statusText = 'Healthy';
-                      }
+                      final pct = item.remainingPercentage;
+                      final daysToExpiry = item.daysToExpiry;
+                      // Use centralized status — single source of truth.
+                      final statusColor = switch (item.status) {
+                        ItemStatus.expired => MediColors.error,
+                        ItemStatus.wastageRisk => const Color(0xFFF59E0B),
+                        ItemStatus.lowStock => MediColors.error,
+                        ItemStatus.expiringSoon => MediColors.warning,
+                        ItemStatus.healthy => MediColors.success,
+                      };
+                      final statusText = item.statusText;
 
                       return DataRow(cells: [
                         DataCell(Row(children: [
