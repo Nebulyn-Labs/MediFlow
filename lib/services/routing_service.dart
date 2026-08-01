@@ -274,8 +274,9 @@ class RoutingService {
     if (stops.length == 1) return RouteResult(points: stops);
 
     List<LatLng> fullRoute = [];
-    double? totalDistanceKm;
-    double? totalDurationSeconds;
+    double totalDistanceKm = 0;
+    double totalDurationSeconds = 0;
+    bool hasRoadDataForEverySegment = true;
 
     for (int i = 0; i < stops.length - 1; i++) {
       final segResult = await getRoute(stops[i], stops[i + 1]);
@@ -286,23 +287,21 @@ class RoutingService {
           fullRoute.addAll(segResult.points);
         }
       }
-      // Accumulate road metadata only when every segment has it.
       if (segResult.hasRoadData) {
-        totalDistanceKm = (totalDistanceKm ?? 0) + segResult.distanceKm!;
-        totalDurationSeconds =
-            (totalDurationSeconds ?? 0) + segResult.durationSeconds!;
+        totalDistanceKm += segResult.distanceKm!;
+        totalDurationSeconds += segResult.durationSeconds!;
       } else {
-        // At least one segment fell back to straight-line: discard metadata
-        // so callers know the totals are unreliable.
-        totalDistanceKm = null;
-        totalDurationSeconds = null;
+        // Tracked as a flag rather than by nulling the running totals: a
+        // later segment with road data would otherwise restart the sum from
+        // zero and the partial figure would be reported as a road distance.
+        hasRoadDataForEverySegment = false;
       }
     }
 
     return RouteResult(
       points: fullRoute,
-      distanceKm: totalDistanceKm,
-      durationSeconds: totalDurationSeconds,
+      distanceKm: hasRoadDataForEverySegment ? totalDistanceKm : null,
+      durationSeconds: hasRoadDataForEverySegment ? totalDurationSeconds : null,
     );
   }
 }
