@@ -5,6 +5,9 @@ import '../../services/firebase_service.dart';
 import '../../models/inventory_item.dart';
 import 'package:med_supply_prototype/constants/colors.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'confirm_logout_dialog.dart';
+import 'scroll_to_top_button.dart';
+import '../../models/notification.dart' as notif;
 
 class SidebarLayout extends ConsumerStatefulWidget {
   final Widget child;
@@ -24,6 +27,12 @@ class SidebarLayout extends ConsumerStatefulWidget {
 
 class _SidebarLayoutState extends ConsumerState<SidebarLayout> {
   bool _isExpanded = false;
+  final ScrollController _mainScrollController = ScrollController();
+  @override
+  void dispose() {
+    _mainScrollController.dispose();
+    super.dispose();
+  }
 
   int _calculateSelectedIndex(BuildContext context) {
     final location = GoRouterState.of(context).uri.toString();
@@ -32,10 +41,12 @@ class _SidebarLayoutState extends ConsumerState<SidebarLayout> {
       if (location.endsWith('/logging')) return 1;
       if (location.endsWith('/forecast')) return 2;
       if (location.endsWith('/alerts')) return 3;
-      if (location.endsWith('/indent')) return 4;
-      if (location.endsWith('/active-indents')) return 4;
-      if (location.endsWith('/chat')) return 5;
-      if (location.endsWith('/help')) return 6;
+      if (location.endsWith('/wastage')) return 4;
+      if (location.endsWith('/indent')) return 5;
+      if (location.endsWith('/active-indents')) return 5;
+      if (location.endsWith('/chat')) return 6;
+      if (location.endsWith('/profile')) return 7;
+      if (location.endsWith('/help')) return 8;
       return 0;
     } else {
       if (location.endsWith('/overview')) return 0;
@@ -43,7 +54,8 @@ class _SidebarLayoutState extends ConsumerState<SidebarLayout> {
       if (location.endsWith('/supply-status')) return 2;
       if (location.endsWith('/routing')) return 3;
       if (location.endsWith('/chat')) return 4;
-      if (location.endsWith('/help')) return 5;
+      if (location.endsWith('/audit')) return 5;
+      if (location.endsWith('/help')) return 6;
       return 0;
     }
   }
@@ -64,12 +76,18 @@ class _SidebarLayoutState extends ConsumerState<SidebarLayout> {
           context.go('/facility/${widget.facilityId}/alerts');
           break;
         case 4:
-          context.go('/facility/${widget.facilityId}/indent');
+          context.go('/facility/${widget.facilityId}/wastage');
           break;
         case 5:
-          context.go('/facility/${widget.facilityId}/chat');
+          context.go('/facility/${widget.facilityId}/indent');
           break;
         case 6:
+          context.go('/facility/${widget.facilityId}/chat');
+          break;
+        case 7:
+          context.go('/facility/${widget.facilityId}/profile');
+          break;
+        case 8:
           context.go('/facility/${widget.facilityId}/help');
           break;
       }
@@ -91,6 +109,9 @@ class _SidebarLayoutState extends ConsumerState<SidebarLayout> {
           context.go('/admin/chat');
           break;
         case 5:
+          context.go('/admin/audit');
+          break;
+        case 6:
           context.go('/admin/help');
           break;
       }
@@ -103,8 +124,10 @@ class _SidebarLayoutState extends ConsumerState<SidebarLayout> {
           _NavItem(Icons.edit_calendar_rounded, 'Daily Log'),
           _NavItem(Icons.auto_graph_rounded, 'Forecast'),
           _NavItem(Icons.notifications_active_rounded, 'Alerts'),
+          _NavItem(Icons.delete_outline_rounded, 'Wastage Report'),
           _NavItem(Icons.receipt_long_rounded, 'Requests'),
           _NavItem(Icons.smart_toy_rounded, 'AI Chat'),
+          _NavItem(Icons.person_outline_rounded, 'Profile'),
           _NavItem(Icons.help_outline_rounded, 'Help'),
         ]
       : [
@@ -113,6 +136,7 @@ class _SidebarLayoutState extends ConsumerState<SidebarLayout> {
           _NavItem(Icons.history_rounded, 'Supply Status'),
           _NavItem(Icons.map_rounded, 'Route Opt.'),
           _NavItem(Icons.smart_toy_rounded, 'AI Chat'),
+          _NavItem(Icons.security_rounded, 'Audit Trail'),
           _NavItem(Icons.help_outline_rounded, 'Help'),
         ];
 
@@ -157,51 +181,81 @@ class _SidebarLayoutState extends ConsumerState<SidebarLayout> {
                   ),
 
                   // Nav Items
-                  StreamBuilder<List<InventoryItem>>(
-                    stream:
-                        widget.role == 'facility' && widget.facilityId != null
-                            ? ref
-                                .watch(firebaseServiceProvider)
-                                .streamInventory(widget.facilityId!)
-                            : Stream.value([]),
-                    builder: (context, snapshot) {
-                      final inventory = snapshot.data ?? [];
-                      final hasAlerts = inventory.any((i) {
-                        final pct = i.initialQuantity > 0
-                            ? i.remainingQuantity / i.initialQuantity
-                            : 0.0;
-                        final daysLeft =
-                            i.expiryDate.difference(DateTime.now()).inDays;
-                        return pct <= 0.20 ||
-                            i.remainingQuantity <= 500 ||
-                            daysLeft <= 30;
-                      });
+                  Expanded(
+                    child: ScrollConfiguration(
+                      behavior: ScrollConfiguration.of(context)
+                          .copyWith(scrollbars: false),
+                      child: SingleChildScrollView(
+                        child: StreamBuilder<List<notif.NotificationModel>>(
+                          stream: widget.role == 'facility' &&
+                                  widget.facilityId != null
+                              ? ref
+                                  .watch(firebaseServiceProvider)
+                                  .streamNotifications(widget.facilityId!)
+                              : Stream.value([]),
+                          builder: (context, notifSnapshot) {
+                            final notifications = notifSnapshot.data ?? [];
+                            final unreadCount =
+                                notifications.where((n) => !n.isRead).length;
 
-                      return Column(
-                        children: List.generate(items.length, (i) {
-                          final isSelected = i == selectedIndex;
-                          final isAlertTab = widget.role == 'facility' &&
-                              i == 3; // Alerts index
-                          return _buildNavItem(
-                            items[i],
-                            isSelected,
-                            () => _onItemTapped(i, context),
-                            showBadge: isAlertTab && hasAlerts,
-                          );
-                        }),
-                      );
-                    },
+                            return StreamBuilder<List<InventoryItem>>(
+                              stream: widget.role == 'facility' &&
+                                      widget.facilityId != null
+                                  ? ref
+                                      .watch(firebaseServiceProvider)
+                                      .streamInventory(widget.facilityId!)
+                                  : Stream.value([]),
+                              builder: (context, snapshot) {
+                                final inventory = snapshot.data ?? [];
+                                // Use the centralized hasAlert getter from
+                                // InventoryItem to avoid duplicating
+                                // threshold logic.
+                                final hasAlerts =
+                                    inventory.any((i) => i.hasAlert);
+
+                                return Column(
+                                  children: List.generate(items.length, (i) {
+                                    final isSelected = i == selectedIndex;
+                                    final isAlertTab =
+                                        widget.role == 'facility' &&
+                                            i == 3; // Alerts index
+                                    return _buildNavItem(
+                                      items[i],
+                                      isSelected,
+                                      () => _onItemTapped(i, context),
+                                      showBadge: isAlertTab && hasAlerts,
+                                      badgeCount: isAlertTab ? unreadCount : 0,
+                                    );
+                                  }),
+                                );
+                              },
+                            );
+                          },
+                        ),
+                      ),
+                    ),
                   ),
-
-                  const Spacer(),
 
                   // Logout
                   _buildNavItem(
                     _NavItem(Icons.logout_rounded, 'Logout'),
                     false,
                     () async {
-                      if (context.mounted) context.go('/');
-                      await FirebaseAuth.instance.signOut();
+                      final confirmed = await confirmLogout(context);
+                      if (!confirmed) return;
+                      try {
+                        await FirebaseAuth.instance.signOut();
+                        if (context.mounted) context.go('/');
+                      } catch (e) {
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text('Sign out failed: ${e.toString()}'),
+                              backgroundColor: MediColors.error,
+                            ),
+                          );
+                        }
+                      }
                     },
                     isLogout: true,
                   ),
@@ -212,14 +266,31 @@ class _SidebarLayoutState extends ConsumerState<SidebarLayout> {
           ),
 
           // ── Main Content ──
-          Expanded(child: widget.child),
+          Expanded(
+            child: PrimaryScrollController(
+              controller: _mainScrollController,
+              child: Stack(
+                children: [
+                  widget.child,
+                  Positioned(
+                    bottom: 24,
+                    right: 24,
+                    child: ScrollToTopButton(controller: _mainScrollController),
+                  ),
+                  if (widget.role == 'facility' && widget.facilityId != null)
+                    // (Removed floating bell icon)
+                    Container(), // Placeholder since we removed the stack element
+                ],
+              ),
+            ),
+          ),
         ],
       ),
     );
   }
 
   Widget _buildNavItem(_NavItem item, bool isSelected, VoidCallback onTap,
-      {bool isLogout = false, bool showBadge = false}) {
+      {bool isLogout = false, bool showBadge = false, int badgeCount = 0}) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
       child: Material(
@@ -262,7 +333,29 @@ class _SidebarLayoutState extends ConsumerState<SidebarLayout> {
                           ),
                         ),
                       ),
-                      if (showBadge)
+                      if (badgeCount > 0)
+                        Positioned(
+                          right: -4,
+                          top: -4,
+                          child: Container(
+                            padding: const EdgeInsets.all(3),
+                            decoration: const BoxDecoration(
+                              color: MediColors.error,
+                              shape: BoxShape.circle,
+                            ),
+                            child: Text(
+                              badgeCount > 99 ? '99+' : badgeCount.toString(),
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 9,
+                                fontWeight: FontWeight.bold,
+                                height: 1.0,
+                              ),
+                              textAlign: TextAlign.center,
+                            ),
+                          ),
+                        )
+                      else if (showBadge)
                         Positioned(
                           right: -2,
                           top: -2,
@@ -277,8 +370,12 @@ class _SidebarLayoutState extends ConsumerState<SidebarLayout> {
                         ),
                     ],
                   ),
-                  if (_isExpanded) ...[
-                    const SizedBox(width: 14),
+                  AnimatedContainer(
+                    duration: const Duration(milliseconds: 200),
+                    curve: Curves.easeOutCubic,
+                    width: _isExpanded ? 14 : 0,
+                  ),
+                  if (_isExpanded)
                     Expanded(
                       child: Text(
                         item.label,
@@ -296,7 +393,6 @@ class _SidebarLayoutState extends ConsumerState<SidebarLayout> {
                         maxLines: 1,
                       ),
                     ),
-                  ],
                 ],
               ),
             ),

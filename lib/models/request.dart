@@ -13,6 +13,8 @@ class MedRequest {
   final DateTime requestDate;
   final RequestStatus status;
   final String? notes;
+  final String? rejectionReason;
+  final DateTime? resolvedAt;
 
   MedRequest({
     required this.id,
@@ -23,20 +25,27 @@ class MedRequest {
     required this.requestDate,
     required this.status,
     this.notes,
+    this.rejectionReason,
+    this.resolvedAt,
   });
 
   factory MedRequest.fromMap(Map<String, dynamic> map, String id) {
     return MedRequest(
       id: id,
-      facilityId: map['facilityId'] ?? '',
-      medicineName: map['medicineName'] ?? '',
+      facilityId: map['facilityId']?.toString() ?? '',
+      medicineName: map['medicineName']?.toString() ?? '',
       type: RequestType.values.firstWhere((e) => e.name == map['type'],
           orElse: () => RequestType.regularIndent),
-      quantity: map['quantity']?.toInt() ?? 0,
-      requestDate: (map['requestDate'] as Timestamp).toDate(),
+      quantity: (map['quantity'] as num?)?.toInt() ?? 0,
+      requestDate:
+          (map['requestDate'] as Timestamp?)?.toDate() ?? DateTime.now(),
       status: RequestStatus.values.firstWhere((e) => e.name == map['status'],
           orElse: () => RequestStatus.pending),
-      notes: map['notes'],
+      notes: map['notes']?.toString(),
+      rejectionReason: map['rejectionReason']?.toString(),
+      resolvedAt: map['resolvedAt'] is Timestamp
+          ? (map['resolvedAt'] as Timestamp).toDate()
+          : null,
     );
   }
 
@@ -49,6 +58,8 @@ class MedRequest {
       'requestDate': Timestamp.fromDate(requestDate),
       'status': status.name,
       'notes': notes,
+      if (rejectionReason != null) 'rejectionReason': rejectionReason,
+      if (resolvedAt != null) 'resolvedAt': Timestamp.fromDate(resolvedAt!),
     };
   }
 }

@@ -1,0 +1,51 @@
+/* Hide the default cursor everywhere except on touch devices */
+body.custom-cursor-active, 
+body.custom-cursor-active * {
+  cursor: none !important;
+}
+
+.cursor-dot,
+.cursor-ring {
+  position: fixed;
+  top: 0;
+  left: 0;
+  pointer-events: none;
+  z-index: 999999;
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+}
+
+.cursor-dot {
+  width: 8px;
+  height: 8px;
+  background-color: #2F80ED;
+  transition: transform 0.15s ease, background-color 0.15s ease;
+}
+
+.cursor-ring {
+  width: 32px;
+  height: 32px;
+  border: 2px solid rgba(47, 128, 237, 0.5);
+  transition: transform 0.15s ease-out, width 0.2s ease, height 0.2s ease, border-color 0.2s ease;
+}
+
+/* Hover state, applied when the mouse is over a clickable element */
+.cursor-ring.cursor-hover {
+  width: 48px;
+  height: 48px;
+  border-color: #2F80ED;
+}
+
+.cursor-dot.cursor-hover {
+  transform: translate(-50%, -50%) scale(1.5);
+  background-color: #1663C7;
+}
+
+/* Click feedback, applied briefly on mousedown */
+.cursor-dot.cursor-click {
+  transform: translate(-50%, -50%) scale(0.7);
+}
+
+.cursor-ring.cursor-click {
+  transform: translate(-50%, -50%) scale(0.85);
+}
