@@ -8,16 +8,35 @@ import '../models/facility.dart';
 import '../models/inventory_item.dart';
 import '../constants/inventory_thresholds.dart';
 
+typedef GeminiCaller = Future<String> Function(
+  String prompt, {
+  String? imageBase64,
+  String? imageMimeType,
+});
+
 final aiServiceProvider = Provider<AIService>((ref) {
   return AIService(ref);
 });
 
 class AIService {
-  final Ref ref;
+  final Ref? ref;
+  final GeminiCaller? geminiCaller;
+
+  final FirebaseFunctions? _functions;
+
+  /// Resolved on first use rather than in the constructor: reading
+  /// [FirebaseFunctions.instance] requires an initialized Firebase app, which
+  /// unit tests that inject [geminiCaller] do not set up.
+  FirebaseFunctions get functions => _functions ?? FirebaseFunctions.instance;
+
   bool _quotaExhausted = false;
   DateTime? _quotaResetTime;
 
-  AIService(this.ref);
+  AIService(
+    this.ref, {
+    FirebaseFunctions? functions,
+    this.geminiCaller,
+  }) : _functions = functions;
 
   bool get _shouldUseLocal {
     if (!_quotaExhausted) return false;
@@ -48,8 +67,14 @@ class AIService {
   // Helper method to call the generic callGeminiSecure Cloud Function
   Future<String> _callGeminiBackend(String prompt,
       {String? imageBase64, String? imageMimeType}) async {
-    final callable =
-        FirebaseFunctions.instance.httpsCallable('callGeminiSecure');
+    if (geminiCaller != null) {
+      return geminiCaller!(
+        prompt,
+        imageBase64: imageBase64,
+        imageMimeType: imageMimeType,
+      );
+    }
+    final callable = functions.httpsCallable('callGeminiSecure');
     final response = await callable.call({
       'prompt': prompt,
       if (imageBase64 != null) 'imageBase64': imageBase64,
@@ -142,7 +167,7 @@ class AIService {
     String? facilityId,
   }) async {
     try {
-      await FirebaseFunctions.instance.httpsCallable('logAIDecision').call({
+      await functions.httpsCallable('logAIDecision').call({
         'facilityId': facilityId,
         'medicineName': medicineName,
         'decisionType': 'demand_forecast',
@@ -196,8 +221,7 @@ class AIService {
   }) async {
     if (_shouldUseLocal) return _localSystemResponse(query, context, role);
     try {
-      final callable =
-          FirebaseFunctions.instance.httpsCallable('getChatResponseSecure');
+      final callable = functions.httpsCallable('getChatResponseSecure');
       final response = await callable.call({
         'query': query,
         'context': context,
@@ -224,14 +248,13 @@ class AIService {
         query.toLowerCase().contains("inventory")) {
       buffer.writeln("### 📦 System Stock Analysis");
       for (var item in inventory) {
-        final rem = item['remainingQuantity'] ?? 0;
-        final tot = item['initialQuantity'] ?? 0;
-        final name = item['medicineName'] ?? 'Unknown';
-        final status = (tot > 0 &&
-                (rem / tot <= InventoryThresholds.lowStockPercentage ||
-                    rem <= InventoryThresholds.lowStockAbsolute))
-            ? "⚠️ CRITICAL"
-            : "✅ STABLE";
+        final rem = (item['remainingQuantity'] as num?)?.toInt() ?? 0;
+        final tot = (item['initialQuantity'] as num?)?.toInt() ?? 0;
+        final name = item['medicineName']?.toString() ?? 'Unknown';
+        final isLow = tot > 0 &&
+            (rem / tot <= InventoryThresholds.lowStockPercentage ||
+                rem <= InventoryThresholds.lowStockAbsolute);
+        final status = isLow ? "⚠️ CRITICAL" : "✅ STABLE";
         buffer.writeln("• **$name**: $rem/$tot units ($status)");
       }
     } else {
@@ -245,32 +268,38 @@ class AIService {
   // ─── SMART ALERTS ──────────────────────────────────────────────
   Future<List<Map<String, dynamic>>> generateSmartAlerts(
       List<InventoryItem> inventory) async {
-    final local = inventory
-        .where((i) => i.isLowStock)
-        .map((i) => {
-              "type": "low_stock",
-              "severity": "red",
-              "title": i.medicineName,
-              "batchId": i.batchId,
-              "remainingQuantity": i.remainingQuantity,
-              "remainingPercentage":
-                  ((i.remainingQuantity / i.initialQuantity) * 100).round(),
-              "burnRate": "24/day",
-              "depletesInDays": (i.remainingQuantity / 24).round(),
-            })
-        .toList();
-
-    final now = DateTime.now();
+    final local = <Map<String, dynamic>>[];
     for (var i in inventory) {
-      final daysToExpiry = i.expiryDate.difference(now).inDays;
-      if (daysToExpiry <= 90) {
+      if (i.status == ItemStatus.expired) {
         local.add({
-          "type": "expiry",
-          "severity": daysToExpiry <= 30 ? "red" : "yellow",
+          "type": "expired",
+          "severity": "red",
           "title": i.medicineName,
           "batchId": i.batchId,
           "remainingQuantity": i.remainingQuantity,
-          "expiresInDays": daysToExpiry,
+          "expiresInDays": i.daysToExpiry,
+        });
+      } else if (i.status == ItemStatus.lowStock) {
+        local.add({
+          "type": "low_stock",
+          "severity": "red",
+          "title": i.medicineName,
+          "batchId": i.batchId,
+          "remainingQuantity": i.remainingQuantity,
+          "remainingPercentage": (i.remainingPercentage * 100).round(),
+          "burnRate": "24/day",
+          "depletesInDays": (i.remainingQuantity / 24).round(),
+        });
+      } else if (i.status == ItemStatus.expiringSoon ||
+          i.status == ItemStatus.wastageRisk) {
+        local.add({
+          "type":
+              i.status == ItemStatus.wastageRisk ? "wastage_risk" : "expiry",
+          "severity": "yellow",
+          "title": i.medicineName,
+          "batchId": i.batchId,
+          "remainingQuantity": i.remainingQuantity,
+          "expiresInDays": i.daysToExpiry,
         });
       }
     }
