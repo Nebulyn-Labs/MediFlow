@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -60,20 +61,20 @@ class _AlertsPageState extends ConsumerState<AlertsPage> {
 
       final List<_InventoryAlert> alerts = alertMaps.map((data) {
         final item = InventoryItem(
-          id: data['stockId'] ?? '',
-          medicineName: data['medicineName'] ?? '',
-          batchId: data['batchId'] ?? '',
+          id: data['stockId']?.toString() ?? '',
+          medicineName: data['medicineName']?.toString() ?? '',
+          batchId: data['batchId']?.toString() ?? '',
           arrivalDate: DateTime.now(),
-          expiryDate: data['expiryDate'] != null
+          expiryDate: data['expiryDate'] is Timestamp
               ? (data['expiryDate'] as Timestamp).toDate()
               : DateTime.now(),
-          initialQuantity: data['initialQuantity']?.toInt() ?? 0,
-          remainingQuantity: data['qtyRemaining']?.toInt() ?? 0,
-          unit: data['unit'] ?? 'units',
+          initialQuantity: (data['initialQuantity'] as num?)?.toInt() ?? 0,
+          remainingQuantity: (data['qtyRemaining'] as num?)?.toInt() ?? 0,
+          unit: data['unit']?.toString() ?? 'units',
           lastUpdated: DateTime.now(),
         );
 
-        final typeStr = data['type'] ?? '';
+        final typeStr = data['type']?.toString() ?? '';
         _AlertKind kind;
         String title;
         String reason;
@@ -171,7 +172,7 @@ class _AlertsPageState extends ConsumerState<AlertsPage> {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
             content:
                 Text('Marked ${alert.item.medicineName} for safe disposal.')));
-        _loadAlerts();
+        unawaited(_loadAlerts());
       }
     } catch (e) {
       if (mounted) {
