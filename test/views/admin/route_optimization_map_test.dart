@@ -187,15 +187,19 @@ class FakeOptimizationService implements OptimizationService {
   }
 }
 
-class FakeRoutingService implements RoutingService {
+class FakeRoutingService extends RoutingService {
+  final RouteResult? customResult;
+
+  FakeRoutingService({this.customResult});
+
   @override
-  Future<List<LatLng>> getRoute(LatLng start, LatLng end) async {
-    return [start, end];
+  Future<RouteResult> getRoute(LatLng start, LatLng end) async {
+    return customResult ?? RouteResult(points: [start, end]);
   }
 
   @override
-  Future<List<LatLng>> getMultiStopRoute(List<LatLng> stops) async {
-    return stops;
+  Future<RouteResult> getMultiStopRoute(List<LatLng> stops) async {
+    return customResult ?? RouteResult(points: stops);
   }
 }
 
@@ -289,7 +293,7 @@ void main() {
     });
 
     Widget createWidgetUnderTest(List<TransferRecommendation> recs,
-        {FirebaseService? firebaseService}) {
+        {FirebaseService? firebaseService, RoutingService? routingService}) {
       return ProviderScope(
         overrides: [
           firebaseServiceProvider.overrideWithValue(
@@ -302,7 +306,8 @@ void main() {
           ),
           optimizationServiceProvider
               .overrideWithValue(FakeOptimizationService(recs)),
-          routingServiceProvider.overrideWithValue(FakeRoutingService()),
+          routingServiceProvider
+              .overrideWithValue(routingService ?? FakeRoutingService()),
           aiServiceProvider.overrideWithValue(FakeAIService()),
         ],
         child: const MaterialApp(
@@ -644,6 +649,65 @@ void main() {
 
       // Should show success
       expect(find.text('Transfer Manifest'), findsOneWidget);
+    });
+
+    testWidgets(
+        'displays road route distance and travel duration when available',
+        (WidgetTester tester) async {
+      tester.view.physicalSize = const Size(1920, 1080);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
+      final roadResult = RouteResult(
+        points: [
+          LatLng(donor.latitude, donor.longitude),
+          LatLng(recipient.latitude, recipient.longitude),
+        ],
+        distanceKm: 25.4,
+        durationSeconds: 1800, // 30 mins
+      );
+
+      await tester.pumpWidget(createWidgetUnderTest(
+        [recommendation],
+        routingService: FakeRoutingService(customResult: roadResult),
+      ));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Generate Optimal Routes'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('25.4 km'), findsOneWidget);
+      expect(find.text('30m est.'), findsOneWidget);
+      expect(find.textContaining('straight-line'), findsNothing);
+    });
+
+    testWidgets('displays straight-line label when road metadata is null',
+        (WidgetTester tester) async {
+      tester.view.physicalSize = const Size(1920, 1080);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
+      final fallbackResult = RouteResult(
+        points: [
+          LatLng(donor.latitude, donor.longitude),
+          LatLng(recipient.latitude, recipient.longitude),
+        ],
+        distanceKm: null,
+        durationSeconds: null,
+      );
+
+      await tester.pumpWidget(createWidgetUnderTest(
+        [recommendation],
+        routingService: FakeRoutingService(customResult: fallbackResult),
+      ));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Generate Optimal Routes'));
+      await tester.pumpAndSettle();
+
+      expect(find.textContaining('straight-line @ 40 km/h'), findsOneWidget);
     });
   });
 }

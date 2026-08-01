@@ -8,16 +8,35 @@ import '../models/facility.dart';
 import '../models/inventory_item.dart';
 import '../constants/inventory_thresholds.dart';
 
+typedef GeminiCaller = Future<String> Function(
+  String prompt, {
+  String? imageBase64,
+  String? imageMimeType,
+});
+
 final aiServiceProvider = Provider<AIService>((ref) {
   return AIService(ref);
 });
 
 class AIService {
-  final Ref ref;
+  final Ref? ref;
+  final GeminiCaller? geminiCaller;
+
+  final FirebaseFunctions? _functions;
+
+  /// Resolved on first use rather than in the constructor: reading
+  /// [FirebaseFunctions.instance] requires an initialized Firebase app, which
+  /// unit tests that inject [geminiCaller] do not set up.
+  FirebaseFunctions get functions => _functions ?? FirebaseFunctions.instance;
+
   bool _quotaExhausted = false;
   DateTime? _quotaResetTime;
 
-  AIService(this.ref);
+  AIService(
+    this.ref, {
+    FirebaseFunctions? functions,
+    this.geminiCaller,
+  }) : _functions = functions;
 
   bool get _shouldUseLocal {
     if (!_quotaExhausted) return false;
@@ -48,8 +67,14 @@ class AIService {
   // Helper method to call the generic callGeminiSecure Cloud Function
   Future<String> _callGeminiBackend(String prompt,
       {String? imageBase64, String? imageMimeType}) async {
-    final callable =
-        FirebaseFunctions.instance.httpsCallable('callGeminiSecure');
+    if (geminiCaller != null) {
+      return geminiCaller!(
+        prompt,
+        imageBase64: imageBase64,
+        imageMimeType: imageMimeType,
+      );
+    }
+    final callable = functions.httpsCallable('callGeminiSecure');
     final response = await callable.call({
       'prompt': prompt,
       if (imageBase64 != null) 'imageBase64': imageBase64,
@@ -142,7 +167,7 @@ class AIService {
     String? facilityId,
   }) async {
     try {
-      await FirebaseFunctions.instance.httpsCallable('logAIDecision').call({
+      await functions.httpsCallable('logAIDecision').call({
         'facilityId': facilityId,
         'medicineName': medicineName,
         'decisionType': 'demand_forecast',
@@ -196,8 +221,7 @@ class AIService {
   }) async {
     if (_shouldUseLocal) return _localSystemResponse(query, context, role);
     try {
-      final callable =
-          FirebaseFunctions.instance.httpsCallable('getChatResponseSecure');
+      final callable = functions.httpsCallable('getChatResponseSecure');
       final response = await callable.call({
         'query': query,
         'context': context,
