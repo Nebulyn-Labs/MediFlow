@@ -16,7 +16,7 @@ jobs:
 
     steps:
       - name: Check and enforce open issue cap
-        uses: actions/github-script@v7
+        uses: actions/github-script@v9
         with:
           script: |
             const MAX_OPEN_ISSUES = 4;
