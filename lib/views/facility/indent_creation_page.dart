@@ -488,8 +488,8 @@ class _IndentCreationPageState extends ConsumerState<IndentCreationPage> {
                       fontWeight: FontWeight.w600,
                       color: MediColors.textPrimary)),
               Text(item.batchId,
-                  style: TextStyle(
-                      color: MediColors.textSecondary, fontSize: 12)),
+                  style:
+                      TextStyle(color: MediColors.textSecondary, fontSize: 12)),
             ]),
           ),
           Expanded(

@@ -162,8 +162,7 @@ class _AIChatPageState extends ConsumerState<AIChatPage> {
                         color: MediColors.textPrimary)),
                 Text(
                   _isLocalMode ? 'Local Assistant Mode' : 'Powered by Gemini',
-                  style: TextStyle(
-                      fontSize: 11, color: MediColors.textMuted),
+                  style: TextStyle(fontSize: 11, color: MediColors.textMuted),
                 ),
               ],
             ),
@@ -354,24 +353,24 @@ class _AIChatPageState extends ConsumerState<AIChatPage> {
                     selectable: true,
                     imageBuilder: (uri, title, alt) => const SizedBox.shrink(),
                     styleSheet: MarkdownStyleSheet(
-                      p: const TextStyle(
+                      p: TextStyle(
                         color: MediColors.textPrimary,
                         fontSize: 14,
                         height: 1.5,
                       ),
-                      strong: const TextStyle(
+                      strong: TextStyle(
                         color: MediColors.textPrimary,
                         fontSize: 14,
                         height: 1.5,
                         fontWeight: FontWeight.w700,
                       ),
-                      h3: const TextStyle(
+                      h3: TextStyle(
                         color: MediColors.textPrimary,
                         fontSize: 15,
                         height: 1.5,
                         fontWeight: FontWeight.w700,
                       ),
-                      listBullet: const TextStyle(
+                      listBullet: TextStyle(
                         color: MediColors.textPrimary,
                         fontSize: 14,
                         height: 1.5,

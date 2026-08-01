@@ -241,8 +241,8 @@ class _SidebarLayoutState extends ConsumerState<SidebarLayout> {
 
                   // Theme toggle
                   ThemeToggleNavItem(
-                    isDark: ref.watch(themeControllerProvider) ==
-                        ThemeMode.dark,
+                    isDark:
+                        ref.watch(themeControllerProvider) == ThemeMode.dark,
                     isExpanded: _isExpanded,
                     onTap: () =>
                         ref.read(themeControllerProvider.notifier).toggle(),
@@ -437,8 +437,7 @@ class ThemeToggleNavItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final icon =
-        isDark ? Icons.light_mode_outlined : Icons.dark_mode_outlined;
+    final icon = isDark ? Icons.light_mode_outlined : Icons.dark_mode_outlined;
     final label = isDark ? 'Light Mode' : 'Dark Mode';
 
     return Padding(

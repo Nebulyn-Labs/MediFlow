@@ -122,13 +122,13 @@ class _FacilityProfilePageState extends ConsumerState<FacilityProfilePage> {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              const Icon(
+              Icon(
                 Icons.error_outline_rounded,
                 color: MediColors.error,
                 size: 48,
               ),
               const SizedBox(height: 16),
-              const Text(
+              Text(
                 'Failed to load facility',
                 style: TextStyle(
                   fontSize: 20,
@@ -140,7 +140,7 @@ class _FacilityProfilePageState extends ConsumerState<FacilityProfilePage> {
               Text(
                 _error.toString(),
                 textAlign: TextAlign.center,
-                style: const TextStyle(
+                style: TextStyle(
                   color: MediColors.textSecondary,
                   fontSize: 14,
                 ),

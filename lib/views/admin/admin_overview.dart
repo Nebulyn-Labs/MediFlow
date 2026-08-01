@@ -341,8 +341,7 @@ class _AdminOverviewState extends ConsumerState<AdminOverview> {
                       child: Text(
                           '${item.remainingQuantity}/${item.initialQuantity} ${item.unit}',
                           overflow: TextOverflow.ellipsis,
-                          style:
-                              TextStyle(color: MediColors.textSecondary)),
+                          style: TextStyle(color: MediColors.textSecondary)),
                     ),
                     Flexible(
                       child: Text(status,

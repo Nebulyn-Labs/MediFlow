@@ -396,8 +396,8 @@ class _WastageReportPageState extends ConsumerState<WastageReportPage> {
           if (subtitle != null) ...[
             const SizedBox(height: 4),
             Text(subtitle,
-                style: TextStyle(
-                    fontSize: 11, color: MediColors.textSecondary)),
+                style:
+                    TextStyle(fontSize: 11, color: MediColors.textSecondary)),
           ],
         ],
       ),

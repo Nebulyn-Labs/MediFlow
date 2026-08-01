@@ -346,8 +346,7 @@ class _AIForecastPageState extends ConsumerState<AIForecastPage> {
                   color: color, borderRadius: BorderRadius.circular(3))),
           const SizedBox(width: 6),
           Text(label,
-              style:
-                  TextStyle(fontSize: 12, color: MediColors.textMuted)),
+              style: TextStyle(fontSize: 12, color: MediColors.textMuted)),
         ]),
       ),
     );
@@ -402,8 +401,7 @@ class _AIForecastPageState extends ConsumerState<AIForecastPage> {
           showTitles: true,
           reservedSize: 40,
           getTitlesWidget: (v, _) => Text(v.toStringAsFixed(0),
-              style:
-                  TextStyle(fontSize: 10, color: MediColors.textMuted)),
+              style: TextStyle(fontSize: 10, color: MediColors.textMuted)),
         )),
         bottomTitles: AxisTitles(
             sideTitles: SideTitles(

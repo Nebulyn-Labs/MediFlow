@@ -838,8 +838,7 @@ class _ActiveIndentsPageState extends ConsumerState<ActiveIndentsPage> {
                     Flexible(
                       child: Text('Request Qty: ',
                           overflow: TextOverflow.ellipsis,
-                          style:
-                              TextStyle(color: MediColors.textSecondary)),
+                          style: TextStyle(color: MediColors.textSecondary)),
                     ),
                     const SizedBox(width: 8),
                     SizedBox(

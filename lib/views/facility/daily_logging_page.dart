@@ -646,8 +646,8 @@ class _DailyLoggingPageState extends ConsumerState<DailyLoggingPage>
                           color: MediColors.error.withValues(alpha: 0.08),
                           borderRadius: BorderRadius.circular(10)),
                       child: Text(_inventoryError!,
-                          style: TextStyle(
-                              color: MediColors.error, fontSize: 13)))
+                          style:
+                              TextStyle(color: MediColors.error, fontSize: 13)))
                 else if (_availableMedicines.isEmpty)
                   Container(
                       padding: const EdgeInsets.all(12),
@@ -745,8 +745,7 @@ class _DailyLoggingPageState extends ConsumerState<DailyLoggingPage>
                       color: MediColors.teal)),
             ]),
             const SizedBox(height: 12),
-            Text(
-                'Columns: MedicineName, UnitsDistributed, PatientsServed',
+            Text('Columns: MedicineName, UnitsDistributed, PatientsServed',
                 style: TextStyle(color: MediColors.textMuted, fontSize: 13)),
             const SizedBox(height: 16),
             OutlinedButton.icon(
@@ -768,8 +767,8 @@ class _DailyLoggingPageState extends ConsumerState<DailyLoggingPage>
                 const SizedBox(width: 10),
                 Expanded(
                     child: Text(_csvStatus!,
-                        style: TextStyle(
-                            color: MediColors.success, fontSize: 13)))
+                        style:
+                            TextStyle(color: MediColors.success, fontSize: 13)))
               ])),
         ],
         if (_csvItems.isNotEmpty) ...[
@@ -972,8 +971,7 @@ class _DailyLoggingPageState extends ConsumerState<DailyLoggingPage>
                 isOnline
                     ? 'Upload a photo of medicine records for AI-powered extraction'
                     : 'AI extraction needs an internet connection. Reconnect to parse images.',
-                style:
-                    TextStyle(color: MediColors.textMuted, fontSize: 13)),
+                style: TextStyle(color: MediColors.textMuted, fontSize: 13)),
             const SizedBox(height: 16),
             OutlinedButton.icon(
                 icon: _isParsingImage
@@ -1038,8 +1036,8 @@ class _DailyLoggingPageState extends ConsumerState<DailyLoggingPage>
                 Expanded(
                     child: Text(
                         'Extracted ${_imageItems.length} entries from image. Review and edit before submitting.',
-                        style: TextStyle(
-                            color: MediColors.success, fontSize: 13)))
+                        style:
+                            TextStyle(color: MediColors.success, fontSize: 13)))
               ])),
           const SizedBox(height: 16),
           Container(
@@ -1356,8 +1354,8 @@ class _DailyLoggingPageState extends ConsumerState<DailyLoggingPage>
                     ),
                     Text(
                       '${log.totalPatients} patients',
-                      style: TextStyle(
-                          color: MediColors.textMuted, fontSize: 12),
+                      style:
+                          TextStyle(color: MediColors.textMuted, fontSize: 12),
                     ),
                   ],
                 ),

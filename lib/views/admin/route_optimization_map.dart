@@ -165,8 +165,8 @@ class _RouteOptimizationMapState extends ConsumerState<RouteOptimizationMap> {
                 Text(
                   _errorMessage!,
                   textAlign: TextAlign.center,
-                  style: TextStyle(
-                      fontSize: 16, color: MediColors.textSecondary),
+                  style:
+                      TextStyle(fontSize: 16, color: MediColors.textSecondary),
                 ),
                 const SizedBox(height: 24),
                 SizedBox(
@@ -573,8 +573,7 @@ class _RouteOptimizationMapState extends ConsumerState<RouteOptimizationMap> {
               decoration: BoxDecoration(color: color, shape: BoxShape.circle)),
           const SizedBox(width: 8),
           Text(label,
-              style: TextStyle(
-                  color: MediColors.textSecondary, fontSize: 11)),
+              style: TextStyle(color: MediColors.textSecondary, fontSize: 11)),
         ],
       ),
     );
@@ -595,8 +594,7 @@ class _RouteOptimizationMapState extends ConsumerState<RouteOptimizationMap> {
         children: [
           Row(
             children: [
-              Icon(Icons.local_shipping_outlined,
-                  color: MediColors.primary),
+              Icon(Icons.local_shipping_outlined, color: MediColors.primary),
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
@@ -723,8 +721,7 @@ class _RouteOptimizationMapState extends ConsumerState<RouteOptimizationMap> {
                   color: MediColors.textPrimary,
                   fontSize: 15)),
           Text('${rec.quantity} Units requested',
-              style:
-                  TextStyle(color: MediColors.textMuted, fontSize: 13)),
+              style: TextStyle(color: MediColors.textMuted, fontSize: 13)),
           const SizedBox(height: 12),
           Text(rec.reasoning,
               style: TextStyle(
@@ -740,23 +737,23 @@ class _RouteOptimizationMapState extends ConsumerState<RouteOptimizationMap> {
               Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  const Icon(Icons.route_rounded,
+                  Icon(Icons.route_rounded,
                       size: 14, color: MediColors.textMuted),
                   const SizedBox(width: 4),
                   Text('${displayDistKm.toStringAsFixed(1)} km',
-                      style: const TextStyle(
-                          color: MediColors.textMuted, fontSize: 12)),
+                      style:
+                          TextStyle(color: MediColors.textMuted, fontSize: 12)),
                 ],
               ),
               Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  const Icon(Icons.schedule_rounded,
+                  Icon(Icons.schedule_rounded,
                       size: 14, color: MediColors.textMuted),
                   const SizedBox(width: 4),
                   Flexible(
                     child: Text('${displayTimeMinutes}m $etaLabel',
-                        style: const TextStyle(
+                        style: TextStyle(
                             color: MediColors.textMuted, fontSize: 12)),
                   ),
                 ],

@@ -205,13 +205,13 @@ class _AuditTrailPageState extends ConsumerState<AuditTrailPage> {
                       child: Column(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          const Icon(
+                          Icon(
                             Icons.error_outline,
                             color: MediColors.error,
                             size: 48,
                           ),
                           const SizedBox(height: 16),
-                          const Text(
+                          Text(
                             'Failed to load audit logs.\nPlease check your connection and try again.',
                             style: TextStyle(
                               color: MediColors.textSecondary,
@@ -261,7 +261,7 @@ class _AuditTrailPageState extends ConsumerState<AuditTrailPage> {
                                     children: [
                                       Text(
                                         _loadMoreError!,
-                                        style: const TextStyle(
+                                        style: TextStyle(
                                           color: MediColors.error,
                                           fontSize: 14,
                                         ),
@@ -294,7 +294,7 @@ class _AuditTrailPageState extends ConsumerState<AuditTrailPage> {
                               );
                             }
                             if (_isLoading) {
-                              return const Center(
+                              return Center(
                                 child: Padding(
                                   padding: EdgeInsets.all(16.0),
                                   child: CircularProgressIndicator(
@@ -353,7 +353,7 @@ class _AuditTrailPageState extends ConsumerState<AuditTrailPage> {
           const SizedBox(height: 8),
           RichText(
             text: TextSpan(
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 14,
                 color: MediColors.textPrimary,
               ),
@@ -395,7 +395,7 @@ class _AuditTrailPageState extends ConsumerState<AuditTrailPage> {
               ),
               child: Text(
                 log.metadata.toString(),
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 12,
                   color: MediColors.textSecondary,
                   fontFamily: 'monospace',

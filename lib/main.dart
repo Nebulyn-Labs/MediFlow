@@ -86,8 +86,7 @@ void main() async {
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Icon(Icons.error_outline,
-                    size: 64, color: MediColors.error),
+                Icon(Icons.error_outline, size: 64, color: MediColors.error),
                 const SizedBox(height: 16),
                 Text(
                   'Something went wrong',
@@ -102,8 +101,7 @@ void main() async {
                       ? details.exceptionAsString()
                       : 'An unexpected error occurred. Our team has been notified.',
                   textAlign: TextAlign.center,
-                  style: TextStyle(
-                      color: MediColors.textMuted, fontSize: 13),
+                  style: TextStyle(color: MediColors.textMuted, fontSize: 13),
                 ),
                 const SizedBox(height: 24),
                 ElevatedButton(
@@ -346,8 +344,7 @@ class MediFlowApp extends ConsumerWidget {
           padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
           shape:
               RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-          textStyle:
-              const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
+          textStyle: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
         ),
       ),
       outlinedButtonTheme: OutlinedButtonThemeData(
