@@ -12,8 +12,8 @@ class MedicineUsage {
 
   factory MedicineUsage.fromMap(Map<String, dynamic> map) {
     return MedicineUsage(
-      medicineName: map['medicineName'] ?? '',
-      unitsDistributed: map['unitsDistributed']?.toInt() ?? 0,
+      medicineName: map['medicineName']?.toString() ?? '',
+      unitsDistributed: (map['unitsDistributed'] as num?)?.toInt() ?? 0,
     );
   }
 
@@ -39,13 +39,15 @@ class DailyUsageLog {
   });
 
   factory DailyUsageLog.fromMap(Map<String, dynamic> map, String id) {
+    final rawMedicines = map['medicines'] as List? ?? [];
     return DailyUsageLog(
       id: id,
-      date: (map['date'] as Timestamp).toDate(),
-      medicines: (map['medicines'] as List? ?? [])
+      date: (map['date'] as Timestamp?)?.toDate() ?? DateTime.now(),
+      medicines: rawMedicines
+          .whereType<Map>()
           .map((m) => MedicineUsage.fromMap(Map<String, dynamic>.from(m)))
           .toList(),
-      totalPatients: map['totalPatients']?.toInt() ?? 0,
+      totalPatients: (map['totalPatients'] as num?)?.toInt() ?? 0,
     );
   }
 

@@ -22,6 +22,7 @@ class _FacilityProfilePageState extends ConsumerState<FacilityProfilePage> {
   bool _isLoading = true;
   bool _isSaving = false;
   Facility? _facility;
+  Object? _error;
 
   @override
   void initState() {
@@ -32,6 +33,11 @@ class _FacilityProfilePageState extends ConsumerState<FacilityProfilePage> {
   }
 
   Future<void> _loadFacility() async {
+    setState(() {
+      _isLoading = true;
+      _error = null;
+    });
+
     try {
       final facility = await ref
           .read(firebaseServiceProvider)
@@ -45,7 +51,10 @@ class _FacilityProfilePageState extends ConsumerState<FacilityProfilePage> {
         });
       }
     } catch (e) {
-      // Handle or log error if needed
+      if (!mounted) return;
+      setState(() {
+        _error = e;
+      });
     } finally {
       if (mounted) {
         setState(() {
@@ -104,6 +113,52 @@ class _FacilityProfilePageState extends ConsumerState<FacilityProfilePage> {
   Widget build(BuildContext context) {
     if (_isLoading) {
       return const Center(child: CircularProgressIndicator());
+    }
+
+    if (_error != null) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24.0),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Icon(
+                Icons.error_outline_rounded,
+                color: MediColors.error,
+                size: 48,
+              ),
+              const SizedBox(height: 16),
+              const Text(
+                'Failed to load facility',
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                  color: MediColors.textPrimary,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                _error.toString(),
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  color: MediColors.textSecondary,
+                  fontSize: 14,
+                ),
+              ),
+              const SizedBox(height: 24),
+              ElevatedButton.icon(
+                onPressed: _loadFacility,
+                icon: const Icon(Icons.refresh_rounded),
+                label: const Text('Retry'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: MediColors.primary,
+                  foregroundColor: Colors.white,
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
     }
 
     if (_facility == null) {
