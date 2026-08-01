@@ -10,7 +10,7 @@ class AuditTrailPage extends ConsumerStatefulWidget {
   const AuditTrailPage({super.key});
 
   @override
-  ConsumerState<AuditTrailPage> createState() => _AuditTrailPageState();
+  ConsumerState createState() => _AuditTrailPageState();
 }
 
 class _AuditTrailPageState extends ConsumerState<AuditTrailPage> {
@@ -24,11 +24,13 @@ class _AuditTrailPageState extends ConsumerState<AuditTrailPage> {
   String _selectedAction = 'All';
   String? _errorMessage;
 
+  // Added state variable to track load more failures
+  String? _loadMoreError;
+
   final List<String> _actionFilters = [
     'All',
     'delete_request',
     'delete_facility',
-    // add more if needed
   ];
 
   @override
@@ -61,6 +63,7 @@ class _AuditTrailPageState extends ConsumerState<AuditTrailPage> {
       _lastDocument = null;
       _hasMore = true;
       _errorMessage = null;
+      _loadMoreError = null;
     });
 
     final firebaseService = ref.read(firebaseServiceProvider);
@@ -89,10 +92,12 @@ class _AuditTrailPageState extends ConsumerState<AuditTrailPage> {
     }
   }
 
+  // Updated catch block to stop auto-retrying and store the error message
   Future<void> _loadMoreData() async {
-    if (!mounted || _lastDocument == null) return;
+    if (!mounted || _lastDocument == null || _isLoading) return;
     setState(() {
       _isLoading = true;
+      _loadMoreError = null;
     });
 
     final firebaseService = ref.read(firebaseServiceProvider);
@@ -109,6 +114,7 @@ class _AuditTrailPageState extends ConsumerState<AuditTrailPage> {
           _lastDocument = result.lastDocument;
           _hasMore = result.hasMore;
           _isLoading = false;
+          _loadMoreError = null;
         });
       }
     } catch (e) {
@@ -116,6 +122,9 @@ class _AuditTrailPageState extends ConsumerState<AuditTrailPage> {
       if (mounted) {
         setState(() {
           _isLoading = false;
+          _hasMore = false; // Stop auto-retrying on scroll
+          _loadMoreError =
+              'Failed to load more logs. Please check your connection and try again.';
         });
       }
     }
@@ -175,7 +184,9 @@ class _AuditTrailPageState extends ConsumerState<AuditTrailPage> {
         title: const Text(
           'Audit Trail',
           style: TextStyle(
-              color: MediColors.textPrimary, fontWeight: FontWeight.bold),
+            color: MediColors.textPrimary,
+            fontWeight: FontWeight.bold,
+          ),
         ),
         elevation: 1,
         shadowColor: Colors.black12,
@@ -187,14 +198,38 @@ class _AuditTrailPageState extends ConsumerState<AuditTrailPage> {
           _buildFilterChips(),
           Expanded(
             child: _errorMessage != null
+                // Replaced raw exception text with a friendly message and Retry button
                 ? Center(
                     child: Padding(
                       padding: const EdgeInsets.all(24.0),
-                      child: Text(
-                        'Error loading logs:\n$_errorMessage',
-                        style: const TextStyle(
-                            color: MediColors.error, fontSize: 14),
-                        textAlign: TextAlign.center,
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(
+                            Icons.error_outline,
+                            color: MediColors.error,
+                            size: 48,
+                          ),
+                          const SizedBox(height: 16),
+                          const Text(
+                            'Failed to load audit logs.\nPlease check your connection and try again.',
+                            style: TextStyle(
+                              color: MediColors.textSecondary,
+                              fontSize: 16,
+                            ),
+                            textAlign: TextAlign.center,
+                          ),
+                          const SizedBox(height: 24),
+                          ElevatedButton.icon(
+                            onPressed: _loadInitialData,
+                            icon: const Icon(Icons.refresh),
+                            label: const Text('Retry'),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: MediColors.primary,
+                              foregroundColor: Colors.white,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                   )
@@ -203,24 +238,72 @@ class _AuditTrailPageState extends ConsumerState<AuditTrailPage> {
                         child: Text(
                           'No audit logs found.',
                           style: TextStyle(
-                              color: MediColors.textSecondary, fontSize: 16),
+                            color: MediColors.textSecondary,
+                            fontSize: 16,
+                          ),
                         ),
                       )
                     : ListView.separated(
                         controller: _scrollController,
                         padding: const EdgeInsets.all(24),
-                        itemCount: _logs.length + (_hasMore ? 1 : 0),
+                        itemCount: _logs.length +
+                            (_hasMore || _loadMoreError != null ? 1 : 0),
                         separatorBuilder: (context, index) =>
                             const SizedBox(height: 12),
                         itemBuilder: (context, index) {
                           if (index == _logs.length) {
-                            return const Center(
-                              child: Padding(
-                                padding: EdgeInsets.all(16.0),
-                                child: CircularProgressIndicator(
-                                    color: MediColors.primary),
-                              ),
-                            );
+                            // Updated pagination footer to show inline error and Retry button instead of permanent spinner
+                            if (_loadMoreError != null) {
+                              return Center(
+                                child: Padding(
+                                  padding: const EdgeInsets.all(16.0),
+                                  child: Column(
+                                    children: [
+                                      Text(
+                                        _loadMoreError!,
+                                        style: const TextStyle(
+                                          color: MediColors.error,
+                                          fontSize: 14,
+                                        ),
+                                        textAlign: TextAlign.center,
+                                      ),
+                                      const SizedBox(height: 12),
+                                      ElevatedButton.icon(
+                                        onPressed: () {
+                                          setState(() {
+                                            _loadMoreError = null;
+                                            _hasMore = true; // Allow retry
+                                          });
+                                          _loadMoreData();
+                                        },
+                                        icon:
+                                            const Icon(Icons.refresh, size: 18),
+                                        label: const Text('Retry'),
+                                        style: ElevatedButton.styleFrom(
+                                          backgroundColor: MediColors.primary,
+                                          foregroundColor: Colors.white,
+                                          padding: const EdgeInsets.symmetric(
+                                            horizontal: 24,
+                                            vertical: 12,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              );
+                            }
+                            if (_isLoading) {
+                              return const Center(
+                                child: Padding(
+                                  padding: EdgeInsets.all(16.0),
+                                  child: CircularProgressIndicator(
+                                    color: MediColors.primary,
+                                  ),
+                                ),
+                              );
+                            }
+                            return const SizedBox.shrink();
                           }
                           final log = _logs[index];
                           return _buildLogCard(log);
@@ -270,20 +353,25 @@ class _AuditTrailPageState extends ConsumerState<AuditTrailPage> {
           const SizedBox(height: 8),
           RichText(
             text: TextSpan(
-              style:
-                  const TextStyle(fontSize: 14, color: MediColors.textPrimary),
+              style: const TextStyle(
+                fontSize: 14,
+                color: MediColors.textPrimary,
+              ),
               children: [
                 const TextSpan(
-                    text: 'Admin ID: ',
-                    style: TextStyle(fontWeight: FontWeight.w600)),
+                  text: 'Admin ID: ',
+                  style: TextStyle(fontWeight: FontWeight.w600),
+                ),
                 TextSpan(text: '${log.adminId}\n'),
                 const TextSpan(
-                    text: 'Resource: ',
-                    style: TextStyle(fontWeight: FontWeight.w600)),
+                  text: 'Resource: ',
+                  style: TextStyle(fontWeight: FontWeight.w600),
+                ),
                 TextSpan(text: '${log.resourceType} (${log.resourceId})\n'),
                 const TextSpan(
-                    text: 'Status: ',
-                    style: TextStyle(fontWeight: FontWeight.w600)),
+                  text: 'Status: ',
+                  style: TextStyle(fontWeight: FontWeight.w600),
+                ),
                 TextSpan(text: log.status),
               ],
             ),
@@ -293,9 +381,10 @@ class _AuditTrailPageState extends ConsumerState<AuditTrailPage> {
             const Text(
               'Details:',
               style: TextStyle(
-                  fontWeight: FontWeight.w600,
-                  fontSize: 14,
-                  color: MediColors.textPrimary),
+                fontWeight: FontWeight.w600,
+                fontSize: 14,
+                color: MediColors.textPrimary,
+              ),
             ),
             const SizedBox(height: 4),
             Container(
@@ -307,12 +396,13 @@ class _AuditTrailPageState extends ConsumerState<AuditTrailPage> {
               child: Text(
                 log.metadata.toString(),
                 style: const TextStyle(
-                    fontSize: 12,
-                    color: MediColors.textSecondary,
-                    fontFamily: 'monospace'),
+                  fontSize: 12,
+                  color: MediColors.textSecondary,
+                  fontFamily: 'monospace',
+                ),
               ),
             ),
-          ]
+          ],
         ],
       ),
     );
