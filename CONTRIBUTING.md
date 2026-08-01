@@ -13,6 +13,19 @@ discuss ideas, and connect with other contributors!
 
 ---
 
+## Table of Contents
+
+- [1. Code of Conduct](#1-code-of-conduct)
+- [2. Setting Up Your Local Environment](#2-setting-up-your-local-environment)
+- [3. Firebase Emulator Setup](#3-firebase-emulator-setup)
+- [4. Claiming and Creating Issues](#4-claiming-and-creating-issues)
+- [5. Branch Naming Conventions](#5-branch-naming-conventions)
+- [6. Coding Standards & Conventions](#6-coding-standards--conventions)
+- [7. Testing](#7-testing)
+- [8. The Pull Request Process](#8-the-pull-request-process)
+
+---
+
 ## 1. Code of Conduct
 
 By participating in this project, you agree to abide by our
@@ -91,7 +104,7 @@ If you plan to modify or deploy Cloud Functions or Firestore rules:
 
 ---
 
-## Firebase Emulator Setup
+## 3. Firebase Emulator Setup
 
 ### Prerequisites
 
@@ -99,7 +112,7 @@ If you plan to modify or deploy Cloud Functions or Firestore rules:
 - npm
 - Firebase CLI installation (`npm install -g firebase-tools`)
 
-### Repository setup
+### Repository Setup
 
 - Install dependencies:
 
@@ -125,31 +138,31 @@ If you plan to modify or deploy Cloud Functions or Firestore rules:
   firebase use mediflow-92e6f
   ```
 
-### Starting emulators
+### Starting Emulators
 
 ```bash
 firebase emulators:start
 ```
 
-### Backend development
+### Backend Development
 
 - **Available emulator services**: Hosting, Firestore, and Functions.
 - **Backend startup**: Run the emulators from the root directory.
 
-### Running tests
+### Running Tests
 
 ```bash
 cd functions
 npm run test
 ```
 
-### Sample data
+### Sample Data
 
 No seed process currently exists.
 
 ---
 
-## 3. Claiming and Creating Issues
+## 4. Claiming and Creating Issues
 
 Before working on any changes:
 
@@ -172,7 +185,7 @@ Before working on any changes:
 
 ---
 
-## 4. Branch Naming Conventions
+## 5. Branch Naming Conventions
 
 Always create a new branch for your work. Do not work directly on `main`. Use
 the following naming convention:
@@ -187,7 +200,7 @@ the following naming convention:
 
 ---
 
-## 5. Coding Standards & Conventions
+## 6. Coding Standards & Conventions
 
 ### Coding Style
 
@@ -250,7 +263,7 @@ proper review or understanding.
 
 ---
 
-## 6. Testing
+## 7. Testing
 
 We expect bug fixes and features to be accompanied by tests where applicable.
 
@@ -264,7 +277,7 @@ We expect bug fixes and features to be accompanied by tests where applicable.
 
 ---
 
-## 7. The Pull Request Process
+## 8. The Pull Request Process
 
 1. **Verify Your Branch:**
    Ensure the following commands run successfully with zero errors/warnings
