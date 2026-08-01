@@ -67,6 +67,13 @@ class RoutingService {
   static const String _orsBaseUrl =
       'https://api.openrouteservice.org/v2/directions/driving-car';
 
+  /// OpenRouteService API key configured via constructor or environment.
+  final String? orsApiKey;
+
+  RoutingService({
+    String? orsApiKey = const String.fromEnvironment('ORS_API_KEY'),
+  }) : orsApiKey = (orsApiKey != null && orsApiKey.isNotEmpty) ? orsApiKey : null;
+
   // Cache for storing previously fetched routes
   final Map<String, RouteResult> _routeCache = {};
   static const int _maxCacheSize = 100;
@@ -117,7 +124,7 @@ class RoutingService {
   }
 
   Future<RouteResult> getRoute(LatLng start, LatLng end) async {
-    final String? orsKey = null;
+    final String? orsKey = orsApiKey;
 
     // Validate coordinates before making external API requests.
     if (!_canGenerateRoute(start, end)) {
