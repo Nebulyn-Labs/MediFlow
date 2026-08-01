@@ -3,7 +3,8 @@ import 'package:med_supply_prototype/services/ai_service.dart';
 
 void main() {
   group('AIService fallback', () {
-    test('forecastDemand falls back to local prediction when Gemini throws', () async {
+    test('forecastDemand falls back to local prediction when Gemini throws',
+        () async {
       final service = AIService(
         null,
         geminiCaller: (

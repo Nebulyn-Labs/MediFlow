@@ -20,17 +20,23 @@ final aiServiceProvider = Provider<AIService>((ref) {
 
 class AIService {
   final Ref? ref;
-  final FirebaseFunctions functions;
   final GeminiCaller? geminiCaller;
+
+  final FirebaseFunctions? _functions;
+
+  /// Resolved on first use rather than in the constructor: reading
+  /// [FirebaseFunctions.instance] requires an initialized Firebase app, which
+  /// unit tests that inject [geminiCaller] do not set up.
+  FirebaseFunctions get functions => _functions ?? FirebaseFunctions.instance;
 
   bool _quotaExhausted = false;
   DateTime? _quotaResetTime;
 
   AIService(
-  this.ref, {
-  FirebaseFunctions? functions,
-  this.geminiCaller,
-}) : functions = functions ?? FirebaseFunctions.instance;
+    this.ref, {
+    FirebaseFunctions? functions,
+    this.geminiCaller,
+  }) : _functions = functions;
 
   bool get _shouldUseLocal {
     if (!_quotaExhausted) return false;
@@ -61,15 +67,14 @@ class AIService {
   // Helper method to call the generic callGeminiSecure Cloud Function
   Future<String> _callGeminiBackend(String prompt,
       {String? imageBase64, String? imageMimeType}) async {
-        if (geminiCaller != null) {
-           return geminiCaller!(
-              prompt,
-              imageBase64: imageBase64,
-              imageMimeType: imageMimeType,
-           );
-          }
-    final callable =
-        functions.httpsCallable('callGeminiSecure');
+    if (geminiCaller != null) {
+      return geminiCaller!(
+        prompt,
+        imageBase64: imageBase64,
+        imageMimeType: imageMimeType,
+      );
+    }
+    final callable = functions.httpsCallable('callGeminiSecure');
     final response = await callable.call({
       'prompt': prompt,
       if (imageBase64 != null) 'imageBase64': imageBase64,
@@ -216,8 +221,7 @@ class AIService {
   }) async {
     if (_shouldUseLocal) return _localSystemResponse(query, context, role);
     try {
-      final callable =
-         functions.httpsCallable('getChatResponseSecure');
+      final callable = functions.httpsCallable('getChatResponseSecure');
       final response = await callable.call({
         'query': query,
         'context': context,
