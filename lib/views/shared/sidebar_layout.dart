@@ -181,51 +181,60 @@ class _SidebarLayoutState extends ConsumerState<SidebarLayout> {
                   ),
 
                   // Nav Items
-                  StreamBuilder<List<notif.NotificationModel>>(
-                    stream:
-                        widget.role == 'facility' && widget.facilityId != null
-                            ? ref
-                                .watch(firebaseServiceProvider)
-                                .streamNotifications(widget.facilityId!)
-                            : Stream.value([]),
-                    builder: (context, notifSnapshot) {
-                      final notifications = notifSnapshot.data ?? [];
-                      final unreadCount =
-                          notifications.where((n) => !n.isRead).length;
+                  Expanded(
+                    child: ScrollConfiguration(
+                      behavior: ScrollConfiguration.of(context)
+                          .copyWith(scrollbars: false),
+                      child: SingleChildScrollView(
+                        child: StreamBuilder<List<notif.NotificationModel>>(
+                          stream: widget.role == 'facility' &&
+                                  widget.facilityId != null
+                              ? ref
+                                  .watch(firebaseServiceProvider)
+                                  .streamNotifications(widget.facilityId!)
+                              : Stream.value([]),
+                          builder: (context, notifSnapshot) {
+                            final notifications = notifSnapshot.data ?? [];
+                            final unreadCount =
+                                notifications.where((n) => !n.isRead).length;
 
-                      return StreamBuilder<List<InventoryItem>>(
-                        stream: widget.role == 'facility' &&
-                                widget.facilityId != null
-                            ? ref
-                                .watch(firebaseServiceProvider)
-                                .streamInventory(widget.facilityId!)
-                            : Stream.value([]),
-                        builder: (context, snapshot) {
-                          final inventory = snapshot.data ?? [];
-                          // Use the centralized hasAlert getter from InventoryItem
-                          // to avoid duplicating threshold logic.
-                          final hasAlerts = inventory.any((i) => i.hasAlert);
+                            return StreamBuilder<List<InventoryItem>>(
+                              stream: widget.role == 'facility' &&
+                                      widget.facilityId != null
+                                  ? ref
+                                      .watch(firebaseServiceProvider)
+                                      .streamInventory(widget.facilityId!)
+                                  : Stream.value([]),
+                              builder: (context, snapshot) {
+                                final inventory = snapshot.data ?? [];
+                                // Use the centralized hasAlert getter from
+                                // InventoryItem to avoid duplicating
+                                // threshold logic.
+                                final hasAlerts =
+                                    inventory.any((i) => i.hasAlert);
 
-                          return Column(
-                            children: List.generate(items.length, (i) {
-                              final isSelected = i == selectedIndex;
-                              final isAlertTab = widget.role == 'facility' &&
-                                  i == 3; // Alerts index
-                              return _buildNavItem(
-                                items[i],
-                                isSelected,
-                                () => _onItemTapped(i, context),
-                                showBadge: isAlertTab && hasAlerts,
-                                badgeCount: isAlertTab ? unreadCount : 0,
-                              );
-                            }),
-                          );
-                        },
-                      );
-                    },
+                                return Column(
+                                  children: List.generate(items.length, (i) {
+                                    final isSelected = i == selectedIndex;
+                                    final isAlertTab =
+                                        widget.role == 'facility' &&
+                                            i == 3; // Alerts index
+                                    return _buildNavItem(
+                                      items[i],
+                                      isSelected,
+                                      () => _onItemTapped(i, context),
+                                      showBadge: isAlertTab && hasAlerts,
+                                      badgeCount: isAlertTab ? unreadCount : 0,
+                                    );
+                                  }),
+                                );
+                              },
+                            );
+                          },
+                        ),
+                      ),
+                    ),
                   ),
-
-                  const Spacer(),
 
                   // Logout
                   _buildNavItem(
@@ -361,8 +370,12 @@ class _SidebarLayoutState extends ConsumerState<SidebarLayout> {
                         ),
                     ],
                   ),
-                  if (_isExpanded) ...[
-                    const SizedBox(width: 14),
+                  AnimatedContainer(
+                    duration: const Duration(milliseconds: 200),
+                    curve: Curves.easeOutCubic,
+                    width: _isExpanded ? 14 : 0,
+                  ),
+                  if (_isExpanded)
                     Expanded(
                       child: Text(
                         item.label,
@@ -380,7 +393,6 @@ class _SidebarLayoutState extends ConsumerState<SidebarLayout> {
                         maxLines: 1,
                       ),
                     ),
-                  ],
                 ],
               ),
             ),
