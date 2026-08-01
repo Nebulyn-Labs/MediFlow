@@ -54,16 +54,16 @@ class _AlertsPageState extends ConsumerState<AlertsPage> {
   List<_InventoryAlert> _parseAlerts(List<Map<String, dynamic>> alertMaps) {
     return alertMaps.map((data) {
       final item = InventoryItem(
-        id: data['stockId'] ?? '',
-        medicineName: data['medicineName'] ?? '',
-        batchId: data['batchId'] ?? '',
+        id: (data['stockId'] as String?) ?? '',
+        medicineName: (data['medicineName'] as String?) ?? '',
+        batchId: (data['batchId'] as String?) ?? '',
         arrivalDate: DateTime.now(),
         expiryDate: data['expiryDate'] != null
             ? (data['expiryDate'] as Timestamp).toDate()
             : DateTime.now(),
-        initialQuantity: data['initialQuantity']?.toInt() ?? 0,
-        remainingQuantity: data['qtyRemaining']?.toInt() ?? 0,
-        unit: data['unit'] ?? 'units',
+        initialQuantity: (data['initialQuantity'] as num?)?.toInt() ?? 0,
+        remainingQuantity: (data['qtyRemaining'] as num?)?.toInt() ?? 0,
+        unit: (data['unit'] as String?) ?? 'units',
         lastUpdated: DateTime.now(),
       );
 
