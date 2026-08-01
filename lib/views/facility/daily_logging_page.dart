@@ -74,8 +74,6 @@ class _DailyLoggingPageState extends ConsumerState<DailyLoggingPage>
   List<Map<String, dynamic>> _csvItems = [];
   String? _csvStatus;
   bool _isSubmittingCsv = false;
-  // Holds rows that failed to submit, preserving original data for retry
-  List<Map<String, dynamic>> _failedCsvItems = [];
   bool _isScanning = false;
   final List<Map<String, dynamic>> _scannedItems = [];
   bool _isSubmittingQr = false;
@@ -354,7 +352,6 @@ class _DailyLoggingPageState extends ConsumerState<DailyLoggingPage>
         }
         setState(() {
           _csvItems = failed;
-          _failedCsvItems = failed;
           _csvStatus = failCount == 0
               ? null
               : 'Partial success: $successCount saved, $failCount failed.';
