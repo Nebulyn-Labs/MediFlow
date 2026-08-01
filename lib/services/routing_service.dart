@@ -57,7 +57,10 @@ class RouteResult {
 ///   known placeholder coordinates (`(0, 0)` or `(-1, -1)`, used
 ///   elsewhere in the codebase to mean "location not set"). This avoids
 ///   wasting external API calls on facilities with incomplete geodata.
-/// - **Caching:** routes are cached by start and end coordinates with bounded cache size.
+/// - **Route caching:** routes are stored in an in-memory cache bounded to
+///   100 entries (`_maxCacheSize`). When a cache miss occurs, failed segment
+///   requests fall back to a straight line without retries, so a multi-stop
+///   route can mix real road polylines and straight-line segments.
 class RoutingService {
   static const String _osrmBaseUrl =
       'https://router.project-osrm.org/route/v1/driving';
@@ -144,33 +147,49 @@ class RoutingService {
             await http.get(Uri.parse(url)).timeout(const Duration(seconds: 5));
 
         if (response.statusCode == 200) {
-          final data = jsonDecode(response.body);
+          final rawData = jsonDecode(response.body);
+          if (rawData is Map<String, dynamic>) {
+            final features = rawData['features'];
+            if (features is List && features.isNotEmpty) {
+              final firstFeature = features[0];
+              if (firstFeature is Map) {
+                final geometry = firstFeature['geometry'];
+                if (geometry is Map && geometry['coordinates'] is List) {
+                  final List<dynamic> coords = geometry['coordinates'] as List;
 
-          if (data['features'] != null && data['features'].isNotEmpty) {
-            final feature = data['features'][0];
-            final List<dynamic> coords = feature['geometry']['coordinates'];
-            final props = feature['properties'];
-            final summary = props?['summary'];
+                  debugPrint(
+                    'RoutingService: ORS Success. ${coords.length} points found.',
+                  );
 
-            debugPrint(
-              'RoutingService: ORS Success. ${coords.length} points found.',
-            );
+                  final route = coords
+                      .whereType<List>()
+                      .map((c) => LatLng(
+                          (c[1] as num).toDouble(), (c[0] as num).toDouble()))
+                      .toList();
 
-            final result = RouteResult(
-              points: coords
-                  .map((c) => LatLng(c[1].toDouble(), c[0].toDouble()))
-                  .toList(),
-              // ORS returns distance in metres and duration in seconds.
-              distanceKm: summary != null
-                  ? (summary['distance'] as num).toDouble() / 1000.0
-                  : null,
-              durationSeconds: summary != null
-                  ? (summary['duration'] as num).toDouble()
-                  : null,
-            );
-            _cacheRoute(cacheKey, result);
-            debugPrint('RoutingService: Route cached (ORS).');
-            return result;
+                  // ORS reports distance in metres and duration in seconds.
+                  final properties = firstFeature['properties'];
+                  final summary =
+                      properties is Map ? properties['summary'] : null;
+                  final distance = summary is Map ? summary['distance'] : null;
+                  final duration = summary is Map ? summary['duration'] : null;
+
+                  final result = RouteResult(
+                    points: route,
+                    distanceKm:
+                        distance is num ? distance.toDouble() / 1000.0 : null,
+                    durationSeconds:
+                        duration is num ? duration.toDouble() : null,
+                  );
+
+                  _cacheRoute(cacheKey, result);
+
+                  debugPrint('RoutingService: Route cached (ORS).');
+
+                  return result;
+                }
+              }
+            }
           }
         } else {
           debugPrint(
@@ -194,31 +213,45 @@ class RoutingService {
           await http.get(Uri.parse(url)).timeout(const Duration(seconds: 5));
 
       if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
+        final rawData = jsonDecode(response.body);
+        if (rawData is Map<String, dynamic>) {
+          final routes = rawData['routes'];
+          if (routes is List && routes.isNotEmpty) {
+            final firstRoute = routes[0];
+            if (firstRoute is Map) {
+              final geometry = firstRoute['geometry'];
+              if (geometry is Map && geometry['coordinates'] is List) {
+                final List<dynamic> coords = geometry['coordinates'] as List;
 
-        if (data['routes'] != null && data['routes'].isNotEmpty) {
-          final route = data['routes'][0];
-          final List<dynamic> coords = route['geometry']['coordinates'];
+                debugPrint(
+                  'RoutingService: OSRM Success. ${coords.length} points found.',
+                );
 
-          debugPrint(
-            'RoutingService: OSRM Success. ${coords.length} points found.',
-          );
+                final route = coords
+                    .whereType<List>()
+                    .map((c) => LatLng(
+                        (c[1] as num).toDouble(), (c[0] as num).toDouble()))
+                    .toList();
 
-          final result = RouteResult(
-            points: coords
-                .map((c) => LatLng(c[1].toDouble(), c[0].toDouble()))
-                .toList(),
-            // OSRM returns distance in metres and duration in seconds.
-            distanceKm: route['distance'] != null
-                ? (route['distance'] as num).toDouble() / 1000.0
-                : null,
-            durationSeconds: route['duration'] != null
-                ? (route['duration'] as num).toDouble()
-                : null,
-          );
-          _cacheRoute(cacheKey, result);
-          debugPrint('RoutingService: Route cached (OSRM).');
-          return result;
+                // OSRM reports distance in metres and duration in seconds.
+                final distance = firstRoute['distance'];
+                final duration = firstRoute['duration'];
+
+                final result = RouteResult(
+                  points: route,
+                  distanceKm:
+                      distance is num ? distance.toDouble() / 1000.0 : null,
+                  durationSeconds: duration is num ? duration.toDouble() : null,
+                );
+
+                _cacheRoute(cacheKey, result);
+
+                debugPrint('RoutingService: Route cached (OSRM).');
+
+                return result;
+              }
+            }
+          }
         }
       } else {
         debugPrint(

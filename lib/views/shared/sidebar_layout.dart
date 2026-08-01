@@ -202,11 +202,9 @@ class _SidebarLayoutState extends ConsumerState<SidebarLayout> {
                             : Stream.value([]),
                         builder: (context, snapshot) {
                           final inventory = snapshot.data ?? [];
-                          final hasAlerts = inventory.any((i) {
-                            final daysLeft =
-                                i.expiryDate.difference(DateTime.now()).inDays;
-                            return i.isLowStock || daysLeft <= 30;
-                          });
+                          // Use the centralized hasAlert getter from InventoryItem
+                          // to avoid duplicating threshold logic.
+                          final hasAlerts = inventory.any((i) => i.hasAlert);
 
                           return Column(
                             children: List.generate(items.length, (i) {

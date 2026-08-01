@@ -31,8 +31,8 @@ function stockStatus(data) {
 
   if (daysLeft !== null && daysLeft < 0) return "expired";
   if (pct >= 0.7 && daysLeft !== null && daysLeft <= 30) return "wastage_risk";
-  if (pct <= thresholds.lowStockPercentage || remaining <= thresholds.lowStockAbsolute) return "low_stock";
   if (daysLeft !== null && daysLeft <= 30) return "expiring_soon";
+  if (pct <= thresholds.lowStockPercentage || remaining <= thresholds.lowStockAbsolute) return "low_stock";
   return "healthy";
 }
 

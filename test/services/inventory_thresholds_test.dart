@@ -12,10 +12,13 @@ void main() {
           reason: 'Source of truth JSON file must exist.');
 
       final jsonContent = jsonFile.readAsStringSync();
-      final Map<String, dynamic> thresholds = jsonDecode(jsonContent);
+      final Map<String, dynamic> thresholds =
+          jsonDecode(jsonContent) as Map<String, dynamic>;
 
-      final double expectedPercentage = thresholds['lowStockPercentage'];
-      final int expectedAbsolute = thresholds['lowStockAbsolute'];
+      final double expectedPercentage =
+          (thresholds['lowStockPercentage'] as num).toDouble();
+      final int expectedAbsolute =
+          (thresholds['lowStockAbsolute'] as num).toInt();
 
       expect(InventoryThresholds.lowStockPercentage, expectedPercentage,
           reason: 'Dart lowStockPercentage must match JSON source of truth.');
