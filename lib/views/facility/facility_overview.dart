@@ -219,84 +219,50 @@ class _FacilityOverviewState extends ConsumerState<FacilityOverview> {
               ),
             ],
           ),
-          body: RefreshIndicator(
-            onRefresh: () => ref
-                .read(firebaseServiceProvider)
-                .getInventoryOnce(widget.facilityId),
-            color: MediColors.primary,
-            backgroundColor: MediColors.surface,
-            strokeWidth: 2.5,
-            displacement: 48,
-            child: SingleChildScrollView(
-              physics: const AlwaysScrollableScrollPhysics(),
-              padding: const EdgeInsets.all(28),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Greeting
-                  Wrap(
-                    spacing: 16,
-                    runSpacing: 12,
-                    crossAxisAlignment: WrapCrossAlignment.start,
-                    children: [
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text('Facility Dashboard',
-                              style: const TextStyle(
-                                  fontSize: 26,
-                                  fontWeight: FontWeight.w800,
-                                  color: MediColors.textPrimary)),
-                          const SizedBox(height: 4),
-                          Text('Real-time inventory monitoring and insights',
-                              style: const TextStyle(
-                                  color: MediColors.textSecondary,
-                                  fontSize: 14)),
-                        ],
-                      ),
-                      OutlinedButton.icon(
-                        onPressed: _isSimulating
-                            ? null
-                            : () async {
-                                setState(() => _isSimulating = true);
+          body: SingleChildScrollView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            padding: const EdgeInsets.all(28),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Greeting
+                Wrap(
+                  spacing: 16,
+                  runSpacing: 12,
+                  crossAxisAlignment: WrapCrossAlignment.start,
+                  children: [
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('Facility Dashboard',
+                            style: const TextStyle(
+                                fontSize: 26,
+                                fontWeight: FontWeight.w800,
+                                color: MediColors.textPrimary)),
+                        const SizedBox(height: 4),
+                        Text('Real-time inventory monitoring and insights',
+                            style: const TextStyle(
+                                color: MediColors.textSecondary, fontSize: 14)),
+                      ],
+                    ),
+                    OutlinedButton.icon(
+                      onPressed: _isSimulating
+                          ? null
+                          : () async {
+                              setState(() => _isSimulating = true);
 
-                                if (context.mounted) {
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                      const SnackBar(
-                                          content: Text(
-                                              'Simulating 30 days of usage data...')));
-                                }
-                                try {
-                                  final firebase =
-                                      ref.read(firebaseServiceProvider);
-                                  final fac = await firebase
-                                      .getFacility(widget.facilityId);
-                                  if (fac == null) {
-                                    if (context.mounted) {
-                                      ScaffoldMessenger.of(context)
-                                          .showSnackBar(const SnackBar(
+                              if (context.mounted) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(
                                         content: Text(
-                                            'Simulation failed. Please try again.'),
-                                        backgroundColor: MediColors.error,
-                                      ));
-                                    }
-                                    if (mounted) {
-                                      setState(() => _isSimulating = false);
-                                    }
-                                    return;
-                                  }
-
-                                  await ref
-                                      .read(simulationServiceProvider)
-                                      .runFullSimulation(
-                                          widget.facilityId, fac.type);
-                                  if (context.mounted) {
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                        const SnackBar(
-                                            content: Text(
-                                                'Simulation complete! Analytics ready.')));
-                                  }
-                                } catch (_) {
+                                            'Simulating 30 days of usage data...')));
+                              }
+                              try {
+                                final firebase =
+                                    ref.read(firebaseServiceProvider);
+                                final fac = await firebase
+                                    .getFacility(widget.facilityId);
+                                if (fac == null) {
                                   if (context.mounted) {
                                     ScaffoldMessenger.of(context)
                                         .showSnackBar(const SnackBar(
@@ -305,125 +271,142 @@ class _FacilityOverviewState extends ConsumerState<FacilityOverview> {
                                       backgroundColor: MediColors.error,
                                     ));
                                   }
+                                  if (mounted) {
+                                    setState(() => _isSimulating = false);
+                                  }
+                                  return;
                                 }
-                                if (mounted) {
-                                  setState(() => _isSimulating = false);
+
+                                await ref
+                                    .read(simulationServiceProvider)
+                                    .runFullSimulation(
+                                        widget.facilityId, fac.type);
+                                if (context.mounted) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                      const SnackBar(
+                                          content: Text(
+                                              'Simulation complete! Analytics ready.')));
                                 }
-                              },
-                        icon: _isSimulating
-                            ? const SizedBox(
-                                width: 18,
-                                height: 18,
-                                child: CircularProgressIndicator(
-                                    strokeWidth: 2, color: MediColors.primary))
-                            : const Icon(Icons.analytics_outlined),
-                        label: Text(_isSimulating
-                            ? 'Running...'
-                            : 'Simulate Analytics'),
-                        style: OutlinedButton.styleFrom(
-                          foregroundColor: MediColors.primary,
-                          side: const BorderSide(color: MediColors.primary),
-                          shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(10)),
-                        ),
+                              } catch (_) {
+                                if (context.mounted) {
+                                  ScaffoldMessenger.of(context)
+                                      .showSnackBar(const SnackBar(
+                                    content: Text(
+                                        'Simulation failed. Please try again.'),
+                                    backgroundColor: MediColors.error,
+                                  ));
+                                }
+                              }
+                              if (mounted) {
+                                setState(() => _isSimulating = false);
+                              }
+                            },
+                      icon: _isSimulating
+                          ? const SizedBox(
+                              width: 18,
+                              height: 18,
+                              child: CircularProgressIndicator(
+                                  strokeWidth: 2, color: MediColors.primary))
+                          : const Icon(Icons.analytics_outlined),
+                      label: Text(
+                          _isSimulating ? 'Running...' : 'Simulate Analytics'),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: MediColors.primary,
+                        side: const BorderSide(color: MediColors.primary),
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10)),
                       ),
-                    ],
-                  ),
-                  const SizedBox(height: 28),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 28),
 
-                  // KPI Cards
-                  Builder(
-                    builder: (context) {
-                      // All counts now derived from the centralized
-                      // ItemStatus getter — no inline threshold duplication.
-                      final expired = inventory
-                          .where((i) => i.status == ItemStatus.expired)
-                          .length;
-                      final wastageRisk = inventory
-                          .where((i) => i.status == ItemStatus.wastageRisk)
-                          .length;
-                      final lowStock = inventory
-                          .where((i) => i.status == ItemStatus.lowStock)
-                          .length;
-                      final unhealthy =
-                          inventory.where((i) => i.hasAlert).length;
-                      final healthy = (inventory.length - unhealthy)
-                          .clamp(0, inventory.length);
-                      final stockHealthText = inventory.isEmpty
-                          ? 'No stock'
-                          : '$healthy / ${inventory.length} healthy';
-                      final stockHealthColor = unhealthy == 0
-                          ? MediColors.success
-                          : MediColors.warning;
-                      final stockHealthGradient = unhealthy == 0
-                          ? const LinearGradient(
-                              colors: [Color(0xFF0A3D2E), Color(0xFF1E293B)])
-                          : const LinearGradient(
-                              colors: [Color(0xFF3D2E0A), Color(0xFF1E293B)]);
+                // KPI Cards
+                Builder(
+                  builder: (context) {
+                    // All counts now derived from the centralized
+                    // ItemStatus getter — no inline threshold duplication.
+                    final expired = inventory
+                        .where((i) => i.status == ItemStatus.expired)
+                        .length;
+                    final wastageRisk = inventory
+                        .where((i) => i.status == ItemStatus.wastageRisk)
+                        .length;
+                    final lowStock = inventory
+                        .where((i) => i.status == ItemStatus.lowStock)
+                        .length;
+                    final unhealthy = inventory.where((i) => i.hasAlert).length;
+                    final healthy = (inventory.length - unhealthy)
+                        .clamp(0, inventory.length);
+                    final stockHealthText = inventory.isEmpty
+                        ? 'No stock'
+                        : '$healthy / ${inventory.length} healthy';
+                    final stockHealthColor = unhealthy == 0
+                        ? MediColors.success
+                        : MediColors.warning;
+                    final stockHealthGradient = unhealthy == 0
+                        ? const LinearGradient(
+                            colors: [Color(0xFF0A3D2E), Color(0xFF1E293B)])
+                        : const LinearGradient(
+                            colors: [Color(0xFF3D2E0A), Color(0xFF1E293B)]);
 
-                      return Wrap(
-                        spacing: 20,
-                        runSpacing: 20,
-                        children: [
-                          _buildKpiCard(
-                              'Total Meds in Inv',
-                              '${inventory.length}',
-                              Icons.medication_rounded,
-                              MediColors.info,
-                              const LinearGradient(colors: [
-                                Color(0xFF1E3A5F),
-                                Color(0xFF1E293B)
-                              ]),
-                              () {}),
-                          _buildKpiCard(
-                              'Stock Health',
-                              stockHealthText,
-                              Icons.health_and_safety_rounded,
-                              stockHealthColor,
-                              stockHealthGradient, () {
-                            context.go('/facility/${widget.facilityId}/alerts');
-                          }),
-                          _buildKpiCard(
-                              'Expired',
-                              '$expired',
-                              Icons.error_outline_rounded,
-                              MediColors.error,
-                              const LinearGradient(colors: [
-                                Color(0xFF3D1519),
-                                Color(0xFF1E293B)
-                              ]), () {
-                            context.go('/facility/${widget.facilityId}/alerts');
-                          }),
-                          _buildKpiCard(
-                              'Wastage Risk',
-                              '$wastageRisk',
-                              Icons.warning_amber_rounded,
-                              const Color(0xFFF59E0B),
-                              const LinearGradient(colors: [
-                                Color(0xFF3D2E0A),
-                                Color(0xFF1E293B)
-                              ]), () {
-                            context.go('/facility/${widget.facilityId}/alerts');
-                          }),
-                          _buildKpiCard(
-                              'Low Stock',
-                              '$lowStock',
-                              Icons.trending_down_rounded,
-                              MediColors.error,
-                              const LinearGradient(colors: [
-                                Color(0xFF3D1519),
-                                Color(0xFF1E293B)
-                              ]), () {
-                            context.go('/facility/${widget.facilityId}/alerts');
-                          }),
-                        ],
-                      );
-                    },
-                  ),
-                  const SizedBox(height: 36),
-                  _buildInventoryTable(context, ref, inventory),
-                ],
-              ),
+                    return Wrap(
+                      spacing: 20,
+                      runSpacing: 20,
+                      children: [
+                        _buildKpiCard(
+                            'Total Meds in Inv',
+                            '${inventory.length}',
+                            Icons.medication_rounded,
+                            MediColors.info,
+                            const LinearGradient(
+                                colors: [Color(0xFF1E3A5F), Color(0xFF1E293B)]),
+                            () {}),
+                        _buildKpiCard(
+                            'Stock Health',
+                            stockHealthText,
+                            Icons.health_and_safety_rounded,
+                            stockHealthColor,
+                            stockHealthGradient, () {
+                          context.go('/facility/${widget.facilityId}/alerts');
+                        }),
+                        _buildKpiCard(
+                            'Expired',
+                            '$expired',
+                            Icons.error_outline_rounded,
+                            MediColors.error,
+                            const LinearGradient(
+                                colors: [Color(0xFF3D1519), Color(0xFF1E293B)]),
+                            () {
+                          context.go('/facility/${widget.facilityId}/alerts');
+                        }),
+                        _buildKpiCard(
+                            'Wastage Risk',
+                            '$wastageRisk',
+                            Icons.warning_amber_rounded,
+                            const Color(0xFFF59E0B),
+                            const LinearGradient(
+                                colors: [Color(0xFF3D2E0A), Color(0xFF1E293B)]),
+                            () {
+                          context.go('/facility/${widget.facilityId}/alerts');
+                        }),
+                        _buildKpiCard(
+                            'Low Stock',
+                            '$lowStock',
+                            Icons.trending_down_rounded,
+                            MediColors.error,
+                            const LinearGradient(
+                                colors: [Color(0xFF3D1519), Color(0xFF1E293B)]),
+                            () {
+                          context.go('/facility/${widget.facilityId}/alerts');
+                        }),
+                      ],
+                    );
+                  },
+                ),
+                const SizedBox(height: 36),
+                _buildInventoryTable(context, ref, inventory),
+              ],
             ),
           ),
         );
@@ -441,7 +424,7 @@ class _FacilityOverviewState extends ConsumerState<FacilityOverview> {
           facilityName: fac?.name);
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Inventory CSV exported ✓')));
+            const SnackBar(content: Text('Inventory CSV exported \u2713')));
       }
     } catch (e) {
       if (context.mounted) {
