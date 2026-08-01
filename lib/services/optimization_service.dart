@@ -123,10 +123,11 @@ class NearestNeighborRoutingStrategy implements RoutingStrategy {
 /// - **Scoring (Optimal Transfer Score):** for each candidate donor of a
 ///   given medicine, a score is computed from proximity (closer is worth
 ///   more, capped at 200km), a flat +150 bonus when the recipient is rural,
-///   and a fulfillment bonus (+50 full, +25 partial). The highest-scoring
-///   donor is chosen per iteration; this repeats until the deficit is met
-///   or no donor has stock left, allowing a single indent to be split
-///   across multiple donors.
+///   a fulfillment bonus (+50 full, +25 partial), and a near-expiry bonus
+///   (+100 when the donor's soonest valid batch expires within 90 days,
+///   excluding already-expired stock). The highest-scoring donor is chosen
+///   per iteration; this repeats until the deficit is met or no donor has
+///   stock left, allowing a single indent to be split across multiple donors.
 /// - **Routing** ([NearestNeighborRoutingStrategy]): stops for a donor are
 ///   ordered with a simple greedy nearest-neighbor heuristic starting from
 ///   the donor's own location. This is not a shortest-path/TSP solver — it
@@ -341,8 +342,8 @@ class OptimizationService {
             recipient: recipientFac,
             medicine: medicine,
             quantity: qtyTaken,
-            score: bestDonorMatch['score'],
-            reasoning: bestDonorMatch['reasoning'],
+            score: (bestDonorMatch['score'] as num?)?.toDouble() ?? 0.0,
+            reasoning: bestDonorMatch['reasoning']?.toString() ?? '',
           ));
 
           // Update state

@@ -150,9 +150,12 @@ class _ActiveIndentsPageState extends ConsumerState<ActiveIndentsPage> {
     if (forecast <= 0) return 0;
 
     final available = item.remainingQuantity;
-    final isExpired = item.expiryDate.difference(DateTime.now()).inDays < 0;
-    final expiringSoon =
-        item.expiryDate.difference(DateTime.now()).inDays <= 30;
+    // Use centralized ItemStatus; prevents expired items being treated as
+    // expiring-soon, which was causing incorrect suggestedQty calculations.
+    final itemStatus = item.status;
+    final isExpired = itemStatus == ItemStatus.expired;
+    final expiringSoon = itemStatus == ItemStatus.expiringSoon ||
+        itemStatus == ItemStatus.wastageRisk;
 
     if (isExpired) {
       return (forecast * 1.2).round();
@@ -173,9 +176,11 @@ class _ActiveIndentsPageState extends ConsumerState<ActiveIndentsPage> {
     if (forecast <= 0) return RequestType.regularIndent;
 
     final available = item.remainingQuantity;
-    final isExpired = item.expiryDate.difference(DateTime.now()).inDays < 0;
-    final expiringSoon =
-        item.expiryDate.difference(DateTime.now()).inDays <= 30;
+    // Use centralized ItemStatus to prevent double-counting expired items.
+    final itemStatus = item.status;
+    final isExpired = itemStatus == ItemStatus.expired;
+    final expiringSoon = itemStatus == ItemStatus.expiringSoon ||
+        itemStatus == ItemStatus.wastageRisk;
     final hasSurplus = !isExpired &&
         ((available - forecast) > (forecast * 1.5) ||
             (available > forecast && expiringSoon));
@@ -527,9 +532,13 @@ class _ActiveIndentsPageState extends ConsumerState<ActiveIndentsPage> {
     final isLoading = _forecastLoading[item.id] ?? false;
     final forecast = _forecasts[item.id];
     final reasoning = _reasoning[item.id];
-    int available = item.remainingQuantity;
-    bool isExpired = item.expiryDate.difference(DateTime.now()).inDays < 0;
-    bool expiringSoon = item.expiryDate.difference(DateTime.now()).inDays <= 30;
+    final int available = item.remainingQuantity;
+    // Use centralized ItemStatus to prevent expired items being labelled
+    // as expiring-soon in the analysis row.
+    final itemStatus = item.status;
+    final bool isExpired = itemStatus == ItemStatus.expired;
+    final bool expiringSoon = itemStatus == ItemStatus.expiringSoon ||
+        itemStatus == ItemStatus.wastageRisk;
 
     String status = "â€”";
     Color statusColor = MediColors.textMuted;
