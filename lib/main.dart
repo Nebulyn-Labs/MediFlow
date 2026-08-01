@@ -9,6 +9,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 
 import 'package:med_supply_prototype/constants/colors.dart';
 import 'firebase_options.dart';
+import 'services/firebase_setup.dart';
 import 'views/auth/role_selection_screen.dart';
 import 'views/auth/login_screen.dart';
 import 'views/shared/sidebar_layout.dart';
@@ -42,6 +43,7 @@ void main() async {
     await Firebase.initializeApp(
       options: DefaultFirebaseOptions.currentPlatform,
     );
+    await setupFirebaseEmulator();
     debugPrint('Firebase initialized successfully');
   } catch (e) {
     debugPrint('Firebase initialization error: $e');

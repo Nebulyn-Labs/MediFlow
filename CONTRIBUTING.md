@@ -90,6 +90,27 @@ If you plan to modify or deploy Cloud Functions or Firestore rules:
    firebase use mediflow-92e6f
    ```
 
+### Firebase Local Emulators
+
+For local development without affecting production data, you can use the Firebase Emulators (Auth, Firestore, Functions, and Emulator UI).
+
+1. Start the emulators:
+
+   ```bash
+   firebase emulators:start
+   ```
+
+2. Run the Flutter app with the emulator flag:
+
+   ```bash
+   flutter run \
+   --dart-define=USE_FIREBASE_EMULATOR=true
+   ```
+
+### Database Seeding (Demo Data)
+
+If you need initial data for testing, the application includes a built-in demo-data seeder. You can invoke the `FirebaseService.seedDemoData()` method to populate the database with facilities, inventory, and sample requests. This will clear existing data in the targeted collections.
+
 ---
 
 ## 3. Claiming and Creating Issues
