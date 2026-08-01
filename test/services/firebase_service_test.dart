@@ -205,5 +205,25 @@ void main() {
       expect(result.hasMore, isFalse);
       expect(result.lastDocument, isNull);
     });
+
+    test('signUpFacility throws FirebaseAuthException on auth failure (#420)', () async {
+      when(() => mockAuth.createUserWithEmailAndPassword(
+            email: 'failed@test.com',
+            password: 'password123',
+          )).thenThrow(FirebaseAuthException(code: 'error', message: 'Auth failed'));
+      when(() => mockAuth.signInWithEmailAndPassword(
+            email: 'failed@test.com',
+            password: 'password123',
+          )).thenThrow(FirebaseAuthException(code: 'error', message: 'Sign-in failed'));
+
+      expect(
+        () => firebaseService.signUpFacility(
+          name: 'Test Facility',
+          email: 'failed@test.com',
+          password: 'password123',
+        ),
+        throwsA(isA<FirebaseAuthException>()),
+      );
+    });
   });
 }
