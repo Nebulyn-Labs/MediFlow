@@ -96,7 +96,8 @@ void main() {
     test('streamAlerts emits real-time updates when alerts collection changes',
         () async {
       const facilityId = 'facility_123';
-      final alertRef = fakeFirestore.collection('alerts').doc('facility_123_med_1');
+      final alertRef =
+          fakeFirestore.collection('alerts').doc('facility_123_med_1');
 
       final stream = firebaseService.streamAlerts(facilityId);
       final initialAlerts = await stream.first;

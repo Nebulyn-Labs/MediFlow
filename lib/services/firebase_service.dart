@@ -457,7 +457,6 @@ class FirebaseService {
         .map((snapshot) => snapshot.docs.map((doc) => doc.data()).toList());
   }
 
-
   // --- NOTIFICATIONS ---
 
   Stream<List<import_notification.NotificationModel>> streamNotifications(

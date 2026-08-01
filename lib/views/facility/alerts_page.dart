@@ -166,9 +166,8 @@ class _AlertsPageState extends ConsumerState<AlertsPage> {
 
   @override
   Widget build(BuildContext context) {
-    final alertsStream = ref
-        .watch(firebaseServiceProvider)
-        .streamAlerts(widget.facilityId);
+    final alertsStream =
+        ref.watch(firebaseServiceProvider).streamAlerts(widget.facilityId);
 
     return StreamBuilder<List<Map<String, dynamic>>>(
       key: ValueKey(_refreshKey),
@@ -243,14 +242,12 @@ class _AlertsPageState extends ConsumerState<AlertsPage> {
                         ExcludeSemantics(
                           child: Icon(Icons.check_circle_rounded,
                               size: 64,
-                              color:
-                                  MediColors.success.withValues(alpha: 0.8)),
+                              color: MediColors.success.withValues(alpha: 0.8)),
                         ),
                         const SizedBox(height: 16),
                         const Text('No active alerts detected.',
                             style: TextStyle(
-                                color: MediColors.textSecondary,
-                                fontSize: 16)),
+                                color: MediColors.textSecondary, fontSize: 16)),
                       ],
                     ),
                   ),
@@ -293,8 +290,7 @@ class _AlertsPageState extends ConsumerState<AlertsPage> {
         children: [
           const Text('Alerts',
               style: TextStyle(
-                  fontWeight: FontWeight.w800,
-                  color: MediColors.textPrimary)),
+                  fontWeight: FontWeight.w800, color: MediColors.textPrimary)),
           const SizedBox(width: 12),
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
