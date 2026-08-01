@@ -404,17 +404,26 @@ class _DailyLoggingPageState extends ConsumerState<DailyLoggingPage>
         withData: true,
       );
       if (result == null || result.files.isEmpty) return;
-      final bytes = result.files.first.bytes;
+      final file = result.files.first;
+      final bytes = file.bytes;
       if (bytes == null) return;
+      final aiService = ref.read(aiServiceProvider);
+      final imageMimeType = aiService.imageMimeTypeForPickedFile(
+        imageBytes: bytes,
+        fileName: file.name,
+        extension: file.extension,
+      );
       setState(() {
         _isParsingImage = true;
         _imageParseResult = null;
         _imageParseError = null;
         _imageItems.clear();
       });
-      final parsed = await ref.read(aiServiceProvider).parseImageWithVision(
-          bytes,
-          'Extract all medicine names, quantities, and patient counts from this image. Output JSON: [{"medicine": "string", "quantity": int, "patients": int}]');
+      final parsed = await aiService.parseImageWithVision(
+        bytes,
+        'Extract all medicine names, quantities, and patient counts from this image. Output JSON: [{"medicine": "string", "quantity": int, "patients": int}]',
+        imageMimeType: imageMimeType,
+      );
       if (mounted) {
         final extractedItems = parseVisionJson(parsed);
         setState(() {

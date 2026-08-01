@@ -38,6 +38,13 @@ class AIService {
     this.geminiCaller,
   }) : _functions = functions;
 
+  static const Map<String, String> _supportedImageMimeTypes = {
+    'jpg': 'image/jpeg',
+    'jpeg': 'image/jpeg',
+    'png': 'image/png',
+    'webp': 'image/webp',
+  };
+
   bool get _shouldUseLocal {
     if (!_quotaExhausted) return false;
     if (_quotaResetTime != null && DateTime.now().isAfter(_quotaResetTime!)) {
@@ -409,11 +416,68 @@ Output JSON only.
     }
   }
 
+  // ─── MULTI-MODAL VISION ─────────────────────────────────────────
+  String? inferImageMimeType(Uint8List imageBytes) {
+    if (imageBytes.length >= 3 &&
+        imageBytes[0] == 0xFF &&
+        imageBytes[1] == 0xD8 &&
+        imageBytes[2] == 0xFF) {
+      return 'image/jpeg';
+    }
+    if (imageBytes.length >= 4 &&
+        imageBytes[0] == 0x89 &&
+        imageBytes[1] == 0x50 &&
+        imageBytes[2] == 0x4E &&
+        imageBytes[3] == 0x47) {
+      return 'image/png';
+    }
+    if (imageBytes.length >= 12 &&
+        imageBytes[0] == 0x52 &&
+        imageBytes[1] == 0x49 &&
+        imageBytes[2] == 0x46 &&
+        imageBytes[3] == 0x46 &&
+        imageBytes[8] == 0x57 &&
+        imageBytes[9] == 0x45 &&
+        imageBytes[10] == 0x42 &&
+        imageBytes[11] == 0x50) {
+      return 'image/webp';
+    }
+    return null;
+  }
+
+  String imageMimeTypeForPickedFile({
+    required Uint8List imageBytes,
+    String? fileName,
+    String? extension,
+  }) {
+    final normalizedExtension = (extension ??
+            (fileName?.contains('.') == true
+                ? fileName!.split('.').last
+                : null))
+        ?.toLowerCase();
+    final mimeType = (normalizedExtension != null
+            ? _supportedImageMimeTypes[normalizedExtension]
+            : null) ??
+        inferImageMimeType(imageBytes);
+
+    if (mimeType != null) return mimeType;
+
+    final readableType = normalizedExtension?.isNotEmpty == true
+        ? normalizedExtension!
+        : inferImageMimeType(imageBytes) ?? 'unknown';
+    throw UnsupportedError(
+      'Unsupported image type "$readableType". Supported types: JPEG, PNG, WebP.',
+    );
+  }
+
   Future<String> parseImageWithVision(
-      Uint8List imageBytes, String prompt) async {
+    Uint8List imageBytes,
+    String prompt, {
+    required String imageMimeType,
+  }) async {
     final imageBase64 = base64Encode(imageBytes);
     return _callGeminiBackend(prompt,
-        imageBase64: imageBase64, imageMimeType: 'image/jpeg');
+        imageBase64: imageBase64, imageMimeType: imageMimeType);
   }
 
   Map<String, dynamic> _localShipmentStrategy(
