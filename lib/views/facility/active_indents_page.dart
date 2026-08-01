@@ -8,8 +8,6 @@ import '../../models/inventory_item.dart';
 import 'package:med_supply_prototype/constants/colors.dart';
 import '../shared/skeleton_loaders.dart';
 
-enum _IndentSortOption { newestFirst, oldestFirst }
-
 class ActiveIndentsPage extends ConsumerStatefulWidget {
   final String facilityId;
   const ActiveIndentsPage({super.key, required this.facilityId});
@@ -280,7 +278,8 @@ class _ActiveIndentsPageState extends ConsumerState<ActiveIndentsPage> {
           .updateRequestStatus(requestId, RequestStatus.pending);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Request sent to CMS! âœ“')));
+          const SnackBar(content: Text('Request sent to CMS! ✓')),
+        );
       }
     } catch (e) {
       if (mounted) {
@@ -540,7 +539,7 @@ class _ActiveIndentsPageState extends ConsumerState<ActiveIndentsPage> {
     final bool expiringSoon = itemStatus == ItemStatus.expiringSoon ||
         itemStatus == ItemStatus.wastageRisk;
 
-    String status = "â€”";
+    String status = "—";
     Color statusColor = MediColors.textMuted;
     Color statusBg = Colors.transparent;
     IconData statusIcon = Icons.help_outline;
@@ -617,7 +616,7 @@ class _ActiveIndentsPageState extends ConsumerState<ActiveIndentsPage> {
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         Text(
-                          forecast != null ? forecast.toString() : 'â€”',
+                          forecast != null ? forecast.toString() : '—',
                           style: TextStyle(
                               color: forecast != null
                                   ? MediColors.primaryLight
@@ -938,14 +937,15 @@ class _ActiveIndentsPageState extends ConsumerState<ActiveIndentsPage> {
         if (snapshot.hasError || snapshot.data == null) {
           return const SizedBox.shrink();
         }
-        final allHistory = snapshot.data!
-            .where((request) => request.status != RequestStatus.draft)
-            .toList();
-        final history = _filterAndSortHistory(snapshot.data!);
+        final history = snapshot.data!
+            .where((r) => r.status != RequestStatus.draft)
+            .toList()
+          ..sort((a, b) => b.requestDate.compareTo(a.requestDate));
 
         if (allHistory.isEmpty) {
           return const SizedBox.shrink();
         }
+        final history = _filterAndSortHistory(allHistory);
 
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
