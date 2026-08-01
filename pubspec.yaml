@@ -38,6 +38,8 @@ dependencies:
   csv: ^8.0.0
   firebase_app_check: ^0.3.2+10
   vector_math: ^2.2.0
+  connectivity_plus: ^7.3.1
+  flutter_markdown_plus: ^1.0.6
 
 dev_dependencies:
   flutter_test:
@@ -50,3 +52,7 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
+
+dependency_overrides:
+  meta: ^1.18.0
+  test_api: ^0.7.11

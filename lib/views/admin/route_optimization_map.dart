@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../models/facility.dart';
 import '../../models/request.dart';
 import '../../models/inventory_item.dart';
+
 import '../../services/firebase_service.dart';
 import '../../services/ai_service.dart';
 import '../../services/routing_service.dart';
@@ -29,7 +30,9 @@ class _RouteOptimizationMapState extends ConsumerState<RouteOptimizationMap> {
   bool _isGenerating = false;
   String _aiSummary = '';
   List<MultiStopRoute> _multiStopRoutes = [];
-  Map<String, List<LatLng>> _roadRoutes = {};
+  // Stores the full RouteResult (polyline + road distance/duration) for each
+  // multi-stop route, keyed by the donor facility id.
+  Map<String, RouteResult> _roadRoutes = {};
 
   @override
   void initState() {
@@ -91,13 +94,12 @@ class _RouteOptimizationMapState extends ConsumerState<RouteOptimizationMap> {
         requests: requests,
       );
 
-      // 2. Fetch road-accurate routes for each multi-stop route
-      Map<String, List<LatLng>> routes = {};
+      // 2. Fetch road-accurate routes for each multi-stop route and leg
+      Map<String, RouteResult> routes = {};
       for (var mr in multiRoutes) {
         if (mr.stops.isEmpty) continue;
-        final stopsCoords = mr.stops
-            .map((f) => LatLng(f.latitude, f.longitude))
-            .toList();
+        final stopsCoords =
+            mr.stops.map((f) => LatLng(f.latitude, f.longitude)).toList();
         final path = await router.getMultiStopRoute(stopsCoords);
         routes[mr.transfers.first.donor.id] = path;
       }
@@ -112,7 +114,6 @@ class _RouteOptimizationMapState extends ConsumerState<RouteOptimizationMap> {
         'RouteOptimizationMap: Generated ${multiRoutes.length} multi-stop routes.',
       );
       debugPrint('RouteOptimizationMap: Fetched ${routes.length} road routes.');
-
       setState(() {
         _multiStopRoutes = multiRoutes;
         _roadRoutes = routes;
@@ -129,6 +130,12 @@ class _RouteOptimizationMapState extends ConsumerState<RouteOptimizationMap> {
     } finally {
       if (mounted) setState(() => _isGenerating = false);
     }
+  }
+
+  @override
+  void dispose() {
+    _mapController.dispose();
+    super.dispose();
   }
 
   @override
@@ -423,8 +430,7 @@ class _RouteOptimizationMapState extends ConsumerState<RouteOptimizationMap> {
                               PolylineLayer(
                                 polylines: _multiStopRoutes.map<Polyline>((mr) {
                                   final donorId = mr.transfers.first.donor.id;
-                                  final points =
-                                      _roadRoutes[donorId] ??
+                                  final points = _roadRoutes[donorId] ??
                                       mr.stops
                                           .map(
                                             (s) =>
@@ -697,14 +703,23 @@ class _RouteOptimizationMapState extends ConsumerState<RouteOptimizationMap> {
 
   Widget _buildSingleTransferInfo(TransferRecommendation rec) {
     final Distance distanceCalc = const Distance();
-    final distKm =
-        distanceCalc(
-          LatLng(rec.donor.latitude, rec.donor.longitude),
-          LatLng(rec.recipient.latitude, rec.recipient.longitude),
-        ) /
+    final distKm = distanceCalc(LatLng(rec.donor.latitude, rec.donor.longitude),
+            LatLng(rec.recipient.latitude, rec.recipient.longitude)) /
         1000;
-    final timeHours = (distKm / 40);
-    final timeMinutes = (timeHours * 60).toInt();
+
+    // Resolved display values: prefer road data, fall back to straight-line.
+    final bool usingRoadData =
+        roadDistKm != null && roadDurationSeconds != null;
+    final double displayDistKm =
+        usingRoadData ? roadDistKm : straightLineDistKm;
+    final int displayTimeMinutes = usingRoadData
+        ? (roadDurationSeconds / 60).round()
+        : (straightLineDistKm / kFallbackSpeedKmh * 60).round();
+
+    // Label shown next to the ETA so users know what it's based on.
+    final String etaLabel = usingRoadData
+        ? 'est.'
+        : 'est. (straight-line @ ${kFallbackSpeedKmh.toInt()} km/h)';
 
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
@@ -825,40 +840,22 @@ class _RouteOptimizationMapState extends ConsumerState<RouteOptimizationMap> {
             spacing: 8.0,
             runSpacing: 4.0,
             children: [
-              Row(
-                children: [
-                  const Icon(
-                    Icons.route_rounded,
-                    size: 14,
-                    color: MediColors.textMuted,
-                  ),
-                  const SizedBox(width: 4),
-                  Text(
-                    '${distKm.toStringAsFixed(1)} km',
+              Row(children: [
+                const Icon(Icons.route_rounded,
+                    size: 14, color: MediColors.textMuted),
+                const SizedBox(width: 4),
+                Text('${distKm.toStringAsFixed(1)} km',
                     style: const TextStyle(
-                      color: MediColors.textMuted,
-                      fontSize: 12,
-                    ),
-                  ),
-                ],
-              ),
-              Row(
-                children: [
-                  const Icon(
-                    Icons.schedule_rounded,
-                    size: 14,
-                    color: MediColors.textMuted,
-                  ),
-                  const SizedBox(width: 4),
-                  Text(
-                    '${timeMinutes}m est.',
+                        color: MediColors.textMuted, fontSize: 12))
+              ]),
+              Row(children: [
+                const Icon(Icons.schedule_rounded,
+                    size: 14, color: MediColors.textMuted),
+                const SizedBox(width: 4),
+                Text('${timeMinutes}m est.',
                     style: const TextStyle(
-                      color: MediColors.textMuted,
-                      fontSize: 12,
-                    ),
-                  ),
-                ],
-              ),
+                        color: MediColors.textMuted, fontSize: 12))
+              ]),
             ],
           ),
         ],

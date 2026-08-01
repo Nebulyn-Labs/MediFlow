@@ -1,8 +1,26 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../services/ai_service.dart';
 import '../../services/firebase_service.dart';
 import 'package:med_supply_prototype/constants/colors.dart';
+import '../../models/inventory_item.dart';
+
+List<Map<String, dynamic>> buildInventoryContextList(
+    List<InventoryItem> inventory) {
+  return inventory
+      .map((i) => {
+            "medicineName": i.medicineName,
+            "batchId": i.batchId,
+            "arrivalDate": i.arrivalDate.toIso8601String(),
+            "expiryDate": i.expiryDate.toIso8601String(),
+            "initialQuantity": i.initialQuantity,
+            "remainingQuantity": i.remainingQuantity,
+            "unit": i.unit,
+            if (i.facilityId != null) "facilityId": i.facilityId,
+          })
+      .toList();
+}
 
 class AIChatPage extends ConsumerStatefulWidget {
   final String? facilityId;
@@ -18,6 +36,7 @@ class _AIChatPageState extends ConsumerState<AIChatPage> {
   final ScrollController _scrollController = ScrollController();
   final List<Map<String, String>> _messages = [];
   bool _isTyping = false;
+  bool _isLocalMode = false;
   Map<String, dynamic> _activeContext = {};
 
   @override
@@ -37,8 +56,14 @@ class _AIChatPageState extends ConsumerState<AIChatPage> {
             _activeContext = {
               "system_state": "LIVE",
               "data_sources": ["Firestore", "Local Logs"],
-              "current_inventory": inventory.map((i) => i.toMap()).toList(),
-              "historical_data": logs.map((l) => l.toMap()).toList(),
+              "current_inventory": buildInventoryContextList(inventory),
+              "historical_data": logs
+                  .map((l) => {
+                        "date": l.date.toIso8601String(),
+                        "medicines": l.medicines.map((m) => m.toMap()).toList(),
+                        "totalPatients": l.totalPatients,
+                      })
+                  .toList(),
             };
           });
         }
@@ -93,6 +118,7 @@ class _AIChatPageState extends ConsumerState<AIChatPage> {
         setState(() {
           _messages.add({'role': 'ai', 'content': response});
           _isTyping = false;
+          _isLocalMode = ref.read(aiServiceProvider).isLocalFallbackActive;
         });
         _scrollToBottom();
       }
@@ -135,14 +161,11 @@ class _AIChatPageState extends ConsumerState<AIChatPage> {
             Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
-                  'MediFlow AI',
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w700,
-                    color: MediColors.textPrimary,
-                  ),
-                ),
+                const Text('MediFlow AI',
+                    style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w700,
+                        color: MediColors.textPrimary)),
                 const Text(
                   'gemini-flash-lite-latest',
                   style: TextStyle(fontSize: 11, color: MediColors.textMuted),
@@ -336,14 +359,44 @@ class _AIChatPageState extends ConsumerState<AIChatPage> {
               ),
               border: isUser ? null : Border.all(color: MediColors.border),
             ),
-            child: SelectableText(
-              text,
-              style: TextStyle(
-                color: isUser ? Colors.white : MediColors.textPrimary,
-                fontSize: 14,
-                height: 1.5,
-              ),
-            ),
+            child: isUser
+                ? SelectableText(
+                    text,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 14,
+                      height: 1.5,
+                    ),
+                  )
+                : MarkdownBody(
+                    data: text,
+                    selectable: true,
+                    imageBuilder: (uri, title, alt) => const SizedBox.shrink(),
+                    styleSheet: MarkdownStyleSheet(
+                      p: const TextStyle(
+                        color: MediColors.textPrimary,
+                        fontSize: 14,
+                        height: 1.5,
+                      ),
+                      strong: const TextStyle(
+                        color: MediColors.textPrimary,
+                        fontSize: 14,
+                        height: 1.5,
+                        fontWeight: FontWeight.w700,
+                      ),
+                      h3: const TextStyle(
+                        color: MediColors.textPrimary,
+                        fontSize: 15,
+                        height: 1.5,
+                        fontWeight: FontWeight.w700,
+                      ),
+                      listBullet: const TextStyle(
+                        color: MediColors.textPrimary,
+                        fontSize: 14,
+                        height: 1.5,
+                      ),
+                    ),
+                  ),
           ),
         ),
       ),

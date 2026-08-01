@@ -65,25 +65,26 @@ class _IndentCreationPageState extends ConsumerState<IndentCreationPage> {
     }
   }
 
+  /// Maximum number of forecast requests that may run concurrently.
+  ///
+  /// A value of 5 keeps total in-flight requests bounded while still
+  /// providing a large speed-up over fully-sequential execution (#238).
+  static const int _kForecastConcurrency = 5;
+
   Future<void> _getAIForecast() async {
     final aiService = ref.read(aiServiceProvider);
     final firebaseService = ref.read(firebaseServiceProvider);
 
     // Fetch logs for forecasting
-    final logs = await firebaseService.getRecentLogs(
-      widget.facilityId,
-      days: 90,
-    );
+    final logs =
+        await firebaseService.getRecentLogs(widget.facilityId, days: 90);
 
     for (var item in _inventory) {
       setState(() => _forecastLoading[item.id] = true);
       try {
         final dynamic result = await aiService.forecastDemand(
-          item.medicineName,
-          logs,
-          _selectedPeriod,
-          facilityId: widget.facilityId,
-        );
+            item.medicineName, logs, _selectedPeriod,
+            facilityId: widget.facilityId);
         setState(() {
           dynamic predRaw;
           dynamic reasonRaw;
@@ -92,44 +93,47 @@ class _IndentCreationPageState extends ConsumerState<IndentCreationPage> {
             reasonRaw = result['reasoning'];
           }
 
-          int predicted = 0;
-          if (predRaw is num) {
-            predicted = predRaw.toInt();
-          } else if (predRaw is String) {
-            predicted = double.tryParse(predRaw)?.toInt() ?? 0;
-          }
+            int predicted = 0;
+            if (predRaw is num) {
+              predicted = predRaw.toInt();
+            } else if (predRaw is String) {
+              predicted = double.tryParse(predRaw)?.toInt() ?? 0;
+            }
 
-          _forecasts[item.id] = predicted;
-          _reasoning[item.id] =
-              reasonRaw?.toString() ?? "Calculated based on demand.";
+            _forecasts[item.id] = predicted;
+            _reasoning[item.id] =
+                reasonRaw?.toString() ?? "Calculated based on demand.";
 
-          int available = item.remainingQuantity;
-          bool isExpired =
-              item.expiryDate.difference(DateTime.now()).inDays < 0;
-          bool expiringSoon =
-              item.expiryDate.difference(DateTime.now()).inDays <= 30;
-          int suggestedQty = 0;
+            // Use centralized ItemStatus to avoid inline threshold duplication.
+            final itemStatus = item.status;
+            int available = item.remainingQuantity;
+            bool isExpired = itemStatus == ItemStatus.expired;
+            // expiringSoon must NOT include already-expired items.
+            bool expiringSoon = itemStatus == ItemStatus.expiringSoon ||
+                itemStatus == ItemStatus.wastageRisk;
+            int suggestedQty = 0;
 
-          if (isExpired) {
-            suggestedQty = (predicted * 1.2).round();
-          } else if (predicted > available) {
-            suggestedQty = ((predicted - available) * 1.2).round();
-          } else if (predicted > 0 &&
-              ((available - predicted) > (predicted * 1.5) ||
-                  (available > predicted && expiringSoon))) {
-            suggestedQty = available - (predicted * 1.2).round();
-            if (suggestedQty < 0) suggestedQty = 0;
-          } else {
-            suggestedQty = 0;
-          }
+            if (isExpired) {
+              suggestedQty = (predicted * 1.2).round();
+            } else if (predicted > available) {
+              suggestedQty = ((predicted - available) * 1.2).round();
+            } else if (predicted > 0 &&
+                ((available - predicted) > (predicted * 1.5) ||
+                    (available > predicted && expiringSoon))) {
+              suggestedQty = available - (predicted * 1.2).round();
+              if (suggestedQty < 0) suggestedQty = 0;
+            } else {
+              suggestedQty = 0;
+            }
 
-          _controllers[item.id]?.text = suggestedQty.toString();
-        });
-      } catch (e) {
-        debugPrint('Forecast error for ${item.medicineName}: $e');
-      } finally {
-        setState(() => _forecastLoading[item.id] = false);
-      }
+            _controllers[item.id]?.text = suggestedQty.toString();
+            _forecastLoading[item.id] = false;
+          });
+        } catch (e) {
+          debugPrint('Forecast error for ${item.medicineName}: $e');
+          if (mounted) setState(() => _forecastLoading[item.id] = false);
+        }
+      }));
     }
   }
 
@@ -170,10 +174,13 @@ class _IndentCreationPageState extends ConsumerState<IndentCreationPage> {
         final qty = int.tryParse(_controllers[item.id]?.text ?? '0') ?? 0;
 
         final forecast = _forecasts[item.id];
-        int available = item.remainingQuantity;
-        bool isExpired = item.expiryDate.difference(DateTime.now()).inDays < 0;
-        bool expiringSoon =
-            item.expiryDate.difference(DateTime.now()).inDays <= 30;
+        final int available = item.remainingQuantity;
+        // Use centralized ItemStatus to avoid inline threshold duplication
+        // and to prevent expired items being counted as expiring-soon.
+        final itemStatus = item.status;
+        final bool isExpired = itemStatus == ItemStatus.expired;
+        final bool expiringSoon = itemStatus == ItemStatus.expiringSoon ||
+            itemStatus == ItemStatus.wastageRisk;
 
         final RequestType reqType = _determineRequestType(
           item,
@@ -464,9 +471,13 @@ class _IndentCreationPageState extends ConsumerState<IndentCreationPage> {
     final forecast = _forecasts[item.id];
     final reasoning = _reasoning[item.id];
 
-    int available = item.remainingQuantity;
-    bool isExpired = item.expiryDate.difference(DateTime.now()).inDays < 0;
-    bool expiringSoon = item.expiryDate.difference(DateTime.now()).inDays <= 30;
+    final int available = item.remainingQuantity;
+    // Use centralized ItemStatus; prevents expired items being labelled
+    // as expiring-soon in row status display.
+    final itemStatus = item.status;
+    final bool isExpired = itemStatus == ItemStatus.expired;
+    final bool expiringSoon = itemStatus == ItemStatus.expiringSoon ||
+        itemStatus == ItemStatus.wastageRisk;
 
     String status = "—";
     Color statusColor = MediColors.textMuted;

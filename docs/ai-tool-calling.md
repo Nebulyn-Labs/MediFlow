@@ -7,9 +7,8 @@ authorization checks that guard that path.
 ## Overview
 
 The AI chat assistant (`AIService.getChatResponse`) does not talk to Gemini
-directly from the Flutter client. The client-side `ChatService` is disabled
-by design (`isAvailable` always returns `false`) so that the Gemini API key
-and all tool execution stay server-side. Instead, the client calls a single
+directly from the Flutter client. By design, the Gemini API key and all tool
+execution stay server-side. Instead, the client calls a single
 Cloud Function, `getChatResponseSecure`, over Firebase Callable Functions.
 That function owns the entire conversation with Gemini, including any
 function/tool calls Gemini decides to make.
@@ -82,7 +81,7 @@ request, so a bad or hallucinated tool name degrades gracefully.
 
 ## Backend responsibilities summary
 
-- **Client (`AIService`, `ChatService`):** collects context, calls the
+- **Client (`AIService`):** collects context, calls the
   callable function, and falls back to local heuristics on failure. Never
   holds the Gemini API key and never executes tools itself.
 - **`getChatResponseSecure`:** owns authentication, facility/role

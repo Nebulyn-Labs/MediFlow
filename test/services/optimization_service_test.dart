@@ -47,6 +47,23 @@ void main() {
       );
     }
 
+    /// Like [createInventory] but lets the caller control the expiry offset.
+    InventoryItem createInventoryWithExpiry(String facilityId, String medName,
+        int initial, int remaining, int expiryDays) {
+      return InventoryItem(
+        id: 'inv_${facilityId}_exp$expiryDays',
+        medicineName: medName,
+        batchId: 'B_exp$expiryDays',
+        arrivalDate: now,
+        expiryDate: now.add(Duration(days: expiryDays)),
+        initialQuantity: initial,
+        remainingQuantity: remaining,
+        unit: 'tablets',
+        lastUpdated: now,
+        facilityId: facilityId,
+      );
+    }
+
     MedRequest createRequest(
       String id,
       String facilityId,

@@ -10,7 +10,7 @@ class AuditTrailPage extends ConsumerStatefulWidget {
   const AuditTrailPage({super.key});
 
   @override
-  ConsumerState<AuditTrailPage> createState() => _AuditTrailPageState();
+  ConsumerState createState() => _AuditTrailPageState();
 }
 
 class _AuditTrailPageState extends ConsumerState<AuditTrailPage> {
@@ -24,11 +24,13 @@ class _AuditTrailPageState extends ConsumerState<AuditTrailPage> {
   String _selectedAction = 'All';
   String? _errorMessage;
 
+  // Added state variable to track load more failures
+  String? _loadMoreError;
+
   final List<String> _actionFilters = [
     'All',
     'delete_request',
     'delete_facility',
-    // add more if needed
   ];
 
   @override
@@ -61,6 +63,7 @@ class _AuditTrailPageState extends ConsumerState<AuditTrailPage> {
       _lastDocument = null;
       _hasMore = true;
       _errorMessage = null;
+      _loadMoreError = null;
     });
 
     final firebaseService = ref.read(firebaseServiceProvider);
@@ -89,10 +92,12 @@ class _AuditTrailPageState extends ConsumerState<AuditTrailPage> {
     }
   }
 
+  // Updated catch block to stop auto-retrying and store the error message
   Future<void> _loadMoreData() async {
-    if (!mounted || _lastDocument == null) return;
+    if (!mounted || _lastDocument == null || _isLoading) return;
     setState(() {
       _isLoading = true;
+      _loadMoreError = null;
     });
 
     final firebaseService = ref.read(firebaseServiceProvider);
@@ -109,6 +114,7 @@ class _AuditTrailPageState extends ConsumerState<AuditTrailPage> {
           _lastDocument = result.lastDocument;
           _hasMore = result.hasMore;
           _isLoading = false;
+          _loadMoreError = null;
         });
       }
     } catch (e) {
@@ -116,6 +122,9 @@ class _AuditTrailPageState extends ConsumerState<AuditTrailPage> {
       if (mounted) {
         setState(() {
           _isLoading = false;
+          _hasMore = false; // Stop auto-retrying on scroll
+          _loadMoreError =
+              'Failed to load more logs. Please check your connection and try again.';
         });
       }
     }
@@ -189,43 +198,35 @@ class _AuditTrailPageState extends ConsumerState<AuditTrailPage> {
           _buildFilterChips(),
           Expanded(
             child: _errorMessage != null
+                // Replaced raw exception text with a friendly message and Retry button
                 ? Center(
                     child: Padding(
                       padding: const EdgeInsets.all(24.0),
                       child: Text(
                         'Error loading logs:\n$_errorMessage',
-                        style: const TextStyle(
-                          color: MediColors.error,
-                          fontSize: 14,
-                        ),
+                        style: const TextStyle(color: MediColors.error, fontSize: 14),
                         textAlign: TextAlign.center,
                       ),
                     ),
                   )
                 : _logs.isEmpty && !_isLoading
-                ? const Center(
-                    child: Text(
-                      'No audit logs found.',
-                      style: TextStyle(
-                        color: MediColors.textSecondary,
-                        fontSize: 16,
-                      ),
-                    ),
-                  )
+                    ? const Center(
+                        child: Text(
+                          'No audit logs found.',
+                          style: TextStyle(color: MediColors.textSecondary, fontSize: 16),
+                        ),
+                      )
                 : ListView.separated(
                     controller: _scrollController,
                     padding: const EdgeInsets.all(24),
                     itemCount: _logs.length + (_hasMore ? 1 : 0),
-                    separatorBuilder: (context, index) =>
-                        const SizedBox(height: 12),
+                    separatorBuilder: (context, index) => const SizedBox(height: 12),
                     itemBuilder: (context, index) {
                       if (index == _logs.length) {
                         return const Center(
                           child: Padding(
                             padding: EdgeInsets.all(16.0),
-                            child: CircularProgressIndicator(
-                              color: MediColors.primary,
-                            ),
+                            child: CircularProgressIndicator(color: MediColors.primary),
                           ),
                         );
                       }

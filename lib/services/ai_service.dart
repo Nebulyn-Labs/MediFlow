@@ -6,17 +6,44 @@ import '../models/daily_usage_log.dart';
 import '../models/request.dart';
 import '../models/facility.dart';
 import '../models/inventory_item.dart';
+import '../constants/inventory_thresholds.dart';
+
+typedef GeminiCaller = Future<String> Function(
+  String prompt, {
+  String? imageBase64,
+  String? imageMimeType,
+});
 
 final aiServiceProvider = Provider<AIService>((ref) {
   return AIService(ref);
 });
 
 class AIService {
-  final Ref ref;
+  final Ref? ref;
+  final GeminiCaller? geminiCaller;
+
+  final FirebaseFunctions? _functions;
+
+  /// Resolved on first use rather than in the constructor: reading
+  /// [FirebaseFunctions.instance] requires an initialized Firebase app, which
+  /// unit tests that inject [geminiCaller] do not set up.
+  FirebaseFunctions get functions => _functions ?? FirebaseFunctions.instance;
+
   bool _quotaExhausted = false;
   DateTime? _quotaResetTime;
 
-  AIService(this.ref);
+  AIService(
+    this.ref, {
+    FirebaseFunctions? functions,
+    this.geminiCaller,
+  }) : _functions = functions;
+
+  static const Map<String, String> _supportedImageMimeTypes = {
+    'jpg': 'image/jpeg',
+    'jpeg': 'image/jpeg',
+    'png': 'image/png',
+    'webp': 'image/webp',
+  };
 
   bool get _shouldUseLocal {
     if (!_quotaExhausted) return false;
@@ -27,6 +54,11 @@ class AIService {
     }
     return true;
   }
+
+  /// Public read-only view of fallback state, so UI (e.g. AIChatPage)
+  /// can accurately reflect whether responses are coming from Gemini
+  /// or the local rule-based engine.
+  bool get isLocalFallbackActive => _shouldUseLocal;
 
   void _handleQuotaError(String errorMsg) {
     if (errorMsg.contains('quota') ||
@@ -40,14 +72,10 @@ class AIService {
   }
 
   // Helper method to call the generic callGeminiSecure Cloud Function
-  Future<String> _callGeminiBackend(
-    String prompt, {
-    String? imageBase64,
-    String? imageMimeType,
-  }) async {
-    final callable = FirebaseFunctions.instance.httpsCallable(
-      'callGeminiSecure',
-    );
+  Future<String> _callGeminiBackend(String prompt,
+      {String? imageBase64, String? imageMimeType}) async {
+    final callable =
+        FirebaseFunctions.instance.httpsCallable('callGeminiSecure');
     final response = await callable.call({
       'prompt': prompt,
       if (imageBase64 != null) 'imageBase64': imageBase64,
@@ -145,7 +173,7 @@ class AIService {
     String? facilityId,
   }) async {
     try {
-      await FirebaseFunctions.instance.httpsCallable('logAIDecision').call({
+      await functions.httpsCallable('logAIDecision').call({
         'facilityId': facilityId,
         'medicineName': medicineName,
         'decisionType': 'demand_forecast',
@@ -202,9 +230,8 @@ class AIService {
   }) async {
     if (_shouldUseLocal) return _localSystemResponse(query, context, role);
     try {
-      final callable = FirebaseFunctions.instance.httpsCallable(
-        'getChatResponseSecure',
-      );
+      final callable =
+          FirebaseFunctions.instance.httpsCallable('getChatResponseSecure');
       final response = await callable.call({
         'query': query,
         'context': context,
@@ -237,9 +264,8 @@ class AIService {
         final rem = item['remainingQuantity'] ?? 0;
         final tot = item['initialQuantity'] ?? 0;
         final name = item['medicineName'] ?? 'Unknown';
-        final status = (tot > 0 && rem / tot < 0.2)
-            ? "⚠️ CRITICAL"
-            : "✅ STABLE";
+        final status =
+            (tot > 0 && rem / tot < 0.2) ? "⚠️ CRITICAL" : "✅ STABLE";
         buffer.writeln("• **$name**: $rem/$tot units ($status)");
       }
     } else {
@@ -253,23 +279,20 @@ class AIService {
 
   // ─── SMART ALERTS ──────────────────────────────────────────────
   Future<List<Map<String, dynamic>>> generateSmartAlerts(
-    List<InventoryItem> inventory,
-  ) async {
+      List<InventoryItem> inventory) async {
     final local = inventory
         .where((i) => i.isLowStock)
-        .map(
-          (i) => {
-            "type": "low_stock",
-            "severity": "red",
-            "title": i.medicineName,
-            "batchId": i.batchId,
-            "remainingQuantity": i.remainingQuantity,
-            "remainingPercentage":
-                ((i.remainingQuantity / i.initialQuantity) * 100).round(),
-            "burnRate": "24/day",
-            "depletesInDays": (i.remainingQuantity / 24).round(),
-          },
-        )
+        .map((i) => {
+              "type": "low_stock",
+              "severity": "red",
+              "title": i.medicineName,
+              "batchId": i.batchId,
+              "remainingQuantity": i.remainingQuantity,
+              "remainingPercentage":
+                  ((i.remainingQuantity / i.initialQuantity) * 100).round(),
+              "burnRate": "24/day",
+              "depletesInDays": (i.remainingQuantity / 24).round(),
+            })
         .toList();
 
     final now = DateTime.now();
@@ -277,12 +300,13 @@ class AIService {
       final daysToExpiry = i.expiryDate.difference(now).inDays;
       if (daysToExpiry <= 90) {
         local.add({
-          "type": "expiry",
-          "severity": daysToExpiry <= 30 ? "red" : "yellow",
+          "type":
+              i.status == ItemStatus.wastageRisk ? "wastage_risk" : "expiry",
+          "severity": "yellow",
           "title": i.medicineName,
           "batchId": i.batchId,
           "remainingQuantity": i.remainingQuantity,
-          "expiresInDays": daysToExpiry,
+          "expiresInDays": i.daysToExpiry,
         });
       }
     }
@@ -404,16 +428,64 @@ Output JSON only.
   }
 
   // ─── MULTI-MODAL VISION ─────────────────────────────────────────
-  Future<String> parseImageWithVision(
-    Uint8List imageBytes,
-    String prompt,
-  ) async {
-    final imageBase64 = base64Encode(imageBytes);
-    return _callGeminiBackend(
-      prompt,
-      imageBase64: imageBase64,
-      imageMimeType: 'image/jpeg',
+  String? inferImageMimeType(Uint8List imageBytes) {
+    if (imageBytes.length >= 3 &&
+        imageBytes[0] == 0xFF &&
+        imageBytes[1] == 0xD8 &&
+        imageBytes[2] == 0xFF) {
+      return 'image/jpeg';
+    }
+    if (imageBytes.length >= 4 &&
+        imageBytes[0] == 0x89 &&
+        imageBytes[1] == 0x50 &&
+        imageBytes[2] == 0x4E &&
+        imageBytes[3] == 0x47) {
+      return 'image/png';
+    }
+    if (imageBytes.length >= 12 &&
+        imageBytes[0] == 0x52 &&
+        imageBytes[1] == 0x49 &&
+        imageBytes[2] == 0x46 &&
+        imageBytes[3] == 0x46 &&
+        imageBytes[8] == 0x57 &&
+        imageBytes[9] == 0x45 &&
+        imageBytes[10] == 0x42 &&
+        imageBytes[11] == 0x50) {
+      return 'image/webp';
+    }
+    return null;
+  }
+
+  String imageMimeTypeForPickedFile({
+    required Uint8List imageBytes,
+    String? fileName,
+    String? extension,
+  }) {
+    final normalizedExtension = (extension ??
+            (fileName?.contains('.') == true
+                ? fileName!.split('.').last
+                : null))
+        ?.toLowerCase();
+    final mimeType = (normalizedExtension != null
+            ? _supportedImageMimeTypes[normalizedExtension]
+            : null) ??
+        inferImageMimeType(imageBytes);
+
+    if (mimeType != null) return mimeType;
+
+    final readableType = normalizedExtension?.isNotEmpty == true
+        ? normalizedExtension!
+        : inferImageMimeType(imageBytes) ?? 'unknown';
+    throw UnsupportedError(
+      'Unsupported image type "$readableType". Supported types: JPEG, PNG, WebP.',
     );
+  }
+
+  Future<String> parseImageWithVision(
+      Uint8List imageBytes, String prompt) async {
+    final imageBase64 = base64Encode(imageBytes);
+    return _callGeminiBackend(prompt,
+        imageBase64: imageBase64, imageMimeType: 'image/jpeg');
   }
 
   Map<String, dynamic> _localShipmentStrategy(
@@ -440,5 +512,33 @@ Output JSON only.
       };
     }
     return results;
+  }
+
+  // ─── WASTAGE REPORT ─────────────────────────────────────────────
+  Future<String> getWastageRecommendations(
+      List<Map<String, dynamic>> wastageData) async {
+    if (_shouldUseLocal || wastageData.isEmpty) {
+      return "Local analysis suggests prioritizing stock redistribution before expiry and optimizing future indent quantities to match actual burn rates.";
+    }
+
+    try {
+      final payload = wastageData
+          .map((w) =>
+              "${w['medicineName']}: ${w['expiredUnits']} expired, ${w['nearExpiryUnits']} expiring soon. Est. cost impact: \$${w['estimatedCost']}")
+          .join('\n');
+
+      final prompt = '''
+Analyze the following wastage report for a healthcare facility:
+$payload
+
+Provide 3 actionable recommendations to prevent future wastage and minimize financial impact. Keep it concise, practical, and formatted as a numbered list.
+''';
+
+      final responseText = await _callGeminiBackend(prompt);
+      return responseText.trim();
+    } catch (e) {
+      _handleQuotaError(e.toString());
+      return "Local analysis suggests prioritizing stock redistribution before expiry and optimizing future indent quantities to match actual burn rates.";
+    }
   }
 }

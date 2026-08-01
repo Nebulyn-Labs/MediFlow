@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -32,7 +33,10 @@ class _InventoryAlert {
 
 class AlertsPage extends ConsumerStatefulWidget {
   final String facilityId;
-  const AlertsPage({super.key, required this.facilityId});
+  final bool isTabBody;
+
+  const AlertsPage(
+      {super.key, required this.facilityId, this.isTabBody = false});
 
   @override
   ConsumerState<AlertsPage> createState() => _AlertsPageState();
@@ -57,20 +61,20 @@ class _AlertsPageState extends ConsumerState<AlertsPage> {
 
       final List<_InventoryAlert> alerts = alertMaps.map((data) {
         final item = InventoryItem(
-          id: data['stockId'] ?? '',
-          medicineName: data['medicineName'] ?? '',
-          batchId: data['batchId'] ?? '',
+          id: data['stockId']?.toString() ?? '',
+          medicineName: data['medicineName']?.toString() ?? '',
+          batchId: data['batchId']?.toString() ?? '',
           arrivalDate: DateTime.now(),
-          expiryDate: data['expiryDate'] != null
+          expiryDate: data['expiryDate'] is Timestamp
               ? (data['expiryDate'] as Timestamp).toDate()
               : DateTime.now(),
-          initialQuantity: data['initialQuantity']?.toInt() ?? 0,
-          remainingQuantity: data['qtyRemaining']?.toInt() ?? 0,
-          unit: data['unit'] ?? 'units',
+          initialQuantity: (data['initialQuantity'] as num?)?.toInt() ?? 0,
+          remainingQuantity: (data['qtyRemaining'] as num?)?.toInt() ?? 0,
+          unit: data['unit']?.toString() ?? 'units',
           lastUpdated: DateTime.now(),
         );
 
-        final typeStr = data['type'] ?? '';
+        final typeStr = data['type']?.toString() ?? '';
         _AlertKind kind;
         String title;
         String reason;
@@ -165,13 +169,9 @@ class _AlertsPageState extends ConsumerState<AlertsPage> {
           .read(firebaseServiceProvider)
           .disposeInventory(widget.facilityId, alert.item.medicineName);
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              'Marked ${alert.item.medicineName} for safe disposal.',
-            ),
-          ),
-        );
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+            content:
+                Text('Marked ${alert.item.medicineName} for safe disposal.')));
         _loadAlerts();
       }
     } catch (e) {
@@ -201,6 +201,63 @@ class _AlertsPageState extends ConsumerState<AlertsPage> {
     final expiryAlerts = _alerts
         .where((a) => a.kind == _AlertKind.expiringSoon)
         .toList();
+
+    // App bar and scaffold moved below
+    final body = _isLoading
+        ? const AlertsSkeleton()
+        : SingleChildScrollView(
+            padding: const EdgeInsets.all(28),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                if (expiredAlerts.isNotEmpty) ...[
+                  _sectionHeader('Expired Medicines'),
+                  const SizedBox(height: 16),
+                  ...expiredAlerts.map(_buildAlertCard),
+                  const SizedBox(height: 32),
+                ],
+                if (stockAlerts.isNotEmpty) ...[
+                  _sectionHeader('Stock Action Alerts'),
+                  const SizedBox(height: 16),
+                  ...stockAlerts.map(_buildAlertCard),
+                  const SizedBox(height: 32),
+                ],
+                if (expiryAlerts.isNotEmpty) ...[
+                  _sectionHeader('Expiry Watch'),
+                  const SizedBox(height: 16),
+                  ...expiryAlerts.map(_buildAlertCard),
+                ],
+                if (_alerts.isEmpty)
+                  Center(
+                    child: Padding(
+                      padding: const EdgeInsets.only(top: 96),
+                      child: Column(
+                        children: [
+                          ExcludeSemantics(
+                            child: Icon(Icons.check_circle_rounded,
+                                size: 64,
+                                color:
+                                    MediColors.success.withValues(alpha: 0.8)),
+                          ),
+                          const SizedBox(height: 16),
+                          const Text('No active alerts detected.',
+                              style: TextStyle(
+                                  color: MediColors.textSecondary,
+                                  fontSize: 16)),
+                        ],
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          );
+
+    if (widget.isTabBody) {
+      return RefreshIndicator(
+        onRefresh: _loadAlerts,
+        child: body,
+      );
+    }
 
     return Scaffold(
       backgroundColor: MediColors.bg,
@@ -287,22 +344,16 @@ class _AlertsPageState extends ConsumerState<AlertsPage> {
                         child: Column(
                           children: [
                             ExcludeSemantics(
-                              child: Icon(
-                                Icons.check_circle_rounded,
-                                size: 64,
-                                color: MediColors.success.withValues(
-                                  alpha: 0.8,
-                                ),
-                              ),
+                              child: Icon(Icons.check_circle_rounded,
+                                  size: 64,
+                                  color: MediColors.success
+                                      .withValues(alpha: 0.8)),
                             ),
                             const SizedBox(height: 16),
-                            const Text(
-                              'No active alerts detected.',
-                              style: TextStyle(
-                                color: MediColors.textSecondary,
-                                fontSize: 16,
-                              ),
-                            ),
+                            const Text('No active alerts detected.',
+                                style: TextStyle(
+                                    color: MediColors.textSecondary,
+                                    fontSize: 16)),
                           ],
                         ),
                       ),

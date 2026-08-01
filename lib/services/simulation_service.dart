@@ -129,8 +129,8 @@ class SimulationService {
 
     for (var doc in medsSnapshot.docs) {
       final data = doc.data();
-      final int initial = data['initialQuantity'] ?? 2000;
-      final String medName = data['medicineName'] ?? '';
+      final int initial = (data['initialQuantity'] as num?)?.toInt() ?? 2000;
+      final String medName = data['medicineName']?.toString() ?? '';
 
       int remaining;
       int? daysToExpiryOverride;
