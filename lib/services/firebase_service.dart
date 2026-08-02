@@ -449,6 +449,14 @@ class FirebaseService {
     return snapshot.docs.map((doc) => doc.data()).toList();
   }
 
+  Stream<List<Map<String, dynamic>>> streamAlerts(String facilityId) {
+    return _firestore
+        .collection('alerts')
+        .where('facilityId', isEqualTo: facilityId)
+        .snapshots()
+        .map((snapshot) => snapshot.docs.map((doc) => doc.data()).toList());
+  }
+
   // --- NOTIFICATIONS ---
 
   Stream<List<import_notification.NotificationModel>> streamNotifications(
