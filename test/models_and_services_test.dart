@@ -1,3 +1,4 @@
+import 'package:mediflow/services/ai_service.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:latlong2/latlong.dart';
@@ -167,7 +168,7 @@ void main() {
     });
 
     test('generateRedistributionPlan includes approved and shortage requests', () async {
-      final aiService = AiService();
+      final aiService = AIService();
       final facilities = [
         Facility(
           id: 'f1',
