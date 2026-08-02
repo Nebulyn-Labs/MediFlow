@@ -49,7 +49,6 @@ class MedRequest {
     );
   }
 
-
   /// Whether this request represents an actionable deficit (pending or approved regular indent or shortage).
   bool get isDeficit =>
       (status == RequestStatus.pending || status == RequestStatus.approved) &&
