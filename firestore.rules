@@ -35,7 +35,7 @@ service cloud.firestore {
       
       allow create: if isAdmin() || (isAuthenticated() && request.auth.token.email.lower() == request.resource.data.email.lower());
       allow update: if isAdmin() || (isAuthenticated() && request.auth.token.email.lower() == resource.data.email.lower() && request.auth.token.email.lower() == request.resource.data.email.lower());
-      allow delete: if isAdmin();
+      allow delete: if false; // Admin deletions must go through backend audit Callable Function
     }
 
     // Inventory collection
@@ -65,8 +65,54 @@ service cloud.firestore {
     match /requests/{requestId} {
       allow read: if isAdmin() || (isAuthenticated() && resource != null && isFacilityUser(resource.data.facilityId));
       allow create: if isAdmin() || (isAuthenticated() && request.resource.data.facilityId != null && isFacilityUser(request.resource.data.facilityId));
-      allow update: if isAdmin() || (isAuthenticated() && isFacilityUser(resource.data.facilityId) && request.resource.data.facilityId == resource.data.facilityId);
-      allow delete: if isAdmin() || (isAuthenticated() && isFacilityUser(resource.data.facilityId));
+      // Facility users may update their own requests but cannot escalate status to approved/fulfilled;
+      // only admins are permitted to approve or fulfil a request.
+      allow update: if isAdmin() ||
+        (isAuthenticated()
+         && isFacilityUser(resource.data.facilityId)
+         && request.resource.data.facilityId == resource.data.facilityId
+         && !(request.resource.data.status in ['approved', 'fulfilled']));
+      allow delete: if (isAuthenticated() && isFacilityUser(resource.data.facilityId)); // Admin deletions must go through backend audit Callable Function
+    }
+
+    // Audit Logs collection
+    match /audit_logs/{logId} {
+      allow read: if isAdmin();
+      allow write: if false;
+    }
+
+    // Alerts collection
+    match /alerts/{alertId} {
+      allow read: if isAdmin() || (isAuthenticated() && resource != null && isFacilityUser(resource.data.facilityId));
+      allow write: if isAdmin();
+    }
+
+    // Notifications collection
+    match /notifications/{facilityId} {
+      allow read: if isAdmin() || isFacilityUser(facilityId);
+      
+      match /items/{notificationId} {
+        allow read: if isAdmin() || isFacilityUser(facilityId);
+        allow update: if isFacilityUser(facilityId) && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['isRead']);
+        allow write: if isAdmin();
+      }
+    }
+
+    // Users collection (RBAC)
+    match /users/{userId} {
+      allow read: if isAdmin() || (isAuthenticated() && request.auth.uid == userId);
+      // Self-registration is allowed only when the facilityId the user claims is provably
+      // owned by them: the facility document's email must match the caller's verified Auth email.
+      allow create: if isAdmin() ||
+        (isAuthenticated()
+         && request.auth.uid == userId
+         && request.resource.data.role == 'facility_head'
+         && request.resource.data.facilityId != null
+         && exists(/databases/$(database)/documents/facilities/$(request.resource.data.facilityId))
+         && get(/databases/$(database)/documents/facilities/$(request.resource.data.facilityId)).data.email.lower()
+            == request.auth.token.email.lower());
+      allow update: if isAdmin();
+      allow delete: if isAdmin();
     }
 
     // Alerts collection

@@ -24,13 +24,13 @@ class Facility {
   factory Facility.fromMap(Map<String, dynamic> map, String id) {
     return Facility(
       id: id,
-      name: map['name'] ?? '',
-      email: map['email'] ?? '',
-      type: map['type'] ?? 'urban',
-      region: map['region'] ?? '',
-      latitude: map['latitude']?.toDouble() ?? 0.0,
-      longitude: map['longitude']?.toDouble() ?? 0.0,
-      createdAt: map['createdAt'] != null
+      name: map['name']?.toString() ?? '',
+      email: map['email']?.toString() ?? '',
+      type: map['type']?.toString() ?? 'urban',
+      region: map['region']?.toString() ?? '',
+      latitude: (map['latitude'] as num?)?.toDouble() ?? 0.0,
+      longitude: (map['longitude'] as num?)?.toDouble() ?? 0.0,
+      createdAt: map['createdAt'] is Timestamp
           ? (map['createdAt'] as Timestamp).toDate()
           : DateTime.now(),
     );
