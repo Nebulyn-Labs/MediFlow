@@ -33,7 +33,8 @@ void main() {
       routingService = RoutingService();
     });
 
-    test('returns straight-line fallback for placeholder coordinate (0, 0)', () async {
+    test('returns straight-line fallback for placeholder coordinate (0, 0)',
+        () async {
       final start = const LatLng(0.0, 0.0);
       final end = const LatLng(28.61, 77.21);
 
@@ -42,7 +43,8 @@ void main() {
       expect(route.points, equals([start, end]));
     });
 
-    test('returns straight-line fallback for placeholder coordinate (-1, -1)', () async {
+    test('returns straight-line fallback for placeholder coordinate (-1, -1)',
+        () async {
       final start = const LatLng(28.61, 77.21);
       final end = const LatLng(-1.0, -1.0);
 
@@ -51,9 +53,11 @@ void main() {
       expect(route.points, equals([start, end]));
     });
 
-    test('returns straight-line fallback for invalid out-of-bounds latitude/longitude', () async {
+    test(
+        'returns straight-line fallback for invalid out-of-bounds latitude/longitude',
+        () async {
       final start = const LatLng(95.0, 77.21); // invalid lat > 90
-      final end = const LatLng(28.61, 200.0);  // invalid lng > 180
+      final end = const LatLng(28.61, 200.0); // invalid lng > 180
 
       final route = await routingService.getRoute(start, end);
 
@@ -71,7 +75,8 @@ void main() {
       expect(route.points, equals([stop]));
     });
 
-    test('getMultiStopRoute generates segments for multiple valid stops', () async {
+    test('getMultiStopRoute generates segments for multiple valid stops',
+        () async {
       final stops = [
         const LatLng(28.6139, 77.2090),
         const LatLng(28.7041, 77.1025),
@@ -81,8 +86,10 @@ void main() {
       final route = await routingService.getMultiStopRoute(stops);
 
       expect(route.points.isNotEmpty, isTrue);
-      expect((route.points.first.latitude - stops.first.latitude).abs(), lessThan(0.01));
-      expect((route.points.last.latitude - stops.last.latitude).abs(), lessThan(0.01));
+      expect((route.points.first.latitude - stops.first.latitude).abs(),
+          lessThan(0.01));
+      expect((route.points.last.latitude - stops.last.latitude).abs(),
+          lessThan(0.01));
     });
   });
 

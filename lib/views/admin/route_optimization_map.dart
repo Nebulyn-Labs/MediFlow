@@ -75,13 +75,22 @@ class _RouteOptimizationMapState extends ConsumerState<RouteOptimizationMap> {
     setState(() => _isGenerating = true);
     try {
       final firebaseService = ref.read(firebaseServiceProvider);
-      final freshFacs = await firebaseService.getFacilities();
-      if (freshFacs.isNotEmpty) {
-        _facilities = freshFacs;
+      if (_facilities.isEmpty) {
+        final freshFacs = await firebaseService
+            .getFacilities()
+            .catchError((_) => <Facility>[]);
+        if (freshFacs.isNotEmpty) {
+          _facilities = freshFacs;
+        }
       }
-      final freshRequests = await firebaseService.getRequestsOnce();
-      final freshMeds = await firebaseService.getAllMedicinesOnce();
-      final activeRequests = freshRequests.isNotEmpty ? freshRequests : requests;
+      final freshRequests = await firebaseService
+          .getRequestsOnce()
+          .catchError((_) => <MedRequest>[]);
+      final freshMeds = await firebaseService
+          .getAllMedicinesOnce()
+          .catchError((_) => <InventoryItem>[]);
+      final activeRequests =
+          freshRequests.isNotEmpty ? freshRequests : requests;
       final activeMeds = freshMeds.isNotEmpty ? freshMeds : allMeds;
 
       final optimizer = ref.read(optimizationServiceProvider);

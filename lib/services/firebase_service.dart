@@ -676,10 +676,12 @@ class FirebaseService {
             id: facilityId,
             name: f['name']?.toString() ?? '',
             email: f['email']?.toString() ?? '',
-            type: f['type']?.toString() ?? profile['type'],
-            region: f['region']?.toString() ?? profile['region'],
-            latitude: (f['lat'] as num?)?.toDouble() ?? profile['latitude'],
-            longitude: (f['lng'] as num?)?.toDouble() ?? profile['longitude'],
+            type: f['type']?.toString() ?? (profile['type'] as String),
+            region: f['region']?.toString() ?? (profile['region'] as String),
+            latitude: (f['lat'] as num?)?.toDouble() ??
+                (profile['latitude'] as num).toDouble(),
+            longitude: (f['lng'] as num?)?.toDouble() ??
+                (profile['longitude'] as num).toDouble(),
             createdAt: (profile['createdAt'] as Timestamp).toDate(),
           );
           await _firestore
@@ -770,13 +772,13 @@ class FirebaseService {
       for (var f in demoFacilities) {
         try {
           await signUpFacility(
-            name: f['name']!,
-            email: f['email']!,
-            password: f['password']!,
-            type: f['type'],
-            fixedLat: f['lat'],
-            fixedLng: f['lng'],
-            fixedRegion: f['region'],
+            name: f['name']?.toString() ?? '',
+            email: f['email']?.toString() ?? '',
+            password: f['password']?.toString() ?? '',
+            type: f['type']?.toString(),
+            fixedLat: (f['lat'] as num?)?.toDouble(),
+            fixedLng: (f['lng'] as num?)?.toDouble(),
+            fixedRegion: f['region']?.toString(),
           );
         } catch (e) {
           debugPrint('Error signing up facility $f: $e');

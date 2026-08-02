@@ -328,7 +328,8 @@ high-concurrency performance:
        --dart-define=ORS_API_KEY=your_openrouteservice_api_key
      ```
 
-     *Note: If no ORS API key is provided, the app dynamically falls back to the public OSRM demo server and straight-line routing.*
+     *Note: If no ORS API key is provided, the app dynamically falls back to the public OSRM demo*
+     *server and straight-line routing.*
 
 ---
 
