@@ -91,9 +91,6 @@ class _ActiveIndentsPageState extends ConsumerState<ActiveIndentsPage> {
   Future<void> _getAIForecast() async {
     final aiService = ref.read(aiServiceProvider);
     final firebaseService = ref.read(firebaseServiceProvider);
-    // Fetch logs once, shared across all concurrent forecast calls.
-    final logs =
-        await firebaseService.getRecentLogs(widget.facilityId, days: 90);
 
     // Mark every item as loading before starting any futures.
     setState(() {
@@ -101,6 +98,24 @@ class _ActiveIndentsPageState extends ConsumerState<ActiveIndentsPage> {
         _forecastLoading[item.id] = true;
       }
     });
+
+    final dynamic logs;
+    try {
+      logs = await firebaseService.getRecentLogs(widget.facilityId, days: 90);
+    } catch (e) {
+      debugPrint('Error fetching logs for forecast: $e');
+      if (mounted) {
+        setState(() {
+          for (final item in _inventory) {
+            _forecastLoading[item.id] = false;
+          }
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to fetch recent logs for forecast: $e')),
+        );
+      }
+      return;
+    }
 
     // Run forecasts concurrently in chunks of [_kForecastConcurrency] to
     // avoid both serialising N round-trips and flooding the API (#238).
@@ -139,7 +154,12 @@ class _ActiveIndentsPageState extends ConsumerState<ActiveIndentsPage> {
           });
         } catch (e) {
           debugPrint('Forecast error for ${item.medicineName}: $e');
-          if (mounted) setState(() => _forecastLoading[item.id] = false);
+          if (mounted) {
+            setState(() => _forecastLoading[item.id] = false);
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text('Failed to generate forecast for ${item.medicineName}: $e')),
+            );
+          }
         }
       }));
     }
