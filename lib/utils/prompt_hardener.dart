@@ -12,8 +12,8 @@
 class PromptHardener {
   static const int maxInputLength = 4000;
 
-  static final RegExp _delimiterPattern = RegExp(
-      r'---\s*(BEGIN|END)\b[\s\S]{0,80}?---', caseSensitive: false);
+  static final RegExp _delimiterPattern =
+      RegExp(r'---\s*(BEGIN|END)\b[\s\S]{0,80}?---', caseSensitive: false);
   static final RegExp _instructionOverridePattern = RegExp(
       r'\b(ignore|disregard)\s+(all\s+)?(previous|prior|above)\s+instructions\b',
       caseSensitive: false);
