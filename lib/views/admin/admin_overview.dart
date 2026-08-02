@@ -8,7 +8,7 @@ import '../../services/ai_service.dart';
 import '../../models/facility.dart';
 import '../../models/request.dart';
 import '../../models/inventory_item.dart';
-import 'package:med_supply_prototype/constants/colors.dart';
+import 'package:med_supply_prototype/theme/medi_flow_theme.dart';
 import '../shared/skeleton_loaders.dart';
 
 class AdminOverview extends ConsumerStatefulWidget {
@@ -250,6 +250,7 @@ class _AdminOverviewState extends ConsumerState<AdminOverview> {
 
   // ---- medicine list widget (paginated, Issue #209) ----
   Widget _buildMedicineList() {
+    final colors = context.mediTheme;
     final filtered = _applyFilters(_allMedicines);
 
     if (_medicinesLoading && _allMedicines.isEmpty) {
@@ -268,17 +269,17 @@ class _AdminOverviewState extends ConsumerState<AdminOverview> {
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: MediColors.error.withValues(alpha: 0.1),
+              color: colors.error.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: MediColors.error),
+              border: Border.all(color: colors.error),
             ),
             child: Column(
               children: [
-                Icon(Icons.error_outline, color: MediColors.error),
+                Icon(Icons.error_outline, color: colors.error),
                 const SizedBox(height: 8),
                 Text(
                   _medicinesError!,
-                  style: TextStyle(color: MediColors.error),
+                  style: TextStyle(color: colors.error),
                   textAlign: TextAlign.center,
                 ),
                 const SizedBox(height: 8),
@@ -289,7 +290,7 @@ class _AdminOverviewState extends ConsumerState<AdminOverview> {
                     });
                     _loadMedicinePage();
                   },
-                  child: const Text('Retry'),
+                  child: Text('Retry'),
                 ),
               ],
             ),
@@ -301,15 +302,15 @@ class _AdminOverviewState extends ConsumerState<AdminOverview> {
     return Column(
       children: [
         if (filtered.isEmpty && !_medicinesLoading)
-          const Padding(
-            padding: EdgeInsets.symmetric(vertical: 24),
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 24),
             // Note: Intentional scalability trade-off - filtering only searches
             // currently loaded pages to avoid excessive reads or complex
             // composite indexes on the large global medicines collection.
             child: Text(
                 'No medicines match in currently loaded data. Load more to continue searching.',
                 textAlign: TextAlign.center,
-                style: TextStyle(color: MediColors.textSecondary)),
+                style: TextStyle(color: colors.textSecondary)),
           )
         else
           ListView.builder(
@@ -323,9 +324,9 @@ class _AdminOverviewState extends ConsumerState<AdminOverview> {
                 margin: const EdgeInsets.only(bottom: 8),
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
-                  color: MediColors.surface,
+                  color: colors.surface,
                   borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: MediColors.border),
+                  border: Border.all(color: colors.border),
                 ),
                 child: Row(
                   children: [
@@ -333,23 +334,21 @@ class _AdminOverviewState extends ConsumerState<AdminOverview> {
                       flex: 2,
                       child: Text(item.medicineName,
                           overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
+                          style: TextStyle(
                               fontWeight: FontWeight.w700,
-                              color: MediColors.textPrimary)),
+                              color: colors.textPrimary)),
                     ),
                     Expanded(
                       child: Text(
                           '${item.remainingQuantity}/${item.initialQuantity} ${item.unit}',
                           overflow: TextOverflow.ellipsis,
-                          style:
-                              const TextStyle(color: MediColors.textSecondary)),
+                          style: TextStyle(color: colors.textSecondary)),
                     ),
                     Flexible(
                       child: Text(status,
                           overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                              fontWeight: FontWeight.w700,
-                              color: MediColors.info)),
+                          style: TextStyle(
+                              fontWeight: FontWeight.w700, color: colors.info)),
                     ),
                   ],
                 ),
@@ -368,8 +367,8 @@ class _AdminOverviewState extends ConsumerState<AdminOverview> {
                   )
                 : TextButton.icon(
                     onPressed: _loadMedicinePage,
-                    icon: const Icon(Icons.expand_more_rounded, size: 18),
-                    label: const Text('Load more'),
+                    icon: Icon(Icons.expand_more_rounded, size: 18),
+                    label: Text('Load more'),
                   ),
           ),
       ],
@@ -378,6 +377,7 @@ class _AdminOverviewState extends ConsumerState<AdminOverview> {
 
   // ---- filter chips as horizontally-scrollable row (Sprint 9d) ----
   Widget _buildFilterChips() {
+    final colors = context.mediTheme;
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
       child: Row(
@@ -393,14 +393,14 @@ class _AdminOverviewState extends ConsumerState<AdminOverview> {
                   _selectedFilter = filter;
                 });
               },
-              backgroundColor: MediColors.surface,
-              selectedColor: MediColors.info.withValues(alpha: 0.2),
+              backgroundColor: colors.surface,
+              selectedColor: colors.info.withValues(alpha: 0.2),
               labelStyle: TextStyle(
-                color: isSelected ? MediColors.info : MediColors.textSecondary,
+                color: isSelected ? colors.info : colors.textSecondary,
                 fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
               ),
               side: BorderSide(
-                color: isSelected ? MediColors.info : MediColors.border,
+                color: isSelected ? colors.info : colors.border,
               ),
             ),
           );
@@ -410,26 +410,26 @@ class _AdminOverviewState extends ConsumerState<AdminOverview> {
   }
 
   Widget _buildPartialDataWarning() {
+    final colors = context.mediTheme;
     return Container(
       width: double.infinity,
       margin: const EdgeInsets.only(bottom: 16),
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: MediColors.warningOverlay,
+        color: colors.warningOverlay,
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: MediColors.warning.withValues(alpha: 0.3)),
+        border: Border.all(color: colors.warning.withValues(alpha: 0.3)),
       ),
       child: Row(
         children: [
-          const Icon(Icons.warning_amber_rounded,
-              color: MediColors.warning, size: 20),
+          Icon(Icons.warning_amber_rounded, color: colors.warning, size: 20),
           const SizedBox(width: 12),
           Expanded(
             child: Text(
               'Some facility data could not be loaded: '
               '${_failedFacilities.join(", ")}.',
-              style: const TextStyle(
-                color: MediColors.warning,
+              style: TextStyle(
+                color: colors.warning,
                 fontSize: 13,
               ),
             ),
@@ -441,17 +441,18 @@ class _AdminOverviewState extends ConsumerState<AdminOverview> {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.mediTheme;
     return Scaffold(
-      backgroundColor: MediColors.bg,
-      appBar: AppBar(title: const Text('Admin Dashboard')),
+      backgroundColor: colors.background,
+      appBar: AppBar(title: Text('Admin Dashboard')),
       body: _isInitialLoading
           ? const AdminOverviewSkeleton()
           : _errorMessage != null
               ? _buildErrorView()
               : RefreshIndicator(
                   onRefresh: _loadData,
-                  color: MediColors.info,
-                  backgroundColor: MediColors.surface,
+                  color: colors.info,
+                  backgroundColor: colors.surface,
                   strokeWidth: 2.5,
                   displacement: 48,
                   child: SingleChildScrollView(
@@ -477,12 +478,12 @@ class _AdminOverviewState extends ConsumerState<AdminOverview> {
                                 isAlert: true),
                             _buildKpiCard('SURPLUS / EXPIRY OFFERS',
                                 '$_surplusOffers', Icons.swap_horiz_rounded,
-                                isAlert: false, iconColor: MediColors.warning),
+                                isAlert: false, iconColor: colors.warning),
                             _buildKpiCard(
                                 'PENDING INDENT APPROVALS',
                                 '$_pendingIndents',
                                 Icons.assignment_turned_in_rounded,
-                                iconColor: MediColors.info,
+                                iconColor: colors.info,
                                 onTap: () => context.go('/admin/approvals')),
                           ],
                         ),
@@ -496,12 +497,12 @@ class _AdminOverviewState extends ConsumerState<AdminOverview> {
                           },
                           decoration: InputDecoration(
                             hintText: 'Search medicines by name...',
-                            prefixIcon: const Icon(Icons.search),
+                            prefixIcon: Icon(Icons.search),
                             filled: true,
-                            fillColor: MediColors.surface,
+                            fillColor: colors.surface,
                             border: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(8),
-                              borderSide: BorderSide(color: MediColors.border),
+                              borderSide: BorderSide(color: colors.border),
                             ),
                           ),
                         ),
@@ -521,30 +522,30 @@ class _AdminOverviewState extends ConsumerState<AdminOverview> {
   }
 
   Widget _buildErrorView() {
+    final colors = context.mediTheme;
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(32),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.cloud_off_rounded,
-                size: 64, color: MediColors.textMuted),
+            Icon(Icons.cloud_off_rounded, size: 64, color: colors.textMuted),
             const SizedBox(height: 24),
-            const Text(
+            Text(
               'Unable to load dashboard data.',
               style: TextStyle(
                 fontSize: 18,
                 fontWeight: FontWeight.w700,
-                color: MediColors.textPrimary,
+                color: colors.textPrimary,
               ),
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 12),
             Text(
               _errorMessage!,
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 14,
-                color: MediColors.textSecondary,
+                color: colors.textSecondary,
                 height: 1.5,
               ),
               textAlign: TextAlign.center,
@@ -552,11 +553,11 @@ class _AdminOverviewState extends ConsumerState<AdminOverview> {
             const SizedBox(height: 32),
             FilledButton.icon(
               onPressed: _loadData,
-              icon: const Icon(Icons.refresh_rounded, size: 20),
-              label: const Text('Retry'),
+              icon: Icon(Icons.refresh_rounded, size: 20),
+              label: Text('Retry'),
               style: FilledButton.styleFrom(
-                backgroundColor: MediColors.info,
-                foregroundColor: MediColors.textPrimary,
+                backgroundColor: colors.info,
+                foregroundColor: colors.textPrimary,
                 padding:
                     const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
                 shape: RoundedRectangleBorder(
@@ -572,8 +573,8 @@ class _AdminOverviewState extends ConsumerState<AdminOverview> {
 
   Widget _buildKpiCard(String title, String value, IconData icon,
       {bool isAlert = false, Color? iconColor, VoidCallback? onTap}) {
-    final finalIconColor =
-        isAlert ? MediColors.error : (iconColor ?? MediColors.info);
+    final colors = context.mediTheme;
+    final finalIconColor = isAlert ? colors.error : (iconColor ?? colors.info);
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(12),
@@ -581,9 +582,9 @@ class _AdminOverviewState extends ConsumerState<AdminOverview> {
         width: 250,
         padding: const EdgeInsets.all(24),
         decoration: BoxDecoration(
-          color: MediColors.surface,
+          color: colors.surface,
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: MediColors.border),
+          border: Border.all(color: colors.border),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -593,10 +594,10 @@ class _AdminOverviewState extends ConsumerState<AdminOverview> {
               children: [
                 Expanded(
                     child: Text(title,
-                        style: const TextStyle(
+                        style: TextStyle(
                             fontSize: 11,
                             fontWeight: FontWeight.w700,
-                            color: MediColors.textSecondary,
+                            color: colors.textSecondary,
                             letterSpacing: 0.5),
                         overflow: TextOverflow.ellipsis)),
                 const SizedBox(width: 8),
@@ -605,10 +606,10 @@ class _AdminOverviewState extends ConsumerState<AdminOverview> {
             ),
             const SizedBox(height: 16),
             Text(value,
-                style: const TextStyle(
+                style: TextStyle(
                     fontSize: 28,
                     fontWeight: FontWeight.w800,
-                    color: MediColors.textPrimary)),
+                    color: colors.textPrimary)),
           ],
         ),
       ),
@@ -616,14 +617,15 @@ class _AdminOverviewState extends ConsumerState<AdminOverview> {
   }
 
   Widget _buildFacilityHealthGrid() {
+    final colors = context.mediTheme;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text('Facility Health Overview',
+        Text('Facility Health Overview',
             style: TextStyle(
                 fontSize: 16,
                 fontWeight: FontWeight.w700,
-                color: MediColors.textPrimary)),
+                color: colors.textPrimary)),
         const SizedBox(height: 16),
         Wrap(
           spacing: 16,
@@ -635,19 +637,20 @@ class _AdminOverviewState extends ConsumerState<AdminOverview> {
   }
 
   Widget _buildHealthCard(Facility facility) {
+    final colors = context.mediTheme;
     final health = _stockHealth[facility.id] ?? 0;
     final alerts = _alertCounts[facility.id] ?? 0;
 
     Color healthColor;
     String healthStatus;
     if (health > 70) {
-      healthColor = MediColors.success;
+      healthColor = colors.success;
       healthStatus = 'Healthy';
     } else if (health > 40) {
-      healthColor = MediColors.warning;
+      healthColor = colors.warning;
       healthStatus = 'Low';
     } else {
-      healthColor = MediColors.error;
+      healthColor = colors.error;
       healthStatus = 'Critical';
     }
 
@@ -655,9 +658,9 @@ class _AdminOverviewState extends ConsumerState<AdminOverview> {
       width: 280,
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: MediColors.surface,
+        color: colors.surface,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: MediColors.border),
+        border: Border.all(color: colors.border),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -667,20 +670,20 @@ class _AdminOverviewState extends ConsumerState<AdminOverview> {
             children: [
               Expanded(
                   child: Text(facility.name,
-                      style: const TextStyle(
+                      style: TextStyle(
                           fontWeight: FontWeight.w700,
                           fontSize: 15,
-                          color: MediColors.textPrimary),
+                          color: colors.textPrimary),
                       overflow: TextOverflow.ellipsis)),
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                 decoration: BoxDecoration(
-                    color: MediColors.surfaceLight,
+                    color: colors.surfaceLight,
                     borderRadius: BorderRadius.circular(20)),
                 child: Text(facility.type,
-                    style: const TextStyle(
+                    style: TextStyle(
                         fontSize: 10,
-                        color: MediColors.textSecondary,
+                        color: colors.textSecondary,
                         fontWeight: FontWeight.w700)),
               ),
             ],
@@ -689,9 +692,8 @@ class _AdminOverviewState extends ConsumerState<AdminOverview> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text('Stock Health',
-                  style:
-                      TextStyle(fontSize: 12, color: MediColors.textSecondary)),
+              Text('Stock Health',
+                  style: TextStyle(fontSize: 12, color: colors.textSecondary)),
               Text('${health.round()}%',
                   style: TextStyle(
                       fontSize: 14,
@@ -704,7 +706,7 @@ class _AdminOverviewState extends ConsumerState<AdminOverview> {
             borderRadius: BorderRadius.circular(4),
             child: LinearProgressIndicator(
               value: health / 100,
-              backgroundColor: MediColors.surfaceLight,
+              backgroundColor: colors.surfaceLight,
               valueColor: AlwaysStoppedAnimation<Color>(healthColor),
               minHeight: 6,
             ),
@@ -728,12 +730,12 @@ class _AdminOverviewState extends ConsumerState<AdminOverview> {
               if (alerts > 0)
                 Row(
                   children: [
-                    const Icon(Icons.notifications_active_rounded,
-                        color: MediColors.error, size: 14),
+                    Icon(Icons.notifications_active_rounded,
+                        color: colors.error, size: 14),
                     const SizedBox(width: 4),
                     Text('$alerts',
-                        style: const TextStyle(
-                            color: MediColors.error,
+                        style: TextStyle(
+                            color: colors.error,
                             fontSize: 12,
                             fontWeight: FontWeight.w700)),
                   ],
@@ -746,6 +748,7 @@ class _AdminOverviewState extends ConsumerState<AdminOverview> {
   }
 
   Widget _buildTopMedicinesChart() {
+    final colors = context.mediTheme;
     if (_topMedicines.isEmpty) return const SizedBox.shrink();
 
     var sortedEntries = _topMedicines.entries.toList()
@@ -759,18 +762,18 @@ class _AdminOverviewState extends ConsumerState<AdminOverview> {
     return Container(
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
-        color: MediColors.surface,
+        color: colors.surface,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: MediColors.border),
+        border: Border.all(color: colors.border),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text('Top Medicines by Total Units Across All Facilities',
+          Text('Top Medicines by Total Units Across All Facilities',
               style: TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.w700,
-                  color: MediColors.textPrimary)),
+                  color: colors.textPrimary)),
           const SizedBox(height: 32),
           SizedBox(
             height: 200,
@@ -786,8 +789,8 @@ class _AdminOverviewState extends ConsumerState<AdminOverview> {
                       Container(
                         width: 24,
                         height: 150 * heightFactor,
-                        decoration: const BoxDecoration(
-                          color: MediColors.info,
+                        decoration: BoxDecoration(
+                          color: colors.info,
                           borderRadius:
                               BorderRadius.vertical(top: Radius.circular(4)),
                         ),
@@ -795,8 +798,8 @@ class _AdminOverviewState extends ConsumerState<AdminOverview> {
                       const SizedBox(height: 12),
                       Text(
                         e.key,
-                        style: const TextStyle(
-                            fontSize: 10, color: MediColors.textSecondary),
+                        style: TextStyle(
+                            fontSize: 10, color: colors.textSecondary),
                         textAlign: TextAlign.center,
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
