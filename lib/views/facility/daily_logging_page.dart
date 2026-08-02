@@ -513,9 +513,10 @@ class _DailyLoggingPageState extends ConsumerState<DailyLoggingPage>
 
   Widget _buildManualTab() {
     return Center(
-      child: Container(
-        width: 480,
-        margin: const EdgeInsets.all(28),
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 480),
+        child: Container(
+          margin: const EdgeInsets.all(28),
         padding: const EdgeInsets.all(32),
         decoration: BoxDecoration(
             color: MediColors.surface,
@@ -592,9 +593,17 @@ class _DailyLoggingPageState extends ConsumerState<DailyLoggingPage>
                     decoration: const InputDecoration(labelText: 'Medicine'),
                     dropdownColor: MediColors.surfaceLight,
                     initialValue: _medName,
+                    isExpanded: true,
                     style: const TextStyle(color: MediColors.textPrimary),
                     items: _availableMedicines
-                        .map((m) => DropdownMenuItem(value: m, child: Text(m)))
+                        .map((m) => DropdownMenuItem(
+                              value: m,
+                              child: Text(
+                                m,
+                                overflow: TextOverflow.ellipsis,
+                                maxLines: 1,
+                              ),
+                            ))
                         .toList(),
                     onChanged: (v) => setState(() => _medName = v),
                     validator: (v) => v == null ? 'Select a medicine' : null,
@@ -635,11 +644,12 @@ class _DailyLoggingPageState extends ConsumerState<DailyLoggingPage>
                                 child: CircularProgressIndicator(
                                     color: Colors.white, strokeWidth: 2))
                             : const Text('Save Log'))),
-              ],
+             ],
             ),
           ),
         ),
       ),
+    ),
     );
   }
 
