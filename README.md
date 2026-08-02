@@ -296,17 +296,15 @@ high-concurrency performance:
      uses a Debug token. You must register your app's SHA-256 certificate
      in the Firebase Console under App Check.
 
-   - **Web:** We use reCAPTCHA v3. Provide your site key during build or run
-     time:
+   - **Web & Routing:** Provide your reCAPTCHA site key and optional OpenRouteService API key during build or run time:
 
      ```bash
      flutter run -d chrome \
-       --dart-define=RECAPTCHA_SITE_KEY=your_recaptcha_site_key
+       --dart-define=RECAPTCHA_SITE_KEY=your_recaptcha_site_key \
+       --dart-define=ORS_API_KEY=your_openrouteservice_api_key
      ```
 
-     *Note: If no key is provided, the app will continue to run, but App
-     Check will remain inactive for web. If App Check enforcement is enabled
-     in the Firebase Console, requests may be rejected.*
+     *Note: If no ORS API key is provided, the app dynamically falls back to the public OSRM demo server and straight-line routing.*
 
 ---
 
