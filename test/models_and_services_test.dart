@@ -168,7 +168,7 @@ void main() {
     });
 
     test('generateRedistributionPlan includes approved and shortage requests', () async {
-      final aiService = AIService();
+      final aiService = AIService(null);
       final facilities = [
         Facility(
           id: 'f1',
