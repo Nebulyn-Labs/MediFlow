@@ -44,30 +44,59 @@ class AlertsPage extends ConsumerStatefulWidget {
 
 class _AlertsPageState extends ConsumerState<AlertsPage> {
   int _refreshKey = 0;
+  late Stream<List<Map<String, dynamic>>> _alertsStream;
+
+  @override
+  void initState() {
+    super.initState();
+    _initStream();
+  }
+
+  @override
+  void didUpdateWidget(AlertsPage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.facilityId != widget.facilityId) {
+      _initStream();
+    }
+  }
+
+  void _initStream() {
+    _alertsStream =
+        ref.read(firebaseServiceProvider).streamAlerts(widget.facilityId);
+  }
 
   void _manualRefresh() {
     setState(() {
       _refreshKey++;
+      _initStream();
     });
   }
 
   List<_InventoryAlert> _parseAlerts(List<Map<String, dynamic>> alertMaps) {
     return alertMaps.map((data) {
+      final expiryRaw = data['expiryDate'];
+      DateTime expiryDate;
+      if (expiryRaw is Timestamp) {
+        expiryDate = expiryRaw.toDate();
+      } else if (expiryRaw is String) {
+        expiryDate = DateTime.tryParse(expiryRaw) ?? DateTime.now();
+      } else {
+        expiryDate = DateTime.now();
+      }
+
       final item = InventoryItem(
-        id: (data['stockId'] as String?) ?? '',
-        medicineName: (data['medicineName'] as String?) ?? '',
-        batchId: (data['batchId'] as String?) ?? '',
+        id: data['stockId']?.toString() ?? '',
+        medicineName: data['medicineName']?.toString() ?? '',
+        batchId: data['batchId']?.toString() ?? '',
         arrivalDate: DateTime.now(),
-        expiryDate: data['expiryDate'] != null
-            ? (data['expiryDate'] as Timestamp).toDate()
-            : DateTime.now(),
+        expiryDate: expiryDate,
         initialQuantity: (data['initialQuantity'] as num?)?.toInt() ?? 0,
         remainingQuantity: (data['qtyRemaining'] as num?)?.toInt() ?? 0,
-        unit: (data['unit'] as String?) ?? 'units',
+        unit: data['unit']?.toString() ?? 'units',
         lastUpdated: DateTime.now(),
       );
 
-      final typeStr = data['type'] ?? '';
+      final typeStr = data['type']?.toString() ?? '';
       _AlertKind kind;
       String title;
       String reason;
@@ -166,12 +195,9 @@ class _AlertsPageState extends ConsumerState<AlertsPage> {
 
   @override
   Widget build(BuildContext context) {
-    final alertsStream =
-        ref.watch(firebaseServiceProvider).streamAlerts(widget.facilityId);
-
     return StreamBuilder<List<Map<String, dynamic>>>(
       key: ValueKey(_refreshKey),
-      stream: alertsStream,
+      stream: _alertsStream,
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting &&
             !snapshot.hasData) {
@@ -198,8 +224,23 @@ class _AlertsPageState extends ConsumerState<AlertsPage> {
                 );
         }
 
-        final alertMaps = snapshot.data ?? [];
-        final alerts = _parseAlerts(alertMaps);
+        List<_InventoryAlert> alerts;
+        try {
+          final alertMaps = snapshot.data ?? [];
+          alerts = _parseAlerts(alertMaps);
+        } catch (e) {
+          final errorWidget = Center(
+            child: Text('Error loading alerts: $e',
+                style: const TextStyle(color: MediColors.error)),
+          );
+          return widget.isTabBody
+              ? errorWidget
+              : Scaffold(
+                  backgroundColor: MediColors.bg,
+                  appBar: _buildAppBar(),
+                  body: errorWidget,
+                );
+        }
 
         final expiredAlerts =
             alerts.where((a) => a.kind == _AlertKind.expired).toList();
