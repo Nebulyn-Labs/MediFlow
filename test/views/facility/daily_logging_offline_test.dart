@@ -236,4 +236,37 @@ void main() {
       expect(_isButtonEnabled(tester, 'Save Log'), isTrue);
     });
   });
+
+  group('Daily Logging - mounted guards (#323)', () {
+    // The simulated QR scan takes two seconds. If the user navigates away
+    // before it finishes, the post-await setState would throw without the
+    // mounted guard added by #323.
+    testWidgets(
+        'disposing mid simulated QR scan does not throw setState-after-dispose',
+        (tester) async {
+      await _pumpPage(tester, status: Stream.value(true));
+
+      // Switch to the Scan tab. The simulate button is rendered there.
+      await tester.tap(find.text('Scan'));
+      await tester.pumpAndSettle();
+
+      // The tab shows the "Simulate Scan" button until the first scan lands,
+      // then "Scan Another". Tap whichever is visible.
+      final simulate = find.text('Simulate Scan');
+      final another = find.text('Scan Another');
+      final button = simulate.evaluate().isNotEmpty ? simulate : another;
+      expect(button, findsOneWidget);
+      await tester.tap(button);
+      // The 2-second delay is in flight; do not pump it yet.
+      await tester.pump();
+
+      // Navigate away before the simulated scan finishes.
+      await tester.pumpWidget(const SizedBox.shrink());
+      // Drain the queue well past the 2-second timer so any post-dispose
+      // setState would have fired.
+      await tester.pump(const Duration(seconds: 3));
+
+      expect(tester.takeException(), isNull);
+    });
+  });
 }
