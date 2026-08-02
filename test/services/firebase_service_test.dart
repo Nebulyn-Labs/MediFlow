@@ -168,8 +168,7 @@ void main() {
           );
         }
 
-        final page1 =
-            await firebaseService.getPaginatedMedicines(pageSize: 2);
+        final page1 = await firebaseService.getPaginatedMedicines(pageSize: 2);
 
         // The cursor must be set so the caller can request the next page.
         expect(
@@ -202,8 +201,7 @@ void main() {
           );
         }
 
-        final page1 =
-            await firebaseService.getPaginatedMedicines(pageSize: 3);
+        final page1 = await firebaseService.getPaginatedMedicines(pageSize: 3);
 
         // All IDs within a single page must be unique.
         final ids = page1.medicines.map((m) => m.id).toList();
@@ -211,8 +209,7 @@ void main() {
         expect(
           uniqueIds.length,
           ids.length,
-          reason:
-              'A single page must not contain duplicate medicine documents',
+          reason: 'A single page must not contain duplicate medicine documents',
         );
       },
     );
@@ -230,23 +227,20 @@ void main() {
           );
         }
 
-        final result =
-            await firebaseService.getPaginatedMedicines(pageSize: 5);
+        final result = await firebaseService.getPaginatedMedicines(pageSize: 5);
 
         expect(result.medicines.length, 2);
         expect(
           result.hasMore,
           isFalse,
-          reason:
-              'hasMore must be false when result is smaller than pageSize',
+          reason: 'hasMore must be false when result is smaller than pageSize',
         );
       },
     );
 
     test('empty collection returns empty list and hasMore is false', () async {
       // No documents seeded
-      final result =
-          await firebaseService.getPaginatedMedicines(pageSize: 20);
+      final result = await firebaseService.getPaginatedMedicines(pageSize: 20);
 
       expect(result.medicines, isEmpty);
       expect(result.hasMore, isFalse);
@@ -303,8 +297,7 @@ void main() {
         );
 
         // Verify role document written for new UID
-        final newDoc =
-            await fakeFirestore.collection('users').doc(uid).get();
+        final newDoc = await fakeFirestore.collection('users').doc(uid).get();
         expect(newDoc.exists, isTrue);
         expect(newDoc.data()?['email'], email);
         expect(newDoc.data()?['role'], 'facility_head');
