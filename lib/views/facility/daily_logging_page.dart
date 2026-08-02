@@ -326,27 +326,40 @@ class _DailyLoggingPageState extends ConsumerState<DailyLoggingPage>
     if (!_ensureOnline()) return;
     setState(() => _isSubmittingCsv = true);
     try {
+      final List<Map<String, dynamic>> successful = [];
+      final List<Map<String, dynamic>> failed = [];
       for (var item in _csvItems) {
-        await ref.read(firebaseServiceProvider).logUsage(
-            facilityId: widget.facilityId,
-            date: _selectedDate,
-            medicineName: item['medicine']?.toString() ?? '',
-            quantity: (item['quantity'] as num?)?.toInt() ?? 0,
-            patients: (item['patients'] as num?)?.toInt() ?? 0);
+        try {
+          await ref.read(firebaseServiceProvider).logUsage(
+              facilityId: widget.facilityId,
+              date: _selectedDate,
+              medicineName: item['medicine']?.toString() ?? '',
+              quantity: (item['quantity'] as num?)?.toInt() ?? 0,
+              patients: (item['patients'] as num?)?.toInt() ?? 0);
+          successful.add(item);
+        } catch (e) {
+          final failedItem = Map<String, dynamic>.from(item);
+          failedItem['error'] = e.toString();
+          failed.add(failedItem);
+        }
       }
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('${_csvItems.length} logs saved ✓')));
+        final successCount = successful.length;
+        final failCount = failed.length;
+        if (failCount == 0) {
+          ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text('$successCount logs saved ✓')));
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+              content: Text('Saved $successCount logs, $failCount failed.')));
+        }
         setState(() {
-          _csvItems.clear();
-          _csvStatus = null;
+          _csvItems = failed;
+          _csvStatus = failCount == 0
+              ? null
+              : 'Partial success: $successCount saved, $failCount failed.';
         });
         unawaited(_fetchHistoryFirstPage());
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text('Error: $e')));
       }
     } finally {
       if (mounted) setState(() => _isSubmittingCsv = false);
