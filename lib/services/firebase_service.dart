@@ -65,19 +65,31 @@ class FirebaseService {
     final String facilityId =
         email.toLowerCase().replaceAll('@', '_').replaceAll('.', '_');
 
-    // 2. Try to create Auth User in background (Non-blocking for data seeding)
+    // 2. Attempt to create or sign in Auth User
     try {
       await _auth.createUserWithEmailAndPassword(
           email: email, password: password);
     } catch (e) {
-      // If user exists or rate limit hits, we don't care for seeding Firestore data
-      debugPrint('Auth skip/fail for $email: $e');
+      debugPrint('Auth creation failed for $email: $e');
       try {
         await _auth.signInWithEmailAndPassword(
             email: email, password: password);
       } catch (loginErr) {
-        debugPrint('Sign in fallback failed for $email: $loginErr');
+        debugPrint('Sign in fallback also failed for $email: $loginErr');
+        // If authentication cannot be established, throw to prevent creating orphaned facility data
+        throw auth.FirebaseAuthException(
+          code: 'auth-registration-failed',
+          message: 'Failed to authenticate user during facility signup: $e',
+        );
       }
+    }
+
+    final String? uid = _auth.currentUser?.uid;
+    if (uid == null) {
+      throw auth.FirebaseAuthException(
+        code: 'no-current-user',
+        message: 'No authenticated user available after facility signup.',
+      );
     }
 
     // 3. Generate Profile
@@ -103,15 +115,12 @@ class FirebaseService {
         .set(facility.toMap());
 
     // Register role in the 'users' collection for RBAC
-    final String? uid = _auth.currentUser?.uid;
-    if (uid != null) {
-      await _firestore.collection('users').doc(uid).set({
-        'email': email,
-        'role': 'facility_head',
-        'facilityId': facilityId,
-        'createdAt': FieldValue.serverTimestamp(),
-      });
-    }
+    await _firestore.collection('users').doc(uid).set({
+      'email': email,
+      'role': 'facility_head',
+      'facilityId': facilityId,
+      'createdAt': FieldValue.serverTimestamp(),
+    });
 
     // 5. Run Initial Simulation (30 days)
     await _simulation.runFullSimulation(facilityId, facility.type);
