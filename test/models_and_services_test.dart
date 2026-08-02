@@ -167,7 +167,8 @@ void main() {
       expect(surplusRequest.isDeficit, isFalse);
     });
 
-    test('generateRedistributionPlan includes approved and shortage requests', () async {
+    test('generateRedistributionPlan includes approved and shortage requests',
+        () async {
       final aiService = AIService(null);
       final facilities = [
         Facility(
@@ -194,7 +195,8 @@ void main() {
         ),
       ];
 
-      final plan = await aiService.generateRedistributionPlan(requests, facilities);
+      final plan =
+          await aiService.generateRedistributionPlan(requests, facilities);
       expect(plan, isNot(equals('No active indents found to optimize.')));
     });
   });
