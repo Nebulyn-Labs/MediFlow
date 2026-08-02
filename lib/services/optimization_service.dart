@@ -196,6 +196,12 @@ class OptimizationService {
       workingSurpluses[f.id] = {};
       final inv = inventories[f.id] ?? [];
       for (var item in inv) {
+        if (item.initialQuantity <= 0) {
+          debugPrint(
+            'OptimizationService: Skipping item ${item.medicineName} with non-positive initial quantity ${item.initialQuantity}.',
+          );
+          continue;
+        }
         int surplus =
             item.remainingQuantity - (item.initialQuantity * 0.3).toInt();
         if (surplus > 0) {

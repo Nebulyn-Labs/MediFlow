@@ -26,7 +26,7 @@ class _AdminOverviewState extends ConsumerState<AdminOverview> {
 
   int _openShortageRequests = 0;
   int _surplusOffers = 0;
-  int _pendingIndents = 0;
+  int _pendingApprovals = 0;
 
   bool _isInitialLoading = true;
   String? _errorMessage;
@@ -150,18 +150,21 @@ class _AdminOverviewState extends ConsumerState<AdminOverview> {
         if (!mounted) return;
         int shortage = 0;
         int surplus = 0;
-        int pending = 0;
         for (var r in reqs) {
           if (r.status == RequestStatus.pending) {
             if (r.type == RequestType.shortage) shortage++;
             if (r.type == RequestType.surplus) surplus++;
-            if (r.type == RequestType.regularIndent) pending++;
           }
         }
+        // The "Pending Approvals" KPI mirrors the /admin/approvals page,
+        // which lists every pending request regardless of type. Using
+        // MedRequest.countPending keeps the card and the page in lockstep
+        // (#334).
+        final pending = MedRequest.countPending(reqs);
         setState(() {
           _openShortageRequests = shortage;
           _surplusOffers = surplus;
-          _pendingIndents = pending;
+          _pendingApprovals = pending;
         });
       },
       onError: (e) {
@@ -479,8 +482,8 @@ class _AdminOverviewState extends ConsumerState<AdminOverview> {
                                 '$_surplusOffers', Icons.swap_horiz_rounded,
                                 isAlert: false, iconColor: MediColors.warning),
                             _buildKpiCard(
-                                'PENDING INDENT APPROVALS',
-                                '$_pendingIndents',
+                                'PENDING APPROVALS',
+                                '$_pendingApprovals',
                                 Icons.assignment_turned_in_rounded,
                                 iconColor: MediColors.info,
                                 onTap: () => context.go('/admin/approvals')),
