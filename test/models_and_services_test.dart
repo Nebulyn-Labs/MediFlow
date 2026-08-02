@@ -167,16 +167,17 @@ void main() {
     });
 
     test('generateRedistributionPlan includes approved and shortage requests', () async {
-      final aiService = AIService();
+      final aiService = AiService();
       final facilities = [
         Facility(
           id: 'f1',
           name: 'Clinic A',
-          district: 'District 1',
-          type: FacilityType.primary,
-          storageCapacity: 1000,
+          type: 'primary',
+          region: 'North',
+          email: 'clinica@example.com',
           latitude: 12.9716,
           longitude: 77.5946,
+          createdAt: DateTime.now(),
         ),
       ];
 
