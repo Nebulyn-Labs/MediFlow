@@ -154,10 +154,7 @@ class OptimizationService {
     // 1. Group needs (shortage or regular indent) by medicine
     final pendingIndents = <MedRequest>[];
     for (final request in requests) {
-      if (!((request.status == RequestStatus.pending ||
-              request.status == RequestStatus.approved) &&
-          (request.type == RequestType.regularIndent ||
-              request.type == RequestType.shortage))) {
+      if (!request.isDeficit) {
         continue;
       }
 

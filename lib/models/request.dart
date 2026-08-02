@@ -49,6 +49,12 @@ class MedRequest {
     );
   }
 
+
+  /// Whether this request represents an actionable deficit (pending or approved regular indent or shortage).
+  bool get isDeficit =>
+      (status == RequestStatus.pending || status == RequestStatus.approved) &&
+      (type == RequestType.regularIndent || type == RequestType.shortage);
+
   Map<String, dynamic> toMap() {
     return {
       'facilityId': facilityId,
