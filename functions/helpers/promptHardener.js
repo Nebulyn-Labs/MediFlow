@@ -26,7 +26,7 @@ const DATA_END = "---END DATA---";
 
 const MAX_INPUT_LENGTH = 4000;
 
-const DELIMITER_PATTERN = /---\s*(BEGIN|END)\b[^\n]*---/gi;
+const DELIMITER_PATTERN = /---\s*(BEGIN|END)\b[\s\S]{0,80}?---/gi;
 
 const INSTRUCTION_OVERRIDE_PATTERN =
   /\b(ignore|disregard)\s+(all\s+)?(previous|prior|above)\s+instructions\b/gi;
