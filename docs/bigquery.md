@@ -77,3 +77,13 @@ npm ci
 npm test
 npm run lint
 ```
+
+## Related documentation
+
+- [AI Tool-Calling Architecture](ai-tool-calling.md) documents how the
+  forecasting flow mirrors AI decisions to BigQuery for auditability.
+- [Optimization, Routing & Simulation Algorithms](optimization-simulation-algorithms.md)
+  covers the services that produce the requests and inventory changes
+  archived here.
+- [CSP Reporting](csp-reporting.md) documents the public endpoint that
+  feeds web security violations into the same Cloud Function pipeline.

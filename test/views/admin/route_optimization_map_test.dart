@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:io';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -9,6 +10,7 @@ import 'package:flutter_map/flutter_map.dart';
 import 'package:med_supply_prototype/models/facility.dart';
 import 'package:med_supply_prototype/models/inventory_item.dart';
 import 'package:med_supply_prototype/models/request.dart';
+import 'package:med_supply_prototype/models/daily_usage_log.dart';
 import 'package:med_supply_prototype/services/firebase_service.dart';
 import 'package:med_supply_prototype/services/ai_service.dart';
 import 'package:med_supply_prototype/services/routing_service.dart';
@@ -37,13 +39,21 @@ class FakeFirebaseService implements FirebaseService {
     return facilities;
   }
 
-  late final Stream<List<InventoryItem>> _inventoryStream =
-      Stream.value(inventory);
   late final Stream<List<MedRequest>> _requestsStream = Stream.value(requests);
 
   @override
+  Future<PaginatedMedicinesResult> getPaginatedMedicines(
+      {int pageSize = 20, DocumentSnapshot? startAfter}) async {
+    return PaginatedMedicinesResult(
+      medicines: inventory,
+      lastDocument: null,
+      hasMore: false,
+    );
+  }
+
+  @override
   Stream<List<InventoryItem>> streamAllMedicines() {
-    return _inventoryStream;
+    return Stream.value(inventory);
   }
 
   @override
@@ -77,6 +87,16 @@ class FailingFirebaseService implements FirebaseService {
   }
 
   @override
+  Future<PaginatedMedicinesResult> getPaginatedMedicines(
+      {int pageSize = 20, DocumentSnapshot? startAfter}) async {
+    return PaginatedMedicinesResult(
+      medicines: [],
+      lastDocument: null,
+      hasMore: false,
+    );
+  }
+
+  @override
   Stream<List<InventoryItem>> streamAllMedicines() {
     return Stream.value([]);
   }
@@ -107,6 +127,16 @@ class RetryableFirebaseService implements FirebaseService {
       throw Exception('Network unavailable');
     }
     return facilities;
+  }
+
+  @override
+  Future<PaginatedMedicinesResult> getPaginatedMedicines(
+      {int pageSize = 20, DocumentSnapshot? startAfter}) async {
+    return PaginatedMedicinesResult(
+      medicines: [],
+      lastDocument: null,
+      hasMore: false,
+    );
   }
 
   @override
@@ -157,15 +187,19 @@ class FakeOptimizationService implements OptimizationService {
   }
 }
 
-class FakeRoutingService implements RoutingService {
+class FakeRoutingService extends RoutingService {
+  final RouteResult? customResult;
+
+  FakeRoutingService({this.customResult});
+
   @override
-  Future<List<LatLng>> getRoute(LatLng start, LatLng end) async {
-    return [start, end];
+  Future<RouteResult> getRoute(LatLng start, LatLng end) async {
+    return customResult ?? RouteResult(points: [start, end]);
   }
 
   @override
-  Future<List<LatLng>> getMultiStopRoute(List<LatLng> stops) async {
-    return stops;
+  Future<RouteResult> getMultiStopRoute(List<LatLng> stops) async {
+    return customResult ?? RouteResult(points: stops);
   }
 }
 
@@ -259,7 +293,7 @@ void main() {
     });
 
     Widget createWidgetUnderTest(List<TransferRecommendation> recs,
-        {FirebaseService? firebaseService}) {
+        {FirebaseService? firebaseService, RoutingService? routingService}) {
       return ProviderScope(
         overrides: [
           firebaseServiceProvider.overrideWithValue(
@@ -272,7 +306,8 @@ void main() {
           ),
           optimizationServiceProvider
               .overrideWithValue(FakeOptimizationService(recs)),
-          routingServiceProvider.overrideWithValue(FakeRoutingService()),
+          routingServiceProvider
+              .overrideWithValue(routingService ?? FakeRoutingService()),
           aiServiceProvider.overrideWithValue(FakeAIService()),
         ],
         child: const MaterialApp(
@@ -614,6 +649,65 @@ void main() {
 
       // Should show success
       expect(find.text('Transfer Manifest'), findsOneWidget);
+    });
+
+    testWidgets(
+        'displays road route distance and travel duration when available',
+        (WidgetTester tester) async {
+      tester.view.physicalSize = const Size(1920, 1080);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
+      final roadResult = RouteResult(
+        points: [
+          LatLng(donor.latitude, donor.longitude),
+          LatLng(recipient.latitude, recipient.longitude),
+        ],
+        distanceKm: 25.4,
+        durationSeconds: 1800, // 30 mins
+      );
+
+      await tester.pumpWidget(createWidgetUnderTest(
+        [recommendation],
+        routingService: FakeRoutingService(customResult: roadResult),
+      ));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Generate Optimal Routes'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('25.4 km'), findsOneWidget);
+      expect(find.text('30m est.'), findsOneWidget);
+      expect(find.textContaining('straight-line'), findsNothing);
+    });
+
+    testWidgets('displays straight-line label when road metadata is null',
+        (WidgetTester tester) async {
+      tester.view.physicalSize = const Size(1920, 1080);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
+      final fallbackResult = RouteResult(
+        points: [
+          LatLng(donor.latitude, donor.longitude),
+          LatLng(recipient.latitude, recipient.longitude),
+        ],
+        distanceKm: null,
+        durationSeconds: null,
+      );
+
+      await tester.pumpWidget(createWidgetUnderTest(
+        [recommendation],
+        routingService: FakeRoutingService(customResult: fallbackResult),
+      ));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Generate Optimal Routes'));
+      await tester.pumpAndSettle();
+
+      expect(find.textContaining('straight-line @ 40 km/h'), findsOneWidget);
     });
   });
 }

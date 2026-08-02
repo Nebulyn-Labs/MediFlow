@@ -22,15 +22,17 @@ class AuditLog {
   });
 
   factory AuditLog.fromMap(Map<String, dynamic> map, String id) {
+    final rawMetadata = map['metadata'];
     return AuditLog(
       id: id,
-      adminId: map['adminId'] ?? '',
+      adminId: map['adminId']?.toString() ?? '',
       timestamp: (map['timestamp'] as Timestamp?)?.toDate() ?? DateTime.now(),
-      action: map['action'] ?? '',
-      resourceType: map['resourceType'] ?? '',
-      resourceId: map['resourceId'] ?? '',
-      metadata: map['metadata'] as Map<String, dynamic>?,
-      status: map['status'] ?? '',
+      action: map['action']?.toString() ?? '',
+      resourceType: map['resourceType']?.toString() ?? '',
+      resourceId: map['resourceId']?.toString() ?? '',
+      metadata:
+          rawMetadata is Map ? Map<String, dynamic>.from(rawMetadata) : null,
+      status: map['status']?.toString() ?? '',
     );
   }
 

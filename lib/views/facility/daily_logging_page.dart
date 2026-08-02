@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
@@ -230,7 +231,7 @@ class _DailyLoggingPageState extends ConsumerState<DailyLoggingPage>
             .showSnackBar(const SnackBar(content: Text('Log saved ✓')));
         _formKey.currentState!.reset();
         // Keep the History tab fresh with the newly saved log.
-        _fetchHistoryFirstPage();
+        unawaited(_fetchHistoryFirstPage());
       }
     } catch (e) {
       if (mounted) {
@@ -326,9 +327,9 @@ class _DailyLoggingPageState extends ConsumerState<DailyLoggingPage>
         await ref.read(firebaseServiceProvider).logUsage(
             facilityId: widget.facilityId,
             date: _selectedDate,
-            medicineName: item['medicine'],
-            quantity: item['quantity'],
-            patients: item['patients']);
+            medicineName: item['medicine']?.toString() ?? '',
+            quantity: (item['quantity'] as num?)?.toInt() ?? 0,
+            patients: (item['patients'] as num?)?.toInt() ?? 0);
       }
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -337,7 +338,7 @@ class _DailyLoggingPageState extends ConsumerState<DailyLoggingPage>
           _csvItems.clear();
           _csvStatus = null;
         });
-        _fetchHistoryFirstPage();
+        unawaited(_fetchHistoryFirstPage());
       }
     } catch (e) {
       if (mounted) {
@@ -375,15 +376,15 @@ class _DailyLoggingPageState extends ConsumerState<DailyLoggingPage>
         await ref.read(firebaseServiceProvider).logUsage(
             facilityId: widget.facilityId,
             date: _selectedDate,
-            medicineName: item['medicine'],
-            quantity: item['quantity'],
-            patients: item['patients']);
+            medicineName: item['medicine']?.toString() ?? '',
+            quantity: (item['quantity'] as num?)?.toInt() ?? 0,
+            patients: (item['patients'] as num?)?.toInt() ?? 0);
       }
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(content: Text('${_scannedItems.length} logs saved ✓')));
         setState(() => _scannedItems.clear());
-        _fetchHistoryFirstPage();
+        unawaited(_fetchHistoryFirstPage());
       }
     } catch (e) {
       if (mounted) {
@@ -403,17 +404,26 @@ class _DailyLoggingPageState extends ConsumerState<DailyLoggingPage>
         withData: true,
       );
       if (result == null || result.files.isEmpty) return;
-      final bytes = result.files.first.bytes;
+      final file = result.files.first;
+      final bytes = file.bytes;
       if (bytes == null) return;
+      final aiService = ref.read(aiServiceProvider);
+      final imageMimeType = aiService.imageMimeTypeForPickedFile(
+        imageBytes: bytes,
+        fileName: file.name,
+        extension: file.extension,
+      );
       setState(() {
         _isParsingImage = true;
         _imageParseResult = null;
         _imageParseError = null;
         _imageItems.clear();
       });
-      final parsed = await ref.read(aiServiceProvider).parseImageWithVision(
-          bytes,
-          'Extract all medicine names, quantities, and patient counts from this image. Output JSON: [{"medicine": "string", "quantity": int, "patients": int}]');
+      final parsed = await aiService.parseImageWithVision(
+        bytes,
+        'Extract all medicine names, quantities, and patient counts from this image. Output JSON: [{"medicine": "string", "quantity": int, "patients": int}]',
+        imageMimeType: imageMimeType,
+      );
       if (mounted) {
         final extractedItems = parseVisionJson(parsed);
         setState(() {
@@ -477,9 +487,9 @@ class _DailyLoggingPageState extends ConsumerState<DailyLoggingPage>
         await ref.read(firebaseServiceProvider).logUsage(
             facilityId: widget.facilityId,
             date: _selectedDate,
-            medicineName: item['medicine'],
-            quantity: item['quantity'],
-            patients: item['patients']);
+            medicineName: item['medicine']?.toString() ?? '',
+            quantity: (item['quantity'] as num?)?.toInt() ?? 0,
+            patients: (item['patients'] as num?)?.toInt() ?? 0);
       }
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -488,7 +498,7 @@ class _DailyLoggingPageState extends ConsumerState<DailyLoggingPage>
           _imageItems.clear();
           _imageParseResult = null;
         });
-        _fetchHistoryFirstPage();
+        unawaited(_fetchHistoryFirstPage());
       }
     } catch (e) {
       if (mounted) {
@@ -781,7 +791,8 @@ class _DailyLoggingPageState extends ConsumerState<DailyLoggingPage>
                       ],
                       rows: _csvItems
                           .map((item) => DataRow(cells: [
-                                DataCell(Text(item['medicine'],
+                                DataCell(Text(
+                                    item['medicine']?.toString() ?? '',
                                     style: const TextStyle(
                                         fontWeight: FontWeight.w600))),
                                 DataCell(Text(item['quantity'].toString())),
@@ -885,7 +896,8 @@ class _DailyLoggingPageState extends ConsumerState<DailyLoggingPage>
                       ],
                       rows: _scannedItems
                           .map((item) => DataRow(cells: [
-                                DataCell(Text(item['medicine'],
+                                DataCell(Text(
+                                    item['medicine']?.toString() ?? '',
                                     style: const TextStyle(
                                         fontWeight: FontWeight.w600))),
                                 DataCell(Text(item['quantity'].toString())),
@@ -1055,9 +1067,7 @@ class _DailyLoggingPageState extends ConsumerState<DailyLoggingPage>
                           dropdownItems.add(currentMed);
                         }
 
-                        return DataRow(
-                            key: ObjectKey(item),
-                            cells: [
+                        return DataRow(key: ObjectKey(item), cells: [
                           DataCell(Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [

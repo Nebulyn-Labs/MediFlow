@@ -295,33 +295,42 @@ class _WastageReportPageState extends ConsumerState<WastageReportPage> {
                                 label: Text('Est. At Risk'), numeric: true),
                           ],
                           rows: _wastageData.map((data) {
+                            final expiredUnits =
+                                (data['expiredUnits'] as num?)?.toInt() ?? 0;
+                            final nearExpiryUnits =
+                                (data['nearExpiryUnits'] as num?)?.toInt() ?? 0;
+                            final lostCost =
+                                (data['lostCost'] as num?)?.toDouble() ?? 0.0;
+                            final atRiskCost =
+                                (data['atRiskCost'] as num?)?.toDouble() ?? 0.0;
+
                             return DataRow(
                               cells: [
-                                DataCell(Text(data['medicineName'].toString(),
+                                DataCell(Text(
+                                    data['medicineName']?.toString() ?? '',
                                     style: const TextStyle(
                                         fontWeight: FontWeight.w600))),
-                                DataCell(Text(data['unit'].toString())),
-                                DataCell(Text(data['expiredUnits'].toString(),
+                                DataCell(Text(data['unit']?.toString() ?? '')),
+                                DataCell(Text(expiredUnits.toString(),
                                     style: TextStyle(
-                                        color: data['expiredUnits'] > 0
+                                        color: expiredUnits > 0
                                             ? MediColors.error
                                             : null))),
-                                DataCell(Text(
-                                    data['nearExpiryUnits'].toString(),
+                                DataCell(Text(nearExpiryUnits.toString(),
                                     style: TextStyle(
-                                        color: data['nearExpiryUnits'] > 0
+                                        color: nearExpiryUnits > 0
                                             ? MediColors.warning
                                             : null))),
                                 DataCell(Text(
-                                    '\$${(data['lostCost'] as double).toStringAsFixed(2)}',
+                                    '\$${lostCost.toStringAsFixed(2)}',
                                     style: TextStyle(
-                                        color: data['lostCost'] > 0
+                                        color: lostCost > 0
                                             ? MediColors.error
                                             : null))),
                                 DataCell(Text(
-                                    '\$${(data['atRiskCost'] as double).toStringAsFixed(2)}',
+                                    '\$${atRiskCost.toStringAsFixed(2)}',
                                     style: TextStyle(
-                                        color: data['atRiskCost'] > 0
+                                        color: atRiskCost > 0
                                             ? MediColors.warning
                                             : null))),
                               ],

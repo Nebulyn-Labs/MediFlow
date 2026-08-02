@@ -20,11 +20,11 @@ class UsageLog {
   factory UsageLog.fromMap(Map<String, dynamic> map, String id) {
     return UsageLog(
       id: id,
-      facilityId: map['facilityId'] ?? '',
-      medicineName: map['medicineName'] ?? '',
-      date: (map['date'] as Timestamp).toDate(),
-      quantityUsed: map['quantityUsed']?.toInt() ?? 0,
-      patientsTreated: map['patientsTreated']?.toInt() ?? 0,
+      facilityId: map['facilityId']?.toString() ?? '',
+      medicineName: map['medicineName']?.toString() ?? '',
+      date: (map['date'] as Timestamp?)?.toDate() ?? DateTime.now(),
+      quantityUsed: (map['quantityUsed'] as num?)?.toInt() ?? 0,
+      patientsTreated: (map['patientsTreated'] as num?)?.toInt() ?? 0,
     );
   }
 
