@@ -97,10 +97,7 @@ class _AdminIndentApprovalPageState
             return const AdminIndentApprovalSkeleton();
           }
 
-          final pending = snapshot.data
-                  ?.where((r) => r.status == RequestStatus.pending)
-                  .toList() ??
-              [];
+          final pending = MedRequest.filterPending(snapshot.data ?? const []);
 
           if (pending.isEmpty) {
             return const Center(
