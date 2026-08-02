@@ -6,6 +6,7 @@ const { describe, it } = require("node:test");
 const {
   APPROVAL_REJECTION_REASONS,
   ApprovalBusinessRuleError,
+  isTransientFirestoreError,
   handleApprovalFailure,
 } = require("../helpers/approvalErrors");
 
@@ -86,6 +87,71 @@ describe("approval failure handling", () => {
     );
 
     assert.deepEqual(updates, []);
+    assert.equal(logger.warnings.length, 1);
+    assert.equal(logger.errors.length, 0);
+  });
+
+  it("flags non-retryable Firestore errors for manual review instead of retrying", async () => {
+    const updates = [];
+    const requestRef = {
+      async update(data) {
+        updates.push(data);
+      },
+    };
+    const logger = createLogger();
+
+    const permanentError = Object.assign(
+      new Error("7 PERMISSION_DENIED: Missing or insufficient permissions"),
+      { code: 7 }
+    );
+
+    await handleApprovalFailure({
+      error: permanentError,
+      requestRef,
+      logger,
+      requestId: "request-314",
+      operation: "Redistribution",
+    });
+
+    assert.deepEqual(updates, [
+      {
+        status: "approval_failed",
+        needsManualReview: true,
+      },
+    ]);
+
+    assert.equal(logger.warnings.length, 0);
+    assert.equal(logger.errors.length, 1);
+  });
+
+  it("flags errors with no gRPC code (bugs) for manual review instead of retrying", async () => {
+    const updates = [];
+    const requestRef = {
+      async update(data) {
+        updates.push(data);
+      },
+    };
+    const logger = createLogger();
+
+    // A plain bug — e.g. a TypeError from bad field access — has no .code
+    // at all. This must NOT be treated as retryable.
+    const bugError = new TypeError("Cannot read properties of undefined");
+
+    await handleApprovalFailure({
+      error: bugError,
+      requestRef,
+      logger,
+      requestId: "request-314",
+      operation: "Redistribution",
+    });
+
+    assert.deepEqual(updates, [
+      {
+        status: "approval_failed",
+        needsManualReview: true,
+      },
+    ]);
+
     assert.equal(logger.warnings.length, 0);
     assert.equal(logger.errors.length, 1);
   });
