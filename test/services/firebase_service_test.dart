@@ -7,6 +7,8 @@ import 'package:med_supply_prototype/services/firebase_service.dart';
 import 'package:mocktail/mocktail.dart';
 
 class MockFirebaseAuth extends Mock implements FirebaseAuth {}
+class MockUserCredential extends Mock implements UserCredential {}
+class MockUser extends Mock implements User {}
 
 // Helper: write a medicine document into inventory/{facilityId}/medicines/{medId}
 Future<void> _addMedicine(
@@ -228,6 +230,132 @@ void main() {
       expect(result.medicines, isEmpty);
       expect(result.hasMore, isFalse);
       expect(result.lastDocument, isNull);
+    });
+  });
+
+  group('FirebaseService - signUpFacility', () {
+    late FakeFirebaseFirestore fakeFirestore;
+    late MockFirebaseAuth mockAuth;
+    late FirebaseService firebaseService;
+    late MockUserCredential mockCredential;
+    late MockUser mockUser;
+
+    setUp(() {
+      fakeFirestore = FakeFirebaseFirestore();
+      mockAuth = MockFirebaseAuth();
+      firebaseService = FirebaseService(fakeFirestore, mockAuth);
+      mockCredential = MockUserCredential();
+      mockUser = MockUser();
+    });
+
+    test('writes role document using UID returned from credential on creation', () async {
+      const email = 'newfacility@mediflow.com';
+      const password = 'password123';
+      const uid = 'new_facility_uid';
+
+      // Simulate ambient user (e.g. logged in admin)
+      final mockAmbientUser = MockUser();
+      when(() => mockAmbientUser.uid).thenReturn('admin_uid');
+      when(() => mockAuth.currentUser).thenReturn(mockAmbientUser);
+
+      // Seed admin user document
+      await fakeFirestore.collection('users').doc('admin_uid').set({
+        'email': 'admin@mediflow.com',
+        'role': 'admin',
+      });
+
+      when(() => mockAuth.createUserWithEmailAndPassword(
+            email: email,
+            password: password,
+          )).thenAnswer((_) async => mockCredential);
+      when(() => mockCredential.user).thenReturn(mockUser);
+      when(() => mockUser.uid).thenReturn(uid);
+
+      await firebaseService.signUpFacility(
+        name: 'New Facility',
+        email: email,
+        password: password,
+      );
+
+      // Verify role document written for new UID
+      final newDoc = await fakeFirestore.collection('users').doc(uid).get();
+      expect(newDoc.exists, isTrue);
+      expect(newDoc.data()?['email'], email);
+      expect(newDoc.data()?['role'], 'facility_head');
+
+      // Verify admin document was NOT overwritten
+      final adminDoc = await fakeFirestore.collection('users').doc('admin_uid').get();
+      expect(adminDoc.data()?['role'], 'admin');
+    });
+
+    test('falls back to signInWithEmailAndPassword if createUser fails', () async {
+      const email = 'existing@mediflow.com';
+      const password = 'password123';
+      const fallbackUid = 'fallback_uid';
+
+      when(() => mockAuth.createUserWithEmailAndPassword(
+            email: email,
+            password: password,
+          )).thenThrow(FirebaseAuthException(code: 'email-already-in-use'));
+
+      when(() => mockAuth.signInWithEmailAndPassword(
+            email: email,
+            password: password,
+          )).thenAnswer((_) async => mockCredential);
+      when(() => mockCredential.user).thenReturn(mockUser);
+      when(() => mockUser.uid).thenReturn(fallbackUid);
+
+      await firebaseService.signUpFacility(
+        name: 'Existing Facility',
+        email: email,
+        password: password,
+      );
+
+      final userDoc = await fakeFirestore.collection('users').doc(fallbackUid).get();
+      expect(userDoc.exists, isTrue);
+      expect(userDoc.data()?['role'], 'facility_head');
+    });
+
+    test('throws exception and writes no user document when both auth attempts fail', () async {
+      const email = 'failed@mediflow.com';
+      const password = 'password123';
+
+      // Simulate ambient user
+      final mockAmbientUser = MockUser();
+      when(() => mockAmbientUser.uid).thenReturn('ambient_uid');
+      when(() => mockAuth.currentUser).thenReturn(mockAmbientUser);
+
+      await fakeFirestore.collection('users').doc('ambient_uid').set({
+        'email': 'ambient@mediflow.com',
+        'role': 'admin',
+      });
+
+      when(() => mockAuth.createUserWithEmailAndPassword(
+            email: email,
+            password: password,
+          )).thenThrow(FirebaseAuthException(code: 'error_1'));
+
+      when(() => mockAuth.signInWithEmailAndPassword(
+            email: email,
+            password: password,
+          )).thenThrow(FirebaseAuthException(code: 'error_2'));
+
+      expect(
+        () => firebaseService.signUpFacility(
+          name: 'Failed Facility',
+          email: email,
+          password: password,
+        ),
+        throwsA(isA<FirebaseAuthException>()),
+      );
+
+      // Verify ambient user document remains untouched
+      final ambientDoc = await fakeFirestore.collection('users').doc('ambient_uid').get();
+      expect(ambientDoc.data()?['role'], 'admin');
+
+      // Verify no other user document was created
+      final usersSnapshot = await fakeFirestore.collection('users').get();
+      expect(usersSnapshot.docs.length, 1);
     });
   });
 }
