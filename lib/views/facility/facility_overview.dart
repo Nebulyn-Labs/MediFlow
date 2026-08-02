@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -96,26 +97,80 @@ class FacilityOverview extends ConsumerWidget {
                               style: const TextStyle(
                                   fontSize: 11, color: MediColors.textMuted)),
                           trailing: TextButton(
-                            onPressed: () async {
-                              try {
-                                await ref.read(firebaseServiceProvider).restock(
-                                    facilityId, item.medicineName, 500);
-                                if (context.mounted) {
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                      SnackBar(
-                                          content: Text(
-                                              'Restocked 500 units of ${item.medicineName}')));
-                                }
-                              } catch (e) {
-                                if (context.mounted) {
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                      SnackBar(
-                                          content: Text(
-                                              'Failed to restock: Inventory record not found for ${item.medicineName}'),
-                                          backgroundColor: MediColors.error));
-                                }
-                              }
-                            },
+                         onPressed: () async {
+  final controller = TextEditingController();
+
+  final quantity = await showDialog<int>(
+    context: context,
+    builder: (dialogContext) {
+      return AlertDialog(
+        title: const Text('Restock Medicine'),
+        content: TextField(
+          controller: controller,
+          keyboardType: TextInputType.number,
+          inputFormatters: [
+            FilteringTextInputFormatter.digitsOnly,
+          ],
+          decoration: const InputDecoration(
+            labelText: 'Quantity',
+            hintText: 'Enter quantity',
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              final value = int.tryParse(controller.text);
+
+              if (value == null || value <= 0) {
+                return;
+              }
+
+              Navigator.pop(dialogContext, value);
+            },
+            child: const Text('Restock'),
+          ),
+        ],
+      );
+    },
+  );
+
+  if (quantity == null) {
+    return;
+  }
+
+  try {
+    await ref.read(firebaseServiceProvider).restock(
+      facilityId,
+      item.medicineName,
+      quantity,
+    );
+
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Restocked $quantity units of ${item.medicineName}',
+          ),
+        ),
+      );
+    }
+  } catch (e) {
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Failed to restock: Inventory record not found for ${item.medicineName}',
+          ),
+          backgroundColor: MediColors.error,
+        ),
+      );
+    }
+  }
+},
                             child: const Text('Restock',
                                 style: TextStyle(
                                     fontSize: 11,
