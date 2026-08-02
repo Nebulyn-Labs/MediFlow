@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -25,12 +26,20 @@ class _AdminOverviewState extends ConsumerState<AdminOverview> {
 
   int _openShortageRequests = 0;
   int _surplusOffers = 0;
-  int _pendingIndents = 0;
+  int _pendingApprovals = 0;
 
   bool _isInitialLoading = true;
   String? _errorMessage;
   List<String> _failedFacilities = [];
   StreamSubscription? _requestsSub;
+
+  // ---- medicines pagination state (Issue #209) ----
+  List<InventoryItem> _allMedicines = [];
+  bool _medicinesLoading = false;
+  bool _medicinesHasMore = true;
+  DocumentSnapshot? _medicinesLastDoc;
+  String? _medicinesError;
+  int _medicinesRequestId = 0;
 
   // ---- search state (Sprint 3) ----
   String _searchQuery = '';
@@ -65,11 +74,21 @@ class _AdminOverviewState extends ConsumerState<AdminOverview> {
     if (!mounted) return;
     await _requestsSub?.cancel();
 
+    // Reset medicines pagination on full refresh
     if (mounted) {
       setState(() {
         _errorMessage = null;
+        _allMedicines = [];
+        _medicinesLastDoc = null;
+        _medicinesHasMore = true;
+        _medicinesError = null;
+        _medicinesRequestId++;
+        _medicinesLoading = false;
       });
     }
+
+    // Load the first page of medicines (non-blocking alongside facility load)
+    unawaited(_loadMedicinePage());
 
     List<Facility> facs = [];
     try {
@@ -131,18 +150,21 @@ class _AdminOverviewState extends ConsumerState<AdminOverview> {
         if (!mounted) return;
         int shortage = 0;
         int surplus = 0;
-        int pending = 0;
         for (var r in reqs) {
           if (r.status == RequestStatus.pending) {
             if (r.type == RequestType.shortage) shortage++;
             if (r.type == RequestType.surplus) surplus++;
-            if (r.type == RequestType.regularIndent) pending++;
           }
         }
+        // The "Pending Approvals" KPI mirrors the /admin/approvals page,
+        // which lists every pending request regardless of type. Using
+        // MedRequest.countPending keeps the card and the page in lockstep
+        // (#334).
+        final pending = MedRequest.countPending(reqs);
         setState(() {
           _openShortageRequests = shortage;
           _surplusOffers = surplus;
-          _pendingIndents = pending;
+          _pendingApprovals = pending;
         });
       },
       onError: (e) {
@@ -162,15 +184,61 @@ class _AdminOverviewState extends ConsumerState<AdminOverview> {
     }
   }
 
-  String _getStockStatus(InventoryItem item) {
-    final daysToExpiry = item.expiryDate.difference(DateTime.now()).inDays;
-    if (daysToExpiry <= 90) return 'Expiring Soon';
+  /// Loads the next page of medicines from Firestore using cursor-based
+  /// pagination, appending results to [_allMedicines]. Mirrors the
+  /// getPaginatedLogs pattern used elsewhere in the app.
+  Future<void> _loadMedicinePage() async {
+    if (_medicinesLoading || !_medicinesHasMore) return;
 
-    if (item.initialQuantity == 0) return 'Healthy';
-    if (item.isLowStock) return 'Low Stock';
-    final ratio = item.remainingQuantity / item.initialQuantity;
-    if (ratio > 0.8) return 'Surplus';
-    return 'Healthy';
+    final requestId = ++_medicinesRequestId;
+    if (mounted) setState(() => _medicinesLoading = true);
+
+    try {
+      final result = await ref
+          .read(firebaseServiceProvider)
+          .getPaginatedMedicines(startAfter: _medicinesLastDoc);
+
+      if (!mounted || requestId != _medicinesRequestId) {
+        return;
+      }
+
+      setState(() {
+        _allMedicines.addAll(result.medicines);
+        _medicinesLastDoc = result.lastDocument;
+        _medicinesHasMore = result.hasMore;
+        _medicinesLoading = false;
+        _medicinesError = null;
+      });
+    } catch (e) {
+      if (!mounted || requestId != _medicinesRequestId) {
+        return;
+      }
+
+      setState(() {
+        _medicinesLoading = false;
+        _medicinesError = 'Unable to load medicine inventory';
+      });
+    }
+  }
+
+  // ---- status + filtering logic (Sprint 5) ----
+  String _getStockStatus(InventoryItem item) {
+    switch (item.status) {
+      case ItemStatus.expired:
+        return 'Expired';
+      case ItemStatus.lowStock:
+        return 'Low Stock';
+      case ItemStatus.wastageRisk:
+        return 'Wastage Risk';
+      case ItemStatus.expiringSoon:
+        return 'Expiring Soon';
+      case ItemStatus.healthy:
+        if (item.initialQuantity > 0 &&
+            (item.remainingQuantity / item.initialQuantity) > 0.8) {
+          return 'Surplus';
+        }
+        return 'Healthy';
+    }
   }
 
   List<InventoryItem> _applyFilters(List<InventoryItem> items) {
@@ -183,100 +251,131 @@ class _AdminOverviewState extends ConsumerState<AdminOverview> {
     }).toList();
   }
 
-  // ---- medicine list widget (Sprint 6, overflow-fixed in 9c) ----
+  // ---- medicine list widget (paginated, Issue #209) ----
   Widget _buildMedicineList() {
-    return StreamBuilder<List<InventoryItem>>(
-      stream: ref.read(firebaseServiceProvider).streamAllMedicines(),
-      builder: (context, snapshot) {
-        if (snapshot.hasError) {
-          return Container(
+    final filtered = _applyFilters(_allMedicines);
+
+    if (_medicinesLoading && _allMedicines.isEmpty) {
+      return const Column(
+        children: [
+          SkeletonTableRow(),
+          SkeletonTableRow(),
+          SkeletonTableRow(),
+        ],
+      );
+    }
+
+    if (_medicinesError != null && _allMedicines.isEmpty) {
+      return Column(
+        children: [
+          Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: MediColors.surface,
+              color: MediColors.error.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(8),
-              border:
-                  Border.all(color: MediColors.error.withValues(alpha: 0.3)),
+              border: Border.all(color: MediColors.error),
             ),
-            child: const Row(
+            child: Column(
               children: [
-                Icon(Icons.error_outline_rounded,
-                    color: MediColors.error, size: 20),
-                SizedBox(width: 12),
-                Expanded(
-                  child: Text(
-                    'Unable to load medicine inventory.',
-                    style: TextStyle(color: MediColors.error, fontSize: 13),
-                  ),
+                Icon(Icons.error_outline, color: MediColors.error),
+                const SizedBox(height: 8),
+                Text(
+                  _medicinesError!,
+                  style: TextStyle(color: MediColors.error),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 8),
+                ElevatedButton(
+                  onPressed: () {
+                    setState(() {
+                      _medicinesError = null;
+                    });
+                    _loadMedicinePage();
+                  },
+                  child: const Text('Retry'),
                 ),
               ],
             ),
-          );
-        }
-        if (!snapshot.hasData) {
-          return const Column(
-            children: [
-              SkeletonTableRow(),
-              SkeletonTableRow(),
-              SkeletonTableRow(),
-            ],
-          );
-        }
+          ),
+        ],
+      );
+    }
 
-        final filtered = _applyFilters(snapshot.data!);
-
-        if (filtered.isEmpty) {
-          return const Padding(
+    return Column(
+      children: [
+        if (filtered.isEmpty && !_medicinesLoading)
+          const Padding(
             padding: EdgeInsets.symmetric(vertical: 24),
-            child: Text('No medicines match your search or filter.',
+            // Note: Intentional scalability trade-off - filtering only searches
+            // currently loaded pages to avoid excessive reads or complex
+            // composite indexes on the large global medicines collection.
+            child: Text(
+                'No medicines match in currently loaded data. Load more to continue searching.',
+                textAlign: TextAlign.center,
                 style: TextStyle(color: MediColors.textSecondary)),
-          );
-        }
-
-        return ListView.builder(
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          itemCount: filtered.length,
-          itemBuilder: (context, index) {
-            final item = filtered[index];
-            final status = _getStockStatus(item);
-            return Container(
-              margin: const EdgeInsets.only(bottom: 8),
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: MediColors.surface,
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: MediColors.border),
-              ),
-              child: Row(
-                children: [
-                  Expanded(
-                    flex: 2,
-                    child: Text(item.medicineName,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                            fontWeight: FontWeight.w700,
-                            color: MediColors.textPrimary)),
+          )
+        else
+          ListView.builder(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            itemCount: filtered.length,
+            itemBuilder: (context, index) {
+              final item = filtered[index];
+              final status = _getStockStatus(item);
+              return Container(
+                margin: const EdgeInsets.only(bottom: 8),
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: MediColors.surface,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: MediColors.border),
+                ),
+                child: Row(
+                  children: [
+                    Expanded(
+                      flex: 2,
+                      child: Text(item.medicineName,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                              fontWeight: FontWeight.w700,
+                              color: MediColors.textPrimary)),
+                    ),
+                    Expanded(
+                      child: Text(
+                          '${item.remainingQuantity}/${item.initialQuantity} ${item.unit}',
+                          overflow: TextOverflow.ellipsis,
+                          style:
+                              const TextStyle(color: MediColors.textSecondary)),
+                    ),
+                    Flexible(
+                      child: Text(status,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                              fontWeight: FontWeight.w700,
+                              color: MediColors.info)),
+                    ),
+                  ],
+                ),
+              );
+            },
+          ),
+        if (_medicinesHasMore)
+          Padding(
+            padding: const EdgeInsets.only(top: 8),
+            child: _medicinesLoading
+                ? const Center(
+                    child: Padding(
+                      padding: EdgeInsets.all(12),
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    ),
+                  )
+                : TextButton.icon(
+                    onPressed: _loadMedicinePage,
+                    icon: const Icon(Icons.expand_more_rounded, size: 18),
+                    label: const Text('Load more'),
                   ),
-                  Expanded(
-                    child: Text(
-                        '${item.remainingQuantity}/${item.initialQuantity} ${item.unit}',
-                        overflow: TextOverflow.ellipsis,
-                        style:
-                            const TextStyle(color: MediColors.textSecondary)),
-                  ),
-                  Flexible(
-                    child: Text(status,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                            fontWeight: FontWeight.w700,
-                            color: MediColors.info)),
-                  ),
-                ],
-              ),
-            );
-          },
-        );
-      },
+          ),
+      ],
     );
   }
 
@@ -383,8 +482,8 @@ class _AdminOverviewState extends ConsumerState<AdminOverview> {
                                 '$_surplusOffers', Icons.swap_horiz_rounded,
                                 isAlert: false, iconColor: MediColors.warning),
                             _buildKpiCard(
-                                'PENDING INDENT APPROVALS',
-                                '$_pendingIndents',
+                                'PENDING APPROVALS',
+                                '$_pendingApprovals',
                                 Icons.assignment_turned_in_rounded,
                                 iconColor: MediColors.info,
                                 onTap: () => context.go('/admin/approvals')),

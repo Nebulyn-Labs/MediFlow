@@ -9,7 +9,8 @@ const { BigQuery } = require("@google-cloud/bigquery");
 const { checkRateLimit, LIMITS } = require("./helpers/rateLimiter");
 const { createBigQueryRecovery } = require("./helpers/bigQueryRecovery");
 const { createLowStockService } = require("./helpers/lowStock");
-const { handleCspReport } = require("./helpers/cspReport");
+const { handleCspReport, getClientIp } = require("./helpers/cspReport");
+const { isValidQuantity } = require("./helpers/quantityValidation");
 
 admin.initializeApp();
 
@@ -472,7 +473,9 @@ exports.mirrorInventoryToBigQuery = onDocumentWritten("inventory/{facilityId}/me
   const action = !before && after ? "created" : before && after ? "updated" : "deleted";
 
   const db = admin.firestore();
-  await lowStockService.syncAlertForMedicine(db, facilityId, medicineId, after);
+  await lowStockService.syncAlertForMedicine(db, facilityId, medicineId, after, null, async (token, notification) => {
+    await admin.messaging().send({ token, notification });
+  });
 
   await insertBigQuery("inventory_snapshots", {
     snapshot_id: `${facilityId}_${medicineId}_${Date.now()}`,
@@ -592,8 +595,20 @@ exports.onIndentApproved = onDocumentUpdated("requests/{requestId}", async (even
       type,
     } = afterData;
 
-    const qty = Number(quantity || 0);
-    if (!medicineName || qty <= 0) return;
+    if (!medicineName) return;
+
+    if (!isValidQuantity(quantity)) {
+      logger.error(
+        `Invalid quantity for request ${requestId}: ${quantity}. Quantity must be a finite positive number.`
+      );
+      await event.data.after.ref.update({
+        status: "rejected",
+        rejectionReason: `Invalid quantity: ${quantity}. Quantity must be a finite positive number.`,
+      });
+      return;
+    }
+
+    const qty = Number(quantity);
 
     const sourceFacility = fromFacilityId || donorFacilityId || null;
     const destFacility = toFacilityId || recipientFacilityId || null;
@@ -747,17 +762,23 @@ async function executeTool(name, args, authInfo) {
     if (!authInfo.isAdmin && facilityId !== authInfo.userFacilityId) {
       throw new Error(`Unauthorized: Cannot request for facility ${facilityId}`);
     }
+    if (!isValidQuantity(quantity)) {
+      throw new Error(
+        `Invalid quantity: ${quantity}. Quantity must be a finite positive number.`
+      );
+    }
+    const qty = Number(quantity);
     const type = name === "report_shortage" ? "shortage" : "surplus";
     await db.collection("requests").add({
       facilityId: facilityId,
       medicineName: medicineName,
       type: type,
-      quantity: Number(quantity),
+      quantity: qty,
       requestDate: admin.firestore.Timestamp.now(),
       status: "pending",
       notes: `AI generated ${type} report via Cloud Function`,
     });
-    return { status: "success", details: `${type} reported for ${quantity} of ${medicineName}` };
+    return { status: "success", details: `${type} reported for ${qty} of ${medicineName}` };
   } else if (name === "check_system_inventory") {
     if (!authInfo.isAdmin) {
       const facilityDoc = await db.collection("facilities").doc(authInfo.userFacilityId).get();
@@ -805,16 +826,47 @@ async function executeTool(name, args, authInfo) {
  * Explicit audit hook for password reset requests.
  */
 exports.logPasswordResetRequest = onCall(async (request) => {
-  const { email } = request.data;
-  if (!email) throw new HttpsError("invalid-argument", "Email is required");
+  let { email, status } = request.data;
+  
+  if (!email || typeof email !== "string") {
+    throw new HttpsError("invalid-argument", "Email is required and must be a string");
+  }
+
+  email = email.trim().toLowerCase();
+
+  if (email.length > 254 || Buffer.byteLength(email, "utf8") > 1500) {
+    throw new HttpsError("invalid-argument", "Invalid email format");
+  }
+  if (!/^[^\s@/]+@[^\s@/]+\.[^\s@/]+$/.test(email)) {
+    throw new HttpsError("invalid-argument", "Invalid email format");
+  }
+
+  const clientIp = getClientIp(request.rawRequest);
+  if (!clientIp || clientIp === "unknown") {
+    throw new HttpsError("unauthenticated", "Unable to determine client IP");
+  }
 
   await checkRateLimit(
+    clientIp,
+    "logPasswordResetRequest_ip",
+    LIMITS.PASSWORD_RESET_IP
+  );
+  await checkRateLimit(
     email,
-    "logPasswordResetRequest",
-    LIMITS.GENERAL
+    "logPasswordResetRequest_email",
+    LIMITS.PASSWORD_RESET_EMAIL
   );
 
   const eventId = `pwd_reset_${Date.now()}`;
+  
+  let requestStatus = "success";
+  let resourceId = email;
+  try {
+    const userRecord = await admin.auth().getUserByEmail(email);
+    resourceId = userRecord.uid;
+  } catch (e) {
+    requestStatus = "failure";
+  }
 
   // Log to admin dashboard via audit_logs
   const db = admin.firestore();
@@ -823,18 +875,18 @@ exports.logPasswordResetRequest = onCall(async (request) => {
     timestamp: admin.firestore.FieldValue.serverTimestamp(),
     action: "password_reset_requested",
     resourceType: "user",
-    resourceId: email,
-    metadata: { email },
-    status: "success"
+    resourceId: resourceId,
+    metadata: { email, ip: clientIp },
+    status: requestStatus
   });
 
   await auditEvent({
     eventId,
     action: "password_reset_requested",
     entityType: "user",
-    entityId: email,
+    entityId: resourceId,
     actorId: "system",
-    metadata: { email }
+    metadata: { email, status: requestStatus, ip: clientIp }
   });
 
   return { ok: true };

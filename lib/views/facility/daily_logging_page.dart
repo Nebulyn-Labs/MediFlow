@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
@@ -8,7 +9,9 @@ import '../../models/daily_usage_log.dart';
 import '../../services/firebase_service.dart';
 import '../../services/csv_export_service.dart';
 import '../../services/ai_service.dart';
+import '../../services/connectivity_service.dart';
 import 'package:med_supply_prototype/constants/colors.dart';
+import '../shared/connectivity_indicator.dart';
 import '../shared/skeleton_loaders.dart';
 import '../../utils/retry_snackbar.dart';
 
@@ -103,6 +106,30 @@ class _DailyLoggingPageState extends ConsumerState<DailyLoggingPage>
     super.dispose();
   }
 
+  /// Guards network-dependent actions.
+  ///
+  /// Buttons are already disabled while offline, but connectivity can drop
+  /// between the tap and the request, so callers check here too and abort with
+  /// an explanation instead of failing with a raw error.
+  bool _ensureOnline() {
+    if (ref.read(isOnlineProvider)) return true;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text(
+            'You are offline. This action needs an internet connection — try '
+            'again once you reconnect.'),
+        backgroundColor: MediColors.warning,
+      ),
+    );
+    return false;
+  }
+
+  /// Reloads whatever failed to load while the device was offline.
+  void _handleReconnect() {
+    if (_inventoryError != null) _fetchInventory();
+    if (_historyError != null) _fetchHistoryFirstPage();
+  }
+
   Future<void> _fetchInventory() async {
     setState(() {
       _isLoadingInventory = true;
@@ -162,6 +189,7 @@ class _DailyLoggingPageState extends ConsumerState<DailyLoggingPage>
 
   Future<void> _fetchMoreHistory() async {
     if (!_historyHasMore || _isLoadingMoreHistory) return;
+    if (!_ensureOnline()) return;
     setState(() => _isLoadingMoreHistory = true);
     try {
       final result = await ref.read(firebaseServiceProvider).getPaginatedLogs(
@@ -188,6 +216,7 @@ class _DailyLoggingPageState extends ConsumerState<DailyLoggingPage>
 
   Future<void> _submitLog() async {
     if (!_formKey.currentState!.validate() || _medName == null) return;
+    if (!_ensureOnline()) return;
     _formKey.currentState!.save();
     setState(() => _isSubmitting = true);
     try {
@@ -202,7 +231,7 @@ class _DailyLoggingPageState extends ConsumerState<DailyLoggingPage>
             .showSnackBar(const SnackBar(content: Text('Log saved ✓')));
         _formKey.currentState!.reset();
         // Keep the History tab fresh with the newly saved log.
-        _fetchHistoryFirstPage();
+        unawaited(_fetchHistoryFirstPage());
       }
     } catch (e) {
       if (mounted) {
@@ -215,6 +244,7 @@ class _DailyLoggingPageState extends ConsumerState<DailyLoggingPage>
   }
 
   Future<void> _exportUsageLogsCsv() async {
+    if (!_ensureOnline()) return;
     setState(() => _isExportingCsv = true);
     try {
       final firebase = ref.read(firebaseServiceProvider);
@@ -249,6 +279,9 @@ class _DailyLoggingPageState extends ConsumerState<DailyLoggingPage>
         allowedExtensions: ['csv', 'txt'],
         withData: true,
       );
+      // The picker can stay open as long as the user likes, so guard the
+      // post-await setState to avoid calling it after the page is disposed.
+      if (!mounted) return;
       if (result == null || result.files.isEmpty) return;
       final file = result.files.first;
       final bytes = file.bytes;
@@ -290,29 +323,43 @@ class _DailyLoggingPageState extends ConsumerState<DailyLoggingPage>
 
   Future<void> _submitCSVLogs() async {
     if (_csvItems.isEmpty) return;
+    if (!_ensureOnline()) return;
     setState(() => _isSubmittingCsv = true);
     try {
+      final List<Map<String, dynamic>> successful = [];
+      final List<Map<String, dynamic>> failed = [];
       for (var item in _csvItems) {
-        await ref.read(firebaseServiceProvider).logUsage(
-            facilityId: widget.facilityId,
-            date: _selectedDate,
-            medicineName: item['medicine'],
-            quantity: item['quantity'],
-            patients: item['patients']);
+        try {
+          await ref.read(firebaseServiceProvider).logUsage(
+              facilityId: widget.facilityId,
+              date: _selectedDate,
+              medicineName: item['medicine']?.toString() ?? '',
+              quantity: (item['quantity'] as num?)?.toInt() ?? 0,
+              patients: (item['patients'] as num?)?.toInt() ?? 0);
+          successful.add(item);
+        } catch (e) {
+          final failedItem = Map<String, dynamic>.from(item);
+          failedItem['error'] = e.toString();
+          failed.add(failedItem);
+        }
       }
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('${_csvItems.length} logs saved ✓')));
+        final successCount = successful.length;
+        final failCount = failed.length;
+        if (failCount == 0) {
+          ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text('$successCount logs saved ✓')));
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+              content: Text('Saved $successCount logs, $failCount failed.')));
+        }
         setState(() {
-          _csvItems.clear();
-          _csvStatus = null;
+          _csvItems = failed;
+          _csvStatus = failCount == 0
+              ? null
+              : 'Partial success: $successCount saved, $failCount failed.';
         });
-        _fetchHistoryFirstPage();
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text('Error: $e')));
+        unawaited(_fetchHistoryFirstPage());
       }
     } finally {
       if (mounted) setState(() => _isSubmittingCsv = false);
@@ -322,6 +369,9 @@ class _DailyLoggingPageState extends ConsumerState<DailyLoggingPage>
   Future<void> _simulateQRScan() async {
     setState(() => _isScanning = true);
     await Future.delayed(const Duration(seconds: 2));
+    // The simulated scan takes long enough that the user can navigate away.
+    // Bail out before setState if the page was disposed in the meantime.
+    if (!mounted) return;
     if (_availableMedicines.isNotEmpty) {
       final med = _availableMedicines[
           DateTime.now().second % _availableMedicines.length];
@@ -338,21 +388,22 @@ class _DailyLoggingPageState extends ConsumerState<DailyLoggingPage>
 
   Future<void> _submitScannedLogs() async {
     if (_scannedItems.isEmpty) return;
+    if (!_ensureOnline()) return;
     setState(() => _isSubmittingQr = true);
     try {
       for (var item in _scannedItems) {
         await ref.read(firebaseServiceProvider).logUsage(
             facilityId: widget.facilityId,
             date: _selectedDate,
-            medicineName: item['medicine'],
-            quantity: item['quantity'],
-            patients: item['patients']);
+            medicineName: item['medicine']?.toString() ?? '',
+            quantity: (item['quantity'] as num?)?.toInt() ?? 0,
+            patients: (item['patients'] as num?)?.toInt() ?? 0);
       }
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(content: Text('${_scannedItems.length} logs saved ✓')));
         setState(() => _scannedItems.clear());
-        _fetchHistoryFirstPage();
+        unawaited(_fetchHistoryFirstPage());
       }
     } catch (e) {
       if (mounted) {
@@ -365,23 +416,36 @@ class _DailyLoggingPageState extends ConsumerState<DailyLoggingPage>
   }
 
   Future<void> _parseImage() async {
+    if (!_ensureOnline()) return;
     try {
       final result = await FilePicker.pickFiles(
         type: FileType.image,
         withData: true,
       );
+      // The file picker can stay open as long as the user likes, so guard the
+      // post-await setState to avoid calling it after the page is disposed.
+      if (!mounted) return;
       if (result == null || result.files.isEmpty) return;
-      final bytes = result.files.first.bytes;
+      final file = result.files.first;
+      final bytes = file.bytes;
       if (bytes == null) return;
+      final aiService = ref.read(aiServiceProvider);
+      final imageMimeType = aiService.imageMimeTypeForPickedFile(
+        imageBytes: bytes,
+        fileName: file.name,
+        extension: file.extension,
+      );
       setState(() {
         _isParsingImage = true;
         _imageParseResult = null;
         _imageParseError = null;
         _imageItems.clear();
       });
-      final parsed = await ref.read(aiServiceProvider).parseImageWithVision(
-          bytes,
-          'Extract all medicine names, quantities, and patient counts from this image. Output JSON: [{"medicine": "string", "quantity": int, "patients": int}]');
+      final parsed = await aiService.parseImageWithVision(
+        bytes,
+        'Extract all medicine names, quantities, and patient counts from this image. Output JSON: [{"medicine": "string", "quantity": int, "patients": int}]',
+        imageMimeType: imageMimeType,
+      );
       if (mounted) {
         final extractedItems = parseVisionJson(parsed);
         setState(() {
@@ -415,6 +479,7 @@ class _DailyLoggingPageState extends ConsumerState<DailyLoggingPage>
 
   Future<void> _submitImageLogs() async {
     if (_imageItems.isEmpty) return;
+    if (!_ensureOnline()) return;
 
     final invalidItems = _imageItems.where((item) {
       final med = item['medicine']?.toString() ?? '';
@@ -444,9 +509,9 @@ class _DailyLoggingPageState extends ConsumerState<DailyLoggingPage>
         await ref.read(firebaseServiceProvider).logUsage(
             facilityId: widget.facilityId,
             date: _selectedDate,
-            medicineName: item['medicine'],
-            quantity: item['quantity'],
-            patients: item['patients']);
+            medicineName: item['medicine']?.toString() ?? '',
+            quantity: (item['quantity'] as num?)?.toInt() ?? 0,
+            patients: (item['patients'] as num?)?.toInt() ?? 0);
       }
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -455,7 +520,7 @@ class _DailyLoggingPageState extends ConsumerState<DailyLoggingPage>
           _imageItems.clear();
           _imageParseResult = null;
         });
-        _fetchHistoryFirstPage();
+        unawaited(_fetchHistoryFirstPage());
       }
     } catch (e) {
       if (mounted) {
@@ -469,20 +534,34 @@ class _DailyLoggingPageState extends ConsumerState<DailyLoggingPage>
 
   @override
   Widget build(BuildContext context) {
+    // Recover automatically once the connection comes back, so the user does
+    // not have to leave and re-enter the screen.
+    ref.listen<AsyncValue<bool>>(connectivityStatusProvider, (previous, next) {
+      if (previous?.value == false && next.value == true) {
+        _handleReconnect();
+      }
+    });
+    final isOnline = ref.watch(isOnlineProvider);
+
     return Scaffold(
       backgroundColor: MediColors.bg,
       appBar: AppBar(
         title: const Text('Daily Logging'),
         actions: [
+          const ConnectivityIndicator(),
+          const SizedBox(width: 8),
           IconButton(
-            tooltip: 'Export usage logs (CSV)',
+            tooltip: isOnline
+                ? 'Export usage logs (CSV)'
+                : 'Export unavailable while offline',
             icon: _isExportingCsv
                 ? const SizedBox(
                     width: 20,
                     height: 20,
                     child: CircularProgressIndicator(strokeWidth: 2))
                 : const Icon(Icons.file_download_outlined),
-            onPressed: _isExportingCsv ? null : _exportUsageLogsCsv,
+            onPressed:
+                (_isExportingCsv || !isOnline) ? null : _exportUsageLogsCsv,
           ),
           const SizedBox(width: 8),
         ],
@@ -498,20 +577,27 @@ class _DailyLoggingPageState extends ConsumerState<DailyLoggingPage>
           ],
         ),
       ),
-      body: TabBarView(
-        controller: _tabController,
+      body: Column(
         children: [
-          _buildManualTab(),
-          _buildCsvTab(),
-          _buildQrTab(),
-          _buildImageTab(),
-          _buildHistoryTab(),
+          const OfflineBanner(),
+          Expanded(
+            child: TabBarView(
+              controller: _tabController,
+              children: [
+                _buildManualTab(isOnline),
+                _buildCsvTab(isOnline),
+                _buildQrTab(isOnline),
+                _buildImageTab(isOnline),
+                _buildHistoryTab(isOnline),
+              ],
+            ),
+          ),
         ],
       ),
     );
   }
 
-  Widget _buildManualTab() {
+  Widget _buildManualTab(bool isOnline) {
     return Center(
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 480),
@@ -539,27 +625,33 @@ class _DailyLoggingPageState extends ConsumerState<DailyLoggingPage>
                     style:
                         TextStyle(color: MediColors.textMuted, fontSize: 13)),
                 const SizedBox(height: 28),
-                ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  title: const Text('Date',
-                      style: TextStyle(
-                          color: MediColors.textSecondary, fontSize: 13)),
-                  subtitle: Text(
-                      '${_selectedDate.day}/${_selectedDate.month}/${_selectedDate.year}',
-                      style: const TextStyle(
-                          color: MediColors.textPrimary,
-                          fontSize: 16,
-                          fontWeight: FontWeight.w600)),
-                  trailing: const Icon(Icons.calendar_today_rounded,
-                      color: MediColors.textMuted),
-                  onTap: () async {
-                    final date = await showDatePicker(
-                        context: context,
-                        initialDate: _selectedDate,
-                        firstDate: DateTime(2020),
-                        lastDate: DateTime.now());
-                    if (date != null) setState(() => _selectedDate = date);
-                  },
+                // The surrounding Container paints its own background, which
+                // would swallow the tile's ink splash without a Material of
+                // its own.
+                Material(
+                  type: MaterialType.transparency,
+                  child: ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    title: const Text('Date',
+                        style: TextStyle(
+                            color: MediColors.textSecondary, fontSize: 13)),
+                    subtitle: Text(
+                        '${_selectedDate.day}/${_selectedDate.month}/${_selectedDate.year}',
+                        style: const TextStyle(
+                            color: MediColors.textPrimary,
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600)),
+                    trailing: const Icon(Icons.calendar_today_rounded,
+                        color: MediColors.textMuted),
+                    onTap: () async {
+                      final date = await showDatePicker(
+                          context: context,
+                          initialDate: _selectedDate,
+                          firstDate: DateTime(2020),
+                          lastDate: DateTime.now());
+                      if (date != null) setState(() => _selectedDate = date);
+                    },
+                  ),
                 ),
                 const SizedBox(height: 16),
                 if (_isLoadingInventory)
@@ -633,16 +725,24 @@ class _DailyLoggingPageState extends ConsumerState<DailyLoggingPage>
                     width: double.infinity,
                     height: 50,
                     child: FilledButton(
-                        onPressed:
-                            (_isSubmitting || _availableMedicines.isEmpty)
-                                ? null
-                                : _submitLog,
+                        onPressed: (_isSubmitting ||
+                                _availableMedicines.isEmpty ||
+                                !isOnline)
+                            ? null
+                            : _submitLog,
                         child: _isSubmitting
                             ? const SizedBox(
                                 width: 20,
                                 height: 20,
                                 child: CircularProgressIndicator(
                                     color: Colors.white, strokeWidth: 2))
+                            : Text(
+                                isOnline ? 'Save Log' : 'Save Log (offline)'))),
+              ],
+            ),
+          ),
+        ),
+      ),
                             : const Text('Save Log'))),
              ],
             ),
@@ -653,7 +753,7 @@ class _DailyLoggingPageState extends ConsumerState<DailyLoggingPage>
     );
   }
 
-  Widget _buildCsvTab() {
+  Widget _buildCsvTab(bool isOnline) {
     return SingleChildScrollView(
       padding: const EdgeInsets.all(28),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -729,7 +829,8 @@ class _DailyLoggingPageState extends ConsumerState<DailyLoggingPage>
                       ],
                       rows: _csvItems
                           .map((item) => DataRow(cells: [
-                                DataCell(Text(item['medicine'],
+                                DataCell(Text(
+                                    item['medicine']?.toString() ?? '',
                                     style: const TextStyle(
                                         fontWeight: FontWeight.w600))),
                                 DataCell(Text(item['quantity'].toString())),
@@ -753,14 +854,17 @@ class _DailyLoggingPageState extends ConsumerState<DailyLoggingPage>
                           height: 20,
                           child: CircularProgressIndicator(
                               color: Colors.white, strokeWidth: 2))
-                      : Text('Submit ${_csvItems.length} Logs'),
-                  onPressed: _isSubmittingCsv ? null : _submitCSVLogs)),
+                      : Text(isOnline
+                          ? 'Submit ${_csvItems.length} Logs'
+                          : 'Submit ${_csvItems.length} Logs (offline)'),
+                  onPressed:
+                      (_isSubmittingCsv || !isOnline) ? null : _submitCSVLogs)),
         ],
       ]),
     );
   }
 
-  Widget _buildQrTab() {
+  Widget _buildQrTab(bool isOnline) {
     return SingleChildScrollView(
       padding: const EdgeInsets.all(28),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -830,7 +934,8 @@ class _DailyLoggingPageState extends ConsumerState<DailyLoggingPage>
                       ],
                       rows: _scannedItems
                           .map((item) => DataRow(cells: [
-                                DataCell(Text(item['medicine'],
+                                DataCell(Text(
+                                    item['medicine']?.toString() ?? '',
                                     style: const TextStyle(
                                         fontWeight: FontWeight.w600))),
                                 DataCell(Text(item['quantity'].toString())),
@@ -859,15 +964,19 @@ class _DailyLoggingPageState extends ConsumerState<DailyLoggingPage>
                             height: 20,
                             child: CircularProgressIndicator(
                                 color: Colors.white, strokeWidth: 2))
-                        : Text('Submit ${_scannedItems.length}'),
-                    onPressed: _isSubmittingQr ? null : _submitScannedLogs)),
+                        : Text(isOnline
+                            ? 'Submit ${_scannedItems.length}'
+                            : 'Submit ${_scannedItems.length} (offline)'),
+                    onPressed: (_isSubmittingQr || !isOnline)
+                        ? null
+                        : _submitScannedLogs)),
           ]),
         ],
       ]),
     );
   }
 
-  Widget _buildImageTab() {
+  Widget _buildImageTab(bool isOnline) {
     return SingleChildScrollView(
       padding: const EdgeInsets.all(28),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -897,9 +1006,12 @@ class _DailyLoggingPageState extends ConsumerState<DailyLoggingPage>
                       color: MediColors.violet)),
             ]),
             const SizedBox(height: 12),
-            const Text(
-                'Upload a photo of medicine records for AI-powered extraction',
-                style: TextStyle(color: MediColors.textMuted, fontSize: 13)),
+            Text(
+                isOnline
+                    ? 'Upload a photo of medicine records for AI-powered extraction'
+                    : 'AI extraction needs an internet connection. Reconnect to parse images.',
+                style:
+                    const TextStyle(color: MediColors.textMuted, fontSize: 13)),
             const SizedBox(height: 16),
             OutlinedButton.icon(
                 icon: _isParsingImage
@@ -910,7 +1022,7 @@ class _DailyLoggingPageState extends ConsumerState<DailyLoggingPage>
                             strokeWidth: 2, color: MediColors.violet))
                     : const Icon(Icons.photo_camera_rounded),
                 label: Text(_isParsingImage ? 'Parsing...' : 'Choose Image'),
-                onPressed: _isParsingImage ? null : _parseImage),
+                onPressed: (_isParsingImage || !isOnline) ? null : _parseImage),
           ]),
         ),
         if (_imageParseError != null) ...[
@@ -1121,7 +1233,7 @@ class _DailyLoggingPageState extends ConsumerState<DailyLoggingPage>
               child: OutlinedButton.icon(
                 icon: const Icon(Icons.photo_camera_rounded),
                 label: const Text('Parse Another Image'),
-                onPressed: _isParsingImage ? null : _parseImage,
+                onPressed: (_isParsingImage || !isOnline) ? null : _parseImage,
               ),
             ),
             const SizedBox(width: 16),
@@ -1134,8 +1246,11 @@ class _DailyLoggingPageState extends ConsumerState<DailyLoggingPage>
                         height: 20,
                         child: CircularProgressIndicator(
                             color: Colors.white, strokeWidth: 2))
-                    : Text('Submit ${_imageItems.length} Logs'),
-                onPressed: _isSubmittingImage ? null : _submitImageLogs,
+                    : Text(isOnline
+                        ? 'Submit ${_imageItems.length} Logs'
+                        : 'Submit ${_imageItems.length} Logs (offline)'),
+                onPressed:
+                    (_isSubmittingImage || !isOnline) ? null : _submitImageLogs,
               ),
             ),
           ]),
@@ -1171,7 +1286,7 @@ class _DailyLoggingPageState extends ConsumerState<DailyLoggingPage>
 
   // --- History tab UI ---
 
-  Widget _buildHistoryTab() {
+  Widget _buildHistoryTab(bool isOnline) {
     if (_isLoadingHistory) {
       return const DailyLoggingSkeleton();
     }
@@ -1181,17 +1296,23 @@ class _DailyLoggingPageState extends ConsumerState<DailyLoggingPage>
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(Icons.error_outline_rounded,
-                color: MediColors.error, size: 40),
+            Icon(
+                isOnline ? Icons.error_outline_rounded : Icons.wifi_off_rounded,
+                color: isOnline ? MediColors.error : MediColors.warning,
+                size: 40),
             const SizedBox(height: 12),
-            Text('Failed to load history: $_historyError',
+            Text(
+                isOnline
+                    ? 'Failed to load history: $_historyError'
+                    : 'History is unavailable while offline. It will load '
+                        'automatically once you reconnect.',
                 textAlign: TextAlign.center,
                 style: const TextStyle(color: MediColors.textMuted)),
             const SizedBox(height: 16),
             OutlinedButton.icon(
               icon: const Icon(Icons.refresh_rounded),
               label: const Text('Retry'),
-              onPressed: _fetchHistoryFirstPage,
+              onPressed: isOnline ? _fetchHistoryFirstPage : null,
             ),
           ],
         ),
@@ -1235,13 +1356,15 @@ class _DailyLoggingPageState extends ConsumerState<DailyLoggingPage>
               padding: const EdgeInsets.symmetric(vertical: 16),
               child: Center(
                 child: OutlinedButton(
-                  onPressed: _isLoadingMoreHistory ? null : _fetchMoreHistory,
+                  onPressed: (_isLoadingMoreHistory || !isOnline)
+                      ? null
+                      : _fetchMoreHistory,
                   child: _isLoadingMoreHistory
                       ? const SizedBox(
                           width: 18,
                           height: 18,
                           child: CircularProgressIndicator(strokeWidth: 2))
-                      : const Text('Load More'),
+                      : Text(isOnline ? 'Load More' : 'Load More (offline)'),
                 ),
               ),
             );
