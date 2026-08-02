@@ -1,3 +1,4 @@
+import 'package:med_supply_prototype/services/ai_service.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:latlong2/latlong.dart';
@@ -118,6 +119,85 @@ void main() {
         rec.reasoning,
         'Proximity (${distKm.toStringAsFixed(1)}km) + Rural Priority + Full Fulfillment',
       );
+    });
+  });
+
+  group('Issue #352 - Deficit filter and redistribution plan tests', () {
+    test('MedRequest.isDeficit correctly identifies actionable deficits', () {
+      final pendingRegular = MedRequest(
+        id: 'r1',
+        facilityId: 'f1',
+        medicineName: 'Paracetamol',
+        type: RequestType.regularIndent,
+        quantity: 100,
+        requestDate: DateTime.now(),
+        status: RequestStatus.pending,
+      );
+      final approvedShortage = MedRequest(
+        id: 'r2',
+        facilityId: 'f1',
+        medicineName: 'Amoxicillin',
+        type: RequestType.shortage,
+        quantity: 50,
+        requestDate: DateTime.now(),
+        status: RequestStatus.approved,
+      );
+      final fulfilledRegular = MedRequest(
+        id: 'r3',
+        facilityId: 'f1',
+        medicineName: 'Ibuprofen',
+        type: RequestType.regularIndent,
+        quantity: 20,
+        requestDate: DateTime.now(),
+        status: RequestStatus.fulfilled,
+      );
+      final surplusRequest = MedRequest(
+        id: 'r4',
+        facilityId: 'f1',
+        medicineName: 'ORS',
+        type: RequestType.surplus,
+        quantity: 200,
+        requestDate: DateTime.now(),
+        status: RequestStatus.pending,
+      );
+
+      expect(pendingRegular.isDeficit, isTrue);
+      expect(approvedShortage.isDeficit, isTrue);
+      expect(fulfilledRegular.isDeficit, isFalse);
+      expect(surplusRequest.isDeficit, isFalse);
+    });
+
+    test('generateRedistributionPlan includes approved and shortage requests',
+        () async {
+      final aiService = AIService(null);
+      final facilities = [
+        Facility(
+          id: 'f1',
+          name: 'Clinic A',
+          type: 'primary',
+          region: 'North',
+          email: 'clinica@example.com',
+          latitude: 12.9716,
+          longitude: 77.5946,
+          createdAt: DateTime.now(),
+        ),
+      ];
+
+      final requests = [
+        MedRequest(
+          id: 'r1',
+          facilityId: 'f1',
+          medicineName: 'Paracetamol',
+          type: RequestType.shortage,
+          quantity: 50,
+          requestDate: DateTime.now(),
+          status: RequestStatus.approved,
+        ),
+      ];
+
+      final plan =
+          await aiService.generateRedistributionPlan(requests, facilities);
+      expect(plan, isNot(equals('No active indents found to optimize.')));
     });
   });
 }
