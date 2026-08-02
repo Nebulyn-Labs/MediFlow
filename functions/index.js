@@ -11,6 +11,11 @@ const { createBigQueryRecovery } = require("./helpers/bigQueryRecovery");
 const { createLowStockService } = require("./helpers/lowStock");
 const { handleCspReport, getClientIp } = require("./helpers/cspReport");
 const { isValidQuantity } = require("./helpers/quantityValidation");
+const { wrapUserContent, wrapDataContent } = require("./helpers/promptHardener");
+const {
+  ApprovalBusinessRuleError,
+  handleApprovalFailure,
+} = require("./helpers/approvalErrors");
 
 admin.initializeApp();
 
@@ -565,7 +570,12 @@ exports.checkLowStock = onSchedule("every 24 hours", async () => {
  * 3. autoRedistribute(requestId)
  * Atomic stock transfer when a request is approved.
  */
-exports.onIndentApproved = onDocumentUpdated("requests/{requestId}", async (event) => {
+exports.onIndentApproved = onDocumentUpdated(
+  {
+    document: "requests/{requestId}",
+    retry: true,
+  },
+  async (event) => {
   if (!event || !event.data || !event.data.after || !event.data.after.exists) return;
 
   const beforeSnap = event.data.before;
@@ -633,14 +643,14 @@ exports.onIndentApproved = onDocumentUpdated("requests/{requestId}", async (even
         await db.runTransaction(async (transaction) => {
           const sourceDoc = await transaction.get(sourceRef);
           if (!sourceDoc.exists) {
-            throw new Error(
-              `Source stock for ${medicineName} at ${sourceFacility} not found`
+            throw new ApprovalBusinessRuleError(
+              "SOURCE_STOCK_NOT_FOUND"
             );
           }
           const currentSourceQty = Number(sourceDoc.data()?.remainingQuantity || 0);
           if (currentSourceQty < qty) {
-            throw new Error(
-              `Insufficient stock at donor ${sourceFacility}: available ${currentSourceQty}, requested ${qty}`
+            throw new ApprovalBusinessRuleError(
+              "INSUFFICIENT_DONOR_STOCK"
             );
           }
 
@@ -683,10 +693,12 @@ exports.onIndentApproved = onDocumentUpdated("requests/{requestId}", async (even
           `Redistribution successful: ${qty} units of ${medicineName} from ${sourceFacility} to ${destFacility}`
         );
       } catch (err) {
-        logger.error(`Redistribution failed for request ${requestId}:`, err);
-        await event.data.after.ref.update({
-          status: "rejected",
-          rejectionReason: err.message,
+        await handleApprovalFailure({
+          error: err,
+          requestRef: event.data.after.ref,
+          logger,
+          requestId,
+          operation: "Redistribution",
         });
       }
     } else if (facilityId) {
@@ -745,15 +757,18 @@ exports.onIndentApproved = onDocumentUpdated("requests/{requestId}", async (even
           `Stock updated for request ${requestId} at ${facilityId}: ${type || "indent"} of ${qty} ${medicineName}`
         );
       } catch (err) {
-        logger.error(`Stock update failed for request ${requestId}:`, err);
-        await event.data.after.ref.update({
-          status: "rejected",
-          rejectionReason: err.message,
+        await handleApprovalFailure({
+          error: err,
+          requestRef: event.data.after.ref,
+          logger,
+          requestId,
+          operation: "Stock update",
         });
       }
     }
   }
-});
+  }
+);
 
 async function executeTool(name, args, authInfo) {
   const db = admin.firestore();
