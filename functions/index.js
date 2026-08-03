@@ -439,6 +439,7 @@ exports.mirrorRequestToBigQuery = onDocumentWritten("requests/{requestId}", asyn
   }
 });
 
+
 exports.onUserWritten = onDocumentWritten("users/{userId}", async (event) => {
   const change = event.data;
   const before = change.before.exists ? change.before.data() : null;
