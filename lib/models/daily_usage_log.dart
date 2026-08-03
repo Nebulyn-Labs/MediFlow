@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'inventory_item.dart';
 
 class MedicineUsage {
   final String medicineName;
@@ -11,8 +12,8 @@ class MedicineUsage {
 
   factory MedicineUsage.fromMap(Map<String, dynamic> map) {
     return MedicineUsage(
-      medicineName: map['medicineName'] ?? '',
-      unitsDistributed: map['unitsDistributed']?.toInt() ?? 0,
+      medicineName: map['medicineName']?.toString() ?? '',
+      unitsDistributed: (map['unitsDistributed'] as num?)?.toInt() ?? 0,
     );
   }
 
@@ -38,13 +39,15 @@ class DailyUsageLog {
   });
 
   factory DailyUsageLog.fromMap(Map<String, dynamic> map, String id) {
+    final rawMedicines = map['medicines'] as List? ?? [];
     return DailyUsageLog(
       id: id,
-      date: (map['date'] as Timestamp).toDate(),
-      medicines: (map['medicines'] as List? ?? [])
+      date: (map['date'] as Timestamp?)?.toDate() ?? DateTime.now(),
+      medicines: rawMedicines
+          .whereType<Map>()
           .map((m) => MedicineUsage.fromMap(Map<String, dynamic>.from(m)))
           .toList(),
-      totalPatients: map['totalPatients']?.toInt() ?? 0,
+      totalPatients: (map['totalPatients'] as num?)?.toInt() ?? 0,
     );
   }
 
@@ -55,4 +58,33 @@ class DailyUsageLog {
       'totalPatients': totalPatients,
     };
   }
+}
+
+/// Holds one page of daily usage logs plus a cursor for fetching the next
+/// page, so the UI can paginate through history instead of loading
+/// everything at once.
+class PaginatedLogsResult {
+  final List<DailyUsageLog> logs;
+  final DocumentSnapshot? lastDocument;
+  final bool hasMore;
+
+  PaginatedLogsResult({
+    required this.logs,
+    required this.lastDocument,
+    required this.hasMore,
+  });
+}
+
+/// Holds one page of medicines from the global collectionGroup plus a cursor
+/// for fetching the next page. Mirrors [PaginatedLogsResult] for consistency.
+class PaginatedMedicinesResult {
+  final List<InventoryItem> medicines;
+  final DocumentSnapshot? lastDocument;
+  final bool hasMore;
+
+  PaginatedMedicinesResult({
+    required this.medicines,
+    required this.lastDocument,
+    required this.hasMore,
+  });
 }
