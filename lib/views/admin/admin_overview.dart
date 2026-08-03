@@ -582,7 +582,7 @@ class _AdminOverviewState extends ConsumerState<AdminOverview> {
       onTap: onTap,
       borderRadius: BorderRadius.circular(12),
       child: Container(
-        width: 250,
+        constraints: const BoxConstraints(minWidth: 160, maxWidth: 250),
         padding: const EdgeInsets.all(24),
         decoration: BoxDecoration(
           color: colors.surface,
@@ -658,7 +658,7 @@ class _AdminOverviewState extends ConsumerState<AdminOverview> {
     }
 
     return Container(
-      width: 280,
+      constraints: const BoxConstraints(minWidth: 200, maxWidth: 280),
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         color: colors.surface,
