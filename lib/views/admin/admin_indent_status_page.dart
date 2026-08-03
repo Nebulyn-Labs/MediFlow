@@ -6,6 +6,7 @@ import '../../services/csv_export_service.dart';
 import '../../models/request.dart';
 import 'package:med_supply_prototype/constants/colors.dart';
 import '../shared/skeleton_loaders.dart';
+import '../../utils/date_formatter.dart';
 
 class AdminIndentStatusPage extends ConsumerStatefulWidget {
   const AdminIndentStatusPage({super.key});
@@ -216,7 +217,7 @@ class _AdminIndentStatusPageState extends ConsumerState<AdminIndentStatusPage> {
         children: [
           Expanded(
               flex: 2,
-              child: Text('${req.requestDate.day}/${req.requestDate.month}',
+              child: Text(DateFormatter.formatDate(req.requestDate),
                   style: const TextStyle(color: MediColors.textSecondary))),
           Expanded(
               flex: 3,
