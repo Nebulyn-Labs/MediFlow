@@ -53,11 +53,15 @@ class _AdminIndentApprovalPageState
             '✅ APPROVE: Request is aligned with historical usage and current low stock.';
       }
 
+      // The AI call is slow enough that the user can navigate away mid-analysis.
+      // Guard the post-await setState to avoid writing to a disposed State.
+      if (!mounted) return;
       setState(() => _aiSuggestions[request.id] = suggestion);
     } catch (e) {
+      if (!mounted) return;
       setState(() => _aiSuggestions[request.id] = 'Error: $e');
     } finally {
-      setState(() => _aiLoading[request.id] = false);
+      if (mounted) setState(() => _aiLoading[request.id] = false);
     }
   }
 
@@ -93,10 +97,7 @@ class _AdminIndentApprovalPageState
             return const AdminIndentApprovalSkeleton();
           }
 
-          final pending = snapshot.data
-                  ?.where((r) => r.status == RequestStatus.pending)
-                  .toList() ??
-              [];
+          final pending = MedRequest.filterPending(snapshot.data ?? const []);
 
           if (pending.isEmpty) {
             return const Center(
@@ -212,10 +213,8 @@ class _AdminIndentApprovalPageState
                                         .withValues(alpha: 0.3)),
                           ),
                           child: Text(suggestion,
-                              style: TextStyle(
-                                  color: suggestion.contains('✅')
-                                      ? MediColors.success
-                                      : MediColors.warning,
+                              style: const TextStyle(
+                                  color: MediColors.textPrimary,
                                   fontWeight: FontWeight.w500)),
                         ),
 

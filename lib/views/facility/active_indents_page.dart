@@ -2,10 +2,15 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../services/firebase_service.dart';
 import '../../services/ai_service.dart';
+import '../../services/csv_export_service.dart';
 import '../../models/request.dart';
 import '../../models/inventory_item.dart';
+import '../../models/daily_usage_log.dart';
 import 'package:med_supply_prototype/constants/colors.dart';
 import '../shared/skeleton_loaders.dart';
+import '../../utils/date_formatter.dart';
+
+enum _IndentSortOption { newestFirst, oldestFirst }
 
 class ActiveIndentsPage extends ConsumerStatefulWidget {
   final String facilityId;
@@ -32,7 +37,10 @@ class _ActiveIndentsPageState extends ConsumerState<ActiveIndentsPage> {
   final Map<String, TextEditingController> _analysisControllers = {};
   bool _isLoading = true;
   bool _isSubmitting = false;
+  bool _isExportingHistoryCsv = false;
   int _selectedPeriod = 30;
+  RequestStatus? _selectedHistoryStatus;
+  _IndentSortOption _selectedHistorySort = _IndentSortOption.newestFirst;
 
   @override
   void initState() {
@@ -75,43 +83,98 @@ class _ActiveIndentsPageState extends ConsumerState<ActiveIndentsPage> {
     }
   }
 
+  /// Maximum number of forecast requests that may run concurrently.
+  ///
+  /// A value of 5 keeps total in-flight requests bounded while still
+  /// providing a large speed-up over fully-sequential execution (#238).
+  static const int _kForecastConcurrency = 5;
+
   // ---------- AI Forecast ----------
   Future<void> _getAIForecast() async {
     final aiService = ref.read(aiServiceProvider);
     final firebaseService = ref.read(firebaseServiceProvider);
-    final logs =
-        await firebaseService.getRecentLogs(widget.facilityId, days: 90);
-    for (var item in _inventory) {
-      setState(() => _forecastLoading[item.id] = true);
-      try {
-        final dynamic result = await aiService.forecastDemand(
-            item.medicineName, logs, _selectedPeriod,
-            facilityId: widget.facilityId);
-        setState(() {
-          dynamic predRaw;
-          dynamic reasonRaw;
-          if (result != null && result is Map) {
-            predRaw = result['prediction'];
-            reasonRaw = result['reasoning'];
-          }
-          int predicted = 0;
-          if (predRaw is num) {
-            predicted = predRaw.toInt();
-          } else if (predRaw is String) {
-            predicted = double.tryParse(predRaw)?.toInt() ?? 0;
-          }
-          _forecasts[item.id] = predicted;
-          _reasoning[item.id] =
-              reasonRaw?.toString() ?? "Calculated based on demand.";
 
-          _analysisControllers[item.id]?.text =
-              _suggestedQuantity(item, predicted).toString();
-        });
-      } catch (e) {
-        debugPrint('Forecast error for ${item.medicineName}: $e');
-      } finally {
-        setState(() => _forecastLoading[item.id] = false);
+    // Mark every item as loading before starting any futures.
+    setState(() {
+      for (final item in _inventory) {
+        _forecastLoading[item.id] = true;
       }
+    });
+
+    final List<DailyUsageLog> logs;
+    try {
+      logs = await firebaseService.getRecentLogs(widget.facilityId, days: 90);
+    } catch (e) {
+      debugPrint('Error fetching logs for forecast: $e');
+      if (mounted) {
+        setState(() {
+          for (final item in _inventory) {
+            _forecastLoading[item.id] = false;
+          }
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Failed to fetch recent logs for forecast: $e',
+            ),
+          ),
+        );
+      }
+      return;
+    }
+
+    // Run forecasts concurrently in chunks of [_kForecastConcurrency] to
+    // avoid both serialising N round-trips and flooding the API (#238).
+    for (int i = 0; i < _inventory.length; i += _kForecastConcurrency) {
+      final chunk = _inventory.sublist(
+        i,
+        (i + _kForecastConcurrency).clamp(0, _inventory.length),
+      );
+
+      await Future.wait(chunk.map((item) async {
+        try {
+          final dynamic result = await aiService.forecastDemand(
+            item.medicineName,
+            logs,
+            _selectedPeriod,
+            facilityId: widget.facilityId,
+          );
+          if (!mounted) return;
+          setState(() {
+            dynamic predRaw;
+            dynamic reasonRaw;
+            if (result != null && result is Map) {
+              predRaw = result['prediction'];
+              reasonRaw = result['reasoning'];
+            }
+            int predicted = 0;
+            if (predRaw is num) {
+              predicted = predRaw.toInt();
+            } else if (predRaw is String) {
+              predicted = double.tryParse(predRaw)?.toInt() ?? 0;
+            }
+            _forecasts[item.id] = predicted;
+            _reasoning[item.id] =
+                reasonRaw?.toString() ?? "Calculated based on demand.";
+
+            _analysisControllers[item.id]?.text =
+                _suggestedQuantity(item, predicted).toString();
+            _forecastLoading[item.id] = false;
+          });
+        } catch (e) {
+          debugPrint('Forecast error for ${item.medicineName}: $e');
+          if (mounted) {
+            setState(() => _forecastLoading[item.id] = false);
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(
+                  'Failed to generate forecast for ${item.medicineName}: $e',
+                ),
+              ),
+            );
+          }
+        }
+      }));
     }
   }
 
@@ -120,9 +183,12 @@ class _ActiveIndentsPageState extends ConsumerState<ActiveIndentsPage> {
     if (forecast <= 0) return 0;
 
     final available = item.remainingQuantity;
-    final isExpired = item.expiryDate.difference(DateTime.now()).inDays < 0;
-    final expiringSoon =
-        item.expiryDate.difference(DateTime.now()).inDays <= 30;
+    // Use centralized ItemStatus; prevents expired items being treated as
+    // expiring-soon, which was causing incorrect suggestedQty calculations.
+    final itemStatus = item.status;
+    final isExpired = itemStatus == ItemStatus.expired;
+    final expiringSoon = itemStatus == ItemStatus.expiringSoon ||
+        itemStatus == ItemStatus.wastageRisk;
 
     if (isExpired) {
       return (forecast * 1.2).round();
@@ -143,9 +209,11 @@ class _ActiveIndentsPageState extends ConsumerState<ActiveIndentsPage> {
     if (forecast <= 0) return RequestType.regularIndent;
 
     final available = item.remainingQuantity;
-    final isExpired = item.expiryDate.difference(DateTime.now()).inDays < 0;
-    final expiringSoon =
-        item.expiryDate.difference(DateTime.now()).inDays <= 30;
+    // Use centralized ItemStatus to prevent double-counting expired items.
+    final itemStatus = item.status;
+    final isExpired = itemStatus == ItemStatus.expired;
+    final expiringSoon = itemStatus == ItemStatus.expiringSoon ||
+        itemStatus == ItemStatus.wastageRisk;
     final hasSurplus = !isExpired &&
         ((available - forecast) > (forecast * 1.5) ||
             (available > forecast && expiringSoon));
@@ -257,6 +325,29 @@ class _ActiveIndentsPageState extends ConsumerState<ActiveIndentsPage> {
     }
   }
 
+  Future<void> _exportRequestHistoryCsv(List<MedRequest> history) async {
+    setState(() => _isExportingHistoryCsv = true);
+    try {
+      final firebase = ref.read(firebaseServiceProvider);
+      final facility = await firebase.getFacility(widget.facilityId);
+      await CsvExportService.exportTransferRequestHistory(
+        history,
+        facilityName: facility?.name,
+      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Transfer requests CSV exported ✓')));
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('Export failed: $e')));
+      }
+    } finally {
+      if (mounted) setState(() => _isExportingHistoryCsv = false);
+    }
+  }
+
   // ---------- Empty state navigation ----------
   void _goToCreateIndent() {
     final ctx = _analysisSectionKey.currentContext;
@@ -289,6 +380,138 @@ class _ActiveIndentsPageState extends ConsumerState<ActiveIndentsPage> {
           fontSize: 18,
           fontWeight: FontWeight.w700,
           color: MediColors.textPrimary));
+
+  String _statusLabel(RequestStatus? status) {
+    if (status == null) return 'All statuses';
+    return status.name[0].toUpperCase() + status.name.substring(1);
+  }
+
+  String _sortLabel(_IndentSortOption sort) {
+    switch (sort) {
+      case _IndentSortOption.newestFirst:
+        return 'Newest first';
+      case _IndentSortOption.oldestFirst:
+        return 'Oldest first';
+    }
+  }
+
+  List<MedRequest> _filterAndSortHistory(List<MedRequest> requests) {
+    final filtered = requests
+        .where((request) =>
+            request.status != RequestStatus.draft &&
+            (_selectedHistoryStatus == null ||
+                request.status == _selectedHistoryStatus))
+        .toList();
+
+    filtered.sort((a, b) {
+      switch (_selectedHistorySort) {
+        case _IndentSortOption.newestFirst:
+          return b.requestDate.compareTo(a.requestDate);
+        case _IndentSortOption.oldestFirst:
+          return a.requestDate.compareTo(b.requestDate);
+      }
+    });
+
+    return filtered;
+  }
+
+  Widget _historyControls(int visibleCount, int totalCount) {
+    final statuses = RequestStatus.values
+        .where((status) => status != RequestStatus.draft)
+        .toList();
+
+    InputDecoration controlDecoration(String label, IconData icon) {
+      return InputDecoration(
+        labelText: label,
+        prefixIcon: Icon(icon, size: 18),
+        isDense: true,
+        filled: true,
+        fillColor: MediColors.surfaceLight,
+        contentPadding:
+            const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: const BorderSide(color: MediColors.border),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: const BorderSide(color: MediColors.border),
+        ),
+      );
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Wrap(
+          spacing: 12,
+          runSpacing: 12,
+          crossAxisAlignment: WrapCrossAlignment.center,
+          children: [
+            SizedBox(
+              width: 220,
+              child: DropdownButtonFormField<RequestStatus?>(
+                initialValue: _selectedHistoryStatus,
+                dropdownColor: MediColors.surface,
+                decoration:
+                    controlDecoration('Filter by status', Icons.filter_list),
+                hint: const Text('All statuses'),
+                style: const TextStyle(color: MediColors.textPrimary),
+                items: [
+                  const DropdownMenuItem<RequestStatus?>(
+                    value: null,
+                    child: Text('All statuses'),
+                  ),
+                  ...statuses.map(
+                    (status) => DropdownMenuItem<RequestStatus?>(
+                      value: status,
+                      child: Text(_statusLabel(status)),
+                    ),
+                  ),
+                ],
+                onChanged: (status) =>
+                    setState(() => _selectedHistoryStatus = status),
+              ),
+            ),
+            SizedBox(
+              width: 210,
+              child: DropdownButtonFormField<_IndentSortOption>(
+                initialValue: _selectedHistorySort,
+                dropdownColor: MediColors.surface,
+                decoration: controlDecoration('Sort by date', Icons.sort),
+                style: const TextStyle(color: MediColors.textPrimary),
+                items: _IndentSortOption.values
+                    .map(
+                      (sort) => DropdownMenuItem<_IndentSortOption>(
+                        value: sort,
+                        child: Text(_sortLabel(sort)),
+                      ),
+                    )
+                    .toList(),
+                onChanged: (sort) {
+                  if (sort != null) {
+                    setState(() => _selectedHistorySort = sort);
+                  }
+                },
+              ),
+            ),
+            Text(
+              '$visibleCount of $totalCount requests shown',
+              style: const TextStyle(color: MediColors.textMuted, fontSize: 12),
+            ),
+          ],
+        ),
+        if (_selectedHistoryStatus != null) ...[
+          const SizedBox(height: 8),
+          TextButton.icon(
+            onPressed: () => setState(() => _selectedHistoryStatus = null),
+            icon: const Icon(Icons.clear, size: 16),
+            label: const Text('Clear status filter'),
+          ),
+        ],
+      ],
+    );
+  }
 
   // ----- AI Table -----
   Widget _analysisHeader() {
@@ -342,9 +565,13 @@ class _ActiveIndentsPageState extends ConsumerState<ActiveIndentsPage> {
     final isLoading = _forecastLoading[item.id] ?? false;
     final forecast = _forecasts[item.id];
     final reasoning = _reasoning[item.id];
-    int available = item.remainingQuantity;
-    bool isExpired = item.expiryDate.difference(DateTime.now()).inDays < 0;
-    bool expiringSoon = item.expiryDate.difference(DateTime.now()).inDays <= 30;
+    final int available = item.remainingQuantity;
+    // Use centralized ItemStatus to prevent expired items being labelled
+    // as expiring-soon in the analysis row.
+    final itemStatus = item.status;
+    final bool isExpired = itemStatus == ItemStatus.expired;
+    final bool expiringSoon = itemStatus == ItemStatus.expiringSoon ||
+        itemStatus == ItemStatus.wastageRisk;
 
     String status = "â€”";
     Color statusColor = MediColors.textMuted;
@@ -587,7 +814,7 @@ class _ActiveIndentsPageState extends ConsumerState<ActiveIndentsPage> {
                             color: MediColors.textPrimary)),
                     const SizedBox(height: 4),
                     Text(
-                        'Created: ${draft.requestDate.day}/${draft.requestDate.month}/${draft.requestDate.year}',
+                        'Created: ${DateFormatter.formatDate(draft.requestDate)}',
                         style: const TextStyle(
                             fontSize: 12, color: MediColors.textMuted)),
                     if (draft.notes != null) ...[
@@ -744,12 +971,12 @@ class _ActiveIndentsPageState extends ConsumerState<ActiveIndentsPage> {
         if (snapshot.hasError || snapshot.data == null) {
           return const SizedBox.shrink();
         }
-        final history = snapshot.data!
-            .where((r) => r.status != RequestStatus.draft)
-            .toList()
-          ..sort((a, b) => b.requestDate.compareTo(a.requestDate));
+        final allHistory = snapshot.data!
+            .where((request) => request.status != RequestStatus.draft)
+            .toList();
+        final history = _filterAndSortHistory(snapshot.data!);
 
-        if (history.isEmpty) {
+        if (allHistory.isEmpty) {
           return const SizedBox.shrink();
         }
 
@@ -757,8 +984,55 @@ class _ActiveIndentsPageState extends ConsumerState<ActiveIndentsPage> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const SizedBox(height: 32),
-            _sectionHeader('Request History'),
+            Wrap(
+              spacing: 12,
+              runSpacing: 8,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              children: [
+                _sectionHeader('Request History'),
+                OutlinedButton.icon(
+                  onPressed: _isExportingHistoryCsv || history.isEmpty
+                      ? null
+                      : () => _exportRequestHistoryCsv(history),
+                  icon: _isExportingHistoryCsv
+                      ? const SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(Icons.file_download_outlined, size: 18),
+                  label: const Text('Export CSV'),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: MediColors.textSecondary,
+                    side: const BorderSide(color: MediColors.border),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10)),
+                  ),
+                ),
+              ],
+            ),
             const SizedBox(height: 12),
+            _historyControls(history.length, allHistory.length),
+            const SizedBox(height: 12),
+            if (history.isEmpty)
+              Card(
+                child: Padding(
+                  padding: const EdgeInsets.all(24),
+                  child: Row(
+                    children: [
+                      Icon(Icons.search_off_rounded,
+                          color: MediColors.textMuted.withValues(alpha: 0.8)),
+                      const SizedBox(width: 12),
+                      const Expanded(
+                        child: Text(
+                          'No requests match the selected filter.',
+                          style: TextStyle(color: MediColors.textSecondary),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
             ListView.builder(
               shrinkWrap: true,
               physics: const NeverScrollableScrollPhysics(),
@@ -789,7 +1063,8 @@ class _ActiveIndentsPageState extends ConsumerState<ActiveIndentsPage> {
                 String resolutionText = '';
                 if (hasResolution) {
                   final resDate = req.resolvedAt!;
-                  resolutionText = 'Resolved: ${resDate.day}/${resDate.month}/${resDate.year} ${resDate.hour.toString().padLeft(2, '0')}:${resDate.minute.toString().padLeft(2, '0')}';
+                  resolutionText =
+                      'Resolved: ${DateFormatter.formatDate(resDate)} ${resDate.hour.toString().padLeft(2, '0')}:${resDate.minute.toString().padLeft(2, '0')}';
                 }
 
                 final requestInfo = Column(
@@ -802,7 +1077,7 @@ class _ActiveIndentsPageState extends ConsumerState<ActiveIndentsPage> {
                             color: MediColors.textPrimary)),
                     const SizedBox(height: 4),
                     Text(
-                        'Submitted: ${req.requestDate.day}/${req.requestDate.month}/${req.requestDate.year}',
+                        'Submitted: ${DateFormatter.formatDate(req.requestDate)}',
                         style: const TextStyle(
                             fontSize: 12, color: MediColors.textMuted)),
                     if (hasResolution) ...[
@@ -813,7 +1088,9 @@ class _ActiveIndentsPageState extends ConsumerState<ActiveIndentsPage> {
                               color: MediColors.textSecondary,
                               fontWeight: FontWeight.w500)),
                     ],
-                    if (isRejected && req.rejectionReason != null && req.rejectionReason!.isNotEmpty) ...[
+                    if (isRejected &&
+                        req.rejectionReason != null &&
+                        req.rejectionReason!.isNotEmpty) ...[
                       const SizedBox(height: 8),
                       Container(
                         padding: const EdgeInsets.all(10),
@@ -821,7 +1098,8 @@ class _ActiveIndentsPageState extends ConsumerState<ActiveIndentsPage> {
                         decoration: BoxDecoration(
                           color: MediColors.errorOverlay,
                           borderRadius: BorderRadius.circular(8),
-                          border: Border.all(color: MediColors.error.withValues(alpha: 0.3)),
+                          border: Border.all(
+                              color: MediColors.error.withValues(alpha: 0.3)),
                         ),
                         child: Text(
                           'Rejection Reason: ${req.rejectionReason}',
@@ -873,11 +1151,13 @@ class _ActiveIndentsPageState extends ConsumerState<ActiveIndentsPage> {
                 );
 
                 final statusBadge = Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                   decoration: BoxDecoration(
                     color: statusColor.withValues(alpha: 0.12),
                     borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: statusColor.withValues(alpha: 0.25)),
+                    border:
+                        Border.all(color: statusColor.withValues(alpha: 0.25)),
                   ),
                   child: Text(
                     req.status.name.toUpperCase(),
@@ -902,7 +1182,8 @@ class _ActiveIndentsPageState extends ConsumerState<ActiveIndentsPage> {
                               requestInfo,
                               const SizedBox(height: 16),
                               Row(
-                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                mainAxisAlignment:
+                                    MainAxisAlignment.spaceBetween,
                                 children: [
                                   Text(
                                     'Quantity: ${req.quantity}',

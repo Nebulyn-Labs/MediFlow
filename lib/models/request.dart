@@ -29,24 +29,53 @@ class MedRequest {
     this.resolvedAt,
   });
 
+  /// Counts every request whose [RequestStatus] is [RequestStatus.pending],
+  /// regardless of [RequestType]. This is the single source of truth for
+  /// the "Pending Approvals" KPI on the admin dashboard and the row count
+  /// on the /admin/approvals page; keeping it in one place means the two
+  /// cannot drift out of sync (#334).
+  static int countPending(Iterable<MedRequest> requests) {
+    var count = 0;
+    for (final r in requests) {
+      if (r.status == RequestStatus.pending) count++;
+    }
+    return count;
+  }
+
+  /// Returns every request whose [RequestStatus] is [RequestStatus.pending],
+  /// regardless of [RequestType]. Pair with [countPending] so the dashboard
+  /// KPI and the /admin/approvals list agree on the same definition of
+  /// "pending" (#334).
+  static List<MedRequest> filterPending(Iterable<MedRequest> requests) {
+    return requests
+        .where((r) => r.status == RequestStatus.pending)
+        .toList(growable: false);
+  }
+
   factory MedRequest.fromMap(Map<String, dynamic> map, String id) {
     return MedRequest(
       id: id,
-      facilityId: map['facilityId'] ?? '',
-      medicineName: map['medicineName'] ?? '',
+      facilityId: map['facilityId']?.toString() ?? '',
+      medicineName: map['medicineName']?.toString() ?? '',
       type: RequestType.values.firstWhere((e) => e.name == map['type'],
           orElse: () => RequestType.regularIndent),
-      quantity: map['quantity']?.toInt() ?? 0,
-      requestDate: (map['requestDate'] as Timestamp).toDate(),
+      quantity: (map['quantity'] as num?)?.toInt() ?? 0,
+      requestDate:
+          (map['requestDate'] as Timestamp?)?.toDate() ?? DateTime.now(),
       status: RequestStatus.values.firstWhere((e) => e.name == map['status'],
           orElse: () => RequestStatus.pending),
-      notes: map['notes'],
-      rejectionReason: map['rejectionReason'],
-      resolvedAt: map['resolvedAt'] != null
+      notes: map['notes']?.toString(),
+      rejectionReason: map['rejectionReason']?.toString(),
+      resolvedAt: map['resolvedAt'] is Timestamp
           ? (map['resolvedAt'] as Timestamp).toDate()
           : null,
     );
   }
+
+  /// Whether this request represents an actionable deficit (pending or approved regular indent or shortage).
+  bool get isDeficit =>
+      (status == RequestStatus.pending || status == RequestStatus.approved) &&
+      (type == RequestType.regularIndent || type == RequestType.shortage);
 
   Map<String, dynamic> toMap() {
     return {
