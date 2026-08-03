@@ -34,9 +34,16 @@ class _RouteOptimizationMapState extends ConsumerState<RouteOptimizationMap> {
   // multi-stop route, keyed by the donor facility id.
   Map<String, RouteResult> _roadRoutes = {};
 
+  // Cached Firestore streams
+  late final Stream<List<InventoryItem>> _allMedsStream;
+  late final Stream<List<MedRequest>> _requestsStream;
+
   @override
   void initState() {
     super.initState();
+    final firebaseService = ref.read(firebaseServiceProvider);
+    _allMedsStream = firebaseService.streamAllMedicines();
+    _requestsStream = firebaseService.streamRequests(null);
     _loadData();
   }
 
@@ -204,12 +211,12 @@ class _RouteOptimizationMapState extends ConsumerState<RouteOptimizationMap> {
       backgroundColor: MediColors.bg,
       appBar: AppBar(title: const Text('Advanced Route Optimization')),
       body: StreamBuilder<List<InventoryItem>>(
-        stream: ref.watch(firebaseServiceProvider).streamAllMedicines(),
+        stream: _allMedsStream,
         builder: (context, invSnapshot) {
           final allMeds = invSnapshot.data ?? [];
 
           return StreamBuilder<List<MedRequest>>(
-            stream: ref.watch(firebaseServiceProvider).streamRequests(null),
+            stream: _requestsStream,
             builder: (context, snapshot) {
               final requests = snapshot.data ?? [];
 

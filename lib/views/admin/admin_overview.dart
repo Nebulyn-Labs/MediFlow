@@ -33,6 +33,9 @@ class _AdminOverviewState extends ConsumerState<AdminOverview> {
   List<String> _failedFacilities = [];
   StreamSubscription? _requestsSub;
 
+  // Cached Firestore streams
+  late final Stream<List<MedRequest>> _requestsStream;
+
   // ---- medicines pagination state (Issue #209) ----
   List<InventoryItem> _allMedicines = [];
   bool _medicinesLoading = false;
@@ -73,6 +76,36 @@ class _AdminOverviewState extends ConsumerState<AdminOverview> {
 
     if (!mounted) return;
     await _requestsSub?.cancel();
+
+    // Create cached stream
+    _requestsStream = firebaseService.streamRequests(null);
+    // Listen to the stream
+    _requestsSub = _requestsStream.listen(
+      (reqs) {
+        if (!mounted) return;
+        int shortage = 0;
+        int surplus = 0;
+        for (var r in reqs) {
+          if (r.status == RequestStatus.pending) {
+            if (r.type == RequestType.shortage) shortage++;
+            if (r.type == RequestType.surplus) surplus++;
+          }
+        }
+        // The "Pending Approvals" KPI mirrors the /admin/approvals page,
+        // which lists every pending request regardless of type. Using
+        // MedRequest.countPending keeps the card and the page in lockstep
+        // (#334).
+        final pending = MedRequest.countPending(reqs);
+        setState(() {
+          _openShortageRequests = shortage;
+          _surplusOffers = surplus;
+          _pendingApprovals = pending;
+        });
+      },
+      onError: (e) {
+        debugPrint('Failed to stream facility requests: $e');
+      },
+    );
 
     // Reset medicines pagination on full refresh
     if (mounted) {
@@ -143,33 +176,6 @@ class _AdminOverviewState extends ConsumerState<AdminOverview> {
           failedFacilityNames.add(f.name);
         }
       }),
-    );
-
-    _requestsSub = firebaseService.streamRequests(null).listen(
-      (reqs) {
-        if (!mounted) return;
-        int shortage = 0;
-        int surplus = 0;
-        for (var r in reqs) {
-          if (r.status == RequestStatus.pending) {
-            if (r.type == RequestType.shortage) shortage++;
-            if (r.type == RequestType.surplus) surplus++;
-          }
-        }
-        // The "Pending Approvals" KPI mirrors the /admin/approvals page,
-        // which lists every pending request regardless of type. Using
-        // MedRequest.countPending keeps the card and the page in lockstep
-        // (#334).
-        final pending = MedRequest.countPending(reqs);
-        setState(() {
-          _openShortageRequests = shortage;
-          _surplusOffers = surplus;
-          _pendingApprovals = pending;
-        });
-      },
-      onError: (e) {
-        debugPrint('Failed to stream facility requests: $e');
-      },
     );
 
     if (mounted) {

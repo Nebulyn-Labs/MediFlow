@@ -20,6 +20,15 @@ class _AdminIndentApprovalPageState
   final Map<String, bool> _aiLoading = {};
   bool _isActionInProgress = false;
 
+  // Cached Firestore stream
+  late final Stream<List<MedRequest>> _requestsStream;
+
+  @override
+  void initState() {
+    super.initState();
+    _requestsStream = ref.read(firebaseServiceProvider).streamRequests(null);
+  }
+
   Future<void> _analyzeRequest(MedRequest request) async {
     setState(() => _aiLoading[request.id] = true);
     try {
@@ -91,7 +100,7 @@ class _AdminIndentApprovalPageState
       backgroundColor: MediColors.bg,
       appBar: AppBar(title: const Text('Pending Requests Approval')),
       body: StreamBuilder<List<MedRequest>>(
-        stream: ref.read(firebaseServiceProvider).streamRequests(null),
+        stream: _requestsStream,
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
             return const AdminIndentApprovalSkeleton();
