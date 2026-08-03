@@ -9,6 +9,7 @@ import '../../services/csv_export_service.dart';
 import 'package:med_supply_prototype/constants/colors.dart';
 import '../shared/confirm_logout_dialog.dart';
 import '../shared/skeleton_loaders.dart';
+import '../../utils/date_formatter.dart';
 
 class FacilityOverview extends ConsumerStatefulWidget {
   final String facilityId;
@@ -602,7 +603,7 @@ class _FacilityOverviewState extends ConsumerState<FacilityOverview> {
                                   fontWeight: FontWeight.w600)),
                         )),
                         DataCell(Text(
-                          "${item.expiryDate.year}-${item.expiryDate.month.toString().padLeft(2, '0')}-${item.expiryDate.day.toString().padLeft(2, '0')}",
+                          DateFormatter.formatDate(item.expiryDate),
                           style:
                               const TextStyle(color: MediColors.textSecondary),
                         )),
