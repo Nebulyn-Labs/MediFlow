@@ -100,7 +100,9 @@ class FirebaseService {
       longitude: fixedLng ?? (profile['longitude'] as num?)?.toDouble() ?? 0.0,
       createdAt: profile['createdAt'] is Timestamp
           ? (profile['createdAt'] as Timestamp).toDate()
-          : DateTime.now(),
+          : (profile['createdAt'] is DateTime
+              ? profile['createdAt'] as DateTime
+              : DateTime.now()),
     );
 
     await _firestore

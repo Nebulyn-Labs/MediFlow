@@ -248,6 +248,154 @@ void main() {
     });
   });
 
+  group('FirebaseService - signUpFacility', () {
+    late FakeFirebaseFirestore fakeFirestore;
+    late MockFirebaseAuth mockAuth;
+    late FirebaseService firebaseService;
+    late MockUserCredential mockCredential;
+    late MockUser mockUser;
+
+    setUp(() {
+      fakeFirestore = FakeFirebaseFirestore();
+      mockAuth = MockFirebaseAuth();
+      firebaseService = FirebaseService(fakeFirestore, mockAuth);
+      mockCredential = MockUserCredential();
+      mockUser = MockUser();
+    });
+
+    test(
+      'writes role document using UID returned from credential on creation',
+      () async {
+        const email = 'newfacility@mediflow.com';
+        const password = 'password123';
+        const uid = 'new_facility_uid';
+
+        // Simulate ambient user (e.g. logged in admin)
+        final mockAmbientUser = MockUser();
+        when(() => mockAmbientUser.uid).thenReturn('admin_uid');
+        when(() => mockAuth.currentUser).thenReturn(mockAmbientUser);
+
+        // Seed admin user document
+        await fakeFirestore.collection('users').doc('admin_uid').set({
+          'email': 'admin@mediflow.com',
+          'role': 'admin',
+        });
+
+        when(
+          () => mockAuth.createUserWithEmailAndPassword(
+            email: email,
+            password: password,
+          ),
+        ).thenAnswer((_) async => mockCredential);
+        when(() => mockCredential.user).thenReturn(mockUser);
+        when(() => mockUser.uid).thenReturn(uid);
+
+        await firebaseService.signUpFacility(
+          name: 'New Facility',
+          email: email,
+          password: password,
+        );
+
+        // Verify role document written for new UID
+        final newDoc = await fakeFirestore.collection('users').doc(uid).get();
+        expect(newDoc.exists, isTrue);
+        expect(newDoc.data()?['email'], email);
+        expect(newDoc.data()?['role'], 'facility_head');
+
+        // Verify admin document was NOT overwritten
+        final adminDoc =
+            await fakeFirestore.collection('users').doc('admin_uid').get();
+        expect(adminDoc.data()?['role'], 'admin');
+      },
+    );
+
+    test(
+      'falls back to signInWithEmailAndPassword if createUser fails',
+      () async {
+        const email = 'existing@mediflow.com';
+        const password = 'password123';
+        const fallbackUid = 'fallback_uid';
+
+        when(
+          () => mockAuth.createUserWithEmailAndPassword(
+            email: email,
+            password: password,
+          ),
+        ).thenThrow(FirebaseAuthException(code: 'email-already-in-use'));
+
+        when(
+          () => mockAuth.signInWithEmailAndPassword(
+            email: email,
+            password: password,
+          ),
+        ).thenAnswer((_) async => mockCredential);
+        when(() => mockCredential.user).thenReturn(mockUser);
+        when(() => mockUser.uid).thenReturn(fallbackUid);
+
+        await firebaseService.signUpFacility(
+          name: 'Existing Facility',
+          email: email,
+          password: password,
+        );
+
+        final userDoc =
+            await fakeFirestore.collection('users').doc(fallbackUid).get();
+        expect(userDoc.exists, isTrue);
+        expect(userDoc.data()?['role'], 'facility_head');
+      },
+    );
+
+    test(
+      'throws exception and writes no user document when both auth attempts fail',
+      () async {
+        const email = 'failed@mediflow.com';
+        const password = 'password123';
+
+        // Simulate ambient user
+        final mockAmbientUser = MockUser();
+        when(() => mockAmbientUser.uid).thenReturn('ambient_uid');
+        when(() => mockAuth.currentUser).thenReturn(mockAmbientUser);
+
+        await fakeFirestore.collection('users').doc('ambient_uid').set({
+          'email': 'ambient@mediflow.com',
+          'role': 'admin',
+        });
+
+        when(
+          () => mockAuth.createUserWithEmailAndPassword(
+            email: email,
+            password: password,
+          ),
+        ).thenThrow(FirebaseAuthException(code: 'error_1'));
+
+        when(
+          () => mockAuth.signInWithEmailAndPassword(
+            email: email,
+            password: password,
+          ),
+        ).thenThrow(FirebaseAuthException(code: 'error_2'));
+
+        expect(
+          () => firebaseService.signUpFacility(
+            name: 'Failed Facility',
+            email: email,
+            password: password,
+          ),
+          throwsA(isA<FirebaseAuthException>()),
+        );
+
+        // Verify ambient user document remains untouched
+        final ambientDoc =
+            await fakeFirestore.collection('users').doc('ambient_uid').get();
+        expect(ambientDoc.data()?['role'], 'admin');
+
+        // Verify no other user document was created
+        final usersSnapshot = await fakeFirestore.collection('users').get();
+        expect(usersSnapshot.docs.length, 1);
+      },
+    );
+  });
+
   group('FirebaseService - getFacilityByEmail', () {
     late FakeFirebaseFirestore fakeFirestore;
     late MockFirebaseAuth mockAuth;
@@ -259,26 +407,28 @@ void main() {
       firebaseService = FirebaseService(fakeFirestore, mockAuth);
     });
 
-    test('resolves facility with arbitrary non-email-derived document ID',
-        () async {
-      const customDocId = 'fac_uuid_98761234';
-      const email = 'rampur.clinic@mediflow.org';
+    test(
+      'resolves facility with arbitrary non-email-derived document ID',
+      () async {
+        const customDocId = 'fac_uuid_98761234';
+        const email = 'rampur.clinic@mediflow.org';
 
-      await fakeFirestore.collection('facilities').doc(customDocId).set({
-        'name': 'Rampur Clinic',
-        'email': email,
-        'type': 'rural',
-        'region': 'North',
-        'latitude': 28.8,
-        'longitude': 79.0,
-        'createdAt': DateTime.now(),
-      });
+        await fakeFirestore.collection('facilities').doc(customDocId).set({
+          'name': 'Rampur Clinic',
+          'email': email,
+          'type': 'rural',
+          'region': 'North',
+          'latitude': 28.8,
+          'longitude': 79.0,
+          'createdAt': DateTime.now(),
+        });
 
-      final fac = await firebaseService.getFacilityByEmail(email);
-      expect(fac, isNotNull);
-      expect(fac!.id, equals(customDocId));
-      expect(fac.name, equals('Rampur Clinic'));
-    });
+        final fac = await firebaseService.getFacilityByEmail(email);
+        expect(fac, isNotNull);
+        expect(fac!.id, equals(customDocId));
+        expect(fac.name, equals('Rampur Clinic'));
+      },
+    );
 
     test('resolves uppercase and trimmed email addresses', () async {
       const docId = 'fac_alpha_001';
@@ -300,25 +450,28 @@ void main() {
       expect(fac!.id, equals(docId));
     });
 
-    test('resolves complex email addresses with subdomains and tags', () async {
-      const docId = 'fac_complex_409';
-      const email = 'supply+zone1@sub.health.district.gov.in';
+    test(
+      'resolves complex email addresses with subdomains and tags',
+      () async {
+        const docId = 'fac_complex_409';
+        const email = 'supply+zone1@sub.health.district.gov.in';
 
-      await fakeFirestore.collection('facilities').doc(docId).set({
-        'name': 'District Health HQ',
-        'email': email,
-        'type': 'urban',
-        'region': 'Central',
-        'latitude': 28.6,
-        'longitude': 77.2,
-        'createdAt': DateTime.now(),
-      });
+        await fakeFirestore.collection('facilities').doc(docId).set({
+          'name': 'District Health HQ',
+          'email': email,
+          'type': 'urban',
+          'region': 'Central',
+          'latitude': 28.6,
+          'longitude': 77.2,
+          'createdAt': DateTime.now(),
+        });
 
-      final fac = await firebaseService.getFacilityByEmail(email);
-      expect(fac, isNotNull);
-      expect(fac!.id, equals(docId));
-      expect(fac.email, equals(email));
-    });
+        final fac = await firebaseService.getFacilityByEmail(email);
+        expect(fac, isNotNull);
+        expect(fac!.id, equals(docId));
+        expect(fac.email, equals(email));
+      },
+    );
 
     test('returns null when no matching facility exists', () async {
       final fac =
