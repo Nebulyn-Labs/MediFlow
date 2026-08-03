@@ -937,10 +937,9 @@ class _ActiveIndentsPageState extends ConsumerState<ActiveIndentsPage> {
         if (snapshot.hasError || snapshot.data == null) {
           return const SizedBox.shrink();
         }
-        final history = snapshot.data!
+        final allHistory = snapshot.data!
             .where((r) => r.status != RequestStatus.draft)
-            .toList()
-          ..sort((a, b) => b.requestDate.compareTo(a.requestDate));
+            .toList();
 
         if (allHistory.isEmpty) {
           return const SizedBox.shrink();
@@ -1304,4 +1303,9 @@ class _ActiveIndentsPageState extends ConsumerState<ActiveIndentsPage> {
             ),
     );
   }
+}
+
+enum _IndentSortOption {
+  newestFirst,
+  oldestFirst,
 }
