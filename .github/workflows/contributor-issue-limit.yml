@@ -1,0 +1,89 @@
+name: Contributor Issue Assignment Limit
+
+on:
+  issues:
+    types: [assigned]
+
+permissions:
+  issues: write
+  contents: read
+
+jobs:
+  enforce-issue-limit:
+    name: Enforce Contributor Issue Cap
+    runs-on: ubuntu-latest
+    continue-on-error: true # Ensure automation glitches do not block maintainers
+
+    steps:
+      - name: Check and enforce open issue cap
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const MAX_OPEN_ISSUES = 4;
+            const assignee = context.payload.assignee;
+
+            if (!assignee || assignee.type === 'Bot') {
+              console.log('Assignee missing or is a bot, skipping.');
+              return;
+            }
+
+            const { owner, repo } = context.repo;
+            const issue = context.payload.issue;
+
+            let permission = 'none';
+            try {
+              const response = await github.rest.repos.getCollaboratorPermissionLevel({
+                owner,
+                repo,
+                username: assignee.login,
+              });
+              permission = response.data.permission;
+            } catch (error) {
+              console.log(`Could not read permission for ${assignee.login}, treating as none.`);
+            }
+
+            if (permission === 'admin' || permission === 'write') {
+              console.log(`${assignee.login} is a maintainer (${permission}), no cap applied.`);
+              return;
+            }
+
+            const searchResult = await github.rest.search.issuesAndPullRequests({
+              q: `repo:${owner}/${repo} is:issue is:open assignee:${assignee.login}`,
+              per_page: 100,
+            });
+
+            const otherOpenIssues = searchResult.data.items.filter(
+              (item) => item.number !== issue.number
+            );
+
+            if (otherOpenIssues.length < MAX_OPEN_ISSUES) {
+              console.log(`${assignee.login} has ${otherOpenIssues.length} other open issues, within the cap.`);
+              return;
+            }
+
+            await github.rest.issues.removeAssignees({
+              owner,
+              repo,
+              issue_number: issue.number,
+              assignees: [assignee.login],
+            });
+
+            const issueList = otherOpenIssues
+              .map((item) => `- #${item.number} ${item.title}`)
+              .join('\n');
+
+            await github.rest.issues.createComment({
+              owner,
+              repo,
+              issue_number: issue.number,
+              body: [
+                `Hi @${assignee.login}, thanks for picking this up.`,
+                '',
+                `You are already assigned to ${MAX_OPEN_ISSUES} open issues, which is our per-contributor limit, so you have been unassigned from this one to keep it available for other contributors.`,
+                '',
+                'Your current open issues:',
+                issueList,
+                '',
+                'Once you close or hand back one of these, comment here again and a maintainer can reassign this issue to you.',
+              ].join('\n'),
+            });

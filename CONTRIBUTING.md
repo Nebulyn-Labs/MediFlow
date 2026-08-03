@@ -13,6 +13,19 @@ discuss ideas, and connect with other contributors!
 
 ---
 
+## Table of Contents
+
+- [1. Code of Conduct](#1-code-of-conduct)
+- [2. Setting Up Your Local Environment](#2-setting-up-your-local-environment)
+- [3. Firebase Emulator Setup](#3-firebase-emulator-setup)
+- [4. Claiming and Creating Issues](#4-claiming-and-creating-issues)
+- [5. Branch Naming Conventions](#5-branch-naming-conventions)
+- [6. Coding Standards & Conventions](#6-coding-standards--conventions)
+- [7. Testing](#7-testing)
+- [8. The Pull Request Process](#8-the-pull-request-process)
+
+---
+
 ## 1. Code of Conduct
 
 By participating in this project, you agree to abide by our
@@ -60,18 +73,17 @@ By participating in this project, you agree to abide by our
    flutter pub get
    ```
 
-5. **Configure Environment Variables:**
-   Create a `.env` file in the root of the project:
+5. **Firebase Configuration:**
 
-   ```ini
-   GEMINI_API_KEY=your_gemini_api_key_here
-   ORS_API_KEY=your_openroute_service_key_here
-   FIREBASE_PROJECT_ID=mediflow-92e6f
+   Firebase client configuration is provided through
+   `lib/firebase_options.dart`.
+
+   For Flutter Web, provide the reCAPTCHA site key when running the app:
+
+   ```bash
+   flutter run -d chrome \
+     --dart-define=RECAPTCHA_SITE_KEY=your_recaptcha_site_key
    ```
-
-   *Note: If you do not have API keys, you can use placeholder values like
-   `dummy_key`. The application will still compile but some online features
-   will be disabled.*
 
 ### Firebase Configuration
 
@@ -92,7 +104,65 @@ If you plan to modify or deploy Cloud Functions or Firestore rules:
 
 ---
 
-## 3. Claiming and Creating Issues
+## 3. Firebase Emulator Setup
+
+### Prerequisites
+
+- Node.js
+- npm
+- Firebase CLI installation (`npm install -g firebase-tools`)
+
+### Repository Setup
+
+- Install dependencies:
+
+  ```bash
+  cd functions
+  npm install
+  ```
+
+- Firebase client configuration is already provided through
+  `lib/firebase_options.dart`.
+
+- If you're developing or deploying Cloud Functions that use Gemini,
+  configure the required Firebase Secret:
+
+  ```bash
+  firebase functions:secrets:set GEMINI_API_KEY="your_actual_key"
+  ```
+
+- Login:
+
+  ```bash
+  firebase login
+  firebase use mediflow-92e6f
+  ```
+
+### Starting Emulators
+
+```bash
+firebase emulators:start
+```
+
+### Backend Development
+
+- **Available emulator services**: Hosting, Firestore, and Functions.
+- **Backend startup**: Run the emulators from the root directory.
+
+### Running Tests
+
+```bash
+cd functions
+npm run test
+```
+
+### Sample Data
+
+No seed process currently exists.
+
+---
+
+## 4. Claiming and Creating Issues
 
 Before working on any changes:
 
@@ -107,10 +177,15 @@ Before working on any changes:
 4. **Inactive Issues:** If an assigned issue has no meaningful updates for 7
    days, it may be unassigned to allow others to work on it. If you need more
    time, just leave a comment with a progress update.
+5. **Issue Limit:** Contributors can be assigned to a maximum of 4 open
+   issues at a time. If you are already at the limit, an assignment bot will
+   automatically unassign you from any new issue and leave a comment
+   explaining why. Finish or hand back one of your current issues to free up
+   a slot.
 
 ---
 
-## 4. Branch Naming Conventions
+## 5. Branch Naming Conventions
 
 Always create a new branch for your work. Do not work directly on `main`. Use
 the following naming convention:
@@ -125,7 +200,7 @@ the following naming convention:
 
 ---
 
-## 5. Coding Standards & Conventions
+## 6. Coding Standards & Conventions
 
 ### Coding Style
 
@@ -188,7 +263,7 @@ proper review or understanding.
 
 ---
 
-## 6. Testing
+## 7. Testing
 
 We expect bug fixes and features to be accompanied by tests where applicable.
 
@@ -202,7 +277,7 @@ We expect bug fixes and features to be accompanied by tests where applicable.
 
 ---
 
-## 7. The Pull Request Process
+## 8. The Pull Request Process
 
 1. **Verify Your Branch:**
    Ensure the following commands run successfully with zero errors/warnings
