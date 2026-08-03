@@ -8,6 +8,7 @@ import '../../models/inventory_item.dart';
 import '../../models/daily_usage_log.dart';
 import 'package:med_supply_prototype/constants/colors.dart';
 import '../shared/skeleton_loaders.dart';
+import '../../utils/date_formatter.dart';
 
 enum _IndentSortOption { newestFirst, oldestFirst }
 
@@ -813,7 +814,7 @@ class _ActiveIndentsPageState extends ConsumerState<ActiveIndentsPage> {
                             color: MediColors.textPrimary)),
                     const SizedBox(height: 4),
                     Text(
-                        'Created: ${draft.requestDate.day}/${draft.requestDate.month}/${draft.requestDate.year}',
+                        'Created: ${DateFormatter.formatDate(draft.requestDate)}',
                         style: const TextStyle(
                             fontSize: 12, color: MediColors.textMuted)),
                     if (draft.notes != null) ...[
@@ -1063,7 +1064,7 @@ class _ActiveIndentsPageState extends ConsumerState<ActiveIndentsPage> {
                 if (hasResolution) {
                   final resDate = req.resolvedAt!;
                   resolutionText =
-                      'Resolved: ${resDate.day}/${resDate.month}/${resDate.year} ${resDate.hour.toString().padLeft(2, '0')}:${resDate.minute.toString().padLeft(2, '0')}';
+                      'Resolved: ${DateFormatter.formatDate(resDate)} ${resDate.hour.toString().padLeft(2, '0')}:${resDate.minute.toString().padLeft(2, '0')}';
                 }
 
                 final requestInfo = Column(
@@ -1076,7 +1077,7 @@ class _ActiveIndentsPageState extends ConsumerState<ActiveIndentsPage> {
                             color: MediColors.textPrimary)),
                     const SizedBox(height: 4),
                     Text(
-                        'Submitted: ${req.requestDate.day}/${req.requestDate.month}/${req.requestDate.year}',
+                        'Submitted: ${DateFormatter.formatDate(req.requestDate)}',
                         style: const TextStyle(
                             fontSize: 12, color: MediColors.textMuted)),
                     if (hasResolution) ...[
