@@ -1,12 +1,16 @@
-import 'package:flutter_test/flutter_test.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:fake_cloud_firestore/fake_cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter_test/flutter_test.dart';
 import 'package:med_supply_prototype/models/inventory_item.dart';
 import 'package:med_supply_prototype/services/firebase_service.dart';
 import 'package:mocktail/mocktail.dart';
 
 class MockFirebaseAuth extends Mock implements FirebaseAuth {}
+
+class MockUserCredential extends Mock implements UserCredential {}
+
+class MockUser extends Mock implements User {}
 
 // Helper: write a medicine document into inventory/{facilityId}/medicines/{medId}
 Future<void> _addMedicine(
@@ -67,7 +71,8 @@ void main() {
             (e) => e.toString(),
             'message',
             contains(
-                'Inventory document not found for medicine: $medicineName'),
+              'Inventory document not found for medicine: $medicineName',
+            ),
           ),
         ),
       );
@@ -91,6 +96,30 @@ void main() {
       expect(doc.data()?['name'], 'Updated Name');
       expect(doc.data()?['region'], 'Updated Region');
       expect(doc.data()?['email'], 'test@test.com');
+    });
+
+    test('streamAlerts emits real-time updates when alerts collection changes',
+        () async {
+      const facilityId = 'facility_123';
+      final alertRef =
+          fakeFirestore.collection('alerts').doc('facility_123_med_1');
+
+      final stream = firebaseService.streamAlerts(facilityId);
+      final initialAlerts = await stream.first;
+      expect(initialAlerts, isEmpty);
+
+      await alertRef.set({
+        'facilityId': facilityId,
+        'medicineName': 'Paracetamol',
+        'type': 'low_stock',
+        'qtyRemaining': 5,
+        'initialQuantity': 100,
+      });
+
+      final updatedAlerts = await stream.first;
+      expect(updatedAlerts.length, 1);
+      expect(updatedAlerts.first['medicineName'], 'Paracetamol');
+      expect(updatedAlerts.first['type'], 'low_stock');
     });
   });
 
@@ -124,78 +153,90 @@ void main() {
     });
 
     test(
-        'cursor advancement: lastDocument is set and can be passed as startAfter',
-        () async {
-      // Seed 4 medicines and verify the cursor returned on page 1 is usable.
-      // Note: fake_cloud_firestore does not simulate startAfterDocument on
-      // collectionGroup queries, so we verify the contract — that lastDocument
-      // is non-null after a full page — rather than the full multi-page result.
-      for (var i = 1; i <= 4; i++) {
-        await _addMedicine(
-          fakeFirestore,
-          facilityId: 'fac_b',
-          medicineId: 'med_$i',
-          medicineName: 'Med $i',
+      'cursor advancement: lastDocument is set and can be passed as startAfter',
+      () async {
+        // Seed 4 medicines and verify the cursor returned on page 1 is usable.
+        // Note: fake_cloud_firestore does not simulate startAfterDocument on
+        // collectionGroup queries, so we verify the contract — that lastDocument
+        // is non-null after a full page — rather than the full multi-page result.
+        for (var i = 1; i <= 4; i++) {
+          await _addMedicine(
+            fakeFirestore,
+            facilityId: 'fac_b',
+            medicineId: 'med_$i',
+            medicineName: 'Med $i',
+          );
+        }
+
+        final page1 = await firebaseService.getPaginatedMedicines(pageSize: 2);
+
+        // The cursor must be set so the caller can request the next page.
+        expect(
+          page1.lastDocument,
+          isNotNull,
+          reason: 'lastDocument must be set when a full page is returned',
         );
-      }
 
-      final page1 = await firebaseService.getPaginatedMedicines(pageSize: 2);
+        // Calling with the cursor must not throw (fake returns whatever it can).
+        final DocumentSnapshot cursor = page1.lastDocument!;
+        final page2 = await firebaseService.getPaginatedMedicines(
+          pageSize: 2,
+          startAfter: cursor,
+        );
 
-      // The cursor must be set so the caller can request the next page.
-      expect(page1.lastDocument, isNotNull,
-          reason: 'lastDocument must be set when a full page is returned');
-
-      // Calling with the cursor must not throw (fake returns whatever it can).
-      final DocumentSnapshot cursor = page1.lastDocument!;
-      final page2 = await firebaseService.getPaginatedMedicines(
-        pageSize: 2,
-        startAfter: cursor,
-      );
-
-      // The result object must always be valid.
-      expect(page2.medicines, isA<List<InventoryItem>>());
-    });
+        // The result object must always be valid.
+        expect(page2.medicines, isA<List<InventoryItem>>());
+      },
+    );
 
     test(
-        'cursor advances: items returned on page 1 are distinct InventoryItems',
-        () async {
-      for (var i = 1; i <= 6; i++) {
-        await _addMedicine(
-          fakeFirestore,
-          facilityId: 'fac_c',
-          medicineId: 'drug_$i',
-          medicineName: 'Drug $i',
+      'cursor advances: items returned on page 1 are distinct InventoryItems',
+      () async {
+        for (var i = 1; i <= 6; i++) {
+          await _addMedicine(
+            fakeFirestore,
+            facilityId: 'fac_c',
+            medicineId: 'drug_$i',
+            medicineName: 'Drug $i',
+          );
+        }
+
+        final page1 = await firebaseService.getPaginatedMedicines(pageSize: 3);
+
+        // All IDs within a single page must be unique.
+        final ids = page1.medicines.map((m) => m.id).toList();
+        final uniqueIds = ids.toSet();
+        expect(
+          uniqueIds.length,
+          ids.length,
+          reason: 'A single page must not contain duplicate medicine documents',
         );
-      }
+      },
+    );
 
-      final page1 = await firebaseService.getPaginatedMedicines(pageSize: 3);
+    test(
+      'hasMore is false when fewer than pageSize documents are returned',
+      () async {
+        // Seed exactly 2 medicines but request a page of 5
+        for (var i = 1; i <= 2; i++) {
+          await _addMedicine(
+            fakeFirestore,
+            facilityId: 'fac_d',
+            medicineId: 'item_$i',
+            medicineName: 'Item $i',
+          );
+        }
 
-      // All IDs within a single page must be unique.
-      final ids = page1.medicines.map((m) => m.id).toList();
-      final uniqueIds = ids.toSet();
-      expect(uniqueIds.length, ids.length,
-          reason:
-              'A single page must not contain duplicate medicine documents');
-    });
+        final result = await firebaseService.getPaginatedMedicines(pageSize: 5);
 
-    test('hasMore is false when fewer than pageSize documents are returned',
-        () async {
-      // Seed exactly 2 medicines but request a page of 5
-      for (var i = 1; i <= 2; i++) {
-        await _addMedicine(
-          fakeFirestore,
-          facilityId: 'fac_d',
-          medicineId: 'item_$i',
-          medicineName: 'Item $i',
+        expect(result.medicines.length, 2);
+        expect(
+          result.hasMore,
+          isFalse,
+          reason: 'hasMore must be false when result is smaller than pageSize',
         );
-      }
-
-      final result = await firebaseService.getPaginatedMedicines(pageSize: 5);
-
-      expect(result.medicines.length, 2);
-      expect(result.hasMore, isFalse,
-          reason: 'hasMore must be false when result is smaller than pageSize');
-    });
+      },
+    );
 
     test('empty collection returns empty list and hasMore is false', () async {
       // No documents seeded

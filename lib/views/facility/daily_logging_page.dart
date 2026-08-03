@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
@@ -230,7 +231,7 @@ class _DailyLoggingPageState extends ConsumerState<DailyLoggingPage>
             .showSnackBar(const SnackBar(content: Text('Log saved ✓')));
         _formKey.currentState!.reset();
         // Keep the History tab fresh with the newly saved log.
-        _fetchHistoryFirstPage();
+        unawaited(_fetchHistoryFirstPage());
       }
     } catch (e) {
       if (mounted) {
@@ -278,6 +279,9 @@ class _DailyLoggingPageState extends ConsumerState<DailyLoggingPage>
         allowedExtensions: ['csv', 'txt'],
         withData: true,
       );
+      // The picker can stay open as long as the user likes, so guard the
+      // post-await setState to avoid calling it after the page is disposed.
+      if (!mounted) return;
       if (result == null || result.files.isEmpty) return;
       final file = result.files.first;
       final bytes = file.bytes;
@@ -322,27 +326,40 @@ class _DailyLoggingPageState extends ConsumerState<DailyLoggingPage>
     if (!_ensureOnline()) return;
     setState(() => _isSubmittingCsv = true);
     try {
+      final List<Map<String, dynamic>> successful = [];
+      final List<Map<String, dynamic>> failed = [];
       for (var item in _csvItems) {
-        await ref.read(firebaseServiceProvider).logUsage(
-            facilityId: widget.facilityId,
-            date: _selectedDate,
-            medicineName: item['medicine'],
-            quantity: item['quantity'],
-            patients: item['patients']);
+        try {
+          await ref.read(firebaseServiceProvider).logUsage(
+              facilityId: widget.facilityId,
+              date: _selectedDate,
+              medicineName: item['medicine']?.toString() ?? '',
+              quantity: (item['quantity'] as num?)?.toInt() ?? 0,
+              patients: (item['patients'] as num?)?.toInt() ?? 0);
+          successful.add(item);
+        } catch (e) {
+          final failedItem = Map<String, dynamic>.from(item);
+          failedItem['error'] = e.toString();
+          failed.add(failedItem);
+        }
       }
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('${_csvItems.length} logs saved ✓')));
+        final successCount = successful.length;
+        final failCount = failed.length;
+        if (failCount == 0) {
+          ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text('$successCount logs saved ✓')));
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+              content: Text('Saved $successCount logs, $failCount failed.')));
+        }
         setState(() {
-          _csvItems.clear();
-          _csvStatus = null;
+          _csvItems = failed;
+          _csvStatus = failCount == 0
+              ? null
+              : 'Partial success: $successCount saved, $failCount failed.';
         });
-        _fetchHistoryFirstPage();
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text('Error: $e')));
+        unawaited(_fetchHistoryFirstPage());
       }
     } finally {
       if (mounted) setState(() => _isSubmittingCsv = false);
@@ -352,6 +369,9 @@ class _DailyLoggingPageState extends ConsumerState<DailyLoggingPage>
   Future<void> _simulateQRScan() async {
     setState(() => _isScanning = true);
     await Future.delayed(const Duration(seconds: 2));
+    // The simulated scan takes long enough that the user can navigate away.
+    // Bail out before setState if the page was disposed in the meantime.
+    if (!mounted) return;
     if (_availableMedicines.isNotEmpty) {
       final med = _availableMedicines[
           DateTime.now().second % _availableMedicines.length];
@@ -375,15 +395,15 @@ class _DailyLoggingPageState extends ConsumerState<DailyLoggingPage>
         await ref.read(firebaseServiceProvider).logUsage(
             facilityId: widget.facilityId,
             date: _selectedDate,
-            medicineName: item['medicine'],
-            quantity: item['quantity'],
-            patients: item['patients']);
+            medicineName: item['medicine']?.toString() ?? '',
+            quantity: (item['quantity'] as num?)?.toInt() ?? 0,
+            patients: (item['patients'] as num?)?.toInt() ?? 0);
       }
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(content: Text('${_scannedItems.length} logs saved ✓')));
         setState(() => _scannedItems.clear());
-        _fetchHistoryFirstPage();
+        unawaited(_fetchHistoryFirstPage());
       }
     } catch (e) {
       if (mounted) {
@@ -402,18 +422,30 @@ class _DailyLoggingPageState extends ConsumerState<DailyLoggingPage>
         type: FileType.image,
         withData: true,
       );
+      // The file picker can stay open as long as the user likes, so guard the
+      // post-await setState to avoid calling it after the page is disposed.
+      if (!mounted) return;
       if (result == null || result.files.isEmpty) return;
-      final bytes = result.files.first.bytes;
+      final file = result.files.first;
+      final bytes = file.bytes;
       if (bytes == null) return;
+      final aiService = ref.read(aiServiceProvider);
+      final imageMimeType = aiService.imageMimeTypeForPickedFile(
+        imageBytes: bytes,
+        fileName: file.name,
+        extension: file.extension,
+      );
       setState(() {
         _isParsingImage = true;
         _imageParseResult = null;
         _imageParseError = null;
         _imageItems.clear();
       });
-      final parsed = await ref.read(aiServiceProvider).parseImageWithVision(
-          bytes,
-          'Extract all medicine names, quantities, and patient counts from this image. Output JSON: [{"medicine": "string", "quantity": int, "patients": int}]');
+      final parsed = await aiService.parseImageWithVision(
+        bytes,
+        'Extract all medicine names, quantities, and patient counts from this image. Output JSON: [{"medicine": "string", "quantity": int, "patients": int}]',
+        imageMimeType: imageMimeType,
+      );
       if (mounted) {
         final extractedItems = parseVisionJson(parsed);
         setState(() {
@@ -477,9 +509,9 @@ class _DailyLoggingPageState extends ConsumerState<DailyLoggingPage>
         await ref.read(firebaseServiceProvider).logUsage(
             facilityId: widget.facilityId,
             date: _selectedDate,
-            medicineName: item['medicine'],
-            quantity: item['quantity'],
-            patients: item['patients']);
+            medicineName: item['medicine']?.toString() ?? '',
+            quantity: (item['quantity'] as num?)?.toInt() ?? 0,
+            patients: (item['patients'] as num?)?.toInt() ?? 0);
       }
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -488,7 +520,7 @@ class _DailyLoggingPageState extends ConsumerState<DailyLoggingPage>
           _imageItems.clear();
           _imageParseResult = null;
         });
-        _fetchHistoryFirstPage();
+        unawaited(_fetchHistoryFirstPage());
       }
     } catch (e) {
       if (mounted) {
@@ -567,137 +599,148 @@ class _DailyLoggingPageState extends ConsumerState<DailyLoggingPage>
 
   Widget _buildManualTab(bool isOnline) {
     return Center(
-      child: Container(
-        width: 480,
-        margin: const EdgeInsets.all(28),
-        padding: const EdgeInsets.all(32),
-        decoration: BoxDecoration(
-            color: MediColors.surface,
-            borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: MediColors.border)),
-        child: SingleChildScrollView(
-          child: Form(
-            key: _formKey,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text('Log Medicine Usage',
-                    style: TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.w700,
-                        color: MediColors.textPrimary)),
-                const SizedBox(height: 6),
-                const Text('Feeds into AI forecasting model',
-                    style:
-                        TextStyle(color: MediColors.textMuted, fontSize: 13)),
-                const SizedBox(height: 28),
-                // The surrounding Container paints its own background, which
-                // would swallow the tile's ink splash without a Material of
-                // its own.
-                Material(
-                  type: MaterialType.transparency,
-                  child: ListTile(
-                    contentPadding: EdgeInsets.zero,
-                    title: const Text('Date',
-                        style: TextStyle(
-                            color: MediColors.textSecondary, fontSize: 13)),
-                    subtitle: Text(
-                        '${_selectedDate.day}/${_selectedDate.month}/${_selectedDate.year}',
-                        style: const TextStyle(
-                            color: MediColors.textPrimary,
-                            fontSize: 16,
-                            fontWeight: FontWeight.w600)),
-                    trailing: const Icon(Icons.calendar_today_rounded,
-                        color: MediColors.textMuted),
-                    onTap: () async {
-                      final date = await showDatePicker(
-                          context: context,
-                          initialDate: _selectedDate,
-                          firstDate: DateTime(2020),
-                          lastDate: DateTime.now());
-                      if (date != null) setState(() => _selectedDate = date);
-                    },
-                  ),
-                ),
-                const SizedBox(height: 16),
-                if (_isLoadingInventory)
-                  const Column(
-                    children: [
-                      SkeletonTableRow(),
-                      SkeletonTableRow(),
-                      SkeletonTableRow(),
-                    ],
-                  )
-                else if (_inventoryError != null)
-                  Container(
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                          color: MediColors.error.withValues(alpha: 0.08),
-                          borderRadius: BorderRadius.circular(10)),
-                      child: Text(_inventoryError!,
-                          style: const TextStyle(
-                              color: MediColors.error, fontSize: 13)))
-                else if (_availableMedicines.isEmpty)
-                  Container(
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                          color: MediColors.warning.withValues(alpha: 0.08),
-                          borderRadius: BorderRadius.circular(10)),
-                      child: const Text('No active inventory found.',
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 480),
+        child: Container(
+          margin: const EdgeInsets.all(28),
+          padding: const EdgeInsets.all(32),
+          decoration: BoxDecoration(
+              color: MediColors.surface,
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: MediColors.border)),
+          child: SingleChildScrollView(
+            child: Form(
+              key: _formKey,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text('Log Medicine Usage',
+                      style: TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.w700,
+                          color: MediColors.textPrimary)),
+                  const SizedBox(height: 6),
+                  const Text('Feeds into AI forecasting model',
+                      style:
+                          TextStyle(color: MediColors.textMuted, fontSize: 13)),
+                  const SizedBox(height: 28),
+                  // The surrounding Container paints its own background, which
+                  // would swallow the tile's ink splash without a Material of
+                  // its own.
+                  Material(
+                    type: MaterialType.transparency,
+                    child: ListTile(
+                      contentPadding: EdgeInsets.zero,
+                      title: const Text('Date',
                           style: TextStyle(
-                              color: MediColors.warning, fontSize: 13)))
-                else
-                  DropdownButtonFormField<String>(
-                    decoration: const InputDecoration(labelText: 'Medicine'),
-                    dropdownColor: MediColors.surfaceLight,
-                    initialValue: _medName,
-                    style: const TextStyle(color: MediColors.textPrimary),
-                    items: _availableMedicines
-                        .map((m) => DropdownMenuItem(value: m, child: Text(m)))
-                        .toList(),
-                    onChanged: (v) => setState(() => _medName = v),
-                    validator: (v) => v == null ? 'Select a medicine' : null,
+                              color: MediColors.textSecondary, fontSize: 13)),
+                      subtitle: Text(
+                          '${_selectedDate.day}/${_selectedDate.month}/${_selectedDate.year}',
+                          style: const TextStyle(
+                              color: MediColors.textPrimary,
+                              fontSize: 16,
+                              fontWeight: FontWeight.w600)),
+                      trailing: const Icon(Icons.calendar_today_rounded,
+                          color: MediColors.textMuted),
+                      onTap: () async {
+                        final date = await showDatePicker(
+                            context: context,
+                            initialDate: _selectedDate,
+                            firstDate: DateTime(2020),
+                            lastDate: DateTime.now());
+                        if (date != null) setState(() => _selectedDate = date);
+                      },
+                    ),
                   ),
-                const SizedBox(height: 16),
-                TextFormField(
-                    decoration:
-                        const InputDecoration(labelText: 'Units Distributed'),
-                    keyboardType: TextInputType.number,
-                    style: const TextStyle(color: MediColors.textPrimary),
-                    validator: (v) => (int.tryParse(v ?? '') == null)
-                        ? 'Enter valid number'
-                        : null,
-                    onSaved: (v) => _quantity = int.parse(v!)),
-                const SizedBox(height: 16),
-                TextFormField(
-                    decoration:
-                        const InputDecoration(labelText: 'Patients Served'),
-                    keyboardType: TextInputType.number,
-                    style: const TextStyle(color: MediColors.textPrimary),
-                    validator: (v) => (int.tryParse(v ?? '') == null)
-                        ? 'Enter valid number'
-                        : null,
-                    onSaved: (v) => _patients = int.parse(v!)),
-                const SizedBox(height: 28),
-                SizedBox(
-                    width: double.infinity,
-                    height: 50,
-                    child: FilledButton(
-                        onPressed: (_isSubmitting ||
-                                _availableMedicines.isEmpty ||
-                                !isOnline)
-                            ? null
-                            : _submitLog,
-                        child: _isSubmitting
-                            ? const SizedBox(
-                                width: 20,
-                                height: 20,
-                                child: CircularProgressIndicator(
-                                    color: Colors.white, strokeWidth: 2))
-                            : Text(
-                                isOnline ? 'Save Log' : 'Save Log (offline)'))),
-              ],
+                  const SizedBox(height: 16),
+                  if (_isLoadingInventory)
+                    const Column(
+                      children: [
+                        SkeletonTableRow(),
+                        SkeletonTableRow(),
+                        SkeletonTableRow(),
+                      ],
+                    )
+                  else if (_inventoryError != null)
+                    Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                            color: MediColors.error.withValues(alpha: 0.08),
+                            borderRadius: BorderRadius.circular(10)),
+                        child: Text(_inventoryError!,
+                            style: const TextStyle(
+                                color: MediColors.error, fontSize: 13)))
+                  else if (_availableMedicines.isEmpty)
+                    Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                            color: MediColors.warning.withValues(alpha: 0.08),
+                            borderRadius: BorderRadius.circular(10)),
+                        child: const Text('No active inventory found.',
+                            style: TextStyle(
+                                color: MediColors.warning, fontSize: 13)))
+                  else
+                    DropdownButtonFormField<String>(
+                      decoration: const InputDecoration(labelText: 'Medicine'),
+                      dropdownColor: MediColors.surfaceLight,
+                      initialValue: _medName,
+                      isExpanded: true,
+                      style: const TextStyle(color: MediColors.textPrimary),
+                      items: _availableMedicines
+                          .map((m) => DropdownMenuItem(
+                                value: m,
+                                child: Text(
+                                  m,
+                                  overflow: TextOverflow.ellipsis,
+                                  maxLines: 1,
+                                ),
+                              ))
+                          .toList(),
+                      onChanged: (v) => setState(() => _medName = v),
+                      validator: (v) => v == null ? 'Select a medicine' : null,
+                    ),
+                  const SizedBox(height: 16),
+                  TextFormField(
+                      decoration:
+                          const InputDecoration(labelText: 'Units Distributed'),
+                      keyboardType: TextInputType.number,
+                      style: const TextStyle(color: MediColors.textPrimary),
+                      validator: (v) => (int.tryParse(v ?? '') == null)
+                          ? 'Enter valid number'
+                          : null,
+                      onSaved: (v) => _quantity = int.parse(v!)),
+                  const SizedBox(height: 16),
+                  TextFormField(
+                      decoration:
+                          const InputDecoration(labelText: 'Patients Served'),
+                      keyboardType: TextInputType.number,
+                      style: const TextStyle(color: MediColors.textPrimary),
+                      validator: (v) => (int.tryParse(v ?? '') == null)
+                          ? 'Enter valid number'
+                          : null,
+                      onSaved: (v) => _patients = int.parse(v!)),
+                  const SizedBox(height: 28),
+                  SizedBox(
+                      width: double.infinity,
+                      height: 50,
+                      child: FilledButton(
+                          onPressed: (_isSubmitting ||
+                                  _availableMedicines.isEmpty ||
+                                  !isOnline)
+                              ? null
+                              : _submitLog,
+                          child: _isSubmitting
+                              ? const SizedBox(
+                                  width: 20,
+                                  height: 20,
+                                  child: CircularProgressIndicator(
+                                      color: Colors.white, strokeWidth: 2))
+                              : Text(isOnline
+                                  ? 'Save Log'
+                                  : 'Save Log (offline)'))),
+                ],
+              ),
             ),
           ),
         ),
@@ -781,7 +824,8 @@ class _DailyLoggingPageState extends ConsumerState<DailyLoggingPage>
                       ],
                       rows: _csvItems
                           .map((item) => DataRow(cells: [
-                                DataCell(Text(item['medicine'],
+                                DataCell(Text(
+                                    item['medicine']?.toString() ?? '',
                                     style: const TextStyle(
                                         fontWeight: FontWeight.w600))),
                                 DataCell(Text(item['quantity'].toString())),
@@ -885,7 +929,8 @@ class _DailyLoggingPageState extends ConsumerState<DailyLoggingPage>
                       ],
                       rows: _scannedItems
                           .map((item) => DataRow(cells: [
-                                DataCell(Text(item['medicine'],
+                                DataCell(Text(
+                                    item['medicine']?.toString() ?? '',
                                     style: const TextStyle(
                                         fontWeight: FontWeight.w600))),
                                 DataCell(Text(item['quantity'].toString())),

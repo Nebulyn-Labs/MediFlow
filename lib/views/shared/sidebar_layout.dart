@@ -3,7 +3,7 @@ import 'package:go_router/go_router.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../../services/firebase_service.dart';
 import '../../models/inventory_item.dart';
-import 'package:med_supply_prototype/constants/colors.dart';
+import 'package:med_supply_prototype/theme/medi_flow_theme.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'confirm_logout_dialog.dart';
 import 'scroll_to_top_button.dart';
@@ -142,11 +142,12 @@ class _SidebarLayoutState extends ConsumerState<SidebarLayout> {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.mediTheme;
     final selectedIndex = _calculateSelectedIndex(context);
     final items = _navItems;
 
     return Scaffold(
-      backgroundColor: MediColors.bg,
+      backgroundColor: colors.background,
       body: Row(
         children: [
           // ── Sidebar ──
@@ -158,9 +159,9 @@ class _SidebarLayoutState extends ConsumerState<SidebarLayout> {
               curve: Curves.easeOutCubic,
               width: _isExpanded ? 220 : 72,
               decoration: BoxDecoration(
-                color: MediColors.surface,
-                border: Border(
-                    right: BorderSide(color: MediColors.border, width: 1)),
+                color: colors.surface,
+                border:
+                    Border(right: BorderSide(color: colors.border, width: 1)),
               ),
               child: Column(
                 children: [
@@ -172,62 +173,69 @@ class _SidebarLayoutState extends ConsumerState<SidebarLayout> {
                       width: 44,
                       height: 44,
                       decoration: BoxDecoration(
-                        gradient: MediColors.primaryGradient,
+                        gradient: colors.primaryGradient,
                         borderRadius: BorderRadius.circular(14),
                       ),
-                      child: const Icon(Icons.health_and_safety_rounded,
-                          color: Colors.white, size: 24),
+                      child: Icon(Icons.health_and_safety_rounded,
+                          color: colors.onAccent, size: 24),
                     ),
                   ),
 
                   // Nav Items
-                  StreamBuilder<List<notif.NotificationModel>>(
-                    stream:
-                        widget.role == 'facility' && widget.facilityId != null
-                            ? ref
-                                .watch(firebaseServiceProvider)
-                                .streamNotifications(widget.facilityId!)
-                            : Stream.value([]),
-                    builder: (context, notifSnapshot) {
-                      final notifications = notifSnapshot.data ?? [];
-                      final unreadCount =
-                          notifications.where((n) => !n.isRead).length;
+                  Expanded(
+                    child: ScrollConfiguration(
+                      behavior: ScrollConfiguration.of(context)
+                          .copyWith(scrollbars: false),
+                      child: SingleChildScrollView(
+                        child: StreamBuilder<List<notif.NotificationModel>>(
+                          stream: widget.role == 'facility' &&
+                                  widget.facilityId != null
+                              ? ref
+                                  .watch(firebaseServiceProvider)
+                                  .streamNotifications(widget.facilityId!)
+                              : Stream.value([]),
+                          builder: (context, notifSnapshot) {
+                            final notifications = notifSnapshot.data ?? [];
+                            final unreadCount =
+                                notifications.where((n) => !n.isRead).length;
 
-                      return StreamBuilder<List<InventoryItem>>(
-                        stream: widget.role == 'facility' &&
-                                widget.facilityId != null
-                            ? ref
-                                .watch(firebaseServiceProvider)
-                                .streamInventory(widget.facilityId!)
-                            : Stream.value([]),
-                        builder: (context, snapshot) {
-                          final inventory = snapshot.data ?? [];
-                          final hasAlerts = inventory.any((i) {
-                            final daysLeft =
-                                i.expiryDate.difference(DateTime.now()).inDays;
-                            return i.isLowStock || daysLeft <= 30;
-                          });
+                            return StreamBuilder<List<InventoryItem>>(
+                              stream: widget.role == 'facility' &&
+                                      widget.facilityId != null
+                                  ? ref
+                                      .watch(firebaseServiceProvider)
+                                      .streamInventory(widget.facilityId!)
+                                  : Stream.value([]),
+                              builder: (context, snapshot) {
+                                final inventory = snapshot.data ?? [];
+                                // Use the centralized hasAlert getter from
+                                // InventoryItem to avoid duplicating
+                                // threshold logic.
+                                final hasAlerts =
+                                    inventory.any((i) => i.hasAlert);
 
-                          return Column(
-                            children: List.generate(items.length, (i) {
-                              final isSelected = i == selectedIndex;
-                              final isAlertTab = widget.role == 'facility' &&
-                                  i == 3; // Alerts index
-                              return _buildNavItem(
-                                items[i],
-                                isSelected,
-                                () => _onItemTapped(i, context),
-                                showBadge: isAlertTab && hasAlerts,
-                                badgeCount: isAlertTab ? unreadCount : 0,
-                              );
-                            }),
-                          );
-                        },
-                      );
-                    },
+                                return Column(
+                                  children: List.generate(items.length, (i) {
+                                    final isSelected = i == selectedIndex;
+                                    final isAlertTab =
+                                        widget.role == 'facility' &&
+                                            i == 3; // Alerts index
+                                    return _buildNavItem(
+                                      items[i],
+                                      isSelected,
+                                      () => _onItemTapped(i, context),
+                                      showBadge: isAlertTab && hasAlerts,
+                                      badgeCount: isAlertTab ? unreadCount : 0,
+                                    );
+                                  }),
+                                );
+                              },
+                            );
+                          },
+                        ),
+                      ),
+                    ),
                   ),
-
-                  const Spacer(),
 
                   // Logout
                   _buildNavItem(
@@ -244,7 +252,7 @@ class _SidebarLayoutState extends ConsumerState<SidebarLayout> {
                           ScaffoldMessenger.of(context).showSnackBar(
                             SnackBar(
                               content: Text('Sign out failed: ${e.toString()}'),
-                              backgroundColor: MediColors.error,
+                              backgroundColor: colors.error,
                             ),
                           );
                         }
@@ -284,6 +292,8 @@ class _SidebarLayoutState extends ConsumerState<SidebarLayout> {
 
   Widget _buildNavItem(_NavItem item, bool isSelected, VoidCallback onTap,
       {bool isLogout = false, bool showBadge = false, int badgeCount = 0}) {
+    final colors = context.mediTheme;
+
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
       child: Material(
@@ -291,18 +301,17 @@ class _SidebarLayoutState extends ConsumerState<SidebarLayout> {
         child: InkWell(
           onTap: onTap,
           borderRadius: BorderRadius.circular(12),
-          hoverColor: MediColors.surfaceHover,
+          hoverColor: colors.surfaceHover,
           child: AnimatedContainer(
             duration: const Duration(milliseconds: 200),
             padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 12),
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(12),
               color: isSelected
-                  ? MediColors.primary.withValues(alpha: 0.12)
+                  ? colors.primary.withValues(alpha: 0.12)
                   : Colors.transparent,
               border: isSelected
-                  ? Border.all(
-                      color: MediColors.primary.withValues(alpha: 0.25))
+                  ? Border.all(color: colors.primary.withValues(alpha: 0.25))
                   : null,
             ),
             child: ClipRect(
@@ -319,10 +328,10 @@ class _SidebarLayoutState extends ConsumerState<SidebarLayout> {
                             item.icon,
                             size: 22,
                             color: isLogout
-                                ? MediColors.error
+                                ? colors.error
                                 : isSelected
-                                    ? MediColors.primary
-                                    : MediColors.textMuted,
+                                    ? colors.primary
+                                    : colors.textMuted,
                           ),
                         ),
                       ),
@@ -332,14 +341,14 @@ class _SidebarLayoutState extends ConsumerState<SidebarLayout> {
                           top: -4,
                           child: Container(
                             padding: const EdgeInsets.all(3),
-                            decoration: const BoxDecoration(
-                              color: MediColors.error,
+                            decoration: BoxDecoration(
+                              color: colors.error,
                               shape: BoxShape.circle,
                             ),
                             child: Text(
                               badgeCount > 99 ? '99+' : badgeCount.toString(),
-                              style: const TextStyle(
-                                color: Colors.white,
+                              style: TextStyle(
+                                color: colors.onAccent,
                                 fontSize: 9,
                                 fontWeight: FontWeight.bold,
                                 height: 1.0,
@@ -355,16 +364,20 @@ class _SidebarLayoutState extends ConsumerState<SidebarLayout> {
                           child: Container(
                             width: 10,
                             height: 10,
-                            decoration: const BoxDecoration(
-                              color: MediColors.error,
+                            decoration: BoxDecoration(
+                              color: colors.error,
                               shape: BoxShape.circle,
                             ),
                           ),
                         ),
                     ],
                   ),
-                  if (_isExpanded) ...[
-                    const SizedBox(width: 14),
+                  AnimatedContainer(
+                    duration: const Duration(milliseconds: 200),
+                    curve: Curves.easeOutCubic,
+                    width: _isExpanded ? 14 : 0,
+                  ),
+                  if (_isExpanded)
                     Expanded(
                       child: Text(
                         item.label,
@@ -373,16 +386,15 @@ class _SidebarLayoutState extends ConsumerState<SidebarLayout> {
                           fontWeight:
                               isSelected ? FontWeight.w600 : FontWeight.w500,
                           color: isLogout
-                              ? MediColors.error
+                              ? colors.error
                               : isSelected
-                                  ? MediColors.primary
-                                  : MediColors.textSecondary,
+                                  ? colors.primary
+                                  : colors.textSecondary,
                         ),
                         overflow: TextOverflow.ellipsis,
                         maxLines: 1,
                       ),
                     ),
-                  ],
                 ],
               ),
             ),

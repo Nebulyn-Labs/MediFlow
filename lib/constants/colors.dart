@@ -1,5 +1,9 @@
 import 'package:flutter/material.dart';
 
+/// Legacy palette values used to seed `MediFlowTheme`.
+///
+/// UI code should consume semantic roles from `context.mediTheme` so changing
+/// the active application theme does not require widget-level color changes.
 class MediColors {
   static const Color bg = Color(0xFF0B1120);
   static const Color surface = Color(0xFF141B2D);

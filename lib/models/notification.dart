@@ -21,11 +21,11 @@ class NotificationModel {
       Map<String, dynamic> data, String documentId) {
     return NotificationModel(
       id: documentId,
-      facilityId: data['facilityId'] ?? '',
-      type: data['type'] ?? 'info',
-      message: data['message'] ?? '',
-      isRead: data['isRead'] ?? false,
-      createdAt: data['createdAt'] != null
+      facilityId: data['facilityId']?.toString() ?? '',
+      type: data['type']?.toString() ?? 'info',
+      message: data['message']?.toString() ?? '',
+      isRead: (data['isRead'] as bool?) ?? false,
+      createdAt: data['createdAt'] is Timestamp
           ? (data['createdAt'] as Timestamp).toDate()
           : DateTime.now(),
     );

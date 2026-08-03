@@ -187,15 +187,19 @@ class FakeOptimizationService implements OptimizationService {
   }
 }
 
-class FakeRoutingService implements RoutingService {
+class FakeRoutingService extends RoutingService {
+  final RouteResult? customResult;
+
+  FakeRoutingService({this.customResult});
+
   @override
-  Future<List<LatLng>> getRoute(LatLng start, LatLng end) async {
-    return [start, end];
+  Future<RouteResult> getRoute(LatLng start, LatLng end) async {
+    return customResult ?? RouteResult(points: [start, end]);
   }
 
   @override
-  Future<List<LatLng>> getMultiStopRoute(List<LatLng> stops) async {
-    return stops;
+  Future<RouteResult> getMultiStopRoute(List<LatLng> stops) async {
+    return customResult ?? RouteResult(points: stops);
   }
 }
 
@@ -289,7 +293,7 @@ void main() {
     });
 
     Widget createWidgetUnderTest(List<TransferRecommendation> recs,
-        {FirebaseService? firebaseService}) {
+        {FirebaseService? firebaseService, RoutingService? routingService}) {
       return ProviderScope(
         overrides: [
           firebaseServiceProvider.overrideWithValue(
@@ -302,7 +306,8 @@ void main() {
           ),
           optimizationServiceProvider
               .overrideWithValue(FakeOptimizationService(recs)),
-          routingServiceProvider.overrideWithValue(FakeRoutingService()),
+          routingServiceProvider
+              .overrideWithValue(routingService ?? FakeRoutingService()),
           aiServiceProvider.overrideWithValue(FakeAIService()),
         ],
         child: const MaterialApp(
@@ -645,5 +650,132 @@ void main() {
       // Should show success
       expect(find.text('Transfer Manifest'), findsOneWidget);
     });
+
+    testWidgets(
+        'displays road route distance and travel duration when available',
+        (WidgetTester tester) async {
+      tester.view.physicalSize = const Size(1920, 1080);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
+      final roadResult = RouteResult(
+        points: [
+          LatLng(donor.latitude, donor.longitude),
+          LatLng(recipient.latitude, recipient.longitude),
+        ],
+        distanceKm: 25.4,
+        durationSeconds: 1800, // 30 mins
+      );
+
+      await tester.pumpWidget(createWidgetUnderTest(
+        [recommendation],
+        routingService: FakeRoutingService(customResult: roadResult),
+      ));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Generate Optimal Routes'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('25.4 km'), findsOneWidget);
+      expect(find.text('30m est.'), findsOneWidget);
+      expect(find.textContaining('straight-line'), findsNothing);
+    });
+
+    testWidgets('displays straight-line label when road metadata is null',
+        (WidgetTester tester) async {
+      tester.view.physicalSize = const Size(1920, 1080);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
+      final fallbackResult = RouteResult(
+        points: [
+          LatLng(donor.latitude, donor.longitude),
+          LatLng(recipient.latitude, recipient.longitude),
+        ],
+        distanceKm: null,
+        durationSeconds: null,
+      );
+
+      await tester.pumpWidget(createWidgetUnderTest(
+        [recommendation],
+        routingService: FakeRoutingService(customResult: fallbackResult),
+      ));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Generate Optimal Routes'));
+      await tester.pumpAndSettle();
+
+      expect(find.textContaining('straight-line @ 40 km/h'), findsOneWidget);
+    });
+    // -------------------------------------------------------------------------
+    // Issue #323: setState after await must be guarded by `mounted`.
+    // Starting "Generate Optimal Routes" and immediately navigating away must
+    // not throw "setState() called after dispose()".
+    // -------------------------------------------------------------------------
+    testWidgets('disposing the page mid route generation does not throw (#323)',
+        (WidgetTester tester) async {
+      tester.view.physicalSize = const Size(1920, 1080);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
+      // AI summary that resolves when the test lets it, so the final
+      // setState fires after we have disposed the page. Without the
+      // mounted guard this would throw "setState() called after dispose()".
+      final hangingSummary = Completer<String>();
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            firebaseServiceProvider.overrideWithValue(
+              FakeFirebaseService(
+                facilities: [donor, recipient],
+                inventory: [inventory],
+                requests: [request],
+              ),
+            ),
+            optimizationServiceProvider
+                .overrideWithValue(FakeOptimizationService([recommendation])),
+            routingServiceProvider.overrideWithValue(FakeRoutingService()),
+            aiServiceProvider
+                .overrideWithValue(_HangingAIService(hangingSummary.future)),
+          ],
+          child: const MaterialApp(home: RouteOptimizationMap()),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // Kick off route generation. The first network calls (multi-stop,
+      // legs) complete under the fakes, but the AI summary future is still
+      // pending — the final setState would fire on the disposed State.
+      await tester.tap(find.text('Generate Optimal Routes'));
+      await tester.pump();
+
+      // Navigate away while the AI summary is still in flight.
+      await tester.pumpWidget(const SizedBox.shrink());
+      // Now resolve the AI summary: the post-await setState would run on
+      // a disposed State without the mounted guard added by #323.
+      hangingSummary.complete('Late AI summary');
+      await tester.pump();
+      await tester.pump(const Duration(seconds: 1));
+
+      expect(tester.takeException(), isNull);
+    });
   });
+}
+
+/// AI service whose summary resolves only when the caller completes the
+/// future. Mirrors the real "Generate Optimal Routes" call where the AI
+/// summary can return after the user has navigated away.
+class _HangingAIService implements AIService {
+  _HangingAIService(this.summary);
+  final Future<String> summary;
+  @override
+  Future<String> generateRedistributionPlan(
+          List<MedRequest> requests, List<Facility> facilities) =>
+      summary;
+  @override
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 }

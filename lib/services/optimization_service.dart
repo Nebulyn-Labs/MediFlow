@@ -154,10 +154,7 @@ class OptimizationService {
     // 1. Group needs (shortage or regular indent) by medicine
     final pendingIndents = <MedRequest>[];
     for (final request in requests) {
-      if (!((request.status == RequestStatus.pending ||
-              request.status == RequestStatus.approved) &&
-          (request.type == RequestType.regularIndent ||
-              request.type == RequestType.shortage))) {
+      if (!request.isDeficit) {
         continue;
       }
 
@@ -199,6 +196,12 @@ class OptimizationService {
       workingSurpluses[f.id] = {};
       final inv = inventories[f.id] ?? [];
       for (var item in inv) {
+        if (item.initialQuantity <= 0) {
+          debugPrint(
+            'OptimizationService: Skipping item ${item.medicineName} with non-positive initial quantity ${item.initialQuantity}.',
+          );
+          continue;
+        }
         int surplus =
             item.remainingQuantity - (item.initialQuantity * 0.3).toInt();
         if (surplus > 0) {
@@ -342,8 +345,8 @@ class OptimizationService {
             recipient: recipientFac,
             medicine: medicine,
             quantity: qtyTaken,
-            score: bestDonorMatch['score'],
-            reasoning: bestDonorMatch['reasoning'],
+            score: (bestDonorMatch['score'] as num?)?.toDouble() ?? 0.0,
+            reasoning: bestDonorMatch['reasoning']?.toString() ?? '',
           ));
 
           // Update state

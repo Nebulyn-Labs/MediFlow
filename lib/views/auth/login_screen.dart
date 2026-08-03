@@ -94,217 +94,258 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
     return Scaffold(
       backgroundColor: MediColors.bg,
-      body: Row(
-        children: [
-          // Left: Brand illustration
-          Expanded(
-            child: Container(
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [MediColors.bg, MediColors.surface],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                ),
-              ),
-              child: Center(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Container(
-                      width: 120,
-                      height: 120,
-                      decoration: BoxDecoration(
-                        gradient: gradient,
-                        borderRadius: BorderRadius.circular(32),
-                        boxShadow: [
-                          BoxShadow(
-                              color: accentColor.withValues(alpha: 0.3),
-                              blurRadius: 40,
-                              spreadRadius: 5),
-                        ],
-                      ),
-                      child: Icon(
-                        isFacility
-                            ? Icons.vaccines_rounded
-                            : Icons.admin_panel_settings_rounded,
-                        size: 56,
-                        color: Colors.white,
-                      ),
-                    ),
-                    const SizedBox(height: 32),
-                    Text(
-                      isFacility ? 'Facility Portal' : 'Admin Portal',
-                      style: TextStyle(
-                          fontSize: 28,
-                          fontWeight: FontWeight.w800,
-                          color: accentColor),
-                    ),
-                    const SizedBox(height: 12),
-                    SizedBox(
-                      width: 360,
-                      child: Text(
-                        isFacility
-                            ? 'Manage daily logs, track inventory, and forecast indents using AI.'
-                            : 'Monitor global stock levels and optimize redistribution routes.',
-                        textAlign: TextAlign.center,
-                        style: const TextStyle(
-                            color: MediColors.textSecondary,
-                            fontSize: 14,
-                            height: 1.6),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
+      body: LayoutBuilder(
+        builder: (context, constraints) {
+          final isNarrow = constraints.maxWidth < 700;
 
-          // Right: Login form
-          Expanded(
-            child: Center(
-              child: Container(
-                width: 400,
-                padding: const EdgeInsets.all(40),
-                decoration: BoxDecoration(
-                  color: MediColors.surface,
-                  borderRadius: BorderRadius.circular(24),
-                  border: Border.all(color: MediColors.border),
-                ),
+          if (isNarrow) {
+            return SafeArea(
+              child: SingleChildScrollView(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 20, vertical: 32),
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    const Text(
-                      'Sign In',
-                      style: TextStyle(
-                          fontSize: 28,
-                          fontWeight: FontWeight.w800,
-                          color: MediColors.textPrimary),
-                    ),
-                    const SizedBox(height: 8),
-                    const Text(
-                      'Enter your credentials to continue',
-                      style: TextStyle(
-                          color: MediColors.textSecondary, fontSize: 14),
-                    ),
-                    const SizedBox(height: 36),
-                    TextField(
-                      controller: _emailController,
-                      keyboardType: TextInputType.emailAddress,
-                      style: const TextStyle(color: MediColors.textPrimary),
-                      decoration: InputDecoration(
-                        labelText: 'Email Address',
-                        prefixIcon: Icon(Icons.email_outlined,
-                            color: MediColors.textMuted, size: 20),
-                      ),
-                    ),
-                    const SizedBox(height: 20),
-                    TextField(
-                      controller: _passwordController,
-                      obscureText: _obscurePassword,
-                      style: const TextStyle(color: MediColors.textPrimary),
-                      decoration: InputDecoration(
-                        labelText: 'Password',
-                        prefixIcon: Icon(Icons.lock_outline_rounded,
-                            color: MediColors.textMuted, size: 20),
-                        suffixIcon: IconButton(
-                          icon: Icon(
-                            _obscurePassword
-                                ? Icons.visibility_off_rounded
-                                : Icons.visibility_rounded,
-                            color: MediColors.textMuted,
-                            size: 20,
-                          ),
-                          onPressed: () => setState(
-                              () => _obscurePassword = !_obscurePassword),
-                        ),
-                      ),
-                      onSubmitted: (_) => _login(),
-                    ),
-                    const SizedBox(height: 12),
-                    Align(
-                      alignment: Alignment.centerRight,
-                      child: TextButton(
-                        onPressed: () => context.push('/forgot-password'),
-                        style: TextButton.styleFrom(
-                          foregroundColor: MediColors.primary,
-                          padding: EdgeInsets.zero,
-                          minimumSize: const Size(0, 0),
-                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                        ),
-                        child: const Text(
-                          'Forgot Password?',
-                          style: TextStyle(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 24),
-                    SizedBox(
-                      height: 52,
-                      child: Container(
-                        decoration: BoxDecoration(
-                          gradient: gradient,
-                          borderRadius: BorderRadius.circular(12),
-                          boxShadow: [
-                            BoxShadow(
-                                color: accentColor.withValues(alpha: 0.3),
-                                blurRadius: 16,
-                                offset: const Offset(0, 6)),
-                          ],
-                        ),
-                        child: FilledButton(
-                          style: FilledButton.styleFrom(
-                            backgroundColor: Colors.transparent,
-                            shadowColor: Colors.transparent,
-                            shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(12)),
-                          ),
-                          onPressed: _isLoading ? null : _login,
-                          child: _isLoading
-                              ? const SizedBox(
-                                  width: 22,
-                                  height: 22,
-                                  child: CircularProgressIndicator(
-                                      strokeWidth: 2, color: Colors.white))
-                              : const Text('Sign In',
-                                  style: TextStyle(
-                                      fontSize: 15,
-                                      fontWeight: FontWeight.w700)),
-                        ),
-                      ),
-                    ),
+                    _buildBrandHeader(isFacility, accentColor, gradient,
+                        compact: true),
                     const SizedBox(height: 32),
-                    const Divider(),
-                    const SizedBox(height: 16),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        TextButton.icon(
-                          onPressed: _isLoading ? null : _seedDatabase,
-                          icon: const Icon(Icons.dataset_rounded, size: 16),
-                          label: const Text('Seed DB'),
-                          style: TextButton.styleFrom(
-                              foregroundColor: MediColors.textMuted),
-                        ),
-                        const SizedBox(width: 8),
-                        TextButton.icon(
-                          onPressed: () => context.go('/'),
-                          icon: const Icon(Icons.arrow_back_rounded, size: 16),
-                          label: const Text('Back'),
-                          style: TextButton.styleFrom(
-                              foregroundColor: MediColors.textMuted),
-                        ),
-                      ],
-                    ),
+                    _buildLoginForm(gradient, accentColor, compact: true),
                   ],
                 ),
               ),
+            );
+          }
+
+          return Row(
+            children: [
+              // Left: Brand illustration
+              Expanded(
+                child: Container(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [MediColors.bg, MediColors.surface],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                  ),
+                  child: Center(
+                    child: _buildBrandHeader(isFacility, accentColor, gradient,
+                        compact: false),
+                  ),
+                ),
+              ),
+
+              // Right: Login form
+              Expanded(
+                child: Center(
+                  child: _buildLoginForm(gradient, accentColor, compact: false),
+                ),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildBrandHeader(
+      bool isFacility, Color accentColor, Gradient gradient,
+      {required bool compact}) {
+    final iconBoxSize = compact ? 88.0 : 120.0;
+    final iconSize = compact ? 40.0 : 56.0;
+    final titleSize = compact ? 22.0 : 28.0;
+
+    return Column(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        Container(
+          width: iconBoxSize,
+          height: iconBoxSize,
+          decoration: BoxDecoration(
+            gradient: gradient,
+            borderRadius: BorderRadius.circular(compact ? 24 : 32),
+            boxShadow: [
+              BoxShadow(
+                  color: accentColor.withValues(alpha: 0.3),
+                  blurRadius: compact ? 24 : 40,
+                  spreadRadius: compact ? 3 : 5),
+            ],
+          ),
+          child: Icon(
+            isFacility
+                ? Icons.vaccines_rounded
+                : Icons.admin_panel_settings_rounded,
+            size: iconSize,
+            color: Colors.white,
+          ),
+        ),
+        SizedBox(height: compact ? 20 : 32),
+        Text(
+          isFacility ? 'Facility Portal' : 'Admin Portal',
+          style: TextStyle(
+              fontSize: titleSize,
+              fontWeight: FontWeight.w800,
+              color: accentColor),
+        ),
+        if (!compact) ...[
+          const SizedBox(height: 12),
+          ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 360),
+            child: Text(
+              isFacility
+                  ? 'Manage daily logs, track inventory, and forecast indents using AI.'
+                  : 'Monitor global stock levels and optimize redistribution routes.',
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                  color: MediColors.textSecondary, fontSize: 14, height: 1.6),
             ),
           ),
         ],
+      ],
+    );
+  }
+
+  Widget _buildLoginForm(Gradient gradient, Color accentColor,
+      {required bool compact}) {
+    return ConstrainedBox(
+      constraints: const BoxConstraints(maxWidth: 400),
+      child: Container(
+        width: double.infinity,
+        padding: EdgeInsets.all(compact ? 24 : 40),
+        decoration: BoxDecoration(
+          color: MediColors.surface,
+          borderRadius: BorderRadius.circular(24),
+          border: Border.all(color: MediColors.border),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            const Text(
+              'Sign In',
+              style: TextStyle(
+                  fontSize: 28,
+                  fontWeight: FontWeight.w800,
+                  color: MediColors.textPrimary),
+            ),
+            const SizedBox(height: 8),
+            const Text(
+              'Enter your credentials to continue',
+              style: TextStyle(color: MediColors.textSecondary, fontSize: 14),
+            ),
+            const SizedBox(height: 36),
+            TextField(
+              controller: _emailController,
+              keyboardType: TextInputType.emailAddress,
+              style: const TextStyle(color: MediColors.textPrimary),
+              decoration: InputDecoration(
+                labelText: 'Email Address',
+                prefixIcon: Icon(Icons.email_outlined,
+                    color: MediColors.textMuted, size: 20),
+              ),
+            ),
+            const SizedBox(height: 20),
+            TextField(
+              controller: _passwordController,
+              obscureText: _obscurePassword,
+              style: const TextStyle(color: MediColors.textPrimary),
+              decoration: InputDecoration(
+                labelText: 'Password',
+                prefixIcon: Icon(Icons.lock_outline_rounded,
+                    color: MediColors.textMuted, size: 20),
+                suffixIcon: IconButton(
+                  icon: Icon(
+                    _obscurePassword
+                        ? Icons.visibility_off_rounded
+                        : Icons.visibility_rounded,
+                    color: MediColors.textMuted,
+                    size: 20,
+                  ),
+                  onPressed: () =>
+                      setState(() => _obscurePassword = !_obscurePassword),
+                ),
+              ),
+              onSubmitted: (_) => _login(),
+            ),
+            const SizedBox(height: 12),
+            Align(
+              alignment: Alignment.centerRight,
+              child: TextButton(
+                onPressed: () => context.push('/forgot-password'),
+                style: TextButton.styleFrom(
+                  foregroundColor: MediColors.primary,
+                  padding: EdgeInsets.zero,
+                  minimumSize: const Size(0, 0),
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                ),
+                child: const Text(
+                  'Forgot Password?',
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 24),
+            SizedBox(
+              height: 52,
+              child: Container(
+                decoration: BoxDecoration(
+                  gradient: gradient,
+                  borderRadius: BorderRadius.circular(12),
+                  boxShadow: [
+                    BoxShadow(
+                        color: accentColor.withValues(alpha: 0.3),
+                        blurRadius: 16,
+                        offset: const Offset(0, 6)),
+                  ],
+                ),
+                child: FilledButton(
+                  style: FilledButton.styleFrom(
+                    backgroundColor: Colors.transparent,
+                    shadowColor: Colors.transparent,
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12)),
+                  ),
+                  onPressed: _isLoading ? null : _login,
+                  child: _isLoading
+                      ? const SizedBox(
+                          width: 22,
+                          height: 22,
+                          child: CircularProgressIndicator(
+                              strokeWidth: 2, color: Colors.white))
+                      : const Text('Sign In',
+                          style: TextStyle(
+                              fontSize: 15, fontWeight: FontWeight.w700)),
+                ),
+              ),
+            ),
+            const SizedBox(height: 32),
+            const Divider(),
+            const SizedBox(height: 16),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                TextButton.icon(
+                  onPressed: _isLoading ? null : _seedDatabase,
+                  icon: const Icon(Icons.dataset_rounded, size: 16),
+                  label: const Text('Seed DB'),
+                  style: TextButton.styleFrom(
+                      foregroundColor: MediColors.textMuted),
+                ),
+                const SizedBox(width: 8),
+                TextButton.icon(
+                  onPressed: () => context.go('/'),
+                  icon: const Icon(Icons.arrow_back_rounded, size: 16),
+                  label: const Text('Back'),
+                  style: TextButton.styleFrom(
+                      foregroundColor: MediColors.textMuted),
+                ),
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }
