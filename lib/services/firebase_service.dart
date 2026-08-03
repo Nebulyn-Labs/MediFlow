@@ -62,10 +62,15 @@ class FirebaseService {
     String? customFacilityId,
   }) async {
     // 1. Generate facility ID (use custom ID, or fallback strategy)
-    final String facilityId = customFacilityId ??
-        (email.isNotEmpty && email.contains('@')
-            ? email.toLowerCase().replaceAll('@', '_').replaceAll('.', '_')
-            : _firestore.collection('facilities').doc().id);
+    final String facilityId;
+    if (customFacilityId != null) {
+      facilityId = customFacilityId;
+    } else if (email.isNotEmpty && email.contains('@')) {
+      facilityId =
+          email.toLowerCase().replaceAll('@', '_').replaceAll('.', '_');
+    } else {
+      facilityId = _firestore.collection('facilities').doc().id;
+    }
 
     // 2. Authenticate User (create account or fallback to sign-in)
     auth.UserCredential credential;
