@@ -59,11 +59,11 @@ class FirebaseService {
     double? fixedLat,
     double? fixedLng,
     String? fixedRegion,
+    String? customFacilityId,
   }) async {
-    // 1. Generate a deterministic ID from email to bypass Auth dependency
-    // This ensures Firestore docs are created even if Auth rate limits hit.
+    // 1. Generate facility ID (use auto-generated ID or custom ID if provided)
     final String facilityId =
-        email.toLowerCase().replaceAll('@', '_').replaceAll('.', '_');
+        customFacilityId ?? _firestore.collection('facilities').doc().id;
 
     // 2. Try to create Auth User in background (Non-blocking for data seeding)
     try {
@@ -126,6 +126,62 @@ class FirebaseService {
     final doc = await _firestore.collection('facilities').doc(id).get();
     if (!doc.exists) return null;
     return Facility.fromMap(doc.data()!, doc.id);
+  }
+
+  /// Looks up a facility by user email address.
+  /// Does NOT rely on email-derived document IDs.
+  /// Queries the facilities collection by the stored 'email' field.
+  Future<Facility?> getFacilityByEmail(String email) async {
+    final cleanEmail = email.trim();
+    if (cleanEmail.isEmpty) return null;
+    final lowerEmail = cleanEmail.toLowerCase();
+
+    // 1. Check if authenticated user has a facilityId in their user document
+    final currentUser = _auth.currentUser;
+    if (currentUser != null) {
+      try {
+        final userDoc =
+            await _firestore.collection('users').doc(currentUser.uid).get();
+        if (userDoc.exists) {
+          final userFacId = userDoc.data()?['facilityId']?.toString();
+          if (userFacId != null && userFacId.isNotEmpty) {
+            final fac = await getFacility(userFacId);
+            if (fac != null &&
+                fac.email.trim().toLowerCase() == lowerEmail) {
+              return fac;
+            }
+          }
+        }
+      } catch (e) {
+        debugPrint('Error reading user profile for facility lookup: $e');
+      }
+    }
+
+    // 2. Query facilities collection by normalized email
+    final lowerSnapshot = await _firestore
+        .collection('facilities')
+        .where('email', '==', lowerEmail)
+        .limit(1)
+        .get();
+    if (lowerSnapshot.docs.isNotEmpty) {
+      final doc = lowerSnapshot.docs.first;
+      return Facility.fromMap(doc.data(), doc.id);
+    }
+
+    // 3. Fallback: query facilities collection by exact raw email string
+    if (lowerEmail != cleanEmail) {
+      final exactSnapshot = await _firestore
+          .collection('facilities')
+          .where('email', '==', cleanEmail)
+          .limit(1)
+          .get();
+      if (exactSnapshot.docs.isNotEmpty) {
+        final doc = exactSnapshot.docs.first;
+        return Facility.fromMap(doc.data(), doc.id);
+      }
+    }
+
+    return null;
   }
 
   Future<void> updateFacility(String id, Map<String, dynamic> data) async {
