@@ -5,11 +5,13 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../models/facility.dart';
 import '../../models/request.dart';
 import '../../models/inventory_item.dart';
+
 import '../../services/firebase_service.dart';
 import '../../services/ai_service.dart';
 import '../../services/routing_service.dart';
 import '../../services/optimization_service.dart';
 import 'package:med_supply_prototype/constants/colors.dart';
+import '../shared/skeleton_loaders.dart';
 
 class RouteOptimizationMap extends ConsumerStatefulWidget {
   const RouteOptimizationMap({super.key});
@@ -23,11 +25,14 @@ class _RouteOptimizationMapState extends ConsumerState<RouteOptimizationMap> {
   final MapController _mapController = MapController();
   List<Facility> _facilities = [];
   bool _isLoading = true;
+  String? _errorMessage;
   bool _showRoutes = false;
   bool _isGenerating = false;
   String _aiSummary = '';
   List<MultiStopRoute> _multiStopRoutes = [];
-  Map<String, List<LatLng>> _roadRoutes = {};
+  // Stores the full RouteResult (polyline + road distance/duration) for each
+  // multi-stop route, keyed by the donor facility id.
+  Map<String, RouteResult> _roadRoutes = {};
 
   @override
   void initState() {
@@ -36,14 +41,32 @@ class _RouteOptimizationMapState extends ConsumerState<RouteOptimizationMap> {
   }
 
   Future<void> _loadData() async {
-    final firebaseService = ref.read(firebaseServiceProvider);
-    final facs = await firebaseService.getFacilities();
+    if (_isLoading && _errorMessage == null && _facilities.isNotEmpty) return;
 
-    if (mounted) {
-      setState(() {
-        _facilities = facs;
-        _isLoading = false;
-      });
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
+
+    try {
+      final firebaseService = ref.read(firebaseServiceProvider);
+      final facs = await firebaseService.getFacilities();
+
+      if (mounted) {
+        setState(() {
+          _facilities = facs;
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      debugPrint('RouteOptimizationMap: Failed to load facilities: $e');
+      if (mounted) {
+        setState(() {
+          _errorMessage =
+              'Unable to load facilities. Please check your connection and try again.';
+          _isLoading = false;
+        });
+      }
     }
   }
 
@@ -69,14 +92,22 @@ class _RouteOptimizationMapState extends ConsumerState<RouteOptimizationMap> {
         requests: requests,
       );
 
-      // 2. Fetch road-accurate routes for each multi-stop route
-      Map<String, List<LatLng>> routes = {};
+      // 2. Fetch road-accurate routes for each multi-stop route and leg
+      Map<String, RouteResult> routes = {};
       for (var mr in multiRoutes) {
         if (mr.stops.isEmpty) continue;
         final stopsCoords =
             mr.stops.map((f) => LatLng(f.latitude, f.longitude)).toList();
-        final path = await router.getMultiStopRoute(stopsCoords);
-        routes[mr.transfers.first.donor.id] = path;
+        final result = await router.getMultiStopRoute(stopsCoords);
+        routes[mr.transfers.first.donor.id] = result;
+
+        for (var rec in mr.transfers) {
+          final legResult = await router.getRoute(
+            LatLng(rec.donor.latitude, rec.donor.longitude),
+            LatLng(rec.recipient.latitude, rec.recipient.longitude),
+          );
+          routes['${rec.donor.id}_${rec.recipient.id}'] = legResult;
+        }
       }
 
       // 3. Generate AI Summary
@@ -86,7 +117,10 @@ class _RouteOptimizationMapState extends ConsumerState<RouteOptimizationMap> {
       debugPrint(
           'RouteOptimizationMap: Generated ${multiRoutes.length} multi-stop routes.');
       debugPrint('RouteOptimizationMap: Fetched ${routes.length} road routes.');
-
+      // The route generation kicks off several network requests and the user
+      // can navigate away while they are in flight. Guard the post-await
+      // setState so we do not touch a disposed State.
+      if (!mounted) return;
       setState(() {
         _multiStopRoutes = multiRoutes;
         _roadRoutes = routes;
@@ -105,8 +139,62 @@ class _RouteOptimizationMapState extends ConsumerState<RouteOptimizationMap> {
   }
 
   @override
+  void dispose() {
+    _mapController.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    if (_isLoading) return const Center(child: CircularProgressIndicator());
+    if (_isLoading) {
+      return const Scaffold(
+        backgroundColor: MediColors.bg,
+        body: RouteOptimizationMapSkeleton(),
+      );
+    }
+
+    if (_errorMessage != null) {
+      return Scaffold(
+        backgroundColor: MediColors.bg,
+        appBar: AppBar(title: const Text('Advanced Route Optimization')),
+        body: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(32),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Icon(Icons.error_outline_rounded,
+                    size: 64, color: MediColors.textMuted),
+                const SizedBox(height: 20),
+                Text(
+                  _errorMessage!,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                      fontSize: 16, color: MediColors.textSecondary),
+                ),
+                const SizedBox(height: 24),
+                SizedBox(
+                  height: 44,
+                  child: Container(
+                    decoration: BoxDecoration(
+                        gradient: MediColors.primaryGradient,
+                        borderRadius: BorderRadius.circular(12)),
+                    child: FilledButton.icon(
+                      style: FilledButton.styleFrom(
+                          backgroundColor: Colors.transparent,
+                          shadowColor: Colors.transparent),
+                      icon: const Icon(Icons.refresh_rounded, size: 18),
+                      label: const Text('Retry'),
+                      onPressed: _loadData,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
 
     final mapCenter = _facilities.isNotEmpty
         ? LatLng(_facilities.first.latitude, _facilities.first.longitude)
@@ -208,12 +296,20 @@ class _RouteOptimizationMapState extends ConsumerState<RouteOptimizationMap> {
                                       style: TextStyle(fontSize: 12)),
                                   onPressed: () async {
                                     setState(() => _isGenerating = true);
-                                    await ref
-                                        .read(firebaseServiceProvider)
-                                        .seedDemoData();
-                                    // RE-LOAD FACILITIES AFTER SEEDING
-                                    await _loadData();
-                                    setState(() => _isGenerating = false);
+                                    try {
+                                      await ref
+                                          .read(firebaseServiceProvider)
+                                          .seedDemoData();
+                                      // RE-LOAD FACILITIES AFTER SEEDING
+                                      await _loadData();
+                                    } catch (e) {
+                                      debugPrint(
+                                          'RouteOptimizationMap: Demo seed failed: $e');
+                                    } finally {
+                                      if (mounted) {
+                                        setState(() => _isGenerating = false);
+                                      }
+                                    }
                                     if (context.mounted) {
                                       ScaffoldMessenger.of(context)
                                           .showSnackBar(const SnackBar(
@@ -290,7 +386,8 @@ class _RouteOptimizationMapState extends ConsumerState<RouteOptimizationMap> {
                               PolylineLayer(
                                 polylines: _multiStopRoutes.map<Polyline>((mr) {
                                   final donorId = mr.transfers.first.donor.id;
-                                  final points = _roadRoutes[donorId] ??
+                                  final routeResult = _roadRoutes[donorId];
+                                  final points = routeResult?.points ??
                                       mr.stops
                                           .map((s) =>
                                               LatLng(s.latitude, s.longitude))
@@ -523,12 +620,41 @@ class _RouteOptimizationMapState extends ConsumerState<RouteOptimizationMap> {
   }
 
   Widget _buildSingleTransferInfo(TransferRecommendation rec) {
-    final Distance distanceCalc = const Distance();
-    final distKm = distanceCalc(LatLng(rec.donor.latitude, rec.donor.longitude),
-            LatLng(rec.recipient.latitude, rec.recipient.longitude)) /
+    /// Fallback assumed average speed when no road-routing data is available.
+    /// Named here as a constant so it is easy to find and change (#252).
+    const double kFallbackSpeedKmh = 40.0;
+
+    // Prefer road distance/duration for this specific transfer leg if present,
+    // falling back to whole-tour donor route metadata.
+    final legKey = '${rec.donor.id}_${rec.recipient.id}';
+    final routeResult = _roadRoutes[legKey] ?? _roadRoutes[rec.donor.id];
+
+    // Road distance and duration from the API (null when straight-line
+    // fallback was used or the route has not been fetched yet).
+    final double? roadDistKm = routeResult?.distanceKm;
+    final double? roadDurationSeconds = routeResult?.durationSeconds;
+
+    // Straight-line haversine distance — used only as a fallback.
+    const Distance distanceCalc = Distance();
+    final double straightLineDistKm = distanceCalc(
+          LatLng(rec.donor.latitude, rec.donor.longitude),
+          LatLng(rec.recipient.latitude, rec.recipient.longitude),
+        ) /
         1000;
-    final timeHours = (distKm / 40);
-    final timeMinutes = (timeHours * 60).toInt();
+
+    // Resolved display values: prefer road data, fall back to straight-line.
+    final bool usingRoadData =
+        roadDistKm != null && roadDurationSeconds != null;
+    final double displayDistKm =
+        usingRoadData ? roadDistKm : straightLineDistKm;
+    final int displayTimeMinutes = usingRoadData
+        ? (roadDurationSeconds / 60).round()
+        : (straightLineDistKm / kFallbackSpeedKmh * 60).round();
+
+    // Label shown next to the ETA so users know what it's based on.
+    final String etaLabel = usingRoadData
+        ? 'est.'
+        : 'est. (straight-line @ ${kFallbackSpeedKmh.toInt()} km/h)';
 
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
@@ -548,7 +674,7 @@ class _RouteOptimizationMapState extends ConsumerState<RouteOptimizationMap> {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                 decoration: BoxDecoration(
-                    color: MediColors.primary.withValues(alpha: 0.1),
+                    color: MediColors.primaryOverlay,
                     borderRadius: BorderRadius.circular(6)),
                 child: Text('Score: ${rec.score.toInt()}',
                     style: const TextStyle(
@@ -615,22 +741,30 @@ class _RouteOptimizationMapState extends ConsumerState<RouteOptimizationMap> {
             spacing: 8.0,
             runSpacing: 4.0,
             children: [
-              Row(children: [
-                const Icon(Icons.route_rounded,
-                    size: 14, color: MediColors.textMuted),
-                const SizedBox(width: 4),
-                Text('${distKm.toStringAsFixed(1)} km',
-                    style: const TextStyle(
-                        color: MediColors.textMuted, fontSize: 12))
-              ]),
-              Row(children: [
-                const Icon(Icons.schedule_rounded,
-                    size: 14, color: MediColors.textMuted),
-                const SizedBox(width: 4),
-                Text('${timeMinutes}m est.',
-                    style: const TextStyle(
-                        color: MediColors.textMuted, fontSize: 12))
-              ]),
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(Icons.route_rounded,
+                      size: 14, color: MediColors.textMuted),
+                  const SizedBox(width: 4),
+                  Text('${displayDistKm.toStringAsFixed(1)} km',
+                      style: const TextStyle(
+                          color: MediColors.textMuted, fontSize: 12)),
+                ],
+              ),
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(Icons.schedule_rounded,
+                      size: 14, color: MediColors.textMuted),
+                  const SizedBox(width: 4),
+                  Flexible(
+                    child: Text('${displayTimeMinutes}m $etaLabel',
+                        style: const TextStyle(
+                            color: MediColors.textMuted, fontSize: 12)),
+                  ),
+                ],
+              ),
             ],
           ),
         ],

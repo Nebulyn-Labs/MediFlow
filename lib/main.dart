@@ -1,37 +1,46 @@
 import 'dart:ui';
-import 'package:flutter/material.dart';
+
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:med_supply_prototype/theme/medi_flow_theme.dart';
+import 'package:med_supply_prototype/views/shared/not_found_page.dart';
 
-import 'package:med_supply_prototype/constants/colors.dart';
 import 'services/firebase_setup.dart';
-import 'views/auth/role_selection_screen.dart';
-import 'views/auth/login_screen.dart';
-import 'views/shared/sidebar_layout.dart';
-import 'views/shared/help_page.dart';
-
-// Facility Pages
-import 'views/facility/facility_overview.dart';
-import 'views/facility/ai_forecast_page.dart';
-import 'views/facility/active_indents_page.dart';
-import 'views/facility/daily_logging_page.dart';
-import 'views/facility/alerts_page.dart';
-
-// Admin Pages
-import 'views/admin/admin_overview.dart';
 import 'views/admin/admin_indent_approval_page.dart';
 import 'views/admin/admin_indent_status_page.dart';
+// Admin Pages
+import 'views/admin/admin_overview.dart';
+import 'views/admin/audit_trail_page.dart';
 import 'views/admin/route_optimization_map.dart';
+import 'views/auth/forgot_password_page.dart';
+import 'views/auth/login_screen.dart';
+import 'views/auth/role_selection_screen.dart';
+import 'views/facility/active_indents_page.dart';
+import 'views/facility/ai_forecast_page.dart';
+import 'views/facility/daily_logging_page.dart';
+import 'views/facility/facility_overview.dart';
+import 'views/facility/wastage_report_page.dart';
+import 'views/facility/facility_profile_page.dart';
+import 'views/facility/alerts_hub_page.dart';
 import 'views/shared/ai_chat_page.dart';
+import 'views/shared/help_page.dart';
+import 'views/shared/sidebar_layout.dart';
 
 final GlobalKey<NavigatorState> _rootNavigatorKey = GlobalKey<NavigatorState>();
 final GlobalKey<NavigatorState> _facilityShellNavigatorKey =
     GlobalKey<NavigatorState>();
 final GlobalKey<NavigatorState> _adminShellNavigatorKey =
     GlobalKey<NavigatorState>();
+
+void _handleGlobalError(Object error, StackTrace? stack) {
+  debugPrint('Global Error Caught: $error');
+  if (stack != null) debugPrint(stack.toString());
+}
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -46,24 +55,68 @@ void main() async {
 
   FlutterError.onError = (details) {
     FlutterError.presentError(details);
-    debugPrint('FlutterError: ${details.exceptionAsString()}');
+    _handleGlobalError(details.exception, details.stack);
   };
 
   PlatformDispatcher.instance.onError = (error, stack) {
-    debugPrint('PlatformDispatcher error: $error\n$stack');
+    _handleGlobalError(error, stack);
     return true;
   };
+  ErrorWidget.builder = (FlutterErrorDetails details) {
+    const mediTheme = MediFlowTheme.dark;
 
+    return Material(
+      child: Scaffold(
+        backgroundColor: mediTheme.background,
+        body: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(24.0),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(Icons.error_outline, size: 64, color: mediTheme.error),
+                const SizedBox(height: 16),
+                Text(
+                  'Something went wrong',
+                  style: TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                      color: mediTheme.textPrimary),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  kDebugMode
+                      ? details.exceptionAsString()
+                      : 'An unexpected error occurred. Our team has been notified.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(color: mediTheme.textMuted, fontSize: 13),
+                ),
+                const SizedBox(height: 24),
+                ElevatedButton(
+                  onPressed: () {
+                    _router.go('/');
+                  },
+                  child: const Text('Go Home'),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  };
   runApp(const ProviderScope(child: MediFlowApp()));
 }
 
 final _router = GoRouter(
   navigatorKey: _rootNavigatorKey,
   initialLocation: '/',
+  errorBuilder: (context, state) => const NotFoundPage(),
   redirect: (context, state) {
     final isLoggedIn = FirebaseAuth.instance.currentUser != null;
     final isAuthRoute = state.uri.toString() == '/' ||
-        state.uri.toString().startsWith('/login');
+        state.uri.toString().startsWith('/login') ||
+        state.uri.toString().startsWith('/forgot-password');
     if (!isLoggedIn && !isAuthRoute) return '/';
     return null;
   },
@@ -76,8 +129,15 @@ final _router = GoRouter(
       path: '/login/:role',
       builder: (context, state) {
         final role = state.pathParameters['role']!;
+        if (!['facility', 'admin'].contains(role)) {
+          return const NotFoundPage();
+        }
         return LoginScreen(role: role);
       },
+    ),
+    GoRoute(
+      path: '/forgot-password',
+      builder: (context, state) => const ForgotPasswordPage(),
     ),
     ShellRoute(
       navigatorKey: _facilityShellNavigatorKey,
@@ -110,11 +170,19 @@ final _router = GoRouter(
         GoRoute(
             path: '/facility/:id/alerts',
             builder: (context, state) =>
-                AlertsPage(facilityId: state.pathParameters['id']!)),
+                AlertsHubPage(facilityId: state.pathParameters['id']!)),
+        GoRoute(
+            path: '/facility/:id/wastage',
+            builder: (context, state) =>
+                WastageReportPage(facilityId: state.pathParameters['id']!)),
         GoRoute(
             path: '/facility/:id/chat',
             builder: (context, state) => AIChatPage(
                 facilityId: state.pathParameters['id']!, role: 'facility')),
+        GoRoute(
+            path: '/facility/:id/profile',
+            builder: (context, state) =>
+                FacilityProfilePage(facilityId: state.pathParameters['id']!)),
         GoRoute(
             path: '/facility/:id/help',
             builder: (context, state) => HelpPage(role: 'facility')),
@@ -142,6 +210,9 @@ final _router = GoRouter(
             path: '/admin/chat',
             builder: (context, state) => const AIChatPage(role: 'admin')),
         GoRoute(
+            path: '/admin/audit',
+            builder: (context, state) => const AuditTrailPage()),
+        GoRoute(
             path: '/admin/help',
             builder: (context, state) => const HelpPage(role: 'admin')),
       ],
@@ -149,71 +220,88 @@ final _router = GoRouter(
   ],
 );
 
+class AppScrollBehavior extends MaterialScrollBehavior {
+  @override
+  Set<PointerDeviceKind> get dragDevices => {
+        PointerDeviceKind.touch,
+        PointerDeviceKind.mouse,
+        PointerDeviceKind.stylus,
+        PointerDeviceKind.trackpad,
+      };
+}
+
 class MediFlowApp extends StatelessWidget {
   const MediFlowApp({super.key});
 
   @override
   Widget build(BuildContext context) {
+    const mediTheme = MediFlowTheme.dark;
+
     return MaterialApp.router(
       title: 'MediFlow',
       debugShowCheckedModeBanner: false,
+      scrollBehavior: AppScrollBehavior(),
       theme: ThemeData(
         useMaterial3: true,
         brightness: Brightness.dark,
-        scaffoldBackgroundColor: MediColors.bg,
+        extensions: [mediTheme],
+        scaffoldBackgroundColor: mediTheme.background,
         colorScheme: ColorScheme.dark(
-          surface: MediColors.surface,
-          primary: MediColors.primary,
-          secondary: MediColors.cyan,
-          error: MediColors.error,
-          onSurface: MediColors.textPrimary,
-          onPrimary: Colors.white,
-          outline: MediColors.border,
+          surface: mediTheme.surface,
+          surfaceContainerHighest: mediTheme.surfaceLight,
+          primary: mediTheme.primary,
+          secondary: mediTheme.cyan,
+          error: mediTheme.error,
+          onSurface: mediTheme.textPrimary,
+          onSurfaceVariant: mediTheme.textSecondary,
+          onPrimary: mediTheme.onAccent,
+          outline: mediTheme.border,
+          outlineVariant: mediTheme.borderLight,
         ),
         textTheme: GoogleFonts.interTextTheme(
           ThemeData.dark().textTheme,
         ),
         cardTheme: CardThemeData(
-          color: MediColors.surface,
+          color: mediTheme.surface,
           elevation: 0,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(16),
-            side: BorderSide(color: MediColors.border),
+            side: BorderSide(color: mediTheme.border),
           ),
         ),
-        appBarTheme: const AppBarTheme(
+        appBarTheme: AppBarTheme(
           backgroundColor: Colors.transparent,
           elevation: 0,
           centerTitle: false,
           titleTextStyle: TextStyle(
             fontSize: 20,
             fontWeight: FontWeight.w700,
-            color: MediColors.textPrimary,
+            color: mediTheme.textPrimary,
           ),
-          iconTheme: IconThemeData(color: MediColors.textSecondary),
+          iconTheme: IconThemeData(color: mediTheme.textSecondary),
         ),
         inputDecorationTheme: InputDecorationTheme(
           filled: true,
-          fillColor: MediColors.surfaceLight,
+          fillColor: mediTheme.surfaceLight,
           border: OutlineInputBorder(
             borderRadius: BorderRadius.circular(12),
-            borderSide: BorderSide(color: MediColors.border),
+            borderSide: BorderSide(color: mediTheme.border),
           ),
           enabledBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(12),
-            borderSide: BorderSide(color: MediColors.border),
+            borderSide: BorderSide(color: mediTheme.border),
           ),
           focusedBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(12),
-            borderSide: const BorderSide(color: MediColors.primary, width: 2),
+            borderSide: BorderSide(color: mediTheme.primary, width: 2),
           ),
-          labelStyle: const TextStyle(color: MediColors.textSecondary),
-          hintStyle: const TextStyle(color: MediColors.textMuted),
+          labelStyle: TextStyle(color: mediTheme.textSecondary),
+          hintStyle: TextStyle(color: mediTheme.textMuted),
         ),
         filledButtonTheme: FilledButtonThemeData(
           style: FilledButton.styleFrom(
-            backgroundColor: MediColors.primary,
-            foregroundColor: Colors.white,
+            backgroundColor: mediTheme.primary,
+            foregroundColor: mediTheme.onAccent,
             padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
             shape:
                 RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -223,62 +311,60 @@ class MediFlowApp extends StatelessWidget {
         ),
         outlinedButtonTheme: OutlinedButtonThemeData(
           style: OutlinedButton.styleFrom(
-            foregroundColor: MediColors.primary,
-            side: const BorderSide(color: MediColors.border),
+            foregroundColor: mediTheme.primary,
+            side: BorderSide(color: mediTheme.border),
             padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
             shape:
                 RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
           ),
         ),
-        dividerTheme:
-            const DividerThemeData(color: MediColors.border, thickness: 1),
+        dividerTheme: DividerThemeData(color: mediTheme.border, thickness: 1),
         snackBarTheme: SnackBarThemeData(
-          backgroundColor: MediColors.surfaceLight,
-          contentTextStyle: const TextStyle(color: MediColors.textPrimary),
+          backgroundColor: mediTheme.surfaceLight,
+          contentTextStyle: TextStyle(color: mediTheme.textPrimary),
           shape:
               RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
           behavior: SnackBarBehavior.floating,
         ),
         popupMenuTheme: PopupMenuThemeData(
-          color: MediColors.surfaceLight,
+          color: mediTheme.surfaceLight,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(12),
-            side: BorderSide(color: MediColors.border),
+            side: BorderSide(color: mediTheme.border),
           ),
         ),
         dialogTheme: DialogThemeData(
-          backgroundColor: MediColors.surface,
+          backgroundColor: mediTheme.surface,
           shape:
               RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-          titleTextStyle: const TextStyle(
+          titleTextStyle: TextStyle(
               fontSize: 18,
               fontWeight: FontWeight.w700,
-              color: MediColors.textPrimary),
+              color: mediTheme.textPrimary),
         ),
         tabBarTheme: TabBarThemeData(
-          labelColor: MediColors.primary,
-          unselectedLabelColor: MediColors.textMuted,
-          indicatorColor: MediColors.primary,
-          dividerColor: MediColors.border,
+          labelColor: mediTheme.primary,
+          unselectedLabelColor: mediTheme.textMuted,
+          indicatorColor: mediTheme.primary,
+          dividerColor: mediTheme.border,
         ),
         dataTableTheme: DataTableThemeData(
-          headingTextStyle: const TextStyle(
+          headingTextStyle: TextStyle(
               fontWeight: FontWeight.w600,
-              color: MediColors.textSecondary,
+              color: mediTheme.textSecondary,
               fontSize: 13),
-          dataTextStyle:
-              const TextStyle(color: MediColors.textPrimary, fontSize: 13),
-          headingRowColor: WidgetStateProperty.all(MediColors.surfaceLight),
+          dataTextStyle: TextStyle(color: mediTheme.textPrimary, fontSize: 13),
+          headingRowColor: WidgetStateProperty.all(mediTheme.surfaceLight),
           dataRowColor: WidgetStateProperty.resolveWith((states) {
             if (states.contains(WidgetState.hovered)) {
-              return MediColors.surfaceHover;
+              return mediTheme.surfaceHover;
             }
             return Colors.transparent;
           }),
           dividerThickness: 1,
-          decoration: const BoxDecoration(
+          decoration: BoxDecoration(
               border: Border(
-                  bottom: BorderSide(color: MediColors.border, width: 0.5))),
+                  bottom: BorderSide(color: mediTheme.border, width: 0.5))),
         ),
       ),
       routerConfig: _router,

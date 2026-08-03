@@ -1,8 +1,26 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../services/ai_service.dart';
 import '../../services/firebase_service.dart';
 import 'package:med_supply_prototype/constants/colors.dart';
+import '../../models/inventory_item.dart';
+
+List<Map<String, dynamic>> buildInventoryContextList(
+    List<InventoryItem> inventory) {
+  return inventory
+      .map((i) => {
+            "medicineName": i.medicineName,
+            "batchId": i.batchId,
+            "arrivalDate": i.arrivalDate.toIso8601String(),
+            "expiryDate": i.expiryDate.toIso8601String(),
+            "initialQuantity": i.initialQuantity,
+            "remainingQuantity": i.remainingQuantity,
+            "unit": i.unit,
+            if (i.facilityId != null) "facilityId": i.facilityId,
+          })
+      .toList();
+}
 
 class AIChatPage extends ConsumerStatefulWidget {
   final String? facilityId;
@@ -18,6 +36,7 @@ class _AIChatPageState extends ConsumerState<AIChatPage> {
   final ScrollController _scrollController = ScrollController();
   final List<Map<String, String>> _messages = [];
   bool _isTyping = false;
+  bool _isLocalMode = false;
   Map<String, dynamic> _activeContext = {};
 
   @override
@@ -37,8 +56,14 @@ class _AIChatPageState extends ConsumerState<AIChatPage> {
             _activeContext = {
               "system_state": "LIVE",
               "data_sources": ["Firestore", "Local Logs"],
-              "current_inventory": inventory.map((i) => i.toMap()).toList(),
-              "historical_data": logs.map((l) => l.toMap()).toList(),
+              "current_inventory": buildInventoryContextList(inventory),
+              "historical_data": logs
+                  .map((l) => {
+                        "date": l.date.toIso8601String(),
+                        "medicines": l.medicines.map((m) => m.toMap()).toList(),
+                        "totalPatients": l.totalPatients,
+                      })
+                  .toList(),
             };
           });
         }
@@ -68,6 +93,7 @@ class _AIChatPageState extends ConsumerState<AIChatPage> {
   }
 
   Future<void> _sendMessage() async {
+    if (_isTyping) return;
     final text = _controller.text.trim();
     if (text.isEmpty) return;
     _controller.clear();
@@ -91,6 +117,7 @@ class _AIChatPageState extends ConsumerState<AIChatPage> {
         setState(() {
           _messages.add({'role': 'ai', 'content': response});
           _isTyping = false;
+          _isLocalMode = ref.read(aiServiceProvider).isLocalFallbackActive;
         });
         _scrollToBottom();
       }
@@ -115,13 +142,15 @@ class _AIChatPageState extends ConsumerState<AIChatPage> {
       appBar: AppBar(
         title: Row(
           children: [
-            Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                  gradient: MediColors.primaryGradient,
-                  borderRadius: BorderRadius.circular(10)),
-              child: const Icon(Icons.smart_toy_rounded,
-                  color: Colors.white, size: 18),
+            ExcludeSemantics(
+              child: Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                    gradient: MediColors.primaryGradient,
+                    borderRadius: BorderRadius.circular(10)),
+                child: const Icon(Icons.smart_toy_rounded,
+                    color: Colors.white, size: 18),
+              ),
             ),
             const SizedBox(width: 12),
             Column(
@@ -132,9 +161,10 @@ class _AIChatPageState extends ConsumerState<AIChatPage> {
                         fontSize: 16,
                         fontWeight: FontWeight.w700,
                         color: MediColors.textPrimary)),
-                const Text(
-                  'gemini-flash-lite-latest',
-                  style: TextStyle(fontSize: 11, color: MediColors.textMuted),
+                Text(
+                  _isLocalMode ? 'Local Assistant Mode' : 'Powered by Gemini',
+                  style: const TextStyle(
+                      fontSize: 11, color: MediColors.textMuted),
                 ),
               ],
             ),
@@ -193,6 +223,7 @@ class _AIChatPageState extends ConsumerState<AIChatPage> {
                       borderRadius: BorderRadius.circular(14)),
                   child: IconButton(
                     onPressed: _isTyping ? null : _sendMessage,
+                    tooltip: 'Send message',
                     icon: const Icon(Icons.send_rounded,
                         color: Colors.white, size: 20),
                   ),
@@ -207,49 +238,73 @@ class _AIChatPageState extends ConsumerState<AIChatPage> {
 
   Widget _buildEmptyState() {
     return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Container(
-            padding: const EdgeInsets.all(24),
-            decoration: BoxDecoration(
-              color: MediColors.primary.withValues(alpha: 0.08),
-              borderRadius: BorderRadius.circular(24),
-            ),
-            child: Icon(Icons.smart_toy_rounded,
-                size: 52, color: MediColors.primary),
-          ),
-          const SizedBox(height: 24),
-          Text('MediFlow AI Assistant',
-              style: TextStyle(
-                  fontSize: 22,
-                  fontWeight: FontWeight.w700,
-                  color: MediColors.textPrimary)),
-          const SizedBox(height: 8),
-          Text('Ask about inventory, forecasts, or supply chain insights',
-              style: TextStyle(color: MediColors.textSecondary)),
-          const SizedBox(height: 32),
-          Wrap(
-            spacing: 12,
-            runSpacing: 12,
-            alignment: WrapAlignment.center,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 24),
+        child: TweenAnimationBuilder<double>(
+          tween: Tween(begin: 0.0, end: 1.0),
+          duration: const Duration(milliseconds: 450),
+          curve: Curves.easeOut,
+          builder: (context, value, child) {
+            return Opacity(
+              opacity: value,
+              child: Transform.translate(
+                offset: Offset(0, (1 - value) * 16),
+                child: child,
+              ),
+            );
+          },
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              _buildSuggestion('Show inventory status'),
-              _buildSuggestion('What is running low?'),
-              _buildSuggestion('Forecast demand'),
+              Container(
+                padding: const EdgeInsets.all(24),
+                decoration: BoxDecoration(
+                  color: MediColors.primarySubtle,
+                  borderRadius: BorderRadius.circular(24),
+                ),
+                child: Icon(Icons.smart_toy_rounded,
+                    size: 52, color: MediColors.primary),
+              ),
+              const SizedBox(height: 24),
+              Text('MediFlow AI Assistant',
+                  style: TextStyle(
+                      fontSize: 22,
+                      fontWeight: FontWeight.w700,
+                      color: MediColors.textPrimary)),
+              const SizedBox(height: 8),
+              Text(
+                'Ask MediFlow AI about inventory, medicine availability, '
+                'stock insights, expiry risks, or healthcare logistics.',
+                textAlign: TextAlign.center,
+                style: TextStyle(color: MediColors.textSecondary),
+              ),
+              const SizedBox(height: 32),
+              Wrap(
+                spacing: 12,
+                runSpacing: 12,
+                alignment: WrapAlignment.center,
+                children: [
+                  _buildSuggestion('Which medicines are expiring soon?'),
+                  _buildSuggestion('Show low stock medicines.'),
+                  _buildSuggestion('Explain inventory trends.'),
+                  _buildSuggestion('How can I improve stock distribution?'),
+                ],
+              ),
             ],
           ),
-        ],
+        ),
       ),
     );
   }
 
   Widget _buildSuggestion(String text) {
     return OutlinedButton(
-      onPressed: () {
-        _controller.text = text;
-        _sendMessage();
-      },
+      onPressed: _isTyping
+          ? null
+          : () {
+              _controller.text = text;
+              _sendMessage();
+            },
       style: OutlinedButton.styleFrom(
         foregroundColor: MediColors.primary,
         side: BorderSide(color: MediColors.border),
@@ -262,32 +317,70 @@ class _AIChatPageState extends ConsumerState<AIChatPage> {
 
   Widget _buildBubble(String role, String text) {
     final isUser = role == 'user';
-    return Align(
-      alignment: isUser ? Alignment.centerRight : Alignment.centerLeft,
-      child: Container(
-        margin: const EdgeInsets.only(bottom: 14),
-        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
-        constraints:
-            BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.6),
-        decoration: BoxDecoration(
-          gradient: isUser ? MediColors.primaryGradient : null,
-          color: isUser ? null : MediColors.surface,
-          borderRadius: BorderRadius.only(
-            topLeft: const Radius.circular(18),
-            topRight: const Radius.circular(18),
-            bottomLeft:
-                isUser ? const Radius.circular(18) : const Radius.circular(4),
-            bottomRight:
-                isUser ? const Radius.circular(4) : const Radius.circular(18),
-          ),
-          border: isUser ? null : Border.all(color: MediColors.border),
-        ),
-        child: SelectableText(
-          text,
-          style: TextStyle(
-            color: isUser ? Colors.white : MediColors.textPrimary,
-            fontSize: 14,
-            height: 1.5,
+    final sender = isUser ? 'You' : 'MediFlow AI';
+    return Semantics(
+      label: '$sender said: $text',
+      child: ExcludeSemantics(
+        child: Align(
+          alignment: isUser ? Alignment.centerRight : Alignment.centerLeft,
+          child: Container(
+            margin: const EdgeInsets.only(bottom: 14),
+            padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
+            constraints: BoxConstraints(
+                maxWidth: MediaQuery.of(context).size.width * 0.6),
+            decoration: BoxDecoration(
+              gradient: isUser ? MediColors.primaryGradient : null,
+              color: isUser ? null : MediColors.surface,
+              borderRadius: BorderRadius.only(
+                topLeft: const Radius.circular(18),
+                topRight: const Radius.circular(18),
+                bottomLeft: isUser
+                    ? const Radius.circular(18)
+                    : const Radius.circular(4),
+                bottomRight: isUser
+                    ? const Radius.circular(4)
+                    : const Radius.circular(18),
+              ),
+              border: isUser ? null : Border.all(color: MediColors.border),
+            ),
+            child: isUser
+                ? SelectableText(
+                    text,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 14,
+                      height: 1.5,
+                    ),
+                  )
+                : MarkdownBody(
+                    data: text,
+                    selectable: true,
+                    imageBuilder: (uri, title, alt) => const SizedBox.shrink(),
+                    styleSheet: MarkdownStyleSheet(
+                      p: const TextStyle(
+                        color: MediColors.textPrimary,
+                        fontSize: 14,
+                        height: 1.5,
+                      ),
+                      strong: const TextStyle(
+                        color: MediColors.textPrimary,
+                        fontSize: 14,
+                        height: 1.5,
+                        fontWeight: FontWeight.w700,
+                      ),
+                      h3: const TextStyle(
+                        color: MediColors.textPrimary,
+                        fontSize: 15,
+                        height: 1.5,
+                        fontWeight: FontWeight.w700,
+                      ),
+                      listBullet: const TextStyle(
+                        color: MediColors.textPrimary,
+                        fontSize: 14,
+                        height: 1.5,
+                      ),
+                    ),
+                  ),
           ),
         ),
       ),
@@ -295,29 +388,35 @@ class _AIChatPageState extends ConsumerState<AIChatPage> {
   }
 
   Widget _buildTypingIndicator() {
-    return Align(
-      alignment: Alignment.centerLeft,
-      child: Container(
-        margin: const EdgeInsets.only(bottom: 14),
-        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
-        decoration: BoxDecoration(
-          color: MediColors.surface,
-          borderRadius: const BorderRadius.only(
-            topLeft: Radius.circular(18),
-            topRight: Radius.circular(18),
-            bottomRight: Radius.circular(18),
-            bottomLeft: Radius.circular(4),
+    return Semantics(
+      label: 'MediFlow AI is typing',
+      liveRegion: true,
+      child: ExcludeSemantics(
+        child: Align(
+          alignment: Alignment.centerLeft,
+          child: Container(
+            margin: const EdgeInsets.only(bottom: 14),
+            padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
+            decoration: BoxDecoration(
+              color: MediColors.surface,
+              borderRadius: const BorderRadius.only(
+                topLeft: Radius.circular(18),
+                topRight: Radius.circular(18),
+                bottomRight: Radius.circular(18),
+                bottomLeft: Radius.circular(4),
+              ),
+              border: Border.all(color: MediColors.border),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: List.generate(
+                  3,
+                  (i) => Padding(
+                        padding: EdgeInsets.only(right: i < 2 ? 6 : 0),
+                        child: _BouncingDot(delay: i * 150),
+                      )),
+            ),
           ),
-          border: Border.all(color: MediColors.border),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: List.generate(
-              3,
-              (i) => Padding(
-                    padding: EdgeInsets.only(right: i < 2 ? 6 : 0),
-                    child: _BouncingDot(delay: i * 150),
-                  )),
         ),
       ),
     );

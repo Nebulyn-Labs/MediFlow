@@ -1,4 +1,4 @@
-const { onCall, HttpsError } = require("firebase-functions/v2/https");
+const { onCall, onRequest, HttpsError } = require("firebase-functions/v2/https");
 const { onDocumentWritten, onDocumentUpdated } = require("firebase-functions/v2/firestore");
 const { onSchedule } = require("firebase-functions/v2/scheduler");
 const { defineSecret } = require("firebase-functions/params");
@@ -6,8 +6,18 @@ const logger = require("firebase-functions/logger");
 const admin = require("firebase-admin");
 const { GoogleGenerativeAI } = require("@google/generative-ai");
 const { BigQuery } = require("@google-cloud/bigquery");
+const { checkRateLimit, LIMITS } = require("./helpers/rateLimiter");
+const { createBigQueryRecovery } = require("./helpers/bigQueryRecovery");
+const { createLowStockService } = require("./helpers/lowStock");
+const { handleCspReport, getClientIp } = require("./helpers/cspReport");
+const { isValidQuantity } = require("./helpers/quantityValidation");
 
 admin.initializeApp();
+
+const lowStockService = createLowStockService({
+  serverTimestamp: () => admin.firestore.FieldValue.serverTimestamp(),
+});
+const { stockStatus } = lowStockService;
 
 const GEMINI_API_KEY = defineSecret("GEMINI_API_KEY");
 
@@ -16,33 +26,71 @@ async function getUserFacilityAndRole(auth, db) {
     throw new HttpsError("unauthenticated", "User must log in");
   }
 
-  const userEmail = auth.token.email.toLowerCase();
-  const isAdmin = userEmail === "admin@mediflow.com";
+  const uid = auth.uid;
+  const userDoc = await db.collection("users").doc(uid).get();
+  if (!userDoc.exists) {
+    // Backward compatibility / legacy fallback for users who are not yet in the 'users' collection
+    const userEmail = auth.token.email.toLowerCase();
+    const isAdmin = userEmail === "admin@mediflow.com";
+    let userFacilityId = null;
+
+    if (!isAdmin) {
+      const docId = userEmail.replace(/@/g, "_").replace(/\./g, "_");
+      const facilityDoc = await db.collection("facilities").doc(docId).get();
+      if (!facilityDoc.exists) {
+        const facilitiesSnapshot = await db.collection("facilities")
+          .where("email", "==", userEmail)
+          .limit(1)
+          .get();
+        if (facilitiesSnapshot.empty) {
+          throw new HttpsError("failed-precondition", "No facility assigned to this user");
+        }
+        userFacilityId = facilitiesSnapshot.docs[0].id;
+      } else {
+        userFacilityId = docId;
+      }
+    }
+
+    return {
+      userEmail,
+      userFacilityId,
+      isAdmin,
+      role: isAdmin ? "admin" : "facility_head",
+    };
+  }
+
+  const userData = userDoc.data();
+  const role = userData.role || "facility_head";
+  const isAdmin = role === "admin";
   let userFacilityId = null;
 
   if (!isAdmin) {
-    const docId = userEmail.replace(/@/g, "_").replace(/\./g, "_");
-    const facilityDoc = await db.collection("facilities").doc(docId).get();
-    if (!facilityDoc.exists) {
-      // Fallback query by email field
-      const facilitiesSnapshot = await db.collection("facilities")
-        .where("email", "==", userEmail)
-        .limit(1)
-        .get();
-      if (facilitiesSnapshot.empty) {
-        throw new HttpsError("failed-precondition", "No facility assigned to this user");
+    userFacilityId = userData.facilityId || null;
+    if (!userFacilityId) {
+      // Fallback email lookup if facilityId is not stored in user doc
+      const userEmail = auth.token.email.toLowerCase();
+      const docId = userEmail.replace(/@/g, "_").replace(/\./g, "_");
+      const facilityDoc = await db.collection("facilities").doc(docId).get();
+      if (!facilityDoc.exists) {
+        const facilitiesSnapshot = await db.collection("facilities")
+          .where("email", "==", userEmail)
+          .limit(1)
+          .get();
+        if (facilitiesSnapshot.empty) {
+          throw new HttpsError("failed-precondition", "No facility assigned to this user");
+        }
+        userFacilityId = facilitiesSnapshot.docs[0].id;
+      } else {
+        userFacilityId = docId;
       }
-      userFacilityId = facilitiesSnapshot.docs[0].id;
-    } else {
-      userFacilityId = docId;
     }
   }
 
   return {
-    userEmail,
+    userEmail: auth.token.email.toLowerCase(),
     userFacilityId,
     isAdmin,
-    role: isAdmin ? "admin" : "facility_head",
+    role,
   };
 }
 
@@ -50,13 +98,13 @@ async function getUserFacilityAndRole(auth, db) {
 const bigquery = new BigQuery();
 const BQ_DATASET = process.env.BQ_DATASET || "mediflow_analytics";
 const BQ_LOCATION = process.env.BQ_LOCATION || "US";
-const tableReady = new Map();
 
 // Initialize Gemini clients per-invocation using the GEMINI_API_KEY secret.
 // NOTE: GEMINI_API_KEY must be set in Firebase Secrets
 // Use: firebase functions:secrets:set GEMINI_API_KEY
 function getGenAI() {
-  return new GoogleGenerativeAI(GEMINI_API_KEY.value());
+  const key = process.env.GEMINI_API_KEY || (typeof GEMINI_API_KEY !== "undefined" && GEMINI_API_KEY.value ? GEMINI_API_KEY.value() : "");
+  return new GoogleGenerativeAI(key);
 }
 
 const BIGQUERY_TABLES = {
@@ -159,58 +207,17 @@ function toBigQueryDate(value) {
   return iso ? iso.substring(0, 10) : null;
 }
 
-function stockStatus(data) {
-  const initial = Number(data.initialQuantity || 0);
-  const remaining = Number(data.remainingQuantity || 0);
-  const pct = initial > 0 ? remaining / initial : 0;
-  const expiry = toIsoTimestamp(data.expiryDate);
-  const daysLeft = expiry ? Math.ceil((new Date(expiry).getTime() - Date.now()) / 86400000) : null;
+const bigQueryRecovery = createBigQueryRecovery({
+  bigquery,
+  firestore: admin.firestore(),
+  logger,
+  tables: BIGQUERY_TABLES,
+  datasetName: BQ_DATASET,
+  location: BQ_LOCATION,
+});
 
-  if (daysLeft !== null && daysLeft < 0) return "expired";
-  if (pct >= 0.7 && daysLeft !== null && daysLeft <= 30) return "wastage_risk";
-  if (pct <= 0.2 || remaining <= 500) return "low_stock";
-  if (daysLeft !== null && daysLeft <= 30) return "expiring_soon";
-  return "healthy";
-}
-
-async function ensureBigQueryTable(tableName) {
-  if (tableReady.has(tableName)) return tableReady.get(tableName);
-
-  const promise = (async () => {
-    const dataset = bigquery.dataset(BQ_DATASET);
-    const [datasetExists] = await dataset.exists();
-    if (!datasetExists) {
-      await bigquery.createDataset(BQ_DATASET, { location: BQ_LOCATION });
-    }
-
-    const table = dataset.table(tableName);
-    const [tableExists] = await table.exists();
-    if (!tableExists) {
-      await dataset.createTable(tableName, {
-        schema: { fields: BIGQUERY_TABLES[tableName].schema },
-        timePartitioning: { type: "DAY" },
-      });
-    }
-    return table;
-  })();
-
-  tableReady.set(tableName, promise);
-  return promise;
-}
-
-async function insertBigQuery(tableName, rows) {
-  const rowList = Array.isArray(rows) ? rows : [rows];
-  if (rowList.length === 0) return;
-
-  try {
-    const table = await ensureBigQueryTable(tableName);
-    await table.insert(rowList, {
-      ignoreUnknownValues: true,
-      skipInvalidRows: true,
-    });
-  } catch (error) {
-    logger.error(`BigQuery insert failed for ${tableName}`, error);
-  }
+async function insertBigQuery(tableName, rows, source) {
+  return bigQueryRecovery.insert(tableName, rows, { source });
 }
 
 async function auditEvent({ eventId, action, entityType, entityId, before, after, facilityId, medicineName, metadata, actorId = null }) {
@@ -227,7 +234,7 @@ async function auditEvent({ eventId, action, entityType, entityId, before, after
     before_json: safeJson(before),
     after_json: safeJson(after),
     metadata_json: safeJson(metadata),
-  });
+  }, "audit_event");
 }
 
 /**
@@ -245,31 +252,45 @@ exports.forecastDemand = onCall({ secrets: [GEMINI_API_KEY] }, async (request) =
     throw new HttpsError('permission-denied', 'Unauthorized facility access');
   }
 
+  await checkRateLimit(
+    request.auth.uid,
+    "forecastDemand",
+    LIMITS.AI
+  );
+
+  if (!medicineNames || !Array.isArray(medicineNames)) {
+    throw new HttpsError('invalid-argument', 'medicineNames must be an array');
+  }
+
   // 1. Fetch facility details
   const facilityDoc = await db.collection("facilities").doc(facilityId).get();
   const facility = facilityDoc.data();
+
+  if (!facility || typeof facility.name !== 'string') {
+    throw new HttpsError('invalid-argument', 'facility must have a valid name property');
+  }
 
   // 2. Fetch last 90 days of usage_logs
   const ninetyDaysAgo = new Date();
   ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 90);
 
-  const usageQuery = await db.collection("facilities")
+  const usageQuery = await db.collection("daily_usage_logs")
     .doc(facilityId)
-    .collection("usage_logs")
-    .where("loggedAt", ">=", admin.firestore.Timestamp.fromDate(ninetyDaysAgo))
+    .collection("logs")
+    .where("date", ">=", admin.firestore.Timestamp.fromDate(ninetyDaysAgo))
     .get();
 
   const usageHistory = usageQuery.docs.map(doc => doc.data());
 
   // 3. Fetch current stock levels
-  const stocksQuery = await db.collection("facilities")
+  const stocksQuery = await db.collection("inventory")
     .doc(facilityId)
-    .collection("stocks")
+    .collection("medicines")
     .get();
 
   const currentStocks = stocksQuery.docs.map(doc => ({
     medicineName: doc.data().medicineName,
-    qtyRemaining: doc.data().qtyRemaining
+    qtyRemaining: doc.data().remainingQuantity
   }));
 
   // 4. Construct Gemini Prompt
@@ -327,6 +348,12 @@ exports.logAIDecision = onCall(async (request) => {
     throw new HttpsError("permission-denied", "Unauthorized facility access");
   }
 
+  await checkRateLimit(
+    request.auth.uid,
+    "logAIDecision",
+    LIMITS.GENERAL
+  );
+
   const decisionId = data.decisionId || `${Date.now()}_${Math.random().toString(36).slice(2)}`;
   await insertBigQuery("ai_decisions", {
     decision_id: decisionId,
@@ -342,7 +369,7 @@ exports.logAIDecision = onCall(async (request) => {
     period_days: Number.isFinite(Number(data.periodDays)) ? Number(data.periodDays) : null,
     input_json: safeJson(data.input),
     output_json: safeJson(data.output),
-  });
+  }, "log_ai_decision");
 
   await auditEvent({
     eventId: `ai_${decisionId}`,
@@ -380,7 +407,7 @@ exports.mirrorRequestToBigQuery = onDocumentWritten("requests/{requestId}", asyn
     notes: rowData.notes || null,
     captured_at: new Date().toISOString(),
     payload_json: safeJson(rowData),
-  });
+  }, "mirror_request");
 
   await auditEvent({
     eventId: `request_${requestId}_${Date.now()}`,
@@ -408,6 +435,28 @@ exports.mirrorRequestToBigQuery = onDocumentWritten("requests/{requestId}", asyn
       period_days: null,
       input_json: null,
       output_json: safeJson(after),
+    }, "mirror_ai_request");
+  }
+});
+
+exports.onUserWritten = onDocumentWritten("users/{userId}", async (event) => {
+  const change = event.data;
+  const before = change.before.exists ? change.before.data() : null;
+  const after = change.after.exists ? change.after.data() : null;
+  const userId = event.params.userId;
+
+  if (before?.role !== after?.role) {
+    await auditEvent({
+      eventId: `user_role_${userId}_${Date.now()}`,
+      action: "role_changed",
+      entityType: "user",
+      entityId: userId,
+      before,
+      after,
+      metadata: {
+        oldRole: before?.role || null,
+        newRole: after?.role || null
+      }
     });
   }
 });
@@ -422,6 +471,11 @@ exports.mirrorInventoryToBigQuery = onDocumentWritten("inventory/{facilityId}/me
   const initial = Number(data.initialQuantity || 0);
   const remaining = Number(data.remainingQuantity || 0);
   const action = !before && after ? "created" : before && after ? "updated" : "deleted";
+
+  const db = admin.firestore();
+  await lowStockService.syncAlertForMedicine(db, facilityId, medicineId, after, null, async (token, notification) => {
+    await admin.messaging().send({ token, notification });
+  });
 
   await insertBigQuery("inventory_snapshots", {
     snapshot_id: `${facilityId}_${medicineId}_${Date.now()}`,
@@ -438,7 +492,7 @@ exports.mirrorInventoryToBigQuery = onDocumentWritten("inventory/{facilityId}/me
     status: after ? stockStatus(data) : "deleted",
     captured_at: new Date().toISOString(),
     payload_json: safeJson(data),
-  });
+  }, "mirror_inventory");
 
   await auditEvent({
     eventId: `inventory_${facilityId}_${medicineId}_${Date.now()}`,
@@ -472,7 +526,7 @@ exports.mirrorUsageLogToBigQuery = onDocumentWritten("daily_usage_logs/{facility
     total_patients: Number(data.totalPatients || 0),
     captured_at: new Date().toISOString(),
     payload_json: safeJson(data),
-  })));
+  })), "mirror_usage_log");
 
   await auditEvent({
     eventId: `usage_${facilityId}_${logId}_${Date.now()}`,
@@ -486,121 +540,218 @@ exports.mirrorUsageLogToBigQuery = onDocumentWritten("daily_usage_logs/{facility
 });
 
 /**
+ * Replays BigQuery writes that exhausted their immediate retry attempts.
+ * The dead-letter documents remain available for operational investigation.
+ */
+exports.retryFailedBigQueryInsertions = onSchedule("every 5 minutes", async () => {
+  await bigQueryRecovery.recoverPending();
+});
+
+/**
  * 2. checkLowStock() - Scheduled daily CRON
- * Scans all facilities and creates alerts.
+ * Scans all facilities and creates/updates alerts.
  */
 exports.checkLowStock = onSchedule("every 24 hours", async () => {
   const db = admin.firestore();
-  const facilities = await db.collection("facilities").get();
-
-  for (const facilityDoc of facilities.docs) {
-    const stocks = await db.collection("facilities")
-      .doc(facilityDoc.id)
-      .collection("stocks")
-      .where("qtyRemaining", "<=", "reorderLevel") // Note: Firestore doesn't support field-to-field comparison natively, so we fetch and filter
-      .get();
-
-    for (const stockDoc of stocks.docs) {
-      const stock = stockDoc.data();
-      if (stock.qtyRemaining <= stock.reorderLevel) {
-        // Create an alert document
-        await db.collection("alerts").add({
-          facilityId: facilityDoc.id,
-          facilityName: facilityDoc.data().name,
-          stockId: stockDoc.id,
-          medicineName: stock.medicineName,
-          qtyRemaining: stock.qtyRemaining,
-          reorderLevel: stock.reorderLevel,
-          type: "low_stock",
-          createdAt: admin.firestore.FieldValue.serverTimestamp(),
-          isRead: false
-        });
-
-        // Trigger FCM Notification (Assuming FCM token is stored in the facility's user doc)
-        const userQuery = await db.collection("users")
-          .where("facilityId", "==", facilityDoc.id)
-          .where("role", "==", "facility_head")
-          .limit(1)
-          .get();
-
-        if (!userQuery.empty) {
-          const user = userQuery.docs[0].data();
-          if (user.fcmToken) {
-            await admin.messaging().send({
-              token: user.fcmToken,
-              notification: {
-                title: "Low Stock Alert",
-                body: `${stock.medicineName} is below reorder level (${stock.qtyRemaining} left).`
-              }
-            });
-          }
-        }
-      }
-    }
-  }
-  return null;
+  return lowStockService.runLowStockSweep({
+    db,
+    sendNotification: async (token, notification) => {
+      await admin.messaging().send({ token, notification });
+    },
+  });
 });
 
 /**
  * 3. autoRedistribute(requestId)
  * Atomic stock transfer when a request is approved.
  */
-exports.onIndentApproved = onDocumentUpdated('requests/{requestId}', async (event) => {
-  const beforeStatus = event.data.before.data().status;
-  const after = event.data.after.data();
+exports.onIndentApproved = onDocumentUpdated("requests/{requestId}", async (event) => {
+  if (!event || !event.data || !event.data.after || !event.data.after.exists) return;
 
-  // Only fire if status changed to 'approved'
-  if (beforeStatus === 'pending' && after.status === 'approved') {
+  const beforeSnap = event.data.before;
+  const afterSnap = event.data.after;
+
+  const beforeData = beforeSnap && beforeSnap.exists ? beforeSnap.data() : null;
+  const afterData = afterSnap ? afterSnap.data() : null;
+
+  if (!afterData) return;
+
+  const beforeStatus = beforeData ? beforeData.status : null;
+  const afterStatus = afterData.status;
+
+  // Execute only when request transitions to 'approved' status
+  if (beforeStatus !== "approved" && afterStatus === "approved") {
     const db = admin.firestore();
+    const requestId = event.params.requestId;
 
-    const { fromFacilityId, toFacilityId, medicineName, qtyRequested } = after;
+    const {
+      facilityId,
+      fromFacilityId,
+      toFacilityId,
+      donorFacilityId,
+      recipientFacilityId,
+      medicineName,
+      quantity,
+      type,
+    } = afterData;
 
-    // 1. Find source stock (toFacilityId - the surplus provider)
-    const sourceStockQuery = await db.collection("facilities")
-      .doc(toFacilityId)
-      .collection("stocks")
-      .where("medicineName", "==", medicineName)
-      .limit(1)
-      .get();
+    if (!medicineName) return;
 
-    // 2. Find destination stock (fromFacilityId - the requester)
-    const destStockQuery = await db.collection("facilities")
-      .doc(fromFacilityId)
-      .collection("stocks")
-      .where("medicineName", "==", medicineName)
-      .limit(1)
-      .get();
-
-    if (sourceStockQuery.empty || destStockQuery.empty) {
-      logger.error("Stock documents not found for redistribution");
+    if (!isValidQuantity(quantity)) {
+      logger.error(
+        `Invalid quantity for request ${requestId}: ${quantity}. Quantity must be a finite positive number.`
+      );
+      await event.data.after.ref.update({
+        status: "rejected",
+        rejectionReason: `Invalid quantity: ${quantity}. Quantity must be a finite positive number.`,
+      });
       return;
     }
 
-    const sourceDoc = sourceStockQuery.docs[0];
-    const destDoc = destStockQuery.docs[0];
+    const qty = Number(quantity);
 
-    // 3. Execute atomic batch write
-    const batch = db.batch();
+    const sourceFacility = fromFacilityId || donorFacilityId || null;
+    const destFacility = toFacilityId || recipientFacilityId || null;
 
-    // Decrement source
-    batch.update(sourceDoc.ref, {
-      qtyRemaining: admin.firestore.FieldValue.increment(-qtyRequested),
-      updatedAt: admin.firestore.FieldValue.serverTimestamp()
-    });
+    // Case 1: Inter-facility redistribution transfer (both donor and recipient specified)
+    if (sourceFacility && destFacility) {
+      const sourceMedId = medicineName.toLowerCase().replaceAll(" ", "_");
+      const sourceRef = db
+        .collection("inventory")
+        .doc(sourceFacility)
+        .collection("medicines")
+        .doc(sourceMedId);
 
-    // Increment destination
-    batch.update(destDoc.ref, {
-      qtyRemaining: admin.firestore.FieldValue.increment(qtyRequested),
-      updatedAt: admin.firestore.FieldValue.serverTimestamp()
-    });
+      const destMedId = medicineName.toLowerCase().replaceAll(" ", "_");
+      const destRef = db
+        .collection("inventory")
+        .doc(destFacility)
+        .collection("medicines")
+        .doc(destMedId);
 
-    // Update request resolution
-    batch.update(event.data.after.ref, {
-      resolvedAt: admin.firestore.FieldValue.serverTimestamp()
-    });
+      try {
+        await db.runTransaction(async (transaction) => {
+          const sourceDoc = await transaction.get(sourceRef);
+          if (!sourceDoc.exists) {
+            throw new Error(
+              `Source stock for ${medicineName} at ${sourceFacility} not found`
+            );
+          }
+          const currentSourceQty = Number(sourceDoc.data()?.remainingQuantity || 0);
+          if (currentSourceQty < qty) {
+            throw new Error(
+              `Insufficient stock at donor ${sourceFacility}: available ${currentSourceQty}, requested ${qty}`
+            );
+          }
 
-    await batch.commit();
-    logger.log(`Redistribution successful: ${qtyRequested} units of ${medicineName} from ${toFacilityId} to ${fromFacilityId}`);
+          const destDoc = await transaction.get(destRef);
+
+          // Decrement donor stock
+          transaction.update(sourceRef, {
+            remainingQuantity: currentSourceQty - qty,
+            lastUpdated: admin.firestore.FieldValue.serverTimestamp(),
+          });
+
+          // Increment or initialize recipient stock
+          if (destDoc.exists) {
+            const currentDestQty = Number(destDoc.data()?.remainingQuantity || 0);
+            transaction.update(destRef, {
+              remainingQuantity: currentDestQty + qty,
+              lastUpdated: admin.firestore.FieldValue.serverTimestamp(),
+            });
+          } else {
+            transaction.set(destRef, {
+              medicineName: medicineName,
+              batchId: `B-${Math.floor(1000 + Math.random() * 9000)}`,
+              initialQuantity: qty,
+              remainingQuantity: qty,
+              unit: "units",
+              arrivalDate: admin.firestore.FieldValue.serverTimestamp(),
+              expiryDate: admin.firestore.Timestamp.fromDate(
+                new Date(Date.now() + 180 * 86400000)
+              ),
+              lastUpdated: admin.firestore.FieldValue.serverTimestamp(),
+            });
+          }
+
+          transaction.update(event.data.after.ref, {
+            status: "fulfilled",
+            resolvedAt: admin.firestore.FieldValue.serverTimestamp(),
+          });
+        });
+        logger.log(
+          `Redistribution successful: ${qty} units of ${medicineName} from ${sourceFacility} to ${destFacility}`
+        );
+      } catch (err) {
+        logger.error(`Redistribution failed for request ${requestId}:`, err);
+        await event.data.after.ref.update({
+          status: "rejected",
+          rejectionReason: err.message,
+        });
+      }
+    } else if (facilityId) {
+      // Case 2: Facility restock / shortage / surplus request (single target facility)
+      const medId = medicineName.toLowerCase().replaceAll(" ", "_");
+      const medRef = db
+        .collection("inventory")
+        .doc(facilityId)
+        .collection("medicines")
+        .doc(medId);
+
+      try {
+        await db.runTransaction(async (transaction) => {
+          const medDoc = await transaction.get(medRef);
+
+          if (type === "surplus") {
+            // Surplus approved: deduct surplus from local active stock
+            if (medDoc.exists) {
+              const currentQty = Number(medDoc.data()?.remainingQuantity || 0);
+              const newQty = Math.max(0, currentQty - qty);
+              transaction.update(medRef, {
+                remainingQuantity: newQty,
+                lastUpdated: admin.firestore.FieldValue.serverTimestamp(),
+              });
+            }
+          } else {
+            // Indent / Shortage approved: add stock to facility
+            if (medDoc.exists) {
+              const currentQty = Number(medDoc.data()?.remainingQuantity || 0);
+              transaction.update(medRef, {
+                remainingQuantity: currentQty + qty,
+                lastUpdated: admin.firestore.FieldValue.serverTimestamp(),
+              });
+            } else {
+              transaction.set(medRef, {
+                medicineName: medicineName,
+                batchId: `B-${Math.floor(1000 + Math.random() * 9000)}`,
+                initialQuantity: qty,
+                remainingQuantity: qty,
+                unit: "units",
+                arrivalDate: admin.firestore.FieldValue.serverTimestamp(),
+                expiryDate: admin.firestore.Timestamp.fromDate(
+                  new Date(Date.now() + 180 * 86400000)
+                ),
+                lastUpdated: admin.firestore.FieldValue.serverTimestamp(),
+              });
+            }
+          }
+
+          transaction.update(event.data.after.ref, {
+            status: "fulfilled",
+            resolvedAt: admin.firestore.FieldValue.serverTimestamp(),
+          });
+        });
+        logger.log(
+          `Stock updated for request ${requestId} at ${facilityId}: ${type || "indent"} of ${qty} ${medicineName}`
+        );
+      } catch (err) {
+        logger.error(`Stock update failed for request ${requestId}:`, err);
+        await event.data.after.ref.update({
+          status: "rejected",
+          rejectionReason: err.message,
+        });
+      }
+    }
   }
 });
 
@@ -611,17 +762,23 @@ async function executeTool(name, args, authInfo) {
     if (!authInfo.isAdmin && facilityId !== authInfo.userFacilityId) {
       throw new Error(`Unauthorized: Cannot request for facility ${facilityId}`);
     }
+    if (!isValidQuantity(quantity)) {
+      throw new Error(
+        `Invalid quantity: ${quantity}. Quantity must be a finite positive number.`
+      );
+    }
+    const qty = Number(quantity);
     const type = name === "report_shortage" ? "shortage" : "surplus";
     await db.collection("requests").add({
       facilityId: facilityId,
       medicineName: medicineName,
       type: type,
-      quantity: Number(quantity),
+      quantity: qty,
       requestDate: admin.firestore.Timestamp.now(),
       status: "pending",
       notes: `AI generated ${type} report via Cloud Function`,
     });
-    return { status: "success", details: `${type} reported for ${quantity} of ${medicineName}` };
+    return { status: "success", details: `${type} reported for ${qty} of ${medicineName}` };
   } else if (name === "check_system_inventory") {
     if (!authInfo.isAdmin) {
       const facilityDoc = await db.collection("facilities").doc(authInfo.userFacilityId).get();
@@ -664,30 +821,77 @@ async function executeTool(name, args, authInfo) {
   throw new Error(`Unknown function call: ${name}`);
 }
 
-exports.getForecastSecure = onCall({ secrets: [GEMINI_API_KEY] }, async (request) => {
-  if (!request.auth) throw new HttpsError('unauthenticated', 'User must log in');
-
-  const db = admin.firestore();
-  await getUserFacilityAndRole(request.auth, db);
-
-  const { medicineName, logs, daysToForecast } = request.data;
-  const logSummary = logs
-    .map(l => `Date: ${l.date}, Used: ${l.used}`)
-    .join('\n');
-  const prompt = `Forecast ${daysToForecast} days for ${medicineName}. History:\n${logSummary}\nOutput JSON: {"prediction": int, "reasoning": "string"}`;
-
-  try {
-    const genAI = getGenAI();
-    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
-    const result = await model.generateContent(prompt);
-    const responseText = result.response.text();
-    const jsonMatch = responseText.match(/\{[\s\S]*\}/);
-    return JSON.parse(jsonMatch ? jsonMatch[0] : responseText);
-  } catch (error) {
-    logger.error("Gemini Error:", error);
-    throw new HttpsError('internal', 'AI forecasting failed');
+/**
+ * 4. logPasswordResetRequest(email)
+ * Explicit audit hook for password reset requests.
+ */
+exports.logPasswordResetRequest = onCall(async (request) => {
+  let { email, status } = request.data;
+  
+  if (!email || typeof email !== "string") {
+    throw new HttpsError("invalid-argument", "Email is required and must be a string");
   }
+
+  email = email.trim().toLowerCase();
+
+  if (email.length > 254 || Buffer.byteLength(email, "utf8") > 1500) {
+    throw new HttpsError("invalid-argument", "Invalid email format");
+  }
+  if (!/^[^\s@/]+@[^\s@/]+\.[^\s@/]+$/.test(email)) {
+    throw new HttpsError("invalid-argument", "Invalid email format");
+  }
+
+  const clientIp = getClientIp(request.rawRequest);
+  if (!clientIp || clientIp === "unknown") {
+    throw new HttpsError("unauthenticated", "Unable to determine client IP");
+  }
+
+  await checkRateLimit(
+    clientIp,
+    "logPasswordResetRequest_ip",
+    LIMITS.PASSWORD_RESET_IP
+  );
+  await checkRateLimit(
+    email,
+    "logPasswordResetRequest_email",
+    LIMITS.PASSWORD_RESET_EMAIL
+  );
+
+  const eventId = `pwd_reset_${Date.now()}`;
+  
+  let requestStatus = "success";
+  let resourceId = email;
+  try {
+    const userRecord = await admin.auth().getUserByEmail(email);
+    resourceId = userRecord.uid;
+  } catch (e) {
+    requestStatus = "failure";
+  }
+
+  // Log to admin dashboard via audit_logs
+  const db = admin.firestore();
+  await db.collection("audit_logs").add({
+    adminId: "system",
+    timestamp: admin.firestore.FieldValue.serverTimestamp(),
+    action: "password_reset_requested",
+    resourceType: "user",
+    resourceId: resourceId,
+    metadata: { email, ip: clientIp },
+    status: requestStatus
+  });
+
+  await auditEvent({
+    eventId,
+    action: "password_reset_requested",
+    entityType: "user",
+    entityId: resourceId,
+    actorId: "system",
+    metadata: { email, status: requestStatus, ip: clientIp }
+  });
+
+  return { ok: true };
 });
+
 
 exports.generateSmartAlertsSecure = onCall({ secrets: [GEMINI_API_KEY] }, async (request) => {
   if (!request.auth) throw new HttpsError('unauthenticated', 'User must log in');
@@ -696,6 +900,16 @@ exports.generateSmartAlertsSecure = onCall({ secrets: [GEMINI_API_KEY] }, async 
   await getUserFacilityAndRole(request.auth, db);
 
   const { inventory } = request.data;
+  await checkRateLimit(
+    request.auth.uid,
+    "generateSmartAlertsSecure",
+    LIMITS.AI
+  );
+
+  if (!inventory || !Array.isArray(inventory)) {
+    throw new HttpsError('invalid-argument', 'inventory must be an array');
+  }
+
   const payload = inventory
     .map(i => `${i.medicineName} (Batch: ${i.batchId}): ${i.remainingQuantity}/${i.initialQuantity} units left. Expiry: ${i.expiryDate}`)
     .join('\n');
@@ -724,6 +938,15 @@ exports.getChatResponseSecure = onCall({ secrets: [GEMINI_API_KEY] }, async (req
 
   if (!authInfo.isAdmin && clientContext && clientContext.current_facility_id && clientContext.current_facility_id !== authInfo.userFacilityId) {
     throw new HttpsError('permission-denied', 'Unauthorized facility access in chat context');
+  }
+  await checkRateLimit(
+    request.auth.uid,
+    "getChatResponseSecure",
+    LIMITS.AI
+  );
+
+  if (!history || !Array.isArray(history)) {
+    throw new HttpsError('invalid-argument', 'history must be an array');
   }
 
   const contextStr = JSON.stringify(clientContext);
@@ -813,6 +1036,12 @@ exports.callGeminiSecure = onCall({ secrets: [GEMINI_API_KEY] }, async (request)
   const db = admin.firestore();
   await getUserFacilityAndRole(request.auth, db);
 
+  await checkRateLimit(
+    request.auth.uid,
+    "callGeminiSecure",
+    LIMITS.AI
+  );
+
   const { prompt, imageBase64, imageMimeType } = request.data;
   try {
     const genAI = getGenAI();
@@ -837,6 +1066,72 @@ exports.callGeminiSecure = onCall({ secrets: [GEMINI_API_KEY] }, async (request)
     return { text: result.response.text() };
   } catch (error) {
     logger.error("Gemini callGeminiSecure Error:", error);
-    throw new HttpsError('internal', 'AI generation failed');
+    throw new HttpsError('internal', `AI generation failed: ${error.message || error}`);
   }
+});
+
+exports.adminDeleteResource = onCall(async (request) => {
+  if (!request.auth) throw new HttpsError("unauthenticated", "User must log in");
+  
+  const db = admin.firestore();
+  const authInfo = await getUserFacilityAndRole(request.auth, db);
+  
+  if (!authInfo.isAdmin) {
+    throw new HttpsError("permission-denied", "Only administrators can perform destructive actions");
+  }
+
+  const { resourceType, resourceId } = request.data;
+  
+  if (!["facilities", "requests"].includes(resourceType)) {
+    throw new HttpsError("invalid-argument", "Invalid resource type for deletion");
+  }
+
+  const ref = db.collection(resourceType).doc(resourceId);
+  const doc = await ref.get();
+  
+  if (!doc.exists) {
+    throw new HttpsError("not-found", "Resource not found");
+  }
+  
+  const data = doc.data();
+
+  // Create audit log and delete resource atomically using a batch
+  const batch = db.batch();
+  const auditRef = db.collection("audit_logs").doc();
+  batch.set(auditRef, {
+    adminId: request.auth.uid,
+    timestamp: admin.firestore.FieldValue.serverTimestamp(),
+    action: `delete_${resourceType.slice(0, -1)}`,
+    resourceType: resourceType,
+    resourceId: resourceId,
+    metadata: data,
+    status: "success"
+  });
+  batch.delete(ref);
+  await batch.commit();
+
+  return { success: true };
+});
+const cspReportLastSeen = new Map();
+
+/**
+ * Public HTTP endpoint for receiving Content Security Policy (CSP) violation reports.
+ *
+ * Requirements & Constraints:
+ * - Method: POST
+ * - Content-Type: application/csp-report, application/reports+json, application/json
+ * - Payload Size Limit: Max 10 KB (10,240 bytes)
+ * - Rate Limit: 1 report per IP per 5 seconds
+ * - Payload Schema: Must contain valid CSP report directive properties
+ *
+ * HTTP Responses:
+ * - 204 No Content: Report successfully received and logged
+ * - 400 Bad Request: Missing, malformed, or invalid CSP report payload
+ * - 405 Method Not Allowed: Non-POST HTTP methods
+ * - 413 Payload Too Large: Content-Length or body byte size exceeds 10 KB limit
+ * - 415 Unsupported Media Type: Invalid or missing Content-Type header
+ * - 429 Too Many Requests: Rate limit exceeded for client IP
+ */
+exports.cspReport = onRequest(async (req, res) => {
+  await handleCspReport(req, res, logger, cspReportLastSeen);
 });

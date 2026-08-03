@@ -6,6 +6,8 @@ import '../../services/ai_service.dart';
 import '../../models/request.dart';
 import '../../models/inventory_item.dart';
 import 'package:med_supply_prototype/constants/colors.dart';
+import '../shared/skeleton_loaders.dart';
+import '../../utils/retry_snackbar.dart';
 
 class IndentCreationPage extends ConsumerStatefulWidget {
   final String facilityId;
@@ -62,66 +64,90 @@ class _IndentCreationPageState extends ConsumerState<IndentCreationPage> {
     }
   }
 
+  /// Maximum number of forecast requests that may run concurrently.
+  ///
+  /// A value of 5 keeps total in-flight requests bounded while still
+  /// providing a large speed-up over fully-sequential execution (#238).
+  static const int _kForecastConcurrency = 5;
+
   Future<void> _getAIForecast() async {
     final aiService = ref.read(aiServiceProvider);
     final firebaseService = ref.read(firebaseServiceProvider);
 
-    // Fetch logs for forecasting
+    // Fetch logs once, shared across all concurrent forecast calls.
     final logs =
         await firebaseService.getRecentLogs(widget.facilityId, days: 90);
 
-    for (var item in _inventory) {
-      setState(() => _forecastLoading[item.id] = true);
-      try {
-        final dynamic result = await aiService.forecastDemand(
-            item.medicineName, logs, _selectedPeriod,
-            facilityId: widget.facilityId);
-        setState(() {
-          dynamic predRaw;
-          dynamic reasonRaw;
-          if (result != null && result is Map) {
-            predRaw = result['prediction'];
-            reasonRaw = result['reasoning'];
-          }
-
-          int predicted = 0;
-          if (predRaw is num) {
-            predicted = predRaw.toInt();
-          } else if (predRaw is String) {
-            predicted = double.tryParse(predRaw)?.toInt() ?? 0;
-          }
-
-          _forecasts[item.id] = predicted;
-          _reasoning[item.id] =
-              reasonRaw?.toString() ?? "Calculated based on demand.";
-
-          int available = item.remainingQuantity;
-          bool isExpired =
-              item.expiryDate.difference(DateTime.now()).inDays < 0;
-          bool expiringSoon =
-              item.expiryDate.difference(DateTime.now()).inDays <= 30;
-          int suggestedQty = 0;
-
-          if (isExpired) {
-            suggestedQty = (predicted * 1.2).round();
-          } else if (predicted > available) {
-            suggestedQty = ((predicted - available) * 1.2).round();
-          } else if (predicted > 0 &&
-              ((available - predicted) > (predicted * 1.5) ||
-                  (available > predicted && expiringSoon))) {
-            suggestedQty = available - (predicted * 1.2).round();
-            if (suggestedQty < 0) suggestedQty = 0;
-          } else {
-            suggestedQty = 0;
-          }
-
-          _controllers[item.id]?.text = suggestedQty.toString();
-        });
-      } catch (e) {
-        debugPrint('Forecast error for ${item.medicineName}: $e');
-      } finally {
-        setState(() => _forecastLoading[item.id] = false);
+    setState(() {
+      for (var item in _inventory) {
+        _forecastLoading[item.id] = true;
       }
+    });
+
+    // Run forecasts concurrently in chunks of [_kForecastConcurrency] to
+    // avoid both serialising N round-trips and flooding the API (#238).
+    for (int i = 0; i < _inventory.length; i += _kForecastConcurrency) {
+      final chunk = _inventory.sublist(
+        i,
+        (i + _kForecastConcurrency).clamp(0, _inventory.length),
+      );
+
+      await Future.wait(chunk.map((item) async {
+        try {
+          final dynamic result = await aiService.forecastDemand(
+              item.medicineName, logs, _selectedPeriod,
+              facilityId: widget.facilityId);
+
+          if (!mounted) return;
+          setState(() {
+            dynamic predRaw;
+            dynamic reasonRaw;
+            if (result != null && result is Map) {
+              predRaw = result['prediction'];
+              reasonRaw = result['reasoning'];
+            }
+
+            int predicted = 0;
+            if (predRaw is num) {
+              predicted = predRaw.toInt();
+            } else if (predRaw is String) {
+              predicted = double.tryParse(predRaw)?.toInt() ?? 0;
+            }
+
+            _forecasts[item.id] = predicted;
+            _reasoning[item.id] =
+                reasonRaw?.toString() ?? "Calculated based on demand.";
+
+            // Use centralized ItemStatus to avoid inline threshold duplication.
+            final itemStatus = item.status;
+            int available = item.remainingQuantity;
+            bool isExpired = itemStatus == ItemStatus.expired;
+            // expiringSoon must NOT include already-expired items.
+            bool expiringSoon = itemStatus == ItemStatus.expiringSoon ||
+                itemStatus == ItemStatus.wastageRisk;
+            int suggestedQty = 0;
+
+            if (isExpired) {
+              suggestedQty = (predicted * 1.2).round();
+            } else if (predicted > available) {
+              suggestedQty = ((predicted - available) * 1.2).round();
+            } else if (predicted > 0 &&
+                ((available - predicted) > (predicted * 1.5) ||
+                    (available > predicted && expiringSoon))) {
+              suggestedQty = available - (predicted * 1.2).round();
+              if (suggestedQty < 0) suggestedQty = 0;
+            } else {
+              suggestedQty = 0;
+            }
+
+            _controllers[item.id]?.text = suggestedQty.toString();
+            _forecastLoading[item.id] = false;
+          });
+        } catch (e) {
+          debugPrint('Forecast error for ${item.medicineName}: $e');
+          if (mounted) setState(() => _forecastLoading[item.id] = false);
+        }
+      }));
     }
   }
 
@@ -153,10 +179,13 @@ class _IndentCreationPageState extends ConsumerState<IndentCreationPage> {
         final qty = int.tryParse(_controllers[item.id]?.text ?? '0') ?? 0;
 
         final forecast = _forecasts[item.id];
-        int available = item.remainingQuantity;
-        bool isExpired = item.expiryDate.difference(DateTime.now()).inDays < 0;
-        bool expiringSoon =
-            item.expiryDate.difference(DateTime.now()).inDays <= 30;
+        final int available = item.remainingQuantity;
+        // Use centralized ItemStatus to avoid inline threshold duplication
+        // and to prevent expired items being counted as expiring-soon.
+        final itemStatus = item.status;
+        final bool isExpired = itemStatus == ItemStatus.expired;
+        final bool expiringSoon = itemStatus == ItemStatus.expiringSoon ||
+            itemStatus == ItemStatus.wastageRisk;
 
         final RequestType reqType = _determineRequestType(
             item, forecast, available, isExpired, expiringSoon);
@@ -181,8 +210,8 @@ class _IndentCreationPageState extends ConsumerState<IndentCreationPage> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text('Submission failed: $e')));
+        showRetrySnackBar(context,
+            message: 'Submission failed: $e', onRetry: _submitIndent);
       }
     } finally {
       if (mounted) setState(() => _isSubmitting = false);
@@ -201,7 +230,7 @@ class _IndentCreationPageState extends ConsumerState<IndentCreationPage> {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
               decoration: BoxDecoration(
-                color: MediColors.primary.withValues(alpha: 0.1),
+                color: MediColors.primaryOverlay,
                 borderRadius: BorderRadius.circular(6),
               ),
               child: Text(
@@ -216,7 +245,7 @@ class _IndentCreationPageState extends ConsumerState<IndentCreationPage> {
         ),
       ),
       body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
+          ? const IndentCreationSkeleton()
           : SingleChildScrollView(
               padding: const EdgeInsets.all(24),
               child: Column(
@@ -399,9 +428,13 @@ class _IndentCreationPageState extends ConsumerState<IndentCreationPage> {
     final forecast = _forecasts[item.id];
     final reasoning = _reasoning[item.id];
 
-    int available = item.remainingQuantity;
-    bool isExpired = item.expiryDate.difference(DateTime.now()).inDays < 0;
-    bool expiringSoon = item.expiryDate.difference(DateTime.now()).inDays <= 30;
+    final int available = item.remainingQuantity;
+    // Use centralized ItemStatus; prevents expired items being labelled
+    // as expiring-soon in row status display.
+    final itemStatus = item.status;
+    final bool isExpired = itemStatus == ItemStatus.expired;
+    final bool expiringSoon = itemStatus == ItemStatus.expiringSoon ||
+        itemStatus == ItemStatus.wastageRisk;
 
     String status = "—";
     Color statusColor = MediColors.textMuted;
@@ -412,24 +445,24 @@ class _IndentCreationPageState extends ConsumerState<IndentCreationPage> {
       if (isExpired) {
         status = "EXPIRED";
         statusColor = MediColors.error;
-        statusBg = MediColors.error.withValues(alpha: 0.1);
+        statusBg = MediColors.errorOverlay;
         statusIcon = Icons.warning_rounded;
       } else if (forecast > available) {
         status = "LOW STOCK";
         statusColor = MediColors.error;
-        statusBg = MediColors.error.withValues(alpha: 0.1);
+        statusBg = MediColors.errorOverlay;
         statusIcon = Icons.trending_down_rounded;
       } else if (forecast > 0 &&
           ((available - forecast) > (forecast * 1.5) ||
               (available > forecast && expiringSoon))) {
         status = "SURPLUS";
         statusColor = MediColors.success;
-        statusBg = MediColors.success.withValues(alpha: 0.1);
+        statusBg = MediColors.successOverlay;
         statusIcon = Icons.arrow_upward_rounded;
       } else {
         status = "OK";
         statusColor = MediColors.primary;
-        statusBg = MediColors.primary.withValues(alpha: 0.1);
+        statusBg = MediColors.primaryOverlay;
         statusIcon = Icons.check;
       }
     }
