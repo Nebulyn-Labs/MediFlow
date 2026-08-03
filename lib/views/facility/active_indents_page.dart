@@ -5,6 +5,7 @@ import '../../services/ai_service.dart';
 import '../../services/csv_export_service.dart';
 import '../../models/request.dart';
 import '../../models/inventory_item.dart';
+import '../../models/daily_usage_log.dart';
 import 'package:med_supply_prototype/constants/colors.dart';
 import '../shared/skeleton_loaders.dart';
 
@@ -99,7 +100,7 @@ class _ActiveIndentsPageState extends ConsumerState<ActiveIndentsPage> {
       }
     });
 
-    final dynamic logs;
+    final List<DailyUsageLog> logs;
     try {
       logs = await firebaseService.getRecentLogs(widget.facilityId, days: 90);
     } catch (e) {
@@ -111,7 +112,11 @@ class _ActiveIndentsPageState extends ConsumerState<ActiveIndentsPage> {
           }
         });
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to fetch recent logs for forecast: $e')),
+          SnackBar(
+            content: Text(
+              'Failed to fetch recent logs for forecast: $e',
+            ),
+          ),
         );
       }
       return;
@@ -128,8 +133,11 @@ class _ActiveIndentsPageState extends ConsumerState<ActiveIndentsPage> {
       await Future.wait(chunk.map((item) async {
         try {
           final dynamic result = await aiService.forecastDemand(
-              item.medicineName, logs, _selectedPeriod,
-              facilityId: widget.facilityId);
+            item.medicineName,
+            logs,
+            _selectedPeriod,
+            facilityId: widget.facilityId,
+          );
           if (!mounted) return;
           setState(() {
             dynamic predRaw;
@@ -157,7 +165,11 @@ class _ActiveIndentsPageState extends ConsumerState<ActiveIndentsPage> {
           if (mounted) {
             setState(() => _forecastLoading[item.id] = false);
             ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text('Failed to generate forecast for ${item.medicineName}: $e')),
+              SnackBar(
+                content: Text(
+                  'Failed to generate forecast for ${item.medicineName}: $e',
+                ),
+              ),
             );
           }
         }

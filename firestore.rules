@@ -114,19 +114,5 @@ service cloud.firestore {
       allow update: if isAdmin();
       allow delete: if isAdmin();
     }
-
-    // Alerts collection
-    match /alerts/{alertId} {
-      allow read: if isAdmin() || (isAuthenticated() && resource != null && isFacilityUser(resource.data.facilityId));
-      allow write: if isAdmin();
-    }
-
-    // Users collection (RBAC)
-    match /users/{userId} {
-      allow read: if isAdmin() || (isAuthenticated() && request.auth.uid == userId);
-      allow create: if isAdmin() || (isAuthenticated() && request.auth.uid == userId && request.resource.data.role == 'facility_head');
-      allow update: if isAdmin();
-      allow delete: if isAdmin();
-    }
   }
 }
