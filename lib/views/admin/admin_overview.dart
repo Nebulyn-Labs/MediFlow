@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -7,7 +8,8 @@ import '../../services/ai_service.dart';
 import '../../models/facility.dart';
 import '../../models/request.dart';
 import '../../models/inventory_item.dart';
-import 'package:med_supply_prototype/constants/colors.dart';
+import 'package:med_supply_prototype/theme/medi_flow_theme.dart';
+import '../shared/skeleton_loaders.dart';
 
 class AdminOverview extends ConsumerStatefulWidget {
   const AdminOverview({super.key});
@@ -24,10 +26,20 @@ class _AdminOverviewState extends ConsumerState<AdminOverview> {
 
   int _openShortageRequests = 0;
   int _surplusOffers = 0;
-  int _pendingIndents = 0;
+  int _pendingApprovals = 0;
 
-  bool _isLoading = true;
+  bool _isInitialLoading = true;
+  String? _errorMessage;
+  List<String> _failedFacilities = [];
   StreamSubscription? _requestsSub;
+
+  // ---- medicines pagination state (Issue #209) ----
+  List<InventoryItem> _allMedicines = [];
+  bool _medicinesLoading = false;
+  bool _medicinesHasMore = true;
+  DocumentSnapshot? _medicinesLastDoc;
+  String? _medicinesError;
+  int _medicinesRequestId = 0;
 
   // ---- search state (Sprint 3) ----
   String _searchQuery = '';
@@ -56,52 +68,109 @@ class _AdminOverviewState extends ConsumerState<AdminOverview> {
   }
 
   Future<void> _loadData() async {
-    final facs = await ref.read(firebaseServiceProvider).getFacilities();
+    final firebaseService = ref.read(firebaseServiceProvider);
+    final aiService = ref.read(aiServiceProvider);
+
+    if (!mounted) return;
+    await _requestsSub?.cancel();
+
+    // Reset medicines pagination on full refresh
+    if (mounted) {
+      setState(() {
+        _errorMessage = null;
+        _allMedicines = [];
+        _medicinesLastDoc = null;
+        _medicinesHasMore = true;
+        _medicinesError = null;
+        _medicinesRequestId++;
+        _medicinesLoading = false;
+      });
+    }
+
+    // Load the first page of medicines (non-blocking alongside facility load)
+    unawaited(_loadMedicinePage());
+
+    List<Facility> facs = [];
+    try {
+      facs = await ref.read(firebaseServiceProvider).getFacilities();
+    } catch (e) {
+      debugPrint('Failed to load facilities: $e');
+      if (mounted) {
+        if (_facilities.isEmpty) {
+          setState(() {
+            _errorMessage =
+                'Unable to load dashboard data. Please check your connection and try again.';
+            _isInitialLoading = false;
+          });
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Could not refresh dashboard data.'),
+            ),
+          );
+        }
+      }
+      return;
+    }
 
     Map<String, double> health = {};
     Map<String, int> alerts = {};
     Map<String, int> topMeds = {};
+    List<String> failedFacilityNames = [];
 
-    for (var f in facs) {
-      final inv =
-          await ref.read(firebaseServiceProvider).getInventoryOnce(f.id);
+    await Future.wait(
+      facs.map((f) async {
+        try {
+          final inv = await firebaseService.getInventoryOnce(f.id);
 
-      double totalInitial = 0;
-      double totalRemaining = 0;
-      for (var item in inv) {
-        totalInitial += item.initialQuantity;
-        totalRemaining += item.remainingQuantity;
+          double totalInitial = 0;
+          double totalRemaining = 0;
+          for (var item in inv) {
+            totalInitial += item.initialQuantity;
+            totalRemaining += item.remainingQuantity;
 
-        topMeds[item.medicineName] =
-            (topMeds[item.medicineName] ?? 0) + item.remainingQuantity.toInt();
-      }
-      health[f.id] =
-          totalInitial == 0 ? 100.0 : (totalRemaining / totalInitial) * 100;
+            topMeds[item.medicineName] = (topMeds[item.medicineName] ?? 0) +
+                item.remainingQuantity.toInt();
+          }
+          health[f.id] =
+              totalInitial == 0 ? 100.0 : (totalRemaining / totalInitial) * 100;
 
-      final fAlerts =
-          await ref.read(aiServiceProvider).generateSmartAlerts(inv);
-      alerts[f.id] = fAlerts.length;
-    }
-
-    _requestsSub =
-        ref.read(firebaseServiceProvider).streamRequests(null).listen((reqs) {
-      if (!mounted) return;
-      int shortage = 0;
-      int surplus = 0;
-      int pending = 0;
-      for (var r in reqs) {
-        if (r.status == RequestStatus.pending) {
-          if (r.type == RequestType.shortage) shortage++;
-          if (r.type == RequestType.surplus) surplus++;
-          if (r.type == RequestType.regularIndent) pending++;
+          final fAlerts = await aiService.generateSmartAlerts(inv);
+          alerts[f.id] = fAlerts.length;
+        } catch (e) {
+          debugPrint(
+              'Failed to load data for facility ${f.name} (${f.id}): $e');
+          failedFacilityNames.add(f.name);
         }
-      }
-      setState(() {
-        _openShortageRequests = shortage;
-        _surplusOffers = surplus;
-        _pendingIndents = pending;
-      });
-    });
+      }),
+    );
+
+    _requestsSub = firebaseService.streamRequests(null).listen(
+      (reqs) {
+        if (!mounted) return;
+        int shortage = 0;
+        int surplus = 0;
+        for (var r in reqs) {
+          if (r.status == RequestStatus.pending) {
+            if (r.type == RequestType.shortage) shortage++;
+            if (r.type == RequestType.surplus) surplus++;
+          }
+        }
+        // The "Pending Approvals" KPI mirrors the /admin/approvals page,
+        // which lists every pending request regardless of type. Using
+        // MedRequest.countPending keeps the card and the page in lockstep
+        // (#334).
+        final pending = MedRequest.countPending(reqs);
+        setState(() {
+          _openShortageRequests = shortage;
+          _surplusOffers = surplus;
+          _pendingApprovals = pending;
+        });
+      },
+      onError: (e) {
+        debugPrint('Failed to stream facility requests: $e');
+      },
+    );
 
     if (mounted) {
       setState(() {
@@ -109,21 +178,67 @@ class _AdminOverviewState extends ConsumerState<AdminOverview> {
         _stockHealth = health;
         _alertCounts = alerts;
         _topMedicines = topMeds;
-        _isLoading = false;
+        _failedFacilities = failedFacilityNames;
+        _isInitialLoading = false;
+      });
+    }
+  }
+
+  /// Loads the next page of medicines from Firestore using cursor-based
+  /// pagination, appending results to [_allMedicines]. Mirrors the
+  /// getPaginatedLogs pattern used elsewhere in the app.
+  Future<void> _loadMedicinePage() async {
+    if (_medicinesLoading || !_medicinesHasMore) return;
+
+    final requestId = ++_medicinesRequestId;
+    if (mounted) setState(() => _medicinesLoading = true);
+
+    try {
+      final result = await ref
+          .read(firebaseServiceProvider)
+          .getPaginatedMedicines(startAfter: _medicinesLastDoc);
+
+      if (!mounted || requestId != _medicinesRequestId) {
+        return;
+      }
+
+      setState(() {
+        _allMedicines.addAll(result.medicines);
+        _medicinesLastDoc = result.lastDocument;
+        _medicinesHasMore = result.hasMore;
+        _medicinesLoading = false;
+        _medicinesError = null;
+      });
+    } catch (e) {
+      if (!mounted || requestId != _medicinesRequestId) {
+        return;
+      }
+
+      setState(() {
+        _medicinesLoading = false;
+        _medicinesError = 'Unable to load medicine inventory';
       });
     }
   }
 
   // ---- status + filtering logic (Sprint 5) ----
   String _getStockStatus(InventoryItem item) {
-    final daysToExpiry = item.expiryDate.difference(DateTime.now()).inDays;
-    if (daysToExpiry <= 90) return 'Expiring Soon';
-
-    if (item.initialQuantity == 0) return 'Healthy';
-    final ratio = item.remainingQuantity / item.initialQuantity;
-    if (ratio < 0.2) return 'Low Stock';
-    if (ratio > 0.8) return 'Surplus';
-    return 'Healthy';
+    switch (item.status) {
+      case ItemStatus.expired:
+        return 'Expired';
+      case ItemStatus.lowStock:
+        return 'Low Stock';
+      case ItemStatus.wastageRisk:
+        return 'Wastage Risk';
+      case ItemStatus.expiringSoon:
+        return 'Expiring Soon';
+      case ItemStatus.healthy:
+        if (item.initialQuantity > 0 &&
+            (item.remainingQuantity / item.initialQuantity) > 0.8) {
+          return 'Surplus';
+        }
+        return 'Healthy';
+    }
   }
 
   List<InventoryItem> _applyFilters(List<InventoryItem> items) {
@@ -136,78 +251,136 @@ class _AdminOverviewState extends ConsumerState<AdminOverview> {
     }).toList();
   }
 
-  // ---- medicine list widget (Sprint 6, overflow-fixed in 9c) ----
+  // ---- medicine list widget (paginated, Issue #209) ----
   Widget _buildMedicineList() {
-    return StreamBuilder<List<InventoryItem>>(
-      stream: ref.read(firebaseServiceProvider).streamAllMedicines(),
-      builder: (context, snapshot) {
-        if (snapshot.hasError) {
-          return Text('Error loading inventory: ${snapshot.error}');
-        }
-        if (!snapshot.hasData) {
-          return const Center(child: CircularProgressIndicator());
-        }
+    final colors = context.mediTheme;
+    final filtered = _applyFilters(_allMedicines);
 
-        final filtered = _applyFilters(snapshot.data!);
+    if (_medicinesLoading && _allMedicines.isEmpty) {
+      return const Column(
+        children: [
+          SkeletonTableRow(),
+          SkeletonTableRow(),
+          SkeletonTableRow(),
+        ],
+      );
+    }
 
-        if (filtered.isEmpty) {
-          return const Padding(
-            padding: EdgeInsets.symmetric(vertical: 24),
-            child: Text('No medicines match your search or filter.',
-                style: TextStyle(color: MediColors.textSecondary)),
-          );
-        }
+    if (_medicinesError != null && _allMedicines.isEmpty) {
+      return Column(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: colors.error.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: colors.error),
+            ),
+            child: Column(
+              children: [
+                Icon(Icons.error_outline, color: colors.error),
+                const SizedBox(height: 8),
+                Text(
+                  _medicinesError!,
+                  style: TextStyle(color: colors.error),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 8),
+                ElevatedButton(
+                  onPressed: () {
+                    setState(() {
+                      _medicinesError = null;
+                    });
+                    _loadMedicinePage();
+                  },
+                  child: Text('Retry'),
+                ),
+              ],
+            ),
+          ),
+        ],
+      );
+    }
 
-        return ListView.builder(
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          itemCount: filtered.length,
-          itemBuilder: (context, index) {
-            final item = filtered[index];
-            final status = _getStockStatus(item);
-            return Container(
-              margin: const EdgeInsets.only(bottom: 8),
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: MediColors.surface,
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: MediColors.border),
-              ),
-              child: Row(
-                children: [
-                  Expanded(
-                    flex: 2,
-                    child: Text(item.medicineName,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                            fontWeight: FontWeight.w700,
-                            color: MediColors.textPrimary)),
+    return Column(
+      children: [
+        if (filtered.isEmpty && !_medicinesLoading)
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 24),
+            // Note: Intentional scalability trade-off - filtering only searches
+            // currently loaded pages to avoid excessive reads or complex
+            // composite indexes on the large global medicines collection.
+            child: Text(
+                'No medicines match in currently loaded data. Load more to continue searching.',
+                textAlign: TextAlign.center,
+                style: TextStyle(color: colors.textSecondary)),
+          )
+        else
+          ListView.builder(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            itemCount: filtered.length,
+            itemBuilder: (context, index) {
+              final item = filtered[index];
+              final status = _getStockStatus(item);
+              return Container(
+                margin: const EdgeInsets.only(bottom: 8),
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: colors.surface,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: colors.border),
+                ),
+                child: Row(
+                  children: [
+                    Expanded(
+                      flex: 2,
+                      child: Text(item.medicineName,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                              fontWeight: FontWeight.w700,
+                              color: colors.textPrimary)),
+                    ),
+                    Expanded(
+                      child: Text(
+                          '${item.remainingQuantity}/${item.initialQuantity} ${item.unit}',
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(color: colors.textSecondary)),
+                    ),
+                    Flexible(
+                      child: Text(status,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                              fontWeight: FontWeight.w700, color: colors.info)),
+                    ),
+                  ],
+                ),
+              );
+            },
+          ),
+        if (_medicinesHasMore)
+          Padding(
+            padding: const EdgeInsets.only(top: 8),
+            child: _medicinesLoading
+                ? const Center(
+                    child: Padding(
+                      padding: EdgeInsets.all(12),
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    ),
+                  )
+                : TextButton.icon(
+                    onPressed: _loadMedicinePage,
+                    icon: Icon(Icons.expand_more_rounded, size: 18),
+                    label: Text('Load more'),
                   ),
-                  Expanded(
-                    child: Text(
-                        '${item.remainingQuantity}/${item.initialQuantity} ${item.unit}',
-                        overflow: TextOverflow.ellipsis,
-                        style:
-                            const TextStyle(color: MediColors.textSecondary)),
-                  ),
-                  Flexible(
-                    child: Text(status,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                            fontWeight: FontWeight.w700,
-                            color: MediColors.info)),
-                  ),
-                ],
-              ),
-            );
-          },
-        );
-      },
+          ),
+      ],
     );
   }
 
   // ---- filter chips as horizontally-scrollable row (Sprint 9d) ----
   Widget _buildFilterChips() {
+    final colors = context.mediTheme;
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
       child: Row(
@@ -223,14 +396,14 @@ class _AdminOverviewState extends ConsumerState<AdminOverview> {
                   _selectedFilter = filter;
                 });
               },
-              backgroundColor: MediColors.surface,
-              selectedColor: MediColors.info.withValues(alpha: 0.2),
+              backgroundColor: colors.surface,
+              selectedColor: colors.info.withValues(alpha: 0.2),
               labelStyle: TextStyle(
-                color: isSelected ? MediColors.info : MediColors.textSecondary,
+                color: isSelected ? colors.info : colors.textSecondary,
                 fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
               ),
               side: BorderSide(
-                color: isSelected ? MediColors.info : MediColors.border,
+                color: isSelected ? colors.info : colors.border,
               ),
             ),
           );
@@ -239,89 +412,172 @@ class _AdminOverviewState extends ConsumerState<AdminOverview> {
     );
   }
 
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: MediColors.bg,
-      appBar: AppBar(title: const Text('Admin Dashboard')),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : SingleChildScrollView(
-              padding: const EdgeInsets.all(28),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // KPI Header
-                  Wrap(
-                    spacing: 20,
-                    runSpacing: 20,
-                    children: [
-                      _buildKpiCard('TOTAL FACILITIES', '${_facilities.length}',
-                          Icons.business_rounded,
-                          onTap: () {}),
-                      _buildKpiCard('OPEN SHORTAGE REQUESTS',
-                          '$_openShortageRequests', Icons.warning_amber_rounded,
-                          isAlert: true, onTap: () {}),
-                      _buildKpiCard('SURPLUS / EXPIRY OFFERS',
-                          '$_surplusOffers', Icons.swap_horiz_rounded,
-                          isAlert: false,
-                          iconColor: MediColors.warning,
-                          onTap: () {}),
-                      _buildKpiCard(
-                          'PENDING INDENT APPROVALS',
-                          '$_pendingIndents',
-                          Icons.assignment_turned_in_rounded,
-                          iconColor: MediColors.info,
-                          onTap: () => context.go('/admin/approvals')),
-                    ],
-                  ),
-                  const SizedBox(height: 36),
-
-                  // ---- search field (Sprint 3) ----
-                  TextField(
-                    controller: _searchController,
-                    onChanged: (value) {
-                      setState(() {
-                        _searchQuery = value.toLowerCase();
-                      });
-                    },
-                    decoration: InputDecoration(
-                      hintText: 'Search medicines by name...',
-                      prefixIcon: const Icon(Icons.search),
-                      filled: true,
-                      fillColor: MediColors.surface,
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(8),
-                        borderSide: BorderSide(color: MediColors.border),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 20),
-
-                  // ---- filter chips (Sprint 4, horizontal-scroll in 9d) ----
-                  _buildFilterChips(),
-                  const SizedBox(height: 20),
-
-                  // ---- medicine list (Sprint 6) ----
-                  _buildMedicineList(),
-                  const SizedBox(height: 36),
-
-                  // Facility Health Grid
-                  _buildFacilityHealthGrid(),
-                  const SizedBox(height: 36),
-
-                  // Top Medicines Chart
-                  _buildTopMedicinesChart(),
-                ],
+  Widget _buildPartialDataWarning() {
+    final colors = context.mediTheme;
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.only(bottom: 16),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: colors.warningOverlay,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: colors.warning.withValues(alpha: 0.3)),
+      ),
+      child: Row(
+        children: [
+          Icon(Icons.warning_amber_rounded, color: colors.warning, size: 20),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              'Some facility data could not be loaded: '
+              '${_failedFacilities.join(", ")}.',
+              style: TextStyle(
+                color: colors.warning,
+                fontSize: 13,
               ),
             ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.mediTheme;
+    return Scaffold(
+      backgroundColor: colors.background,
+      appBar: AppBar(title: Text('Admin Dashboard')),
+      body: _isInitialLoading
+          ? const AdminOverviewSkeleton()
+          : _errorMessage != null
+              ? _buildErrorView()
+              : RefreshIndicator(
+                  onRefresh: _loadData,
+                  color: colors.info,
+                  backgroundColor: colors.surface,
+                  strokeWidth: 2.5,
+                  displacement: 48,
+                  child: SingleChildScrollView(
+                    physics: const AlwaysScrollableScrollPhysics(),
+                    padding: const EdgeInsets.all(28),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        if (_failedFacilities.isNotEmpty)
+                          _buildPartialDataWarning(),
+                        Wrap(
+                          spacing: 20,
+                          runSpacing: 20,
+                          children: [
+                            _buildKpiCard(
+                                'TOTAL FACILITIES',
+                                '${_facilities.length}',
+                                Icons.business_rounded),
+                            _buildKpiCard(
+                                'OPEN SHORTAGE REQUESTS',
+                                '$_openShortageRequests',
+                                Icons.warning_amber_rounded,
+                                isAlert: true),
+                            _buildKpiCard('SURPLUS / EXPIRY OFFERS',
+                                '$_surplusOffers', Icons.swap_horiz_rounded,
+                                isAlert: false, iconColor: colors.warning),
+                            _buildKpiCard(
+                                'PENDING APPROVALS',
+                                '$_pendingApprovals',
+                                Icons.assignment_turned_in_rounded,
+                                iconColor: colors.info,
+                                onTap: () => context.go('/admin/approvals')),
+                          ],
+                        ),
+                        const SizedBox(height: 36),
+                        TextField(
+                          controller: _searchController,
+                          onChanged: (value) {
+                            setState(() {
+                              _searchQuery = value.toLowerCase();
+                            });
+                          },
+                          decoration: InputDecoration(
+                            hintText: 'Search medicines by name...',
+                            prefixIcon: Icon(Icons.search),
+                            filled: true,
+                            fillColor: colors.surface,
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(8),
+                              borderSide: BorderSide(color: colors.border),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 20),
+                        _buildFilterChips(),
+                        const SizedBox(height: 20),
+                        _buildMedicineList(),
+                        const SizedBox(height: 36),
+                        _buildFacilityHealthGrid(),
+                        const SizedBox(height: 36),
+                        _buildTopMedicinesChart(),
+                      ],
+                    ),
+                  ),
+                ),
+    );
+  }
+
+  Widget _buildErrorView() {
+    final colors = context.mediTheme;
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(32),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.cloud_off_rounded, size: 64, color: colors.textMuted),
+            const SizedBox(height: 24),
+            Text(
+              'Unable to load dashboard data.',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.w700,
+                color: colors.textPrimary,
+              ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 12),
+            Text(
+              _errorMessage!,
+              style: TextStyle(
+                fontSize: 14,
+                color: colors.textSecondary,
+                height: 1.5,
+              ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 32),
+            FilledButton.icon(
+              onPressed: _loadData,
+              icon: Icon(Icons.refresh_rounded, size: 20),
+              label: Text('Retry'),
+              style: FilledButton.styleFrom(
+                backgroundColor: colors.info,
+                foregroundColor: colors.textPrimary,
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 
   Widget _buildKpiCard(String title, String value, IconData icon,
       {bool isAlert = false, Color? iconColor, VoidCallback? onTap}) {
-    final finalIconColor =
-        isAlert ? MediColors.error : (iconColor ?? MediColors.info);
+    final colors = context.mediTheme;
+    final finalIconColor = isAlert ? colors.error : (iconColor ?? colors.info);
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(12),
@@ -329,9 +585,9 @@ class _AdminOverviewState extends ConsumerState<AdminOverview> {
         width: 250,
         padding: const EdgeInsets.all(24),
         decoration: BoxDecoration(
-          color: MediColors.surface,
+          color: colors.surface,
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: MediColors.border),
+          border: Border.all(color: colors.border),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -341,10 +597,10 @@ class _AdminOverviewState extends ConsumerState<AdminOverview> {
               children: [
                 Expanded(
                     child: Text(title,
-                        style: const TextStyle(
+                        style: TextStyle(
                             fontSize: 11,
                             fontWeight: FontWeight.w700,
-                            color: MediColors.textSecondary,
+                            color: colors.textSecondary,
                             letterSpacing: 0.5),
                         overflow: TextOverflow.ellipsis)),
                 const SizedBox(width: 8),
@@ -353,10 +609,10 @@ class _AdminOverviewState extends ConsumerState<AdminOverview> {
             ),
             const SizedBox(height: 16),
             Text(value,
-                style: const TextStyle(
+                style: TextStyle(
                     fontSize: 28,
                     fontWeight: FontWeight.w800,
-                    color: MediColors.textPrimary)),
+                    color: colors.textPrimary)),
           ],
         ),
       ),
@@ -364,14 +620,15 @@ class _AdminOverviewState extends ConsumerState<AdminOverview> {
   }
 
   Widget _buildFacilityHealthGrid() {
+    final colors = context.mediTheme;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text('Facility Health Overview',
+        Text('Facility Health Overview',
             style: TextStyle(
                 fontSize: 16,
                 fontWeight: FontWeight.w700,
-                color: MediColors.textPrimary)),
+                color: colors.textPrimary)),
         const SizedBox(height: 16),
         Wrap(
           spacing: 16,
@@ -383,19 +640,20 @@ class _AdminOverviewState extends ConsumerState<AdminOverview> {
   }
 
   Widget _buildHealthCard(Facility facility) {
+    final colors = context.mediTheme;
     final health = _stockHealth[facility.id] ?? 0;
     final alerts = _alertCounts[facility.id] ?? 0;
 
     Color healthColor;
     String healthStatus;
     if (health > 70) {
-      healthColor = MediColors.success;
+      healthColor = colors.success;
       healthStatus = 'Healthy';
     } else if (health > 40) {
-      healthColor = MediColors.warning;
+      healthColor = colors.warning;
       healthStatus = 'Low';
     } else {
-      healthColor = MediColors.error;
+      healthColor = colors.error;
       healthStatus = 'Critical';
     }
 
@@ -403,9 +661,9 @@ class _AdminOverviewState extends ConsumerState<AdminOverview> {
       width: 280,
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: MediColors.surface,
+        color: colors.surface,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: MediColors.border),
+        border: Border.all(color: colors.border),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -415,20 +673,20 @@ class _AdminOverviewState extends ConsumerState<AdminOverview> {
             children: [
               Expanded(
                   child: Text(facility.name,
-                      style: const TextStyle(
+                      style: TextStyle(
                           fontWeight: FontWeight.w700,
                           fontSize: 15,
-                          color: MediColors.textPrimary),
+                          color: colors.textPrimary),
                       overflow: TextOverflow.ellipsis)),
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                 decoration: BoxDecoration(
-                    color: MediColors.surfaceLight,
+                    color: colors.surfaceLight,
                     borderRadius: BorderRadius.circular(20)),
                 child: Text(facility.type,
-                    style: const TextStyle(
+                    style: TextStyle(
                         fontSize: 10,
-                        color: MediColors.textSecondary,
+                        color: colors.textSecondary,
                         fontWeight: FontWeight.w700)),
               ),
             ],
@@ -437,9 +695,8 @@ class _AdminOverviewState extends ConsumerState<AdminOverview> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text('Stock Health',
-                  style:
-                      TextStyle(fontSize: 12, color: MediColors.textSecondary)),
+              Text('Stock Health',
+                  style: TextStyle(fontSize: 12, color: colors.textSecondary)),
               Text('${health.round()}%',
                   style: TextStyle(
                       fontSize: 14,
@@ -452,7 +709,7 @@ class _AdminOverviewState extends ConsumerState<AdminOverview> {
             borderRadius: BorderRadius.circular(4),
             child: LinearProgressIndicator(
               value: health / 100,
-              backgroundColor: MediColors.surfaceLight,
+              backgroundColor: colors.surfaceLight,
               valueColor: AlwaysStoppedAnimation<Color>(healthColor),
               minHeight: 6,
             ),
@@ -476,12 +733,12 @@ class _AdminOverviewState extends ConsumerState<AdminOverview> {
               if (alerts > 0)
                 Row(
                   children: [
-                    const Icon(Icons.notifications_active_rounded,
-                        color: MediColors.error, size: 14),
+                    Icon(Icons.notifications_active_rounded,
+                        color: colors.error, size: 14),
                     const SizedBox(width: 4),
                     Text('$alerts',
-                        style: const TextStyle(
-                            color: MediColors.error,
+                        style: TextStyle(
+                            color: colors.error,
                             fontSize: 12,
                             fontWeight: FontWeight.w700)),
                   ],
@@ -494,6 +751,7 @@ class _AdminOverviewState extends ConsumerState<AdminOverview> {
   }
 
   Widget _buildTopMedicinesChart() {
+    final colors = context.mediTheme;
     if (_topMedicines.isEmpty) return const SizedBox.shrink();
 
     var sortedEntries = _topMedicines.entries.toList()
@@ -507,18 +765,18 @@ class _AdminOverviewState extends ConsumerState<AdminOverview> {
     return Container(
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
-        color: MediColors.surface,
+        color: colors.surface,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: MediColors.border),
+        border: Border.all(color: colors.border),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text('Top Medicines by Total Units Across All Facilities',
+          Text('Top Medicines by Total Units Across All Facilities',
               style: TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.w700,
-                  color: MediColors.textPrimary)),
+                  color: colors.textPrimary)),
           const SizedBox(height: 32),
           SizedBox(
             height: 200,
@@ -534,8 +792,8 @@ class _AdminOverviewState extends ConsumerState<AdminOverview> {
                       Container(
                         width: 24,
                         height: 150 * heightFactor,
-                        decoration: const BoxDecoration(
-                          color: MediColors.info,
+                        decoration: BoxDecoration(
+                          color: colors.info,
                           borderRadius:
                               BorderRadius.vertical(top: Radius.circular(4)),
                         ),
@@ -543,8 +801,8 @@ class _AdminOverviewState extends ConsumerState<AdminOverview> {
                       const SizedBox(height: 12),
                       Text(
                         e.key,
-                        style: const TextStyle(
-                            fontSize: 10, color: MediColors.textSecondary),
+                        style: TextStyle(
+                            fontSize: 10, color: colors.textSecondary),
                         textAlign: TextAlign.center,
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,

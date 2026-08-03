@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:vector_math/vector_math_64.dart' show Vector3;
 import '../../services/firebase_service.dart';
 import 'package:med_supply_prototype/constants/colors.dart';
 import 'dart:math' as math;
@@ -16,6 +17,8 @@ class _RoleSelectionScreenState extends State<RoleSelectionScreen>
     with SingleTickerProviderStateMixin {
   bool _isHoveringFacility = false;
   bool _isHoveringAdmin = false;
+  bool _isFocusedFacility = false;
+  bool _isFocusedAdmin = false;
   late AnimationController _pulseController;
 
   @override
@@ -70,7 +73,7 @@ class _RoleSelectionScreenState extends State<RoleSelectionScreen>
                               shape: BoxShape.circle,
                               gradient: RadialGradient(
                                 colors: [
-                                  MediColors.primary.withValues(alpha: 0.08),
+                                  MediColors.primarySubtle,
                                   Colors.transparent,
                                 ],
                               ),
@@ -188,8 +191,11 @@ class _RoleSelectionScreenState extends State<RoleSelectionScreen>
                       gradient: const LinearGradient(
                           colors: [Color(0xFF059669), Color(0xFF14B8A6)]),
                       isHovering: _isHoveringFacility,
+                      isFocused: _isFocusedFacility,
                       onHover: (val) =>
                           setState(() => _isHoveringFacility = val),
+                      onFocusChange: (val) =>
+                          setState(() => _isFocusedFacility = val),
                       onTap: () => context.go('/login/facility'),
                     ),
                     const SizedBox(height: 20),
@@ -199,7 +205,10 @@ class _RoleSelectionScreenState extends State<RoleSelectionScreen>
                       icon: Icons.admin_panel_settings_rounded,
                       gradient: MediColors.primaryGradient,
                       isHovering: _isHoveringAdmin,
+                      isFocused: _isFocusedAdmin,
                       onHover: (val) => setState(() => _isHoveringAdmin = val),
+                      onFocusChange: (val) =>
+                          setState(() => _isFocusedAdmin = val),
                       onTap: () => context.go('/login/admin'),
                     ),
                     const SizedBox(height: 48),
@@ -263,74 +272,93 @@ class _RoleSelectionScreenState extends State<RoleSelectionScreen>
     required IconData icon,
     required LinearGradient gradient,
     required bool isHovering,
+    required bool isFocused,
     required ValueChanged<bool> onHover,
+    required ValueChanged<bool> onFocusChange,
     required VoidCallback onTap,
   }) {
-    return MouseRegion(
-      onEnter: (_) => onHover(true),
-      onExit: (_) => onHover(false),
-      cursor: SystemMouseCursors.click,
-      child: GestureDetector(
-        onTap: onTap,
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 250),
-          curve: Curves.easeOutCubic,
-          width: 420,
-          padding: const EdgeInsets.all(24),
-          transform:
-              Matrix4.translationValues(0.0, isHovering ? -4.0 : 0.0, 0.0),
-          decoration: BoxDecoration(
-            color: MediColors.surface,
+    // The card is a real button: a focusable, activatable widget (InkWell
+    // inside FocusableActionDetector) so keyboard users can Tab to it, press
+    // Enter or Space, and screen readers announce it as a button. A visible
+    // focus ring reuses the existing hover styling so the affordance is
+    // obvious without depending on the mouse. The outer Semantics widget
+    // gives a clean single label that reads "Facility Head, Manage
+    // inventory, daily logs & AI indents, button" instead of the bare text
+    // labels the previous GestureDetector surfaced.
+    final isActive = isHovering || isFocused;
+    final borderColor = isActive
+        ? gradient.colors.first.withValues(alpha: 0.5)
+        : MediColors.border;
+    final shadow = isActive
+        ? [
+            BoxShadow(
+                color: gradient.colors.first.withValues(alpha: 0.15),
+                blurRadius: 30,
+                offset: const Offset(0, 12)),
+          ]
+        : const <BoxShadow>[];
+
+    return Semantics(
+      button: true,
+      label: '$title. $subtitle',
+      child: MouseRegion(
+        onEnter: (_) => onHover(true),
+        onExit: (_) => onHover(false),
+        cursor: SystemMouseCursors.click,
+        child: FocusableActionDetector(
+          onFocusChange: onFocusChange,
+          child: InkWell(
+            onTap: onTap,
             borderRadius: BorderRadius.circular(20),
-            border: Border.all(
-              color: isHovering
-                  ? gradient.colors.first.withValues(alpha: 0.5)
-                  : MediColors.border,
-              width: 1.5,
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 250),
+              curve: Curves.easeOutCubic,
+              width: 420,
+              padding: const EdgeInsets.all(24),
+              transform:
+                  Matrix4.translation(Vector3(0.0, isActive ? -4.0 : 0.0, 0.0)),
+              decoration: BoxDecoration(
+                color: MediColors.surface,
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(color: borderColor, width: 1.5),
+                boxShadow: shadow,
+              ),
+              child: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(14),
+                    decoration: BoxDecoration(
+                      gradient: gradient,
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                    child: Icon(icon, size: 28, color: Colors.white),
+                  ),
+                  const SizedBox(width: 20),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(title,
+                            style: const TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.w700,
+                                color: MediColors.textPrimary)),
+                        const SizedBox(height: 4),
+                        Text(subtitle,
+                            style: const TextStyle(
+                                fontSize: 13, color: MediColors.textSecondary)),
+                      ],
+                    ),
+                  ),
+                  Icon(
+                    Icons.arrow_forward_ios_rounded,
+                    size: 16,
+                    color:
+                        isActive ? gradient.colors.first : MediColors.textMuted,
+                  ),
+                ],
+              ),
             ),
-            boxShadow: isHovering
-                ? [
-                    BoxShadow(
-                        color: gradient.colors.first.withValues(alpha: 0.15),
-                        blurRadius: 30,
-                        offset: const Offset(0, 12))
-                  ]
-                : [],
-          ),
-          child: Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(14),
-                decoration: BoxDecoration(
-                  gradient: gradient,
-                  borderRadius: BorderRadius.circular(14),
-                ),
-                child: Icon(icon, size: 28, color: Colors.white),
-              ),
-              const SizedBox(width: 20),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(title,
-                        style: const TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.w700,
-                            color: MediColors.textPrimary)),
-                    const SizedBox(height: 4),
-                    Text(subtitle,
-                        style: const TextStyle(
-                            fontSize: 13, color: MediColors.textSecondary)),
-                  ],
-                ),
-              ),
-              Icon(
-                Icons.arrow_forward_ios_rounded,
-                size: 16,
-                color:
-                    isHovering ? gradient.colors.first : MediColors.textMuted,
-              ),
-            ],
           ),
         ),
       ),

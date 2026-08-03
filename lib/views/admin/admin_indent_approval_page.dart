@@ -4,6 +4,7 @@ import '../../services/firebase_service.dart';
 import '../../services/ai_service.dart';
 import '../../models/request.dart';
 import 'package:med_supply_prototype/constants/colors.dart';
+import '../shared/skeleton_loaders.dart';
 
 class AdminIndentApprovalPage extends ConsumerStatefulWidget {
   const AdminIndentApprovalPage({super.key});
@@ -52,11 +53,15 @@ class _AdminIndentApprovalPageState
             '✅ APPROVE: Request is aligned with historical usage and current low stock.';
       }
 
+      // The AI call is slow enough that the user can navigate away mid-analysis.
+      // Guard the post-await setState to avoid writing to a disposed State.
+      if (!mounted) return;
       setState(() => _aiSuggestions[request.id] = suggestion);
     } catch (e) {
+      if (!mounted) return;
       setState(() => _aiSuggestions[request.id] = 'Error: $e');
     } finally {
-      setState(() => _aiLoading[request.id] = false);
+      if (mounted) setState(() => _aiLoading[request.id] = false);
     }
   }
 
@@ -89,13 +94,10 @@ class _AdminIndentApprovalPageState
         stream: ref.read(firebaseServiceProvider).streamRequests(null),
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
+            return const AdminIndentApprovalSkeleton();
           }
 
-          final pending = snapshot.data
-                  ?.where((r) => r.status == RequestStatus.pending)
-                  .toList() ??
-              [];
+          final pending = MedRequest.filterPending(snapshot.data ?? const []);
 
           if (pending.isEmpty) {
             return const Center(
@@ -139,10 +141,8 @@ class _AdminIndentApprovalPageState
                                         horizontal: 8, vertical: 4),
                                     decoration: BoxDecoration(
                                       color: isRedistribution
-                                          ? MediColors.success
-                                              .withValues(alpha: 0.1)
-                                          : MediColors.error
-                                              .withValues(alpha: 0.1),
+                                          ? MediColors.successOverlay
+                                          : MediColors.errorOverlay,
                                       borderRadius: BorderRadius.circular(6),
                                     ),
                                     child: Text(
@@ -203,8 +203,8 @@ class _AdminIndentApprovalPageState
                           margin: const EdgeInsets.only(bottom: 20),
                           decoration: BoxDecoration(
                             color: suggestion.contains('✅')
-                                ? MediColors.success.withValues(alpha: 0.1)
-                                : MediColors.warning.withValues(alpha: 0.1),
+                                ? MediColors.successOverlay
+                                : MediColors.warningOverlay,
                             borderRadius: BorderRadius.circular(12),
                             border: Border.all(
                                 color: suggestion.contains('✅')
@@ -213,10 +213,8 @@ class _AdminIndentApprovalPageState
                                         .withValues(alpha: 0.3)),
                           ),
                           child: Text(suggestion,
-                              style: TextStyle(
-                                  color: suggestion.contains('✅')
-                                      ? MediColors.success
-                                      : MediColors.warning,
+                              style: const TextStyle(
+                                  color: MediColors.textPrimary,
                                   fontWeight: FontWeight.w500)),
                         ),
 

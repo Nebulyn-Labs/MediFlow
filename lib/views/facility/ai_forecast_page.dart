@@ -6,6 +6,7 @@ import '../../models/daily_usage_log.dart';
 import '../../services/firebase_service.dart';
 import '../../services/ai_service.dart';
 import 'package:med_supply_prototype/constants/colors.dart';
+import '../shared/skeleton_loaders.dart';
 
 class AIForecastPage extends ConsumerStatefulWidget {
   final String facilityId;
@@ -22,12 +23,14 @@ class _AIForecastPageState extends ConsumerState<AIForecastPage> {
   bool _isForecasting = false;
   List<double> _historicalData = [];
   bool _isLoadingHistory = false;
+  String? _historyError;
 
   Future<void> _loadHistoricalData(String medicineName) async {
     setState(() {
       _isLoadingHistory = true;
       _historicalData = [];
       _forecastResult = null;
+      _historyError = null;
     });
     try {
       final logs = await ref
@@ -49,7 +52,40 @@ class _AIForecastPageState extends ConsumerState<AIForecastPage> {
         });
       }
     } catch (e) {
-      if (mounted) setState(() => _isLoadingHistory = false);
+      if (mounted) {
+        setState(() {
+          _isLoadingHistory = false;
+          _historyError = e.toString();
+        });
+      }
+    }
+  }
+
+  Future<void> _generateForecast() async {
+    setState(() => _isForecasting = true);
+    try {
+      final logs = await ref
+          .read(firebaseServiceProvider)
+          .getRecentLogs(widget.facilityId);
+      final result = await ref.read(aiServiceProvider).forecastDemand(
+          _selectedMed!, logs, _forecastDays,
+          facilityId: widget.facilityId);
+      if (mounted) {
+        setState(() {
+          _forecastResult = result;
+          _isForecasting = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isForecasting = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Forecast failed: ${e.toString()}'),
+            backgroundColor: MediColors.error,
+          ),
+        );
+      }
     }
   }
 
@@ -65,7 +101,7 @@ class _AIForecastPageState extends ConsumerState<AIForecastPage> {
         stream: inventoryStream,
         builder: (context, snapshot) {
           if (!snapshot.hasData) {
-            return const Center(child: CircularProgressIndicator());
+            return const AIForecastSkeleton();
           }
           final inventory = snapshot.data ?? [];
           final medNames =
@@ -157,23 +193,7 @@ class _AIForecastPageState extends ConsumerState<AIForecastPage> {
                                     color: Colors.white, strokeWidth: 2))
                             : const Icon(Icons.auto_awesome_rounded),
                         label: const Text('Generate Forecast'),
-                        onPressed: _isForecasting
-                            ? null
-                            : () async {
-                                setState(() => _isForecasting = true);
-                                final logs = await ref
-                                    .read(firebaseServiceProvider)
-                                    .getRecentLogs(widget.facilityId);
-                                final result = await ref
-                                    .read(aiServiceProvider)
-                                    .forecastDemand(
-                                        _selectedMed!, logs, _forecastDays,
-                                        facilityId: widget.facilityId);
-                                setState(() {
-                                  _forecastResult = result;
-                                  _isForecasting = false;
-                                });
-                              },
+                        onPressed: _isForecasting ? null : _generateForecast,
                       ),
                     ),
                   ),
@@ -182,10 +202,9 @@ class _AIForecastPageState extends ConsumerState<AIForecastPage> {
                     Container(
                       padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(
-                        color: MediColors.success.withValues(alpha: 0.08),
+                        color: MediColors.successSubtle,
                         borderRadius: BorderRadius.circular(10),
-                        border: Border.all(
-                            color: MediColors.success.withValues(alpha: 0.2)),
+                        border: Border.all(color: MediColors.successBorder),
                       ),
                       child: Row(children: [
                         const Icon(Icons.check_circle_rounded,
@@ -232,8 +251,21 @@ class _AIForecastPageState extends ConsumerState<AIForecastPage> {
                       const SizedBox(height: 20),
                       Expanded(
                           child: _isLoadingHistory
-                              ? const Center(child: CircularProgressIndicator())
-                              : _buildChart()),
+                              ? const SkeletonCard(height: 200)
+                              : _historyError != null
+                                  ? Center(
+                                      child: Padding(
+                                        padding: const EdgeInsets.symmetric(
+                                            horizontal: 16.0),
+                                        child: Text(
+                                          'Failed to load historical data.\n$_historyError',
+                                          textAlign: TextAlign.center,
+                                          style: const TextStyle(
+                                              color: MediColors.error),
+                                        ),
+                                      ),
+                                    )
+                                  : _buildChart()),
                     ],
                   ),
                 ),
@@ -271,7 +303,7 @@ class _AIForecastPageState extends ConsumerState<AIForecastPage> {
                         if (_forecastResult == null)
                           const Text(
                               'Run the forecaster to see AI-powered demand predictions.',
-                              style: TextStyle(color: MediColors.textSecondary))
+                              style: TextStyle(color: MediColors.textPrimary))
                         else ...[
                           Text(
                               'Predicted: ${_forecastResult!['prediction']} units over $_forecastDays days',
@@ -282,8 +314,7 @@ class _AIForecastPageState extends ConsumerState<AIForecastPage> {
                           const SizedBox(height: 8),
                           Text('${_forecastResult!['reasoning']}',
                               style: const TextStyle(
-                                  color: MediColors.textSecondary,
-                                  height: 1.6)),
+                                  color: MediColors.textPrimary, height: 1.6)),
                         ],
                       ]),
                 ),
@@ -304,16 +335,22 @@ class _AIForecastPageState extends ConsumerState<AIForecastPage> {
   }
 
   Widget _buildLegendDot(Color color, String label) {
-    return Row(children: [
-      Container(
-          width: 10,
-          height: 10,
-          decoration: BoxDecoration(
-              color: color, borderRadius: BorderRadius.circular(3))),
-      const SizedBox(width: 6),
-      Text(label,
-          style: const TextStyle(fontSize: 12, color: MediColors.textMuted)),
-    ]);
+    return Semantics(
+      label: '$label series',
+      child: ExcludeSemantics(
+        child: Row(children: [
+          Container(
+              width: 10,
+              height: 10,
+              decoration: BoxDecoration(
+                  color: color, borderRadius: BorderRadius.circular(3))),
+          const SizedBox(width: 6),
+          Text(label,
+              style:
+                  const TextStyle(fontSize: 12, color: MediColors.textMuted)),
+        ]),
+      ),
+    );
   }
 
   Widget _buildChart() {
