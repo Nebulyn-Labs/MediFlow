@@ -17,6 +17,8 @@ class _RoleSelectionScreenState extends State<RoleSelectionScreen>
     with SingleTickerProviderStateMixin {
   bool _isHoveringFacility = false;
   bool _isHoveringAdmin = false;
+  bool _isFocusedFacility = false;
+  bool _isFocusedAdmin = false;
   late AnimationController _pulseController;
 
   @override
@@ -202,8 +204,11 @@ class _RoleSelectionScreenState extends State<RoleSelectionScreen>
                         colors: [Color(0xFF059669), Color(0xFF14B8A6)],
                       ),
                       isHovering: _isHoveringFacility,
+                      isFocused: _isFocusedFacility,
                       onHover: (val) =>
                           setState(() => _isHoveringFacility = val),
+                      onFocusChange: (val) =>
+                          setState(() => _isFocusedFacility = val),
                       onTap: () => context.go('/login/facility'),
                     ),
                     const SizedBox(height: 20),
@@ -213,7 +218,10 @@ class _RoleSelectionScreenState extends State<RoleSelectionScreen>
                       icon: Icons.admin_panel_settings_rounded,
                       gradient: MediColors.primaryGradient,
                       isHovering: _isHoveringAdmin,
+                      isFocused: _isFocusedAdmin,
                       onHover: (val) => setState(() => _isHoveringAdmin = val),
+                      onFocusChange: (val) =>
+                          setState(() => _isFocusedAdmin = val),
                       onTap: () => context.go('/login/admin'),
                     ),
                     const SizedBox(height: 48),
@@ -290,7 +298,9 @@ class _RoleSelectionScreenState extends State<RoleSelectionScreen>
     required IconData icon,
     required LinearGradient gradient,
     required bool isHovering,
+    required bool isFocused,
     required ValueChanged<bool> onHover,
+    required ValueChanged<bool> onFocusChange,
     required VoidCallback onTap,
   }) {
     return MouseRegion(
@@ -367,7 +377,7 @@ class _RoleSelectionScreenState extends State<RoleSelectionScreen>
                     ? gradient.colors.first
                     : MediColors.textMuted,
               ),
-            ],
+            ),
           ),
         ),
       ),

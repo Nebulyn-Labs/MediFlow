@@ -71,15 +71,15 @@ class FirebaseService {
         .replaceAll('@', '_')
         .replaceAll('.', '_');
 
-    // 2. Try to create Auth User in background (Non-blocking for data seeding)
+    // 2. Authenticate User (create account or fallback to sign-in)
+    auth.UserCredential credential;
     try {
       await _auth.createUserWithEmailAndPassword(
         email: email,
         password: password,
       );
     } catch (e) {
-      // If user exists or rate limit hits, we don't care for seeding Firestore data
-      debugPrint('Auth skip/fail for $email: $e');
+      debugPrint('Auth create failed for $email: $e');
       try {
         await _auth.signInWithEmailAndPassword(
           email: email,
@@ -87,7 +87,13 @@ class FirebaseService {
         );
       } catch (loginErr) {
         debugPrint('Sign in fallback failed for $email: $loginErr');
+        rethrow;
       }
+    }
+
+    final String? uid = credential.user?.uid;
+    if (uid == null) {
+      throw Exception('Failed to obtain user UID for $email');
     }
 
     // 3. Generate Profile
@@ -113,15 +119,12 @@ class FirebaseService {
         .set(facility.toMap());
 
     // Register role in the 'users' collection for RBAC
-    final String? uid = _auth.currentUser?.uid;
-    if (uid != null) {
-      await _firestore.collection('users').doc(uid).set({
-        'email': email,
-        'role': 'facility_head',
-        'facilityId': facilityId,
-        'createdAt': FieldValue.serverTimestamp(),
-      });
-    }
+    await _firestore.collection('users').doc(uid).set({
+      'email': email,
+      'role': 'facility_head',
+      'facilityId': facilityId,
+      'createdAt': FieldValue.serverTimestamp(),
+    });
 
     // 5. Run Initial Simulation (30 days)
     await _simulation.runFullSimulation(facilityId, facility.type);
@@ -467,6 +470,14 @@ class FirebaseService {
         .where('facilityId', isEqualTo: facilityId)
         .get();
     return snapshot.docs.map((doc) => doc.data()).toList();
+  }
+
+  Stream<List<Map<String, dynamic>>> streamAlerts(String facilityId) {
+    return _firestore
+        .collection('alerts')
+        .where('facilityId', isEqualTo: facilityId)
+        .snapshots()
+        .map((snapshot) => snapshot.docs.map((doc) => doc.data()).toList());
   }
 
   // --- NOTIFICATIONS ---

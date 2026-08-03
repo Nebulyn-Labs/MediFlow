@@ -59,11 +59,15 @@ class _AdminIndentApprovalPageState
             '✅ APPROVE: Request is aligned with historical usage and current low stock.';
       }
 
+      // The AI call is slow enough that the user can navigate away mid-analysis.
+      // Guard the post-await setState to avoid writing to a disposed State.
+      if (!mounted) return;
       setState(() => _aiSuggestions[request.id] = suggestion);
     } catch (e) {
+      if (!mounted) return;
       setState(() => _aiSuggestions[request.id] = 'Error: $e');
     } finally {
-      setState(() => _aiLoading[request.id] = false);
+      if (mounted) setState(() => _aiLoading[request.id] = false);
     }
   }
 

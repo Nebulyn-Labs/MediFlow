@@ -100,9 +100,9 @@ class InventoryItem {
   ///
   /// Priority (highest to lowest):
   /// 1. [ItemStatus.expired]      — expiry date has passed.
-  /// 2. [ItemStatus.wastageRisk]  — high stock + close to expiry.
-  /// 3. [ItemStatus.expiringSoon] — close to expiry but stock is not high.
-  /// 4. [ItemStatus.lowStock]     — quantity is critically low.
+  /// 2. [ItemStatus.lowStock]     — quantity is critically low.
+  /// 3. [ItemStatus.wastageRisk]  — high stock + close to expiry.
+  /// 4. [ItemStatus.expiringSoon] — close to expiry but stock is not high.
   /// 5. [ItemStatus.healthy]      — everything is fine.
   ///
   /// Note: "expiring soon" explicitly excludes already-expired items so
@@ -110,9 +110,9 @@ class InventoryItem {
   /// and [ItemStatus.expiringSoon].
   ItemStatus get status {
     if (isExpired) return ItemStatus.expired;
+    if (isLowStock) return ItemStatus.lowStock;
     if (isWastageRisk) return ItemStatus.wastageRisk;
     if (isExpiringSoon) return ItemStatus.expiringSoon;
-    if (isLowStock) return ItemStatus.lowStock;
     return ItemStatus.healthy;
   }
 

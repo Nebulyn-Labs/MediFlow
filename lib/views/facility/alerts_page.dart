@@ -43,81 +43,27 @@ class AlertsPage extends ConsumerStatefulWidget {
 }
 
 class _AlertsPageState extends ConsumerState<AlertsPage> {
-  List<_InventoryAlert> _alerts = [];
-  bool _isLoading = true;
+  int _refreshKey = 0;
+  late Stream<List<Map<String, dynamic>>> _alertsStream;
 
   @override
   void initState() {
     super.initState();
-    _loadAlerts();
+    _initStream();
   }
 
-  Future<void> _loadAlerts() async {
-    setState(() => _isLoading = true);
-    try {
-      final alertMaps = await ref
-          .read(firebaseServiceProvider)
-          .getAlertsOnce(widget.facilityId);
+  @override
+  void didUpdateWidget(AlertsPage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.facilityId != widget.facilityId) {
+      _initStream();
+    }
+  }
 
-      final List<_InventoryAlert> alerts = alertMaps.map((data) {
-        final item = InventoryItem(
-          id: data['stockId']?.toString() ?? '',
-          medicineName: data['medicineName']?.toString() ?? '',
-          batchId: data['batchId']?.toString() ?? '',
-          arrivalDate: DateTime.now(),
-          expiryDate: data['expiryDate'] is Timestamp
-              ? (data['expiryDate'] as Timestamp).toDate()
-              : DateTime.now(),
-          initialQuantity: (data['initialQuantity'] as num?)?.toInt() ?? 0,
-          remainingQuantity: (data['qtyRemaining'] as num?)?.toInt() ?? 0,
-          unit: data['unit']?.toString() ?? 'units',
-          lastUpdated: DateTime.now(),
-        );
-
-        final typeStr = data['type']?.toString() ?? '';
-        _AlertKind kind;
-        String title;
-        String reason;
-        Color color;
-        IconData icon;
-
-        final pct = item.initialQuantity > 0
-            ? item.remainingQuantity / item.initialQuantity
-            : 0.0;
-        final percentText = '${(pct * 100).round()}%';
-        final daysLeft = item.expiryDate.difference(DateTime.now()).inDays;
-        final expiryText = daysLeft < 0
-            ? 'expired ${daysLeft.abs()} days ago'
-            : 'expires in $daysLeft days';
-
-        if (typeStr == 'expired') {
-          kind = _AlertKind.expired;
-          title = 'Expired';
-          reason =
-              '${item.medicineName} has passed its expiry date and should not be issued.';
-          color = MediColors.error;
-          icon = Icons.error_rounded;
-        } else if (typeStr == 'low_stock') {
-          kind = _AlertKind.lowStock;
-          title = 'Low Stock';
-          reason = '${item.medicineName} is below the low-stock threshold.';
-          color = MediColors.error;
-          icon = Icons.trending_down_rounded;
-        } else if (typeStr == 'wastage_risk') {
-          kind = _AlertKind.wastageRisk;
-          title = 'Wastage Risk';
-          reason =
-              'High remaining stock is close to expiry, so redistribution should be considered.';
-          color = MediColors.warning;
-          icon = Icons.warning_amber_rounded;
-        } else {
-          // expiring_soon
-          kind = _AlertKind.expiringSoon;
-          title = 'Expiring Soon';
-          reason = '${item.medicineName} is within the 30-day expiry window.';
-          color = MediColors.warning;
-          icon = Icons.schedule_rounded;
-        }
+  void _initStream() {
+    _alertsStream =
+        ref.read(firebaseServiceProvider).streamAlerts(widget.facilityId);
+  }
 
         final detail = typeStr == 'expired'
             ? '${item.remainingQuantity} ${item.unit} remaining; $expiryText.'
@@ -134,11 +80,16 @@ class _AlertsPageState extends ConsumerState<AlertsPage> {
         );
       }).toList()..sort((a, b) => _priority(a).compareTo(_priority(b)));
 
-      if (mounted) {
-        setState(() {
-          _alerts = alerts;
-          _isLoading = false;
-        });
+  List<_InventoryAlert> _parseAlerts(List<Map<String, dynamic>> alertMaps) {
+    return alertMaps.map((data) {
+      final expiryRaw = data['expiryDate'];
+      DateTime expiryDate;
+      if (expiryRaw is Timestamp) {
+        expiryDate = expiryRaw.toDate();
+      } else if (expiryRaw is String) {
+        expiryDate = DateTime.tryParse(expiryRaw) ?? DateTime.now();
+      } else {
+        expiryDate = DateTime.now();
       }
     } catch (e) {
       if (mounted) {
@@ -147,7 +98,22 @@ class _AlertsPageState extends ConsumerState<AlertsPage> {
           context,
         ).showSnackBar(SnackBar(content: Text('Error loading alerts: $e')));
       }
-    }
+
+      final detail = typeStr == 'expired'
+          ? '${item.remainingQuantity} ${item.unit} remaining; $expiryText.'
+          : '${item.remainingQuantity} / ${item.initialQuantity} ${item.unit} left ($percentText); $expiryText.';
+
+      return _InventoryAlert(
+        item: item,
+        kind: kind,
+        title: title,
+        reason: reason,
+        detail: detail,
+        color: color,
+        icon: icon,
+      );
+    }).toList()
+      ..sort((a, b) => _priority(a).compareTo(_priority(b)));
   }
 
   int _priority(_InventoryAlert alert) {
@@ -248,16 +214,38 @@ class _AlertsPageState extends ConsumerState<AlertsPage> {
                       ),
                     ),
                   ),
-              ],
-            ),
-          );
+                ),
+            ],
+          ),
+        );
 
-    if (widget.isTabBody) {
-      return RefreshIndicator(
-        onRefresh: _loadAlerts,
-        child: body,
-      );
-    }
+        if (widget.isTabBody) {
+          return RefreshIndicator(
+            onRefresh: () async => _manualRefresh(),
+            child: body,
+          );
+        }
+
+        return Scaffold(
+          backgroundColor: MediColors.bg,
+          appBar: _buildAppBar(),
+          floatingActionButton: FloatingActionButton(
+            onPressed: () {
+              Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                      builder: (_) =>
+                          const AIChatPage(role: "Facility Manager")));
+            },
+            backgroundColor: const Color(0xFF1E3A8A),
+            tooltip: 'Open MediFlow AI Assistant',
+            child: const Icon(Icons.auto_awesome, color: Colors.white),
+          ),
+          body: body,
+        );
+      },
+    );
+  }
 
     return Scaffold(
       backgroundColor: MediColors.bg,

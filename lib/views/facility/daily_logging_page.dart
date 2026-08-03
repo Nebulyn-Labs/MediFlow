@@ -292,6 +292,9 @@ class _DailyLoggingPageState extends ConsumerState<DailyLoggingPage>
         allowedExtensions: ['csv', 'txt'],
         withData: true,
       );
+      // The picker can stay open as long as the user likes, so guard the
+      // post-await setState to avoid calling it after the page is disposed.
+      if (!mounted) return;
       if (result == null || result.files.isEmpty) return;
       final file = result.files.first;
       final bytes = file.bytes;
@@ -339,6 +342,8 @@ class _DailyLoggingPageState extends ConsumerState<DailyLoggingPage>
     if (!_ensureOnline()) return;
     setState(() => _isSubmittingCsv = true);
     try {
+      final List<Map<String, dynamic>> successful = [];
+      final List<Map<String, dynamic>> failed = [];
       for (var item in _csvItems) {
         await ref.read(firebaseServiceProvider).logUsage(
             facilityId: widget.facilityId,
@@ -352,8 +357,10 @@ class _DailyLoggingPageState extends ConsumerState<DailyLoggingPage>
           SnackBar(content: Text('${_csvItems.length} logs saved ✓')),
         );
         setState(() {
-          _csvItems.clear();
-          _csvStatus = null;
+          _csvItems = failed;
+          _csvStatus = failCount == 0
+              ? null
+              : 'Partial success: $successCount saved, $failCount failed.';
         });
         unawaited(_fetchHistoryFirstPage());
       }
@@ -371,6 +378,9 @@ class _DailyLoggingPageState extends ConsumerState<DailyLoggingPage>
   Future<void> _simulateQRScan() async {
     setState(() => _isScanning = true);
     await Future.delayed(const Duration(seconds: 2));
+    // The simulated scan takes long enough that the user can navigate away.
+    // Bail out before setState if the page was disposed in the meantime.
+    if (!mounted) return;
     if (_availableMedicines.isNotEmpty) {
       final med =
           _availableMedicines[DateTime.now().second %
@@ -427,6 +437,9 @@ class _DailyLoggingPageState extends ConsumerState<DailyLoggingPage>
         type: FileType.image,
         withData: true,
       );
+      // The file picker can stay open as long as the user likes, so guard the
+      // post-await setState to avoid calling it after the page is disposed.
+      if (!mounted) return;
       if (result == null || result.files.isEmpty) return;
       final file = result.files.first;
       final bytes = file.bytes;

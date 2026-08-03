@@ -140,6 +140,24 @@ void main() {
       expect(result, isEmpty);
     });
 
+    test('safely ignores inventory items with initialQuantity <= 0 (#423)', () {
+      final donor = createFacility('d1', 'urban', 28.6, 77.2);
+      final recipient = createFacility('r1', 'rural', 28.7, 77.3);
+      final malformedItem = createInventory(donor.id, 'Paracetamol', 0, 50);
+      final request = createRequest(
+          'req1', recipient.id, 'Paracetamol', RequestType.shortage, 20);
+
+      final result = service.calculateOptimalTransfers(
+        facilities: [donor, recipient],
+        inventories: {
+          donor.id: [malformedItem]
+        },
+        requests: [request],
+      );
+
+      expect(result, isEmpty);
+    });
+
     test('returns empty recommendations when medicine mismatch', () {
       final donor = createFacility('d1', 'urban', 28.6, 77.2);
       final recipient = createFacility('r1', 'rural', 28.7, 77.3);
