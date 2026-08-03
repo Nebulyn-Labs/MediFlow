@@ -180,7 +180,8 @@ void main() {
       expect(result, 'No active indents found to optimize.');
     });
 
-    test('filters pending/approved regularIndent and shortage requests and calls Gemini',
+    test(
+        'filters pending/approved regularIndent and shortage requests and calls Gemini',
         () async {
       String? capturedPrompt;
       final service = AIService(
@@ -240,4 +241,3 @@ void main() {
     });
   });
 }
-
