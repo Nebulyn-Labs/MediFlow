@@ -173,7 +173,7 @@ class FirebaseService {
     // 2. Query facilities collection by normalized email
     final lowerSnapshot = await _firestore
         .collection('facilities')
-        .where('email', '==', lowerEmail)
+        .where('email', isEqualTo: lowerEmail)
         .limit(1)
         .get();
     if (lowerSnapshot.docs.isNotEmpty) {
@@ -185,7 +185,7 @@ class FirebaseService {
     if (lowerEmail != cleanEmail) {
       final exactSnapshot = await _firestore
           .collection('facilities')
-          .where('email', '==', cleanEmail)
+          .where('email', isEqualTo: cleanEmail)
           .limit(1)
           .get();
       if (exactSnapshot.docs.isNotEmpty) {
