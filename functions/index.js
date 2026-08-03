@@ -10,6 +10,7 @@ const { checkRateLimit, LIMITS } = require("./helpers/rateLimiter");
 const { createBigQueryRecovery } = require("./helpers/bigQueryRecovery");
 const { createLowStockService } = require("./helpers/lowStock");
 const { handleCspReport, getClientIp } = require("./helpers/cspReport");
+const { isValidQuantity } = require("./helpers/quantityValidation");
 
 admin.initializeApp();
 
@@ -500,8 +501,20 @@ exports.onIndentApproved = onDocumentUpdated("requests/{requestId}", async (even
       type,
     } = afterData;
 
-    const qty = Number(quantity || 0);
-    if (!medicineName || qty <= 0) return;
+    if (!medicineName) return;
+
+    if (!isValidQuantity(quantity)) {
+      logger.error(
+        `Invalid quantity for request ${requestId}: ${quantity}. Quantity must be a finite positive number.`
+      );
+      await event.data.after.ref.update({
+        status: "rejected",
+        rejectionReason: `Invalid quantity: ${quantity}. Quantity must be a finite positive number.`,
+      });
+      return;
+    }
+
+    const qty = Number(quantity);
 
     const sourceFacility = fromFacilityId || donorFacilityId || null;
     const destFacility = toFacilityId || recipientFacilityId || null;
@@ -655,17 +668,23 @@ async function executeTool(name, args, authInfo) {
     if (!authInfo.isAdmin && facilityId !== authInfo.userFacilityId) {
       throw new Error(`Unauthorized: Cannot request for facility ${facilityId}`);
     }
+    if (!isValidQuantity(quantity)) {
+      throw new Error(
+        `Invalid quantity: ${quantity}. Quantity must be a finite positive number.`
+      );
+    }
+    const qty = Number(quantity);
     const type = name === "report_shortage" ? "shortage" : "surplus";
     await db.collection("requests").add({
       facilityId: facilityId,
       medicineName: medicineName,
       type: type,
-      quantity: Number(quantity),
+      quantity: qty,
       requestDate: admin.firestore.Timestamp.now(),
       status: "pending",
       notes: `AI generated ${type} report via Cloud Function`,
     });
-    return { status: "success", details: `${type} reported for ${quantity} of ${medicineName}` };
+    return { status: "success", details: `${type} reported for ${qty} of ${medicineName}` };
   } else if (name === "check_system_inventory") {
     if (!authInfo.isAdmin) {
       const facilityDoc = await db.collection("facilities").doc(authInfo.userFacilityId).get();

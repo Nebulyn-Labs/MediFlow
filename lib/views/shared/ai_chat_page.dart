@@ -93,6 +93,7 @@ class _AIChatPageState extends ConsumerState<AIChatPage> {
   }
 
   Future<void> _sendMessage() async {
+    if (_isTyping) return;
     final text = _controller.text.trim();
     if (text.isEmpty) return;
     _controller.clear();
@@ -298,10 +299,12 @@ class _AIChatPageState extends ConsumerState<AIChatPage> {
 
   Widget _buildSuggestion(String text) {
     return OutlinedButton(
-      onPressed: () {
-        _controller.text = text;
-        _sendMessage();
-      },
+      onPressed: _isTyping
+          ? null
+          : () {
+              _controller.text = text;
+              _sendMessage();
+            },
       style: OutlinedButton.styleFrom(
         foregroundColor: MediColors.primary,
         side: BorderSide(color: MediColors.border),
