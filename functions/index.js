@@ -813,17 +813,23 @@ async function executeTool(name, args, authInfo) {
       facilityNames[doc.id] = doc.data().name || doc.id;
     }
 
+    // Seed every known facility so ones holding no stock still report an
+    // empty list, matching the previous per-facility loop's output shape.
+    const systemStock = {};
+    for (const facName of Object.values(facilityNames)) {
+      systemStock[facName] = [];
+    }
+
     // Group medicine documents by their parent facilityId.
     // Path structure: inventory/{facilityId}/medicines/{medicineId}
-    const systemStock = {};
     for (const medDoc of allMedicinesSnapshot.docs) {
       const pathSegments = medDoc.ref.path.split("/");
       // pathSegments: ["inventory", facId, "medicines", medId]
       const facId = pathSegments[1];
-      const facName = facilityNames[facId] || facId;
-      if (!systemStock[facName]) {
-        systemStock[facName] = [];
-      }
+      const facName = facilityNames[facId];
+      // Skip inventory orphaned by a deleted facility; the old per-facility
+      // loop never read it.
+      if (!facName) continue;
       const item = medDoc.data();
       systemStock[facName].push({
         name: item.medicineName,
