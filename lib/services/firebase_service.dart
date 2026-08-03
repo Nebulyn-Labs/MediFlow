@@ -538,15 +538,10 @@ class FirebaseService {
         if (collection == 'facilities' || collection == 'requests') {
           final callable =
               FirebaseFunctions.instance.httpsCallable('adminDeleteResource');
-          deleteFutures.add(
-            callable
-                .call({
-                  'resourceType': collection,
-                  'resourceId': doc.id,
-                })
-                .then<dynamic>((_) => null)
-                .catchError((_) => doc.reference.delete()),
-          );
+          deleteFutures.add(callable.call({
+            'resourceType': collection,
+            'resourceId': doc.id,
+          }));
         } else {
           deleteFutures.add(doc.reference.delete());
         }

@@ -2,6 +2,8 @@ import 'dart:typed_data';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:med_supply_prototype/models/facility.dart';
+import 'package:med_supply_prototype/models/request.dart';
 import 'package:med_supply_prototype/services/ai_service.dart';
 
 void main() {
@@ -116,4 +118,126 @@ void main() {
       expect(result['reasoning'], 'AI result');
     });
   });
+
+  group('generateRedistributionPlan', () {
+    final facility1 = Facility(
+      id: 'fac1',
+      name: 'Rampur PHC',
+      email: 'rampur@phc.com',
+      type: 'rural',
+      region: 'North',
+      latitude: 28.5,
+      longitude: 77.1,
+      createdAt: DateTime.now(),
+    );
+
+    final pendingRegularIndent = MedRequest(
+      id: 'req1',
+      facilityId: 'fac1',
+      medicineName: 'ORS',
+      type: RequestType.regularIndent,
+      quantity: 500,
+      requestDate: DateTime.now(),
+      status: RequestStatus.pending,
+    );
+
+    final approvedShortageIndent = MedRequest(
+      id: 'req2',
+      facilityId: 'fac1',
+      medicineName: 'Amoxicillin',
+      type: RequestType.shortage,
+      quantity: 300,
+      requestDate: DateTime.now(),
+      status: RequestStatus.approved,
+    );
+
+    final fulfilledIndent = MedRequest(
+      id: 'req3',
+      facilityId: 'fac1',
+      medicineName: 'Paracetamol',
+      type: RequestType.regularIndent,
+      quantity: 100,
+      requestDate: DateTime.now(),
+      status: RequestStatus.fulfilled,
+    );
+
+    final surplusRequest = MedRequest(
+      id: 'req4',
+      facilityId: 'fac1',
+      medicineName: 'ORS',
+      type: RequestType.surplus,
+      quantity: 200,
+      requestDate: DateTime.now(),
+      status: RequestStatus.pending,
+    );
+
+    test('returns default message when no eligible indents exist', () async {
+      final service = AIService(null);
+      final result = await service.generateRedistributionPlan(
+        [fulfilledIndent, surplusRequest],
+        [facility1],
+      );
+      expect(result, 'No active indents found to optimize.');
+    });
+
+    test('filters pending/approved regularIndent and shortage requests and calls Gemini',
+        () async {
+      String? capturedPrompt;
+      final service = AIService(
+        null,
+        geminiCaller: (
+          String prompt, {
+          String? imageBase64,
+          String? imageMimeType,
+        }) async {
+          capturedPrompt = prompt;
+          return 'Prioritized Rampur PHC for ORS and Amoxicillin redistribution.';
+        },
+      );
+
+      final result = await service.generateRedistributionPlan(
+        [
+          pendingRegularIndent,
+          approvedShortageIndent,
+          fulfilledIndent,
+          surplusRequest,
+        ],
+        [facility1],
+      );
+
+      expect(capturedPrompt, contains('Analyze these 2 pending indents'));
+      expect(capturedPrompt, contains('ORS (500 units)'));
+      expect(capturedPrompt, contains('Amoxicillin (300 units)'));
+      expect(capturedPrompt, isNot(contains('Paracetamol')));
+      expect(
+        result,
+        'Prioritized Rampur PHC for ORS and Amoxicillin redistribution.',
+      );
+    });
+
+    test('falls back to default summary when Gemini throws an exception',
+        () async {
+      final service = AIService(
+        null,
+        geminiCaller: (
+          String prompt, {
+          String? imageBase64,
+          String? imageMimeType,
+        }) async {
+          throw Exception('network failure');
+        },
+      );
+
+      final result = await service.generateRedistributionPlan(
+        [pendingRegularIndent, approvedShortageIndent],
+        [facility1],
+      );
+
+      expect(
+        result,
+        'Optimizing 2 requests across 1 sites by matching local surpluses.',
+      );
+    });
+  });
 }
+
