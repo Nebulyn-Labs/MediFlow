@@ -356,13 +356,7 @@ Output raw JSON array only.
   // ─── REDISTRIBUTION ────────────────────────────────────────────
   Future<String> generateRedistributionPlan(
       List<MedRequest> requests, List<Facility> facilities) async {
-    final indents = requests
-        .where((r) =>
-            (r.status == RequestStatus.pending ||
-                r.status == RequestStatus.approved) &&
-            (r.type == RequestType.regularIndent ||
-                r.type == RequestType.shortage))
-        .toList();
+    final indents = requests.where((r) => r.isDeficit).toList();
     if (indents.isEmpty) return "No active indents found to optimize.";
 
     try {
