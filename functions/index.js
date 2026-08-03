@@ -6,6 +6,7 @@ const logger = require("firebase-functions/logger");
 const admin = require("firebase-admin");
 const { GoogleGenerativeAI } = require("@google/generative-ai");
 const { BigQuery } = require("@google-cloud/bigquery");
+const { cleanupExpiredRateLimitRecords } = require("./helpers/rateLimiter");
 
 admin.initializeApp();
 
@@ -838,5 +839,19 @@ exports.callGeminiSecure = onCall({ secrets: [GEMINI_API_KEY] }, async (request)
   } catch (error) {
     logger.error("Gemini callGeminiSecure Error:", error);
     throw new HttpsError('internal', 'AI generation failed');
+  }
+});
+
+exports.cleanupExpiredRateLimitRecords = onSchedule("every 6 hours", async () => {
+  logger.log("Starting rate-limit cleanup job");
+
+  try {
+    const deleted = await cleanupExpiredRateLimitRecords();
+    logger.log(`Cleaned up ${deleted} expired rate-limit records`);
+
+    return { deleted };
+  } catch (error) {
+    logger.error("Failed to cleanup rate-limit records:", error);
+    throw error;
   }
 });

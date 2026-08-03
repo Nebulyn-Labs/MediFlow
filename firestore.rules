@@ -61,5 +61,11 @@ service cloud.firestore {
       allow update: if isAdmin() || (isAuthenticated() && isFacilityUser(resource.data.facilityId) && request.resource.data.facilityId == resource.data.facilityId);
       allow delete: if isAdmin() || (isAuthenticated() && isFacilityUser(resource.data.facilityId));
     }
+
+    // Rate limits collection
+    match /rate_limits/{rateLimitId} {
+      allow read: if isAdmin();
+      allow write: if false;
+    }
   }
 }
