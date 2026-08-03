@@ -35,6 +35,7 @@ Expired rate-limit documents are automatically deleted by the scheduled Cloud Fu
 `cleanupExpiredRateLimitRecords`, which runs every 6 hours.
 
 This approach is used instead of Firestore TTL because:
+
 - Firestore TTL requires a timestamp field named `expireAt` or `ttl` in the document
 - The rate limiting implementation uses `windowStart` for tracking request windows
 - A scheduled cleanup function provides fine-grained control and logging
