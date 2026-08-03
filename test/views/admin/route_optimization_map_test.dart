@@ -39,8 +39,6 @@ class FakeFirebaseService implements FirebaseService {
     return facilities;
   }
 
-  late final Stream<List<InventoryItem>> _inventoryStream =
-      Stream.value(inventory);
   late final Stream<List<MedRequest>> _requestsStream = Stream.value(requests);
 
   @override
@@ -62,8 +60,7 @@ class FakeFirebaseService implements FirebaseService {
   Stream<List<MedRequest>> streamRequests(String? facilityId) {
     if (facilityId != null) {
       return Stream.value(
-        requests.where((r) => r.facilityId == facilityId).toList(),
-      );
+          requests.where((r) => r.facilityId == facilityId).toList());
     }
     return _requestsStream;
   }
@@ -182,7 +179,10 @@ class FakeOptimizationService implements OptimizationService {
     // Convert recommendation to a simple multi-stop route
     final rec = recommendations.first;
     return [
-      MultiStopRoute(stops: [rec.donor, rec.recipient], transfers: [rec]),
+      MultiStopRoute(
+        stops: [rec.donor, rec.recipient],
+        transfers: [rec],
+      )
     ];
   }
 }
@@ -206,9 +206,7 @@ class FakeRoutingService extends RoutingService {
 class FakeAIService implements AIService {
   @override
   Future<String> generateRedistributionPlan(
-    List<MedRequest> requests,
-    List<Facility> facilities,
-  ) async {
+      List<MedRequest> requests, List<Facility> facilities) async {
     return 'Mock AI Summary: Transfer optimized.';
   }
 
@@ -295,7 +293,7 @@ void main() {
     });
 
     Widget createWidgetUnderTest(List<TransferRecommendation> recs,
-        {FirebaseService? firebaseService}) {
+        {FirebaseService? firebaseService, RoutingService? routingService}) {
       return ProviderScope(
         overrides: [
           firebaseServiceProvider.overrideWithValue(
@@ -308,16 +306,18 @@ void main() {
           ),
           optimizationServiceProvider
               .overrideWithValue(FakeOptimizationService(recs)),
-          routingServiceProvider.overrideWithValue(FakeRoutingService()),
+          routingServiceProvider
+              .overrideWithValue(routingService ?? FakeRoutingService()),
           aiServiceProvider.overrideWithValue(FakeAIService()),
         ],
-        child: const MaterialApp(home: RouteOptimizationMap()),
+        child: const MaterialApp(
+          home: RouteOptimizationMap(),
+        ),
       );
     }
 
-    testWidgets('initial loading state and empty map state', (
-      WidgetTester tester,
-    ) async {
+    testWidgets('initial loading state and empty map state',
+        (WidgetTester tester) async {
       tester.view.physicalSize = const Size(1920, 1080);
       tester.view.devicePixelRatio = 1.0;
       addTearDown(tester.view.resetPhysicalSize);
@@ -339,9 +339,8 @@ void main() {
       expect(find.byType(PolylineLayer), findsNothing);
     });
 
-    testWidgets('generates routes, displays recommendations and AI summary', (
-      WidgetTester tester,
-    ) async {
+    testWidgets('generates routes, displays recommendations and AI summary',
+        (WidgetTester tester) async {
       tester.view.physicalSize = const Size(1920, 1080);
       tester.view.devicePixelRatio = 1.0;
       addTearDown(tester.view.resetPhysicalSize);
@@ -376,9 +375,8 @@ void main() {
       expect(find.byType(PolylineLayer), findsOneWidget);
     });
 
-    testWidgets('Clear Map behavior hides routes and summary', (
-      WidgetTester tester,
-    ) async {
+    testWidgets('Clear Map behavior hides routes and summary',
+        (WidgetTester tester) async {
       tester.view.physicalSize = const Size(1920, 1080);
       tester.view.devicePixelRatio = 1.0;
       addTearDown(tester.view.resetPhysicalSize);
@@ -405,9 +403,8 @@ void main() {
       expect(find.byType(PolylineLayer), findsNothing);
     });
 
-    testWidgets('failed initialization shows error message and retry button', (
-      WidgetTester tester,
-    ) async {
+    testWidgets('failed initialization shows error message and retry button',
+        (WidgetTester tester) async {
       tester.view.physicalSize = const Size(1920, 1080);
       tester.view.devicePixelRatio = 1.0;
       addTearDown(tester.view.resetPhysicalSize);
@@ -425,8 +422,7 @@ void main() {
       // Error message should be displayed
       expect(
         find.text(
-          'Unable to load facilities. Please check your connection and try again.',
-        ),
+            'Unable to load facilities. Please check your connection and try again.'),
         findsOneWidget,
       );
 
@@ -444,15 +440,16 @@ void main() {
       expect(find.text('Generate Optimal Routes'), findsNothing);
     });
 
-    testWidgets('loading indicator always dismissed after failure', (
-      WidgetTester tester,
-    ) async {
+    testWidgets('loading indicator always dismissed after failure',
+        (WidgetTester tester) async {
       tester.view.physicalSize = const Size(1920, 1080);
       tester.view.devicePixelRatio = 1.0;
       addTearDown(tester.view.resetPhysicalSize);
       addTearDown(tester.view.resetDevicePixelRatio);
 
-      final failingService = FailingFirebaseService(Exception('Timeout'));
+      final failingService = FailingFirebaseService(
+        Exception('Timeout'),
+      );
 
       await tester.pumpWidget(
         createWidgetUnderTest([], firebaseService: failingService),
@@ -466,15 +463,13 @@ void main() {
       expect(find.text('Retry'), findsOneWidget);
       expect(
         find.text(
-          'Unable to load facilities. Please check your connection and try again.',
-        ),
+            'Unable to load facilities. Please check your connection and try again.'),
         findsOneWidget,
       );
     });
 
-    testWidgets('retry successfully reloads data after failure', (
-      WidgetTester tester,
-    ) async {
+    testWidgets('retry successfully reloads data after failure',
+        (WidgetTester tester) async {
       tester.view.physicalSize = const Size(1920, 1080);
       tester.view.devicePixelRatio = 1.0;
       addTearDown(tester.view.resetPhysicalSize);
@@ -494,8 +489,7 @@ void main() {
       expect(find.text('Retry'), findsOneWidget);
       expect(
         find.text(
-          'Unable to load facilities. Please check your connection and try again.',
-        ),
+            'Unable to load facilities. Please check your connection and try again.'),
         findsOneWidget,
       );
 
@@ -511,9 +505,8 @@ void main() {
       expect(find.text('Retry'), findsNothing);
     });
 
-    testWidgets('retry after multiple failures eventually succeeds', (
-      WidgetTester tester,
-    ) async {
+    testWidgets('retry after multiple failures eventually succeeds',
+        (WidgetTester tester) async {
       tester.view.physicalSize = const Size(1920, 1080);
       tester.view.devicePixelRatio = 1.0;
       addTearDown(tester.view.resetPhysicalSize);
@@ -547,9 +540,8 @@ void main() {
       expect(find.text('Retry'), findsNothing);
     });
 
-    testWidgets('empty facility list renders successfully', (
-      WidgetTester tester,
-    ) async {
+    testWidgets('empty facility list renders successfully',
+        (WidgetTester tester) async {
       tester.view.physicalSize = const Size(1920, 1080);
       tester.view.devicePixelRatio = 1.0;
       addTearDown(tester.view.resetPhysicalSize);
@@ -573,9 +565,8 @@ void main() {
       expect(find.text('Retry'), findsNothing);
     });
 
-    testWidgets('successful initialization does not show error state', (
-      WidgetTester tester,
-    ) async {
+    testWidgets('successful initialization does not show error state',
+        (WidgetTester tester) async {
       tester.view.physicalSize = const Size(1920, 1080);
       tester.view.devicePixelRatio = 1.0;
       addTearDown(tester.view.resetPhysicalSize);
@@ -593,9 +584,8 @@ void main() {
       expect(find.text('Generate Optimal Routes'), findsOneWidget);
     });
 
-    testWidgets('network unavailable shows user-friendly error', (
-      WidgetTester tester,
-    ) async {
+    testWidgets('network unavailable shows user-friendly error',
+        (WidgetTester tester) async {
       tester.view.physicalSize = const Size(1920, 1080);
       tester.view.devicePixelRatio = 1.0;
       addTearDown(tester.view.resetPhysicalSize);
@@ -613,8 +603,7 @@ void main() {
       // Should show friendly error, not raw exception
       expect(
         find.text(
-          'Unable to load facilities. Please check your connection and try again.',
-        ),
+            'Unable to load facilities. Please check your connection and try again.'),
         findsOneWidget,
       );
       // Raw exception should NOT be visible
@@ -622,9 +611,8 @@ void main() {
       expect(find.textContaining('Network is unreachable'), findsNothing);
     });
 
-    testWidgets('retry button clears previous error before reloading', (
-      WidgetTester tester,
-    ) async {
+    testWidgets('retry button clears previous error before reloading',
+        (WidgetTester tester) async {
       tester.view.physicalSize = const Size(1920, 1080);
       tester.view.devicePixelRatio = 1.0;
       addTearDown(tester.view.resetPhysicalSize);
@@ -652,8 +640,7 @@ void main() {
       // Error message should be gone immediately after retry
       expect(
         find.text(
-          'Unable to load facilities. Please check your connection and try again.',
-        ),
+            'Unable to load facilities. Please check your connection and try again.'),
         findsNothing,
       );
 

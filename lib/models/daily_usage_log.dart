@@ -5,7 +5,10 @@ class MedicineUsage {
   final String medicineName;
   final int unitsDistributed;
 
-  MedicineUsage({required this.medicineName, required this.unitsDistributed});
+  MedicineUsage({
+    required this.medicineName,
+    required this.unitsDistributed,
+  });
 
   factory MedicineUsage.fromMap(Map<String, dynamic> map) {
     return MedicineUsage(
@@ -15,7 +18,10 @@ class MedicineUsage {
   }
 
   Map<String, dynamic> toMap() {
-    return {'medicineName': medicineName, 'unitsDistributed': unitsDistributed};
+    return {
+      'medicineName': medicineName,
+      'unitsDistributed': unitsDistributed,
+    };
   }
 }
 

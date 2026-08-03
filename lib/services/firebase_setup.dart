@@ -19,16 +19,13 @@ Future<void> initializeFirebaseServices() async {
     // Requirements:
     // - Android Debug -> AndroidProvider.debug
     // - Android Release -> AndroidProvider.playIntegrity
-    final androidProvider = kDebugMode
-        ? AndroidProvider.debug
-        : AndroidProvider.playIntegrity;
+    final androidProvider =
+        kDebugMode ? AndroidProvider.debug : AndroidProvider.playIntegrity;
 
     // The site key can be supplied during build via:
     // --dart-define=RECAPTCHA_SITE_KEY=your_actual_key
-    const webRecaptchaSiteKey = String.fromEnvironment(
-      'RECAPTCHA_SITE_KEY',
-      defaultValue: '',
-    );
+    const webRecaptchaSiteKey =
+        String.fromEnvironment('RECAPTCHA_SITE_KEY', defaultValue: '');
 
     if (kIsWeb) {
       if (webRecaptchaSiteKey.isNotEmpty) {
@@ -39,16 +36,15 @@ Future<void> initializeFirebaseServices() async {
         debugPrint('Firebase App Check activated (Web with reCAPTCHA)');
       } else {
         debugPrint(
-          'WARNING: Firebase App Check skipped on Web because RECAPTCHA_SITE_KEY is empty. '
-          'Please provide a valid site key to enable it.',
-        );
+            'WARNING: Firebase App Check skipped on Web because RECAPTCHA_SITE_KEY is empty. '
+            'Please provide a valid site key to enable it.');
       }
     } else {
       await FirebaseAppCheck.instance.activate(
         androidProvider: androidProvider,
       );
       debugPrint(
-          "Firebase App Check activated (Android: \${kDebugMode ? 'Debug' : 'Play Integrity'})");
+          "Firebase App Check activated (Android: ${kDebugMode ? 'Debug' : 'Play Integrity'})");
     }
   } catch (e) {
     // Requirement: If App Check activation fails, log the error using debugPrint() and allow the application to continue running

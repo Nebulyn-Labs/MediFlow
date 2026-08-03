@@ -29,8 +29,7 @@ class _AdminIndentStatusPageState extends ConsumerState<AdminIndentStatusPage> {
   Future<void> _exportTransferRequestsCsv(List<MedRequest> requests) async {
     if (requests.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('No transfer requests to export yet')),
-      );
+          const SnackBar(content: Text('No transfer requests to export yet')));
       return;
     }
 
@@ -39,14 +38,12 @@ class _AdminIndentStatusPageState extends ConsumerState<AdminIndentStatusPage> {
       await CsvExportService.exportTransferRequests(requests);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Transfer requests CSV exported ✓')),
-        );
+            const SnackBar(content: Text('Transfer requests CSV exported ✓')));
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('Export failed: $e')));
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('Export failed: $e')));
       }
     } finally {
       if (mounted) setState(() => _isExportingCsv = false);
@@ -60,9 +57,8 @@ class _AdminIndentStatusPageState extends ConsumerState<AdminIndentStatusPage> {
           .updateRequestStatus(requestId, status);
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('Failed to update: $e')));
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('Failed to update: $e')));
       }
     }
   }
@@ -98,11 +94,8 @@ class _AdminIndentStatusPageState extends ConsumerState<AdminIndentStatusPage> {
 
           if (requests.isEmpty) {
             return const Center(
-              child: Text(
-                'No supply requests found.',
-                style: TextStyle(color: MediColors.textMuted),
-              ),
-            );
+                child: Text('No supply requests found.',
+                    style: TextStyle(color: MediColors.textMuted)));
           }
 
           return SingleChildScrollView(
@@ -128,8 +121,7 @@ class _AdminIndentStatusPageState extends ConsumerState<AdminIndentStatusPage> {
                       foregroundColor: MediColors.textSecondary,
                       side: const BorderSide(color: MediColors.border),
                       shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(10),
-                      ),
+                          borderRadius: BorderRadius.circular(10)),
                     ),
                   ),
                 ),
@@ -170,75 +162,47 @@ class _AdminIndentStatusPageState extends ConsumerState<AdminIndentStatusPage> {
       child: const Row(
         children: [
           Expanded(
-            flex: 2,
-            child: Text(
-              'Date',
-              style: TextStyle(
-                color: MediColors.textSecondary,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-          ),
+              flex: 2,
+              child: Text('Date',
+                  style: TextStyle(
+                      color: MediColors.textSecondary,
+                      fontWeight: FontWeight.bold))),
           Expanded(
-            flex: 3,
-            child: Text(
-              'Facility',
-              style: TextStyle(
-                color: MediColors.textSecondary,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-          ),
+              flex: 3,
+              child: Text('Facility',
+                  style: TextStyle(
+                      color: MediColors.textSecondary,
+                      fontWeight: FontWeight.bold))),
           Expanded(
-            flex: 3,
-            child: Text(
-              'Medicine',
-              style: TextStyle(
-                color: MediColors.textSecondary,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-          ),
+              flex: 3,
+              child: Text('Medicine',
+                  style: TextStyle(
+                      color: MediColors.textSecondary,
+                      fontWeight: FontWeight.bold))),
           Expanded(
-            flex: 2,
-            child: Text(
-              'Quantity',
-              style: TextStyle(
-                color: MediColors.textSecondary,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-          ),
+              flex: 2,
+              child: Text('Quantity',
+                  style: TextStyle(
+                      color: MediColors.textSecondary,
+                      fontWeight: FontWeight.bold))),
           Expanded(
-            flex: 2,
-            child: Text(
-              'Status',
-              style: TextStyle(
-                color: MediColors.textSecondary,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-          ),
+              flex: 2,
+              child: Text('Status',
+                  style: TextStyle(
+                      color: MediColors.textSecondary,
+                      fontWeight: FontWeight.bold))),
           Expanded(
-            flex: 3,
-            child: Text(
-              'Global Optimization',
-              style: TextStyle(
-                color: MediColors.textSecondary,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-          ),
+              flex: 3,
+              child: Text('Global Optimization',
+                  style: TextStyle(
+                      color: MediColors.textSecondary,
+                      fontWeight: FontWeight.bold))),
           Expanded(
-            flex: 1,
-            child: Text(
-              '',
-              style: TextStyle(
-                color: MediColors.textSecondary,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-          ),
+              flex: 1,
+              child: Text('',
+                  style: TextStyle(
+                      color: MediColors.textSecondary,
+                      fontWeight: FontWeight.bold))),
         ],
       ),
     );
@@ -252,37 +216,24 @@ class _AdminIndentStatusPageState extends ConsumerState<AdminIndentStatusPage> {
       child: Row(
         children: [
           Expanded(
-            flex: 2,
-            child: Text(
-              DateFormatter.formatDate(req.requestDate),
-              style: const TextStyle(color: MediColors.textSecondary),
-            ),
-          ),
+              flex: 2,
+              child: Text(DateFormatter.formatDate(req.requestDate),
+                  style: const TextStyle(color: MediColors.textSecondary))),
           Expanded(
-            flex: 3,
-            child: Text(
-              req.facilityId.replaceAll('_', ' ').toUpperCase(),
-              style: const TextStyle(
-                fontWeight: FontWeight.w600,
-                color: MediColors.textPrimary,
-                fontSize: 13,
-              ),
-            ),
-          ),
+              flex: 3,
+              child: Text(req.facilityId.replaceAll('_', ' ').toUpperCase(),
+                  style: const TextStyle(
+                      fontWeight: FontWeight.w600,
+                      color: MediColors.textPrimary,
+                      fontSize: 13))),
           Expanded(
-            flex: 3,
-            child: Text(
-              req.medicineName,
-              style: const TextStyle(color: MediColors.textPrimary),
-            ),
-          ),
+              flex: 3,
+              child: Text(req.medicineName,
+                  style: const TextStyle(color: MediColors.textPrimary))),
           Expanded(
-            flex: 2,
-            child: Text(
-              req.quantity.toString(),
-              style: const TextStyle(fontWeight: FontWeight.bold),
-            ),
-          ),
+              flex: 2,
+              child: Text(req.quantity.toString(),
+                  style: const TextStyle(fontWeight: FontWeight.bold))),
           Expanded(
             flex: 2,
             child: Container(
@@ -291,15 +242,12 @@ class _AdminIndentStatusPageState extends ConsumerState<AdminIndentStatusPage> {
                 color: _getStatusColor(req.status).withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(6),
               ),
-              child: Text(
-                req.status.name.toUpperCase(),
-                style: TextStyle(
-                  color: _getStatusColor(req.status),
-                  fontSize: 10,
-                  fontWeight: FontWeight.bold,
-                ),
-                textAlign: TextAlign.center,
-              ),
+              child: Text(req.status.name.toUpperCase(),
+                  style: TextStyle(
+                      color: _getStatusColor(req.status),
+                      fontSize: 10,
+                      fontWeight: FontWeight.bold),
+                  textAlign: TextAlign.center),
             ),
           ),
           Expanded(
@@ -309,56 +257,39 @@ class _AdminIndentStatusPageState extends ConsumerState<AdminIndentStatusPage> {
                     child: TextButton.icon(
                       onPressed: () => context.go('/admin/routing'),
                       icon: const Icon(Icons.auto_fix_high_rounded, size: 14),
-                      label: const Text(
-                        'Optimize Routes',
-                        style: TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
+                      label: const Text('Optimize Routes',
+                          style: TextStyle(
+                              fontSize: 11, fontWeight: FontWeight.bold)),
                       style: TextButton.styleFrom(
                         foregroundColor: MediColors.primary,
-                        backgroundColor: MediColors.primary.withValues(
-                          alpha: 0.08,
-                        ),
+                        backgroundColor:
+                            MediColors.primary.withValues(alpha: 0.08),
                         padding: const EdgeInsets.symmetric(
-                          horizontal: 12,
-                          vertical: 8,
-                        ),
+                            horizontal: 12, vertical: 8),
                         shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(8),
-                        ),
+                            borderRadius: BorderRadius.circular(8)),
                       ),
                     ),
                   )
                 : const Center(
-                    child: Text(
-                      '—',
-                      style: TextStyle(color: MediColors.textMuted),
-                    ),
-                  ),
+                    child: Text('—',
+                        style: TextStyle(color: MediColors.textMuted))),
           ),
           Expanded(
             flex: 1,
             child: PopupMenuButton<RequestStatus>(
-              icon: const Icon(
-                Icons.more_vert_rounded,
-                color: MediColors.textMuted,
-                size: 20,
-              ),
+              icon: const Icon(Icons.more_vert_rounded,
+                  color: MediColors.textMuted, size: 20),
               onSelected: (status) => _updateStatus(req.id, status),
               itemBuilder: (context) => RequestStatus.values
                   .where((s) => s != RequestStatus.draft)
                   .map((status) {
-                    return PopupMenuItem(
-                      value: status,
-                      child: Text(
-                        status.name.toUpperCase(),
-                        style: const TextStyle(fontSize: 12),
-                      ),
-                    );
-                  })
-                  .toList(),
+                return PopupMenuItem(
+                  value: status,
+                  child: Text(status.name.toUpperCase(),
+                      style: const TextStyle(fontSize: 12)),
+                );
+              }).toList(),
             ),
           ),
         ],

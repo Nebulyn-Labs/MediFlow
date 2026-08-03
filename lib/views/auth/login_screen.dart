@@ -32,17 +32,14 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text(
-              'Database seeded ✓ Use rampur@mediflow.com / password123',
-            ),
-          ),
+              content: Text(
+                  'Database seeded ✓ Use rampur@mediflow.com / password123')),
         );
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('Error: $e')));
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('Error: $e')));
       }
     } finally {
       if (mounted) setState(() => _isLoading = false);
@@ -56,25 +53,22 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     }
     setState(() => _isLoading = true);
     try {
-      await ref
-          .read(firebaseServiceProvider)
-          .login(_emailController.text.trim(), _passwordController.text);
+      await ref.read(firebaseServiceProvider).login(
+            _emailController.text.trim(),
+            _passwordController.text,
+          );
       if (widget.role == 'facility') {
         final email = _emailController.text.trim();
-        final facilityId = email
-            .toLowerCase()
-            .replaceAll('@', '_')
-            .replaceAll('.', '_');
-        final fac = await ref
-            .read(firebaseServiceProvider)
-            .getFacility(facilityId);
+        final facilityId =
+            email.toLowerCase().replaceAll('@', '_').replaceAll('.', '_');
+        final fac =
+            await ref.read(firebaseServiceProvider).getFacility(facilityId);
 
         if (fac != null) {
           if (mounted) context.go('/facility/${fac.id}/overview');
         } else {
           throw Exception(
-            "No facility found for this account ($email). Please ensure you have seeded the database.",
-          );
+              "No facility found for this account ($email). Please ensure you have seeded the database.");
         }
       } else {
         if (mounted) context.go('/admin/overview');
@@ -83,10 +77,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(
-              'Login failed: ${e.toString().split(']').last.trim()}',
-            ),
-          ),
+              content:
+                  Text('Login failed: ${e.toString().split(']').last.trim()}')),
         );
       }
     } finally {
@@ -98,9 +90,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   Widget build(BuildContext context) {
     final isFacility = widget.role == 'facility';
     final accentColor = isFacility ? MediColors.teal : MediColors.primary;
-    final gradient = isFacility
-        ? MediColors.cyanGradient
-        : MediColors.primaryGradient;
+    final gradient =
+        isFacility ? MediColors.cyanGradient : MediColors.primaryGradient;
 
     return Scaffold(
       backgroundColor: MediColors.bg,
@@ -128,10 +119,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                         borderRadius: BorderRadius.circular(32),
                         boxShadow: [
                           BoxShadow(
-                            color: accentColor.withValues(alpha: 0.3),
-                            blurRadius: 40,
-                            spreadRadius: 5,
-                          ),
+                              color: accentColor.withValues(alpha: 0.3),
+                              blurRadius: 40,
+                              spreadRadius: 5),
                         ],
                       ),
                       child: Icon(
@@ -146,10 +136,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     Text(
                       isFacility ? 'Facility Portal' : 'Admin Portal',
                       style: TextStyle(
-                        fontSize: 28,
-                        fontWeight: FontWeight.w800,
-                        color: accentColor,
-                      ),
+                          fontSize: 28,
+                          fontWeight: FontWeight.w800,
+                          color: accentColor),
                     ),
                     const SizedBox(height: 12),
                     SizedBox(
@@ -160,10 +149,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                             : 'Monitor global stock levels and optimize redistribution routes.',
                         textAlign: TextAlign.center,
                         style: const TextStyle(
-                          color: MediColors.textSecondary,
-                          fontSize: 14,
-                          height: 1.6,
-                        ),
+                            color: MediColors.textSecondary,
+                            fontSize: 14,
+                            height: 1.6),
                       ),
                     ),
                   ],
@@ -190,18 +178,15 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     const Text(
                       'Sign In',
                       style: TextStyle(
-                        fontSize: 28,
-                        fontWeight: FontWeight.w800,
-                        color: MediColors.textPrimary,
-                      ),
+                          fontSize: 28,
+                          fontWeight: FontWeight.w800,
+                          color: MediColors.textPrimary),
                     ),
                     const SizedBox(height: 8),
                     const Text(
                       'Enter your credentials to continue',
                       style: TextStyle(
-                        color: MediColors.textSecondary,
-                        fontSize: 14,
-                      ),
+                          color: MediColors.textSecondary, fontSize: 14),
                     ),
                     const SizedBox(height: 36),
                     TextField(
@@ -210,11 +195,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                       style: const TextStyle(color: MediColors.textPrimary),
                       decoration: InputDecoration(
                         labelText: 'Email Address',
-                        prefixIcon: Icon(
-                          Icons.email_outlined,
-                          color: MediColors.textMuted,
-                          size: 20,
-                        ),
+                        prefixIcon: Icon(Icons.email_outlined,
+                            color: MediColors.textMuted, size: 20),
                       ),
                     ),
                     const SizedBox(height: 20),
@@ -224,11 +206,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                       style: const TextStyle(color: MediColors.textPrimary),
                       decoration: InputDecoration(
                         labelText: 'Password',
-                        prefixIcon: Icon(
-                          Icons.lock_outline_rounded,
-                          color: MediColors.textMuted,
-                          size: 20,
-                        ),
+                        prefixIcon: Icon(Icons.lock_outline_rounded,
+                            color: MediColors.textMuted, size: 20),
                         suffixIcon: IconButton(
                           icon: Icon(
                             _obscurePassword
@@ -238,8 +217,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                             size: 20,
                           ),
                           onPressed: () => setState(
-                            () => _obscurePassword = !_obscurePassword,
-                          ),
+                              () => _obscurePassword = !_obscurePassword),
                         ),
                       ),
                       onSubmitted: (_) => _login(),
@@ -273,10 +251,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                           borderRadius: BorderRadius.circular(12),
                           boxShadow: [
                             BoxShadow(
-                              color: accentColor.withValues(alpha: 0.3),
-                              blurRadius: 16,
-                              offset: const Offset(0, 6),
-                            ),
+                                color: accentColor.withValues(alpha: 0.3),
+                                blurRadius: 16,
+                                offset: const Offset(0, 6)),
                           ],
                         ),
                         child: FilledButton(
@@ -284,8 +261,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                             backgroundColor: Colors.transparent,
                             shadowColor: Colors.transparent,
                             shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
+                                borderRadius: BorderRadius.circular(12)),
                           ),
                           onPressed: _isLoading ? null : _login,
                           child: _isLoading
@@ -293,17 +269,11 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                                   width: 22,
                                   height: 22,
                                   child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                    color: Colors.white,
-                                  ),
-                                )
-                              : const Text(
-                                  'Sign In',
+                                      strokeWidth: 2, color: Colors.white))
+                              : const Text('Sign In',
                                   style: TextStyle(
-                                    fontSize: 15,
-                                    fontWeight: FontWeight.w700,
-                                  ),
-                                ),
+                                      fontSize: 15,
+                                      fontWeight: FontWeight.w700)),
                         ),
                       ),
                     ),
@@ -318,8 +288,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                           icon: const Icon(Icons.dataset_rounded, size: 16),
                           label: const Text('Seed DB'),
                           style: TextButton.styleFrom(
-                            foregroundColor: MediColors.textMuted,
-                          ),
+                              foregroundColor: MediColors.textMuted),
                         ),
                         const SizedBox(width: 8),
                         TextButton.icon(
@@ -327,8 +296,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                           icon: const Icon(Icons.arrow_back_rounded, size: 16),
                           label: const Text('Back'),
                           style: TextButton.styleFrom(
-                            foregroundColor: MediColors.textMuted,
-                          ),
+                              foregroundColor: MediColors.textMuted),
                         ),
                       ],
                     ),

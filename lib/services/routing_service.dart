@@ -143,9 +143,8 @@ class RoutingService {
 
         debugPrint('RoutingService: Requesting ORS: $url');
 
-        final response = await http
-            .get(Uri.parse(url))
-            .timeout(const Duration(seconds: 5));
+        final response =
+            await http.get(Uri.parse(url)).timeout(const Duration(seconds: 5));
 
         if (response.statusCode == 200) {
           final rawData = jsonDecode(response.body);
@@ -210,9 +209,8 @@ class RoutingService {
 
       debugPrint('RoutingService: Requesting OSRM: $url');
 
-      final response = await http
-          .get(Uri.parse(url))
-          .timeout(const Duration(seconds: 5));
+      final response =
+          await http.get(Uri.parse(url)).timeout(const Duration(seconds: 5));
 
       if (response.statusCode == 200) {
         final rawData = jsonDecode(response.body);

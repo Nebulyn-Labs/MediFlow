@@ -56,9 +56,8 @@ class _IndentCreationPageState extends ConsumerState<IndentCreationPage> {
       });
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('Error fetching inventory: $e')));
+        ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Error fetching inventory: $e')));
       }
     } finally {
       if (mounted) setState(() => _isLoading = false);
@@ -75,23 +74,38 @@ class _IndentCreationPageState extends ConsumerState<IndentCreationPage> {
     final aiService = ref.read(aiServiceProvider);
     final firebaseService = ref.read(firebaseServiceProvider);
 
-    // Fetch logs for forecasting
+    // Fetch logs once, shared across all concurrent forecast calls.
     final logs =
         await firebaseService.getRecentLogs(widget.facilityId, days: 90);
 
-    for (var item in _inventory) {
-      setState(() => _forecastLoading[item.id] = true);
-      try {
-        final dynamic result = await aiService.forecastDemand(
-            item.medicineName, logs, _selectedPeriod,
-            facilityId: widget.facilityId);
-        setState(() {
-          dynamic predRaw;
-          dynamic reasonRaw;
-          if (result != null && result is Map) {
-            predRaw = result['prediction'];
-            reasonRaw = result['reasoning'];
-          }
+    setState(() {
+      for (var item in _inventory) {
+        _forecastLoading[item.id] = true;
+      }
+    });
+
+    // Run forecasts concurrently in chunks of [_kForecastConcurrency] to
+    // avoid both serialising N round-trips and flooding the API (#238).
+    for (int i = 0; i < _inventory.length; i += _kForecastConcurrency) {
+      final chunk = _inventory.sublist(
+        i,
+        (i + _kForecastConcurrency).clamp(0, _inventory.length),
+      );
+
+      await Future.wait(chunk.map((item) async {
+        try {
+          final dynamic result = await aiService.forecastDemand(
+              item.medicineName, logs, _selectedPeriod,
+              facilityId: widget.facilityId);
+
+          if (!mounted) return;
+          setState(() {
+            dynamic predRaw;
+            dynamic reasonRaw;
+            if (result != null && result is Map) {
+              predRaw = result['prediction'];
+              reasonRaw = result['reasoning'];
+            }
 
             int predicted = 0;
             if (predRaw is num) {
@@ -137,17 +151,11 @@ class _IndentCreationPageState extends ConsumerState<IndentCreationPage> {
     }
   }
 
-  RequestType _determineRequestType(
-    InventoryItem item,
-    int? forecast,
-    int available,
-    bool isExpired,
-    bool expiringSoon,
-  ) {
+  RequestType _determineRequestType(InventoryItem item, int? forecast,
+      int available, bool isExpired, bool expiringSoon) {
     if (forecast == null) return RequestType.regularIndent;
     if (forecast <= 0) return RequestType.regularIndent;
-    final hasSurplus =
-        !isExpired &&
+    final hasSurplus = !isExpired &&
         ((available - forecast) > (forecast * 1.5) ||
             (available > forecast && expiringSoon));
     return hasSurplus ? RequestType.surplus : RequestType.regularIndent;
@@ -160,11 +168,8 @@ class _IndentCreationPageState extends ConsumerState<IndentCreationPage> {
     }).toList();
 
     if (itemsToSubmit.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Please enter quantities for at least one medicine.'),
-        ),
-      );
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text('Please enter quantities for at least one medicine.')));
       return;
     }
 
@@ -183,12 +188,7 @@ class _IndentCreationPageState extends ConsumerState<IndentCreationPage> {
             itemStatus == ItemStatus.wastageRisk;
 
         final RequestType reqType = _determineRequestType(
-          item,
-          forecast,
-          available,
-          isExpired,
-          expiringSoon,
-        );
+            item, forecast, available, isExpired, expiringSoon);
 
         final req = MedRequest(
           id: '',
@@ -205,17 +205,13 @@ class _IndentCreationPageState extends ConsumerState<IndentCreationPage> {
       }
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Requests saved as drafts! ✓')),
-        );
+            const SnackBar(content: Text('Requests saved as drafts! ✓')));
         context.go('/facility/${widget.facilityId}/active-indents');
       }
     } catch (e) {
       if (mounted) {
-        showRetrySnackBar(
-          context,
-          message: 'Submission failed: $e',
-          onRetry: _submitIndent,
-        );
+        showRetrySnackBar(context,
+            message: 'Submission failed: $e', onRetry: _submitIndent);
       }
     } finally {
       if (mounted) setState(() => _isSubmitting = false);
@@ -240,10 +236,9 @@ class _IndentCreationPageState extends ConsumerState<IndentCreationPage> {
               child: Text(
                 widget.facilityId.replaceAll('_', ' ').toUpperCase(),
                 style: const TextStyle(
-                  fontSize: 11,
-                  color: MediColors.primary,
-                  fontWeight: FontWeight.bold,
-                ),
+                    fontSize: 11,
+                    color: MediColors.primary,
+                    fontWeight: FontWeight.bold),
               ),
             ),
           ],
@@ -266,9 +261,7 @@ class _IndentCreationPageState extends ConsumerState<IndentCreationPage> {
                         children: [
                           Container(
                             padding: const EdgeInsets.symmetric(
-                              horizontal: 16,
-                              vertical: 4,
-                            ),
+                                horizontal: 16, vertical: 4),
                             decoration: BoxDecoration(
                               border: Border.all(color: MediColors.border),
                               borderRadius: BorderRadius.circular(12),
@@ -280,12 +273,9 @@ class _IndentCreationPageState extends ConsumerState<IndentCreationPage> {
                                 items: [30, 60, 90].map((int value) {
                                   return DropdownMenuItem<int>(
                                     value: value,
-                                    child: Text(
-                                      '$value days',
-                                      style: const TextStyle(
-                                        color: MediColors.textPrimary,
-                                      ),
-                                    ),
+                                    child: Text('$value days',
+                                        style: const TextStyle(
+                                            color: MediColors.textPrimary)),
                                   );
                                 }).toList(),
                                 onChanged: (val) {
@@ -300,9 +290,7 @@ class _IndentCreationPageState extends ConsumerState<IndentCreationPage> {
                           Text(
                             '${_inventory.length} medicines in inventory',
                             style: const TextStyle(
-                              color: MediColors.textSecondary,
-                              fontSize: 14,
-                            ),
+                                color: MediColors.textSecondary, fontSize: 14),
                           ),
                         ],
                       ),
@@ -327,9 +315,7 @@ class _IndentCreationPageState extends ConsumerState<IndentCreationPage> {
                             backgroundColor: Colors.transparent,
                             shadowColor: Colors.transparent,
                             padding: const EdgeInsets.symmetric(
-                              horizontal: 20,
-                              vertical: 12,
-                            ),
+                                horizontal: 20, vertical: 12),
                           ),
                           icon: const Icon(Icons.auto_awesome, size: 18),
                           label: const Text('Get AI Forecast'),
@@ -367,13 +353,9 @@ class _IndentCreationPageState extends ConsumerState<IndentCreationPage> {
                       onPressed: _isSubmitting ? null : _submitIndent,
                       child: _isSubmitting
                           ? const CircularProgressIndicator(color: Colors.white)
-                          : const Text(
-                              'Save as Draft',
+                          : const Text('Save as Draft',
                               style: TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
+                                  fontSize: 16, fontWeight: FontWeight.bold)),
                     ),
                   ),
                   const SizedBox(height: 40),
@@ -387,10 +369,9 @@ class _IndentCreationPageState extends ConsumerState<IndentCreationPage> {
     return Text(
       title,
       style: const TextStyle(
-        fontSize: 18,
-        fontWeight: FontWeight.w700,
-        color: MediColors.textPrimary,
-      ),
+          fontSize: 18,
+          fontWeight: FontWeight.w700,
+          color: MediColors.textPrimary),
     );
   }
 
@@ -404,63 +385,39 @@ class _IndentCreationPageState extends ConsumerState<IndentCreationPage> {
       child: const Row(
         children: [
           SizedBox(
-            width: 40,
-            child: Icon(
-              Icons.check_box_outline_blank,
-              color: MediColors.textMuted,
-              size: 20,
-            ),
-          ),
+              width: 40,
+              child: Icon(Icons.check_box_outline_blank,
+                  color: MediColors.textMuted, size: 20)),
           Expanded(
-            flex: 3,
-            child: Text(
-              'Medicine',
-              style: TextStyle(
-                color: MediColors.textSecondary,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-          ),
+              flex: 3,
+              child: Text('Medicine',
+                  style: TextStyle(
+                      color: MediColors.textSecondary,
+                      fontWeight: FontWeight.bold))),
           Expanded(
-            flex: 2,
-            child: Text(
-              'Available',
-              style: TextStyle(
-                color: MediColors.textSecondary,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-          ),
+              flex: 2,
+              child: Text('Available',
+                  style: TextStyle(
+                      color: MediColors.textSecondary,
+                      fontWeight: FontWeight.bold))),
           Expanded(
-            flex: 2,
-            child: Text(
-              'AI Predicted Usage',
-              style: TextStyle(
-                color: MediColors.textSecondary,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-          ),
+              flex: 2,
+              child: Text('AI Predicted Usage',
+                  style: TextStyle(
+                      color: MediColors.textSecondary,
+                      fontWeight: FontWeight.bold))),
           Expanded(
-            flex: 2,
-            child: Text(
-              'Status',
-              style: TextStyle(
-                color: MediColors.textSecondary,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-          ),
+              flex: 2,
+              child: Text('Status',
+                  style: TextStyle(
+                      color: MediColors.textSecondary,
+                      fontWeight: FontWeight.bold))),
           Expanded(
-            flex: 2,
-            child: Text(
-              'Request Qty',
-              style: TextStyle(
-                color: MediColors.textSecondary,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-          ),
+              flex: 2,
+              child: Text('Request Qty',
+                  style: TextStyle(
+                      color: MediColors.textSecondary,
+                      fontWeight: FontWeight.bold))),
         ],
       ),
     );
@@ -515,46 +472,32 @@ class _IndentCreationPageState extends ConsumerState<IndentCreationPage> {
       child: Row(
         children: [
           SizedBox(
-            width: 40,
-            child: Checkbox(
-              value: true,
-              onChanged: (v) {},
-              activeColor: MediColors.surfaceLight,
-              checkColor: MediColors.textPrimary,
-              side: const BorderSide(color: MediColors.textMuted),
-            ),
-          ),
+              width: 40,
+              child: Checkbox(
+                  value: true,
+                  onChanged: (v) {},
+                  activeColor: MediColors.surfaceLight,
+                  checkColor: MediColors.textPrimary,
+                  side: const BorderSide(color: MediColors.textMuted))),
           Expanded(
             flex: 3,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  item.medicineName,
+            child:
+                Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text(item.medicineName,
                   style: const TextStyle(
-                    fontWeight: FontWeight.w600,
-                    color: MediColors.textPrimary,
-                  ),
-                ),
-                Text(
-                  item.batchId,
+                      fontWeight: FontWeight.w600,
+                      color: MediColors.textPrimary)),
+              Text(item.batchId,
                   style: const TextStyle(
-                    color: MediColors.textSecondary,
-                    fontSize: 12,
-                  ),
-                ),
-              ],
-            ),
+                      color: MediColors.textSecondary, fontSize: 12)),
+            ]),
           ),
           Expanded(
             flex: 2,
-            child: Text(
-              available.toString(),
-              style: const TextStyle(
-                color: MediColors.textPrimary,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
+            child: Text(available.toString(),
+                style: const TextStyle(
+                    color: MediColors.textPrimary,
+                    fontWeight: FontWeight.bold)),
           ),
           Expanded(
             flex: 2,
@@ -562,8 +505,7 @@ class _IndentCreationPageState extends ConsumerState<IndentCreationPage> {
                 ? const SizedBox(
                     width: 16,
                     height: 16,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  )
+                    child: CircularProgressIndicator(strokeWidth: 2))
                 : Tooltip(
                     message: reasoning ?? "AI reasoning will appear here.",
                     child: Row(
@@ -582,12 +524,9 @@ class _IndentCreationPageState extends ConsumerState<IndentCreationPage> {
                         ),
                         if (forecast != null) ...[
                           const SizedBox(width: 6),
-                          const Icon(
-                            Icons.info_outline,
-                            color: MediColors.primaryLight,
-                            size: 14,
-                          ),
-                        ],
+                          const Icon(Icons.info_outline,
+                              color: MediColors.primaryLight, size: 14),
+                        ]
                       ],
                     ),
                   ),
@@ -597,49 +536,37 @@ class _IndentCreationPageState extends ConsumerState<IndentCreationPage> {
             child: Align(
               alignment: Alignment.centerLeft,
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                decoration: BoxDecoration(
-                  color: statusBg,
-                  borderRadius: BorderRadius.circular(6),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                      color: statusBg, borderRadius: BorderRadius.circular(6)),
+                  child: Row(mainAxisSize: MainAxisSize.min, children: [
                     Icon(statusIcon, color: statusColor, size: 14),
                     const SizedBox(width: 6),
-                    Text(
-                      status,
-                      style: TextStyle(
-                        color: statusColor,
-                        fontSize: 11,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
+                    Text(status,
+                        style: TextStyle(
+                            color: statusColor,
+                            fontSize: 11,
+                            fontWeight: FontWeight.bold)),
+                  ])),
             ),
           ),
           Expanded(
             flex: 2,
             child: Container(
-              height: 40,
-              decoration: BoxDecoration(
-                color: MediColors.surfaceLight,
-                borderRadius: BorderRadius.circular(20),
-                border: Border.all(color: MediColors.border),
-              ),
-              child: Row(
-                children: [
+                height: 40,
+                decoration: BoxDecoration(
+                    color: MediColors.surfaceLight,
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(color: MediColors.border)),
+                child: Row(children: [
                   Expanded(
                     child: TextField(
                       controller: _controllers[item.id],
                       keyboardType: TextInputType.number,
                       textAlign: TextAlign.center,
                       style: const TextStyle(
-                        fontSize: 14,
-                        color: MediColors.textPrimary,
-                      ),
+                          fontSize: 14, color: MediColors.textPrimary),
                       decoration: const InputDecoration(
                         border: InputBorder.none,
                         contentPadding: EdgeInsets.zero,
@@ -648,17 +575,11 @@ class _IndentCreationPageState extends ConsumerState<IndentCreationPage> {
                   ),
                   Padding(
                     padding: const EdgeInsets.only(right: 12.0),
-                    child: Text(
-                      item.unit,
-                      style: const TextStyle(
-                        color: MediColors.textMuted,
-                        fontSize: 11,
-                      ),
-                    ),
+                    child: Text(item.unit,
+                        style: const TextStyle(
+                            color: MediColors.textMuted, fontSize: 11)),
                   ),
-                ],
-              ),
-            ),
+                ])),
           ),
         ],
       ),

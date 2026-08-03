@@ -105,9 +105,7 @@ class _AIChatPageState extends ConsumerState<AIChatPage> {
     _scrollToBottom();
 
     try {
-      final response = await ref
-          .read(aiServiceProvider)
-          .getChatResponse(
+      final response = await ref.read(aiServiceProvider).getChatResponse(
             query: text,
             context: _activeContext,
             role: widget.role,
@@ -128,7 +126,7 @@ class _AIChatPageState extends ConsumerState<AIChatPage> {
         setState(() {
           _messages.add({
             'role': 'ai',
-            'content': 'I encountered an error accessing the system: $e',
+            'content': 'I encountered an error accessing the system: $e'
           });
           _isTyping = false;
         });
@@ -148,14 +146,10 @@ class _AIChatPageState extends ConsumerState<AIChatPage> {
               child: Container(
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
-                  gradient: MediColors.primaryGradient,
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: const Icon(
-                  Icons.smart_toy_rounded,
-                  color: Colors.white,
-                  size: 18,
-                ),
+                    gradient: MediColors.primaryGradient,
+                    borderRadius: BorderRadius.circular(10)),
+                child: const Icon(Icons.smart_toy_rounded,
+                    color: Colors.white, size: 18),
               ),
             ),
             const SizedBox(width: 12),
@@ -167,9 +161,10 @@ class _AIChatPageState extends ConsumerState<AIChatPage> {
                         fontSize: 16,
                         fontWeight: FontWeight.w700,
                         color: MediColors.textPrimary)),
-                const Text(
-                  'gemini-flash-lite-latest',
-                  style: TextStyle(fontSize: 11, color: MediColors.textMuted),
+                Text(
+                  _isLocalMode ? 'Local Assistant Mode' : 'Powered by Gemini',
+                  style: const TextStyle(
+                      fontSize: 11, color: MediColors.textMuted),
                 ),
               ],
             ),
@@ -213,13 +208,10 @@ class _AIChatPageState extends ConsumerState<AIChatPage> {
                       filled: true,
                       fillColor: MediColors.surfaceLight,
                       border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(14),
-                        borderSide: BorderSide.none,
-                      ),
+                          borderRadius: BorderRadius.circular(14),
+                          borderSide: BorderSide.none),
                       contentPadding: const EdgeInsets.symmetric(
-                        horizontal: 20,
-                        vertical: 14,
-                      ),
+                          horizontal: 20, vertical: 14),
                     ),
                     onSubmitted: (_) => _sendMessage(),
                   ),
@@ -227,17 +219,13 @@ class _AIChatPageState extends ConsumerState<AIChatPage> {
                 const SizedBox(width: 12),
                 Container(
                   decoration: BoxDecoration(
-                    gradient: MediColors.primaryGradient,
-                    borderRadius: BorderRadius.circular(14),
-                  ),
+                      gradient: MediColors.primaryGradient,
+                      borderRadius: BorderRadius.circular(14)),
                   child: IconButton(
                     onPressed: _isTyping ? null : _sendMessage,
                     tooltip: 'Send message',
-                    icon: const Icon(
-                      Icons.send_rounded,
-                      color: Colors.white,
-                      size: 20,
-                    ),
+                    icon: const Icon(Icons.send_rounded,
+                        color: Colors.white, size: 20),
                   ),
                 ),
               ],
@@ -274,21 +262,15 @@ class _AIChatPageState extends ConsumerState<AIChatPage> {
                   color: MediColors.primarySubtle,
                   borderRadius: BorderRadius.circular(24),
                 ),
-                child: Icon(
-                  Icons.smart_toy_rounded,
-                  size: 52,
-                  color: MediColors.primary,
-                ),
+                child: Icon(Icons.smart_toy_rounded,
+                    size: 52, color: MediColors.primary),
               ),
               const SizedBox(height: 24),
-              Text(
-                'MediFlow AI Assistant',
-                style: TextStyle(
-                  fontSize: 22,
-                  fontWeight: FontWeight.w700,
-                  color: MediColors.textPrimary,
-                ),
-              ),
+              Text('MediFlow AI Assistant',
+                  style: TextStyle(
+                      fontSize: 22,
+                      fontWeight: FontWeight.w700,
+                      color: MediColors.textPrimary)),
               const SizedBox(height: 8),
               Text(
                 'Ask MediFlow AI about inventory, medicine availability, '
@@ -345,8 +327,7 @@ class _AIChatPageState extends ConsumerState<AIChatPage> {
             margin: const EdgeInsets.only(bottom: 14),
             padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
             constraints: BoxConstraints(
-              maxWidth: MediaQuery.of(context).size.width * 0.6,
-            ),
+                maxWidth: MediaQuery.of(context).size.width * 0.6),
             decoration: BoxDecoration(
               gradient: isUser ? MediColors.primaryGradient : null,
               color: isUser ? null : MediColors.surface,
@@ -429,12 +410,11 @@ class _AIChatPageState extends ConsumerState<AIChatPage> {
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: List.generate(
-                3,
-                (i) => Padding(
-                  padding: EdgeInsets.only(right: i < 2 ? 6 : 0),
-                  child: _BouncingDot(delay: i * 150),
-                ),
-              ),
+                  3,
+                  (i) => Padding(
+                        padding: EdgeInsets.only(right: i < 2 ? 6 : 0),
+                        child: _BouncingDot(delay: i * 150),
+                      )),
             ),
           ),
         ),
@@ -460,13 +440,9 @@ class _BouncingDotState extends State<_BouncingDot>
   void initState() {
     super.initState();
     _controller = AnimationController(
-      duration: const Duration(milliseconds: 600),
-      vsync: this,
-    );
-    _animation = Tween(
-      begin: 0.0,
-      end: -6.0,
-    ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeInOut));
+        duration: const Duration(milliseconds: 600), vsync: this);
+    _animation = Tween(begin: 0.0, end: -6.0)
+        .animate(CurvedAnimation(parent: _controller, curve: Curves.easeInOut));
     Future.delayed(Duration(milliseconds: widget.delay), () {
       if (mounted) _controller.repeat(reverse: true);
     });
@@ -485,13 +461,10 @@ class _BouncingDotState extends State<_BouncingDot>
       builder: (context, child) => Transform.translate(
         offset: Offset(0, _animation.value),
         child: Container(
-          width: 8,
-          height: 8,
-          decoration: BoxDecoration(
-            color: MediColors.primary,
-            shape: BoxShape.circle,
-          ),
-        ),
+            width: 8,
+            height: 8,
+            decoration: BoxDecoration(
+                color: MediColors.primary, shape: BoxShape.circle)),
       ),
     );
   }

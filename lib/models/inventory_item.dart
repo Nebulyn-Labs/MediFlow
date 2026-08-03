@@ -136,11 +136,8 @@ class InventoryItem {
   /// sidebar badge / alert-bell calculations.
   bool get hasAlert => status != ItemStatus.healthy;
 
-  factory InventoryItem.fromMap(
-    Map<String, dynamic> map,
-    String id, {
-    String? facilityId,
-  }) {
+  factory InventoryItem.fromMap(Map<String, dynamic> map, String id,
+      {String? facilityId}) {
     return InventoryItem(
       id: id,
       medicineName: map['medicineName']?.toString() ?? '',

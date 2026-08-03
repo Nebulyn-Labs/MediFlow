@@ -28,8 +28,7 @@ class _ScrollToTopButtonState extends State<ScrollToTopButton> {
   }
 
   void _handleScroll() {
-    final shouldShow =
-        widget.controller.hasClients &&
+    final shouldShow = widget.controller.hasClients &&
         widget.controller.offset > widget.threshold;
     if (shouldShow != _visible) {
       setState(() => _visible = shouldShow);

@@ -104,7 +104,9 @@ class _AdminOverviewState extends ConsumerState<AdminOverview> {
           });
         } else {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Could not refresh dashboard data.')),
+            const SnackBar(
+              content: Text('Could not refresh dashboard data.'),
+            ),
           );
         }
       }
@@ -127,27 +129,23 @@ class _AdminOverviewState extends ConsumerState<AdminOverview> {
             totalInitial += item.initialQuantity;
             totalRemaining += item.remainingQuantity;
 
-            topMeds[item.medicineName] =
-                (topMeds[item.medicineName] ?? 0) +
+            topMeds[item.medicineName] = (topMeds[item.medicineName] ?? 0) +
                 item.remainingQuantity.toInt();
           }
-          health[f.id] = totalInitial == 0
-              ? 100.0
-              : (totalRemaining / totalInitial) * 100;
+          health[f.id] =
+              totalInitial == 0 ? 100.0 : (totalRemaining / totalInitial) * 100;
 
           final fAlerts = await aiService.generateSmartAlerts(inv);
           alerts[f.id] = fAlerts.length;
         } catch (e) {
           debugPrint(
-            'Failed to load data for facility ${f.name} (${f.id}): $e',
-          );
+              'Failed to load data for facility ${f.name} (${f.id}): $e');
           failedFacilityNames.add(f.name);
         }
       }),
     );
 
-    _requestsSub =
-        firebaseService.streamRequests(null).listen(
+    _requestsSub = firebaseService.streamRequests(null).listen(
       (reqs) {
         if (!mounted) return;
         int shortage = 0;
@@ -245,9 +243,8 @@ class _AdminOverviewState extends ConsumerState<AdminOverview> {
 
   List<InventoryItem> _applyFilters(List<InventoryItem> items) {
     return items.where((item) {
-      final matchesSearch = item.medicineName.toLowerCase().contains(
-        _searchQuery,
-      );
+      final matchesSearch =
+          item.medicineName.toLowerCase().contains(_searchQuery);
       final matchesFilter =
           _selectedFilter == 'All' || _getStockStatus(item) == _selectedFilter;
       return matchesSearch && matchesFilter;
@@ -277,19 +274,26 @@ class _AdminOverviewState extends ConsumerState<AdminOverview> {
             decoration: BoxDecoration(
               color: colors.error.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(8),
-              border:
-                  Border.all(color: MediColors.error.withValues(alpha: 0.3)),
+              border: Border.all(color: colors.error),
             ),
             child: Column(
               children: [
-                Icon(Icons.error_outline_rounded,
-                    color: MediColors.error, size: 20),
-                SizedBox(width: 12),
-                Expanded(
-                  child: Text(
-                    'Unable to load medicine inventory.',
-                    style: TextStyle(color: MediColors.error, fontSize: 13),
-                  ),
+                Icon(Icons.error_outline, color: colors.error),
+                const SizedBox(height: 8),
+                Text(
+                  _medicinesError!,
+                  style: TextStyle(color: colors.error),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 8),
+                ElevatedButton(
+                  onPressed: () {
+                    setState(() {
+                      _medicinesError = null;
+                    });
+                    _loadMedicinePage();
+                  },
+                  child: Text('Retry'),
                 ),
               ],
             ),
@@ -301,58 +305,76 @@ class _AdminOverviewState extends ConsumerState<AdminOverview> {
     return Column(
       children: [
         if (filtered.isEmpty && !_medicinesLoading)
-          const Padding(
-            padding: EdgeInsets.symmetric(vertical: 24),
-            child: Text('No medicines match your search or filter.',
-                style: TextStyle(color: MediColors.textSecondary)),
-          );
-        }
-
-        return ListView.builder(
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          itemCount: filtered.length,
-          itemBuilder: (context, index) {
-            final item = filtered[index];
-            final status = _getStockStatus(item);
-            return Container(
-              margin: const EdgeInsets.only(bottom: 8),
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: MediColors.surface,
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: MediColors.border),
-              ),
-              child: Row(
-                children: [
-                  Expanded(
-                    flex: 2,
-                    child: Text(item.medicineName,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                            fontWeight: FontWeight.w700,
-                            color: MediColors.textPrimary)),
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 24),
+            // Note: Intentional scalability trade-off - filtering only searches
+            // currently loaded pages to avoid excessive reads or complex
+            // composite indexes on the large global medicines collection.
+            child: Text(
+                'No medicines match in currently loaded data. Load more to continue searching.',
+                textAlign: TextAlign.center,
+                style: TextStyle(color: colors.textSecondary)),
+          )
+        else
+          ListView.builder(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            itemCount: filtered.length,
+            itemBuilder: (context, index) {
+              final item = filtered[index];
+              final status = _getStockStatus(item);
+              return Container(
+                margin: const EdgeInsets.only(bottom: 8),
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: colors.surface,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: colors.border),
+                ),
+                child: Row(
+                  children: [
+                    Expanded(
+                      flex: 2,
+                      child: Text(item.medicineName,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                              fontWeight: FontWeight.w700,
+                              color: colors.textPrimary)),
+                    ),
+                    Expanded(
+                      child: Text(
+                          '${item.remainingQuantity}/${item.initialQuantity} ${item.unit}',
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(color: colors.textSecondary)),
+                    ),
+                    Flexible(
+                      child: Text(status,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                              fontWeight: FontWeight.w700, color: colors.info)),
+                    ),
+                  ],
+                ),
+              );
+            },
+          ),
+        if (_medicinesHasMore)
+          Padding(
+            padding: const EdgeInsets.only(top: 8),
+            child: _medicinesLoading
+                ? const Center(
+                    child: Padding(
+                      padding: EdgeInsets.all(12),
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    ),
+                  )
+                : TextButton.icon(
+                    onPressed: _loadMedicinePage,
+                    icon: Icon(Icons.expand_more_rounded, size: 18),
+                    label: Text('Load more'),
                   ),
-                  Expanded(
-                    child: Text(
-                        '${item.remainingQuantity}/${item.initialQuantity} ${item.unit}',
-                        overflow: TextOverflow.ellipsis,
-                        style:
-                            const TextStyle(color: MediColors.textSecondary)),
-                  ),
-                  Flexible(
-                    child: Text(status,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                            fontWeight: FontWeight.w700,
-                            color: MediColors.info)),
-                  ),
-                ],
-              ),
-            );
-          },
-        );
-      },
+          ),
+      ],
     );
   }
 
@@ -403,17 +425,16 @@ class _AdminOverviewState extends ConsumerState<AdminOverview> {
       ),
       child: Row(
         children: [
-          const Icon(
-            Icons.warning_amber_rounded,
-            color: MediColors.warning,
-            size: 20,
-          ),
+          Icon(Icons.warning_amber_rounded, color: colors.warning, size: 20),
           const SizedBox(width: 12),
           Expanded(
             child: Text(
               'Some facility data could not be loaded: '
               '${_failedFacilities.join(", ")}.',
-              style: const TextStyle(color: MediColors.warning, fontSize: 13),
+              style: TextStyle(
+                color: colors.warning,
+                fontSize: 13,
+              ),
             ),
           ),
         ],
@@ -449,8 +470,10 @@ class _AdminOverviewState extends ConsumerState<AdminOverview> {
                           spacing: 20,
                           runSpacing: 20,
                           children: [
-                            _buildKpiCard('TOTAL FACILITIES',
-                                '${_facilities.length}', Icons.business_rounded),
+                            _buildKpiCard(
+                                'TOTAL FACILITIES',
+                                '${_facilities.length}',
+                                Icons.business_rounded),
                             _buildKpiCard(
                                 'OPEN SHORTAGE REQUESTS',
                                 '$_openShortageRequests',
@@ -458,8 +481,7 @@ class _AdminOverviewState extends ConsumerState<AdminOverview> {
                                 isAlert: true),
                             _buildKpiCard('SURPLUS / EXPIRY OFFERS',
                                 '$_surplusOffers', Icons.swap_horiz_rounded,
-                                isAlert: false,
-                                iconColor: MediColors.warning),
+                                isAlert: false, iconColor: colors.warning),
                             _buildKpiCard(
                                 'PENDING APPROVALS',
                                 '$_pendingApprovals',
@@ -510,11 +532,7 @@ class _AdminOverviewState extends ConsumerState<AdminOverview> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(
-              Icons.cloud_off_rounded,
-              size: 64,
-              color: MediColors.textMuted,
-            ),
+            Icon(Icons.cloud_off_rounded, size: 64, color: colors.textMuted),
             const SizedBox(height: 24),
             Text(
               'Unable to load dashboard data.',
@@ -541,12 +559,10 @@ class _AdminOverviewState extends ConsumerState<AdminOverview> {
               icon: Icon(Icons.refresh_rounded, size: 20),
               label: Text('Retry'),
               style: FilledButton.styleFrom(
-                backgroundColor: MediColors.info,
-                foregroundColor: MediColors.textPrimary,
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 32,
-                  vertical: 16,
-                ),
+                backgroundColor: colors.info,
+                foregroundColor: colors.textPrimary,
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(10),
                 ),
@@ -558,17 +574,10 @@ class _AdminOverviewState extends ConsumerState<AdminOverview> {
     );
   }
 
-  Widget _buildKpiCard(
-    String title,
-    String value,
-    IconData icon, {
-    bool isAlert = false,
-    Color? iconColor,
-    VoidCallback? onTap,
-  }) {
-    final finalIconColor = isAlert
-        ? MediColors.error
-        : (iconColor ?? MediColors.info);
+  Widget _buildKpiCard(String title, String value, IconData icon,
+      {bool isAlert = false, Color? iconColor, VoidCallback? onTap}) {
+    final colors = context.mediTheme;
+    final finalIconColor = isAlert ? colors.error : (iconColor ?? colors.info);
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(12),
@@ -587,30 +596,23 @@ class _AdminOverviewState extends ConsumerState<AdminOverview> {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Expanded(
-                  child: Text(
-                    title,
-                    style: const TextStyle(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w700,
-                      color: MediColors.textSecondary,
-                      letterSpacing: 0.5,
-                    ),
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ),
+                    child: Text(title,
+                        style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w700,
+                            color: colors.textSecondary,
+                            letterSpacing: 0.5),
+                        overflow: TextOverflow.ellipsis)),
                 const SizedBox(width: 8),
                 Icon(icon, color: finalIconColor, size: 20),
               ],
             ),
             const SizedBox(height: 16),
-            Text(
-              value,
-              style: const TextStyle(
-                fontSize: 28,
-                fontWeight: FontWeight.w800,
-                color: MediColors.textPrimary,
-              ),
-            ),
+            Text(value,
+                style: TextStyle(
+                    fontSize: 28,
+                    fontWeight: FontWeight.w800,
+                    color: colors.textPrimary)),
           ],
         ),
       ),
@@ -622,14 +624,11 @@ class _AdminOverviewState extends ConsumerState<AdminOverview> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
-          'Facility Health Overview',
-          style: TextStyle(
-            fontSize: 16,
-            fontWeight: FontWeight.w700,
-            color: MediColors.textPrimary,
-          ),
-        ),
+        Text('Facility Health Overview',
+            style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w700,
+                color: colors.textPrimary)),
         const SizedBox(height: 16),
         Wrap(
           spacing: 16,
@@ -673,30 +672,22 @@ class _AdminOverviewState extends ConsumerState<AdminOverview> {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Expanded(
-                child: Text(
-                  facility.name,
-                  style: const TextStyle(
-                    fontWeight: FontWeight.w700,
-                    fontSize: 15,
-                    color: MediColors.textPrimary,
-                  ),
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
+                  child: Text(facility.name,
+                      style: TextStyle(
+                          fontWeight: FontWeight.w700,
+                          fontSize: 15,
+                          color: colors.textPrimary),
+                      overflow: TextOverflow.ellipsis)),
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                 decoration: BoxDecoration(
-                  color: MediColors.surfaceLight,
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: Text(
-                  facility.type,
-                  style: const TextStyle(
-                    fontSize: 10,
-                    color: MediColors.textSecondary,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
+                    color: colors.surfaceLight,
+                    borderRadius: BorderRadius.circular(20)),
+                child: Text(facility.type,
+                    style: TextStyle(
+                        fontSize: 10,
+                        color: colors.textSecondary,
+                        fontWeight: FontWeight.w700)),
               ),
             ],
           ),
@@ -704,18 +695,13 @@ class _AdminOverviewState extends ConsumerState<AdminOverview> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text(
-                'Stock Health',
-                style: TextStyle(fontSize: 12, color: MediColors.textSecondary),
-              ),
-              Text(
-                '${health.round()}%',
-                style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w700,
-                  color: healthColor,
-                ),
-              ),
+              Text('Stock Health',
+                  style: TextStyle(fontSize: 12, color: colors.textSecondary)),
+              Text('${health.round()}%',
+                  style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w700,
+                      color: healthColor)),
             ],
           ),
           const SizedBox(height: 8),
@@ -733,40 +719,28 @@ class _AdminOverviewState extends ConsumerState<AdminOverview> {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 10,
-                  vertical: 4,
-                ),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                 decoration: BoxDecoration(
-                  color: healthColor.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: Text(
-                  healthStatus,
-                  style: TextStyle(
-                    color: healthColor,
-                    fontSize: 11,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
+                    color: healthColor.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(20)),
+                child: Text(healthStatus,
+                    style: TextStyle(
+                        color: healthColor,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700)),
               ),
               if (alerts > 0)
                 Row(
                   children: [
-                    const Icon(
-                      Icons.notifications_active_rounded,
-                      color: MediColors.error,
-                      size: 14,
-                    ),
+                    Icon(Icons.notifications_active_rounded,
+                        color: colors.error, size: 14),
                     const SizedBox(width: 4),
-                    Text(
-                      '$alerts',
-                      style: const TextStyle(
-                        color: MediColors.error,
-                        fontSize: 12,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
+                    Text('$alerts',
+                        style: TextStyle(
+                            color: colors.error,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700)),
                   ],
                 ),
             ],
@@ -798,14 +772,11 @@ class _AdminOverviewState extends ConsumerState<AdminOverview> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
-            'Top Medicines by Total Units Across All Facilities',
-            style: TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.w700,
-              color: MediColors.textPrimary,
-            ),
-          ),
+          Text('Top Medicines by Total Units Across All Facilities',
+              style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w700,
+                  color: colors.textPrimary)),
           const SizedBox(height: 32),
           SizedBox(
             height: 200,
@@ -821,20 +792,17 @@ class _AdminOverviewState extends ConsumerState<AdminOverview> {
                       Container(
                         width: 24,
                         height: 150 * heightFactor,
-                        decoration: const BoxDecoration(
-                          color: MediColors.info,
-                          borderRadius: BorderRadius.vertical(
-                            top: Radius.circular(4),
-                          ),
+                        decoration: BoxDecoration(
+                          color: colors.info,
+                          borderRadius:
+                              BorderRadius.vertical(top: Radius.circular(4)),
                         ),
                       ),
                       const SizedBox(height: 12),
                       Text(
                         e.key,
-                        style: const TextStyle(
-                          fontSize: 10,
-                          color: MediColors.textSecondary,
-                        ),
+                        style: TextStyle(
+                            fontSize: 10, color: colors.textSecondary),
                         textAlign: TextAlign.center,
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,

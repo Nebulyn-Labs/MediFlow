@@ -29,14 +29,15 @@ class MultiStopRoute {
   final List<TransferRecommendation> transfers;
   final List<Facility> stops;
 
-  MultiStopRoute({required this.transfers, required this.stops});
+  MultiStopRoute({
+    required this.transfers,
+    required this.stops,
+  });
 }
 
 abstract class RoutingStrategy {
   List<Facility> buildRouteStops(
-    Facility startNode,
-    List<TransferRecommendation> transfers,
-  );
+      Facility startNode, List<TransferRecommendation> transfers);
 }
 
 class NearestNeighborRoutingStrategy implements RoutingStrategy {
@@ -44,9 +45,7 @@ class NearestNeighborRoutingStrategy implements RoutingStrategy {
 
   @override
   List<Facility> buildRouteStops(
-    Facility startNode,
-    List<TransferRecommendation> transfers,
-  ) {
+      Facility startNode, List<TransferRecommendation> transfers) {
     final Distance distanceCalc = const Distance();
 
     final unvisited = <Facility>[];
@@ -148,7 +147,9 @@ class OptimizationService {
   }) {
     List<TransferRecommendation> recommendations = [];
     final Distance distanceCalc = const Distance();
-    final facilityById = {for (final facility in facilities) facility.id: facility};
+    final facilityById = {
+      for (final facility in facilities) facility.id: facility
+    };
 
     // 1. Group needs (shortage or regular indent) by medicine
     final pendingIndents = <MedRequest>[];
@@ -275,11 +276,9 @@ class OptimizationService {
           List<String> reasons = [];
 
           // A. Distance Score
-          final distKm =
-              distanceCalc(
-                LatLng(donorFac.latitude, donorFac.longitude),
-                LatLng(recipientFac.latitude, recipientFac.longitude),
-              ) /
+          final distKm = distanceCalc(
+                  LatLng(donorFac.latitude, donorFac.longitude),
+                  LatLng(recipientFac.latitude, recipientFac.longitude)) /
               1000;
           double distScore = (200 - distKm).clamp(0, 200);
           score += distScore;
@@ -292,9 +291,8 @@ class OptimizationService {
           }
 
           // C. Quantity Match (Bonus if donor can fulfill a lot)
-          int qtyToTake = remainingDeficit < available
-              ? remainingDeficit
-              : available;
+          int qtyToTake =
+              remainingDeficit < available ? remainingDeficit : available;
           if (qtyToTake == remainingDeficit) {
             score += 50;
             reasons.add('Full Fulfillment');
@@ -347,8 +345,8 @@ class OptimizationService {
             recipient: recipientFac,
             medicine: medicine,
             quantity: qtyTaken,
-            score: bestDonorMatch['score'],
-            reasoning: bestDonorMatch['reasoning'],
+            score: (bestDonorMatch['score'] as num?)?.toDouble() ?? 0.0,
+            reasoning: bestDonorMatch['reasoning']?.toString() ?? '',
           ));
 
           // Update state
@@ -392,7 +390,10 @@ class OptimizationService {
       final donor = transfers.first.donor;
       final stops = strategy.buildRouteStops(donor, transfers);
 
-      multiStopRoutes.add(MultiStopRoute(transfers: transfers, stops: stops));
+      multiStopRoutes.add(MultiStopRoute(
+        transfers: transfers,
+        stops: stops,
+      ));
     }
 
     return multiStopRoutes;
