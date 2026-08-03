@@ -153,8 +153,7 @@ class FirebaseService {
           final userFacId = userDoc.data()?['facilityId']?.toString();
           if (userFacId != null && userFacId.isNotEmpty) {
             final fac = await getFacility(userFacId);
-            if (fac != null &&
-                fac.email.trim().toLowerCase() == lowerEmail) {
+            if (fac != null && fac.email.trim().toLowerCase() == lowerEmail) {
               return fac;
             }
           }

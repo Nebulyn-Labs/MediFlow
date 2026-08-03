@@ -59,9 +59,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
           );
       if (widget.role == 'facility') {
         final email = _emailController.text.trim();
-        final fac = await ref
-            .read(firebaseServiceProvider)
-            .getFacilityByEmail(email);
+        final fac =
+            await ref.read(firebaseServiceProvider).getFacilityByEmail(email);
 
         if (fac != null) {
           if (mounted) context.go('/facility/${fac.id}/overview');
