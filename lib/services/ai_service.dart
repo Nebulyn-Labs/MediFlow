@@ -90,6 +90,25 @@ class AIService {
     return response.data['text'] as String? ?? '';
   }
 
+  /// Extracts the JSON payload from an LLM response string, handling markdown fences,
+  /// conversational preambles, and backtick formatting cleanly.
+  static String extractJsonPayload(String responseText) {
+    final trimmed = responseText.trim();
+    final match = RegExp(r'\{[\s\S]*\}').firstMatch(trimmed);
+    if (match != null) {
+      return match.group(0)!;
+    }
+    return trimmed
+        .replaceAll(RegExp(r'^```(?:json)?\s*', multiLine: true), '')
+        .replaceAll(RegExp(r'\s*```$', multiLine: true), '')
+        .trim();
+  }
+
+  /// Sanitizes input strings before injecting into LLM prompts.
+  static String sanitizePromptInput(String input) {
+    return input.replaceAll(RegExp(r'[\r\n]+'), ' ').replaceAll('"', '\\"');
+  }
+
   // ─── FORECASTING ───────────────────────────────────────────────
   Future<Map<String, dynamic>> forecastDemand(
       String medicineName, List<DailyUsageLog> logs, int daysToForecast,
@@ -120,13 +139,13 @@ class AIService {
           .take(30)
           .map((l) => 'Date: ${l['date']}, Used: ${l['used']}')
           .join('\n');
+      final sanitizedMedName = sanitizePromptInput(medicineName);
       final prompt =
-          'Forecast $daysToForecast days for $medicineName. History:\n$logSummary\nOutput JSON: {"prediction": int, "reasoning": "string"}';
+          'Forecast $daysToForecast days for $sanitizedMedName. History:\n$logSummary\nOutput JSON: {"prediction": int, "reasoning": "string"}';
 
       final responseText = await _callGeminiBackend(prompt);
-      final raw = responseText.trim();
-      var decoded = jsonDecode(
-          raw.replaceAll('```json', '').replaceAll('```', '').trim());
+      final jsonPayload = extractJsonPayload(responseText);
+      var decoded = jsonDecode(jsonPayload);
       if (decoded is Map) {
         final result = Map<String, dynamic>.from(decoded);
         await _logAIDecision(

@@ -116,4 +116,24 @@ void main() {
       expect(result['reasoning'], 'AI result');
     });
   });
+
+  group('AIService extractJsonPayload & sanitizePromptInput (#422)', () {
+    test('extracts JSON payload from markdown fences with json tag', () {
+      const input = '```json\n{"prediction": 42, "reasoning": "Test"}\n```';
+      final jsonStr = AIService.extractJsonPayload(input);
+      expect(jsonStr, '{"prediction": 42, "reasoning": "Test"}');
+    });
+
+    test('extracts JSON payload when surrounded by conversational text', () {
+      const input = 'Here is the forecast:\n{"prediction": 50, "reasoning": "Ok"}\nHope this helps!';
+      final jsonStr = AIService.extractJsonPayload(input);
+      expect(jsonStr, '{"prediction": 50, "reasoning": "Ok"}');
+    });
+
+    test('sanitizes newline and quote characters in prompt input', () {
+      const input = 'Paracetamol\n"500mg"';
+      final sanitized = AIService.sanitizePromptInput(input);
+      expect(sanitized, r'Paracetamol \"500mg\"');
+    });
+  });
 }
