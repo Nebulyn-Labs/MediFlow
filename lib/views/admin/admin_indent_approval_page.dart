@@ -39,7 +39,13 @@ class _AdminIndentApprovalPageState
 
       final forecast =
           await aiService.forecastDemand(request.medicineName, logs, 30);
-      final predictedDemand = forecast['prediction'] as int;
+      final predRaw = forecast['prediction'];
+      int predictedDemand = 0;
+      if (predRaw is num) {
+        predictedDemand = predRaw.toInt();
+      } else if (predRaw is String) {
+        predictedDemand = double.tryParse(predRaw)?.toInt() ?? 0;
+      }
 
       String suggestion;
       if (request.quantity > (predictedDemand * 1.5)) {
