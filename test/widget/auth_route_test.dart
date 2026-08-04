@@ -1,4 +1,4 @@
-import 'package:firebase_auth/firebase_auth.dart';
+﻿import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -41,8 +41,7 @@ GoRouter createTestRouter({
           final role = state.pathParameters['role']!;
           return ProviderScope(
             overrides: [
-              firebaseServiceProvider
-                  .overrideWithValue(mockServiceProvider()),
+              firebaseServiceProvider.overrideWithValue(mockServiceProvider()),
             ],
             child: LoginScreen(role: role),
           );
@@ -57,8 +56,7 @@ GoRouter createTestRouter({
         routes: [
           GoRoute(
             path: '/facility/:id/overview',
-            builder: (_, __) =>
-                const Scaffold(body: Text('Facility Overview')),
+            builder: (_, __) => const Scaffold(body: Text('Facility Overview')),
           ),
           GoRoute(
             path: '/admin/overview',
@@ -120,10 +118,8 @@ void main() {
         (tester) async {
       const email = 'rampur@mediflow.com';
       const password = 'password123';
-      final facilityId = email
-          .toLowerCase()
-          .replaceAll('@', '_')
-          .replaceAll('.', '_');
+      final facilityId =
+          email.toLowerCase().replaceAll('@', '_').replaceAll('.', '_');
 
       final mockService = MockFirebaseService();
       final mockCredential = MockUserCredential();
@@ -223,7 +219,7 @@ void main() {
       await tester.tap(find.byType(FilledButton));
       await tester.pumpAndSettle();
 
-      // Should still be on the login screen — no navigation occurred.
+      // Should still be on the login screen â€” no navigation occurred.
       expect(find.byType(TextField), findsAtLeast(2));
       expect(find.text('Login failed: No user found'), findsOneWidget);
     });
