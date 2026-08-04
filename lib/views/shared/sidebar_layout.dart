@@ -294,7 +294,7 @@ class _SidebarLayoutState extends ConsumerState<SidebarLayout> {
       {bool isLogout = false, bool showBadge = false, int badgeCount = 0}) {
     final colors = context.mediTheme;
 
-    return Padding(
+    Widget navItem = Padding(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
       child: Material(
         color: Colors.transparent,
@@ -401,6 +401,16 @@ class _SidebarLayoutState extends ConsumerState<SidebarLayout> {
           ),
         ),
       ),
+    );
+
+    // Expose the item's label to assistive technologies and, when the
+    // sidebar is collapsed (icons only), surface a descriptive tooltip.
+    return Semantics(
+      label: item.label,
+      button: true,
+      child: _isExpanded
+          ? navItem
+          : Tooltip(message: item.label, child: navItem),
     );
   }
 }
