@@ -1,8 +1,7 @@
 {
   "env": {
     "node": true,
-    "es2021": true,
-    "jest": true
+    "es2021": true
   },
   "extends": "eslint:recommended",
   "parserOptions": {
@@ -14,14 +13,5 @@
     "no-empty": "warn",
     "no-inner-declarations": "off",
     "no-useless-escape": "off"
-  },
-  "globals": {
-    "jest": "readonly",
-    "describe": "readonly",
-    "it": "readonly",
-    "test": "readonly",
-    "beforeEach": "readonly",
-    "afterEach": "readonly",
-    "expect": "readonly"
   }
 }
