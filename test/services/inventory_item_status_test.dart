@@ -96,7 +96,7 @@ void main() {
       expect(item.status, ItemStatus.lowStock);
     });
 
-    test('expiring item with low stock prioritizes expiringSoon status', () {
+    test('expiring item with low stock prioritizes lowStock status (#419)', () {
       final item = _item(
         daysUntilExpiry: 10,
         initialQuantity: 1000,
@@ -104,7 +104,7 @@ void main() {
       );
       expect(item.isLowStock, isTrue);
       expect(item.isExpiringSoon, isTrue);
-      expect(item.status, ItemStatus.expiringSoon);
+      expect(item.status, ItemStatus.lowStock);
     });
 
     test('expired item is not counted in expiringSoon bucket', () {

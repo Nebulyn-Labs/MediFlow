@@ -117,6 +117,10 @@ class _RouteOptimizationMapState extends ConsumerState<RouteOptimizationMap> {
       debugPrint(
           'RouteOptimizationMap: Generated ${multiRoutes.length} multi-stop routes.');
       debugPrint('RouteOptimizationMap: Fetched ${routes.length} road routes.');
+      // The route generation kicks off several network requests and the user
+      // can navigate away while they are in flight. Guard the post-await
+      // setState so we do not touch a disposed State.
+      if (!mounted) return;
       setState(() {
         _multiStopRoutes = multiRoutes;
         _roadRoutes = routes;
