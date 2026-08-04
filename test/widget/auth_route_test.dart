@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:mocktail/mocktail.dart';
 
+import 'package:med_supply_prototype/main.dart' show authRedirect;
 import 'package:med_supply_prototype/models/facility.dart';
 import 'package:med_supply_prototype/services/firebase_service.dart';
 import 'package:med_supply_prototype/views/auth/login_screen.dart';
@@ -28,15 +29,7 @@ GoRouter createTestRouter({
 }) {
   return GoRouter(
     initialLocation: '/',
-    redirect: withRedirect
-        ? (context, state) {
-            final isLoggedIn = FirebaseAuth.instance.currentUser != null;
-            final isAuthRoute = state.uri.toString() == '/' ||
-                state.uri.toString().startsWith('/login');
-            if (!isLoggedIn && !isAuthRoute) return '/';
-            return null;
-          }
-        : null,
+    redirect: withRedirect ? authRedirect : null,
     routes: [
       GoRoute(
         path: '/',
@@ -127,7 +120,10 @@ void main() {
         (tester) async {
       const email = 'rampur@mediflow.com';
       const password = 'password123';
-      final facilityId = email.toLowerCase().replaceAll('@', '_').replaceAll('.', '_');
+      final facilityId = email
+          .toLowerCase()
+          .replaceAll('@', '_')
+          .replaceAll('.', '_');
 
       final mockService = MockFirebaseService();
       final mockCredential = MockUserCredential();
