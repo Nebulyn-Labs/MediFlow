@@ -947,8 +947,7 @@ class _DailyLoggingPageState extends ConsumerState<DailyLoggingPage>
                     const SizedBox(height: 8),
                     ..._csvSkippedRows.map((skipped) => Padding(
                         padding: const EdgeInsets.only(bottom: 4),
-                        child: Text(
-                            'row ${skipped.line}: ${skipped.reason}',
+                        child: Text('row ${skipped.line}: ${skipped.reason}',
                             style: const TextStyle(
                                 color: MediColors.textSecondary,
                                 fontSize: 12))))
