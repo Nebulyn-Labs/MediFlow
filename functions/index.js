@@ -13,7 +13,6 @@ const { createLowStockService } = require("./helpers/lowStock");
 const { handleCspReport, getClientIp } = require("./helpers/cspReport");
 const { wrapUserContent, wrapDataContent } = require("./helpers/promptHardener");
 const { isValidQuantity } = require("./helpers/quantityValidation");
-const { wrapUserContent, wrapDataContent } = require("./helpers/promptHardener");
 const {
   ApprovalBusinessRuleError,
   handleApprovalFailure,
