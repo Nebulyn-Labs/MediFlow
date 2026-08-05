@@ -33,16 +33,22 @@ List<Map<String, dynamic>> parseVisionJson(String text) {
       final jsonSub = text.substring(start, end + 1);
       final decoded = jsonDecode(jsonSub);
       if (decoded is List) {
-        return decoded.map<Map<String, dynamic>>((item) {
+        final result = <Map<String, dynamic>>[];
+        for (final item in decoded) {
           if (item is Map) {
-            return {
-              'medicine': item['medicine']?.toString().trim() ?? '',
-              'quantity': _parseNumber(item['quantity']),
-              'patients': _parseNumber(item['patients']),
-            };
+            final med = item['medicine']?.toString().trim() ?? '';
+            final qty = _parseNumber(item['quantity']);
+            final pat = _parseNumber(item['patients']);
+            if (med.isNotEmpty || qty > 0) {
+              result.add({
+                'medicine': med,
+                'quantity': qty,
+                'patients': pat,
+              });
+            }
           }
-          return {'medicine': '', 'quantity': 0, 'patients': 0};
-        }).toList();
+        }
+        return result;
       }
     }
   } catch (e) {
