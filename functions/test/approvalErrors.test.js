@@ -25,6 +25,43 @@ function createLogger() {
   };
 }
 
+describe("isTransientFirestoreError", () => {
+  it("returns true for ABORTED (10)", () => {
+    const err = Object.assign(new Error("10 ABORTED"), { code: 10 });
+    assert.equal(isTransientFirestoreError(err), true);
+  });
+
+  it("returns true for UNAVAILABLE (14)", () => {
+    const err = Object.assign(new Error("14 UNAVAILABLE"), { code: 14 });
+    assert.equal(isTransientFirestoreError(err), true);
+  });
+
+  it("returns true for DEADLINE_EXCEEDED (4)", () => {
+    const err = Object.assign(new Error("4 DEADLINE_EXCEEDED"), { code: 4 });
+    assert.equal(isTransientFirestoreError(err), true);
+  });
+
+  it("returns true for RESOURCE_EXHAUSTED (8)", () => {
+    const err = Object.assign(new Error("8 RESOURCE_EXHAUSTED"), { code: 8 });
+    assert.equal(isTransientFirestoreError(err), true);
+  });
+
+  it("returns false for PERMISSION_DENIED (7)", () => {
+    const err = Object.assign(new Error("7 PERMISSION_DENIED"), { code: 7 });
+    assert.equal(isTransientFirestoreError(err), false);
+  });
+
+  it("returns false for errors with no gRPC code", () => {
+    const err = new TypeError("Cannot read properties of undefined");
+    assert.equal(isTransientFirestoreError(err), false);
+  });
+
+  it("returns false for generic errors with an unknown code", () => {
+    const err = Object.assign(new Error("Something else"), { code: 42 });
+    assert.equal(isTransientFirestoreError(err), false);
+  });
+});
+
 describe("approval failure handling", () => {
   it("rejects insufficient donor stock with a curated reason", async () => {
     const updates = [];
