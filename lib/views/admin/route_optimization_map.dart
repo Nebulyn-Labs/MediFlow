@@ -74,12 +74,31 @@ class _RouteOptimizationMapState extends ConsumerState<RouteOptimizationMap> {
       List<MedRequest> requests, List<InventoryItem> allMeds) async {
     setState(() => _isGenerating = true);
     try {
+      final firebaseService = ref.read(firebaseServiceProvider);
+      if (_facilities.isEmpty) {
+        final freshFacs = await firebaseService
+            .getFacilities()
+            .catchError((_) => <Facility>[]);
+        if (freshFacs.isNotEmpty) {
+          _facilities = freshFacs;
+        }
+      }
+      final freshRequests = await firebaseService
+          .getRequestsOnce()
+          .catchError((_) => <MedRequest>[]);
+      final freshMeds = await firebaseService
+          .getAllMedicinesOnce()
+          .catchError((_) => <InventoryItem>[]);
+      final activeRequests =
+          freshRequests.isNotEmpty ? freshRequests : requests;
+      final activeMeds = freshMeds.isNotEmpty ? freshMeds : allMeds;
+
       final optimizer = ref.read(optimizationServiceProvider);
       final router = ref.read(routingServiceProvider);
       final ai = ref.read(aiServiceProvider);
 
       Map<String, List<InventoryItem>> inventories = {};
-      for (var med in allMeds) {
+      for (var med in activeMeds) {
         if (med.facilityId != null) {
           inventories.putIfAbsent(med.facilityId!, () => []).add(med);
         }
@@ -89,7 +108,7 @@ class _RouteOptimizationMapState extends ConsumerState<RouteOptimizationMap> {
       final multiRoutes = optimizer.calculateMultiStopRoutes(
         facilities: _facilities,
         inventories: inventories,
-        requests: requests,
+        requests: activeRequests,
       );
 
       // 2. Fetch road-accurate routes for each multi-stop route and leg
@@ -112,7 +131,7 @@ class _RouteOptimizationMapState extends ConsumerState<RouteOptimizationMap> {
 
       // 3. Generate AI Summary
       final summary =
-          await ai.generateRedistributionPlan(requests, _facilities);
+          await ai.generateRedistributionPlan(activeRequests, _facilities);
 
       debugPrint(
           'RouteOptimizationMap: Generated ${multiRoutes.length} multi-stop routes.');
@@ -300,8 +319,9 @@ class _RouteOptimizationMapState extends ConsumerState<RouteOptimizationMap> {
                                       await ref
                                           .read(firebaseServiceProvider)
                                           .seedDemoData();
-                                      // RE-LOAD FACILITIES AFTER SEEDING
+                                      // RE-LOAD FACILITIES & AUTO GENERATE ROUTES AFTER SEEDING
                                       await _loadData();
+                                      await _generateOptimalRoutes([], []);
                                     } catch (e) {
                                       debugPrint(
                                           'RouteOptimizationMap: Demo seed failed: $e');

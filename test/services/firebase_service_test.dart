@@ -395,4 +395,88 @@ void main() {
       },
     );
   });
+
+  group('FirebaseService - getFacilityByEmail', () {
+    late FakeFirebaseFirestore fakeFirestore;
+    late MockFirebaseAuth mockAuth;
+    late FirebaseService firebaseService;
+
+    setUp(() {
+      fakeFirestore = FakeFirebaseFirestore();
+      mockAuth = MockFirebaseAuth();
+      firebaseService = FirebaseService(fakeFirestore, mockAuth);
+    });
+
+    test(
+      'resolves facility with arbitrary non-email-derived document ID',
+      () async {
+        const customDocId = 'fac_uuid_98761234';
+        const email = 'rampur.clinic@mediflow.org';
+
+        await fakeFirestore.collection('facilities').doc(customDocId).set({
+          'name': 'Rampur Clinic',
+          'email': email,
+          'type': 'rural',
+          'region': 'North',
+          'latitude': 28.8,
+          'longitude': 79.0,
+          'createdAt': DateTime.now(),
+        });
+
+        final fac = await firebaseService.getFacilityByEmail(email);
+        expect(fac, isNotNull);
+        expect(fac!.id, equals(customDocId));
+        expect(fac.name, equals('Rampur Clinic'));
+      },
+    );
+
+    test('resolves uppercase and trimmed email addresses', () async {
+      const docId = 'fac_alpha_001';
+      const canonicalEmail = 'hapur.general@mediflow.org';
+
+      await fakeFirestore.collection('facilities').doc(docId).set({
+        'name': 'Hapur Hospital',
+        'email': canonicalEmail,
+        'type': 'urban',
+        'region': 'East',
+        'latitude': 28.7,
+        'longitude': 77.7,
+        'createdAt': DateTime.now(),
+      });
+
+      final fac = await firebaseService
+          .getFacilityByEmail('  HAPUR.GENERAL@MEDIFLOW.ORG  ');
+      expect(fac, isNotNull);
+      expect(fac!.id, equals(docId));
+    });
+
+    test(
+      'resolves complex email addresses with subdomains and tags',
+      () async {
+        const docId = 'fac_complex_409';
+        const email = 'supply+zone1@sub.health.district.gov.in';
+
+        await fakeFirestore.collection('facilities').doc(docId).set({
+          'name': 'District Health HQ',
+          'email': email,
+          'type': 'urban',
+          'region': 'Central',
+          'latitude': 28.6,
+          'longitude': 77.2,
+          'createdAt': DateTime.now(),
+        });
+
+        final fac = await firebaseService.getFacilityByEmail(email);
+        expect(fac, isNotNull);
+        expect(fac!.id, equals(docId));
+        expect(fac.email, equals(email));
+      },
+    );
+
+    test('returns null when no matching facility exists', () async {
+      final fac =
+          await firebaseService.getFacilityByEmail('nonexistent@mediflow.org');
+      expect(fac, isNull);
+    });
+  });
 }
