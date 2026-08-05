@@ -368,10 +368,12 @@ class FirebaseService {
         int index =
             medicines.indexWhere((m) => m['medicineName'] == medicineName);
         if (index >= 0) {
-          medicines[index]['unitsDistributed'] += quantity;
+          medicines[index]['unitsDistributed'] += actualDeduction;
         } else {
-          medicines.add(
-              {'medicineName': medicineName, 'unitsDistributed': quantity});
+          medicines.add({
+            'medicineName': medicineName,
+            'unitsDistributed': actualDeduction,
+          });
         }
 
         transaction.update(logRef, {
@@ -382,7 +384,10 @@ class FirebaseService {
         transaction.set(logRef, {
           'date': Timestamp.fromDate(date),
           'medicines': [
-            {'medicineName': medicineName, 'unitsDistributed': quantity}
+            {
+              'medicineName': medicineName,
+              'unitsDistributed': actualDeduction,
+            }
           ],
           'totalPatients': patients,
         });
