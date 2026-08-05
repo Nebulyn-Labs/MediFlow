@@ -59,11 +59,18 @@ class FirebaseService {
     double? fixedLat,
     double? fixedLng,
     String? fixedRegion,
+    String? customFacilityId,
   }) async {
-    // 1. Generate a deterministic ID from email to bypass Auth dependency
-    // This ensures Firestore docs are created even if Auth rate limits hit.
-    final String facilityId =
-        email.toLowerCase().replaceAll('@', '_').replaceAll('.', '_');
+    // 1. Generate facility ID (use custom ID, or fallback strategy)
+    final String facilityId;
+    if (customFacilityId != null) {
+      facilityId = customFacilityId;
+    } else if (email.isNotEmpty && email.contains('@')) {
+      facilityId =
+          email.toLowerCase().replaceAll('@', '_').replaceAll('.', '_');
+    } else {
+      facilityId = _firestore.collection('facilities').doc().id;
+    }
 
     // 2. Authenticate User (create account or fallback to sign-in)
     auth.UserCredential credential;
@@ -100,7 +107,9 @@ class FirebaseService {
       longitude: fixedLng ?? (profile['longitude'] as num?)?.toDouble() ?? 0.0,
       createdAt: profile['createdAt'] is Timestamp
           ? (profile['createdAt'] as Timestamp).toDate()
-          : DateTime.now(),
+          : (profile['createdAt'] is DateTime
+              ? profile['createdAt'] as DateTime
+              : DateTime.now()),
     );
 
     await _firestore
@@ -131,6 +140,61 @@ class FirebaseService {
     final doc = await _firestore.collection('facilities').doc(id).get();
     if (!doc.exists) return null;
     return Facility.fromMap(doc.data()!, doc.id);
+  }
+
+  /// Looks up a facility by user email address.
+  /// Does NOT rely on email-derived document IDs.
+  /// Queries the facilities collection by the stored 'email' field.
+  Future<Facility?> getFacilityByEmail(String email) async {
+    final cleanEmail = email.trim();
+    if (cleanEmail.isEmpty) return null;
+    final lowerEmail = cleanEmail.toLowerCase();
+
+    // 1. Check if authenticated user has a facilityId in their user document
+    final currentUser = _auth.currentUser;
+    if (currentUser != null) {
+      try {
+        final userDoc =
+            await _firestore.collection('users').doc(currentUser.uid).get();
+        if (userDoc.exists) {
+          final userFacId = userDoc.data()?['facilityId']?.toString();
+          if (userFacId != null && userFacId.isNotEmpty) {
+            final fac = await getFacility(userFacId);
+            if (fac != null && fac.email.trim().toLowerCase() == lowerEmail) {
+              return fac;
+            }
+          }
+        }
+      } catch (e) {
+        debugPrint('Error reading user profile for facility lookup: $e');
+      }
+    }
+
+    // 2. Query facilities collection by normalized email
+    final lowerSnapshot = await _firestore
+        .collection('facilities')
+        .where('email', isEqualTo: lowerEmail)
+        .limit(1)
+        .get();
+    if (lowerSnapshot.docs.isNotEmpty) {
+      final doc = lowerSnapshot.docs.first;
+      return Facility.fromMap(doc.data(), doc.id);
+    }
+
+    // 3. Fallback: query facilities collection by exact raw email string
+    if (lowerEmail != cleanEmail) {
+      final exactSnapshot = await _firestore
+          .collection('facilities')
+          .where('email', isEqualTo: cleanEmail)
+          .limit(1)
+          .get();
+      if (exactSnapshot.docs.isNotEmpty) {
+        final doc = exactSnapshot.docs.first;
+        return Facility.fromMap(doc.data(), doc.id);
+      }
+    }
+
+    return null;
   }
 
   Future<void> updateFacility(String id, Map<String, dynamic> data) async {
@@ -215,6 +279,15 @@ class FirebaseService {
       lastDocument: snapshot.docs.isNotEmpty ? snapshot.docs.last : null,
       hasMore: snapshot.docs.length == pageSize,
     );
+  }
+
+  Future<List<InventoryItem>> getAllMedicinesOnce() async {
+    final snapshot = await _firestore.collectionGroup('medicines').get();
+    return snapshot.docs.map((doc) {
+      final pathSegments = doc.reference.path.split('/');
+      final facId = pathSegments.length >= 2 ? pathSegments[1] : '';
+      return InventoryItem.fromMap(doc.data(), doc.id, facilityId: facId);
+    }).toList();
   }
 
   Future<void> restock(
@@ -417,6 +490,16 @@ class FirebaseService {
     return query.snapshots().map((snapshot) => snapshot.docs
         .map((doc) => MedRequest.fromMap(doc.data(), doc.id))
         .toList());
+  }
+
+  Future<List<MedRequest>> getRequestsOnce([String? facilityId]) async {
+    var query = _firestore.collection('requests');
+    final snapshot = facilityId != null
+        ? await query.where('facilityId', isEqualTo: facilityId).get()
+        : await query.get();
+    return snapshot.docs
+        .map((doc) => MedRequest.fromMap(doc.data(), doc.id))
+        .toList();
   }
 
   Future<void> addRequest(MedRequest request) async {
@@ -665,34 +748,37 @@ class FirebaseService {
         },
       ];
 
+      // 3. Seed new facility documents immediately
       for (var f in demoFacilities) {
         try {
-          await signUpFacility(
+          final String facilityId = (f['email']?.toString() ?? '')
+              .toLowerCase()
+              .replaceAll('@', '_')
+              .replaceAll('.', '_');
+          final profile =
+              _simulation.generateRealisticProfile(type: f['type']?.toString());
+          final facility = Facility(
+            id: facilityId,
             name: f['name']?.toString() ?? '',
             email: f['email']?.toString() ?? '',
-            password: f['password']?.toString() ?? '',
-            type: f['type']?.toString(),
-            fixedLat: (f['lat'] as num?)?.toDouble(),
-            fixedLng: (f['lng'] as num?)?.toDouble(),
-            fixedRegion: f['region']?.toString(),
+            type: f['type']?.toString() ?? (profile['type'] as String),
+            region: f['region']?.toString() ?? (profile['region'] as String),
+            latitude: (f['lat'] as num?)?.toDouble() ??
+                (profile['latitude'] as num).toDouble(),
+            longitude: (f['lng'] as num?)?.toDouble() ??
+                (profile['longitude'] as num).toDouble(),
+            createdAt: (profile['createdAt'] as Timestamp).toDate(),
           );
-          // Delay to avoid auth rate limits
-          await Future.delayed(const Duration(milliseconds: 1500));
+          await _firestore
+              .collection('facilities')
+              .doc(facilityId)
+              .set(facility.toMap());
         } catch (e) {
-          debugPrint('Error seeding $f: $e');
-          return 'Failed at ${f['name']}: $e';
+          debugPrint('Error setting facility doc for ${f['name']}: $e');
         }
       }
 
-      // Sign back in as admin to have global access to create requests for different facilities
-      try {
-        await _auth.signInWithEmailAndPassword(
-            email: 'admin@mediflow.com', password: 'password123');
-      } catch (e) {
-        debugPrint('Failed to sign back in as admin: $e');
-      }
-
-      // 4. Seed sample requests for Admin Dashboard KPIs & Route Optimization
+      // 4. Seed sample requests IMMEDIATELY so Route Optimization has data right away
       final String f1Id = (demoFacilities[0]['email']?.toString() ?? '')
           .toLowerCase()
           .replaceAll('@', '_')
@@ -766,6 +852,31 @@ class FirebaseService {
         requestDate: DateTime.now(),
         status: RequestStatus.pending,
       ));
+
+      // 5. Run full user registration & simulation logs
+      for (var f in demoFacilities) {
+        try {
+          await signUpFacility(
+            name: f['name']?.toString() ?? '',
+            email: f['email']?.toString() ?? '',
+            password: f['password']?.toString() ?? '',
+            type: f['type']?.toString(),
+            fixedLat: (f['lat'] as num?)?.toDouble(),
+            fixedLng: (f['lng'] as num?)?.toDouble(),
+            fixedRegion: f['region']?.toString(),
+          );
+        } catch (e) {
+          debugPrint('Error signing up facility $f: $e');
+        }
+      }
+
+      // Always sign back in as admin so global permissions (isAdmin()) work
+      try {
+        await _auth.signInWithEmailAndPassword(
+            email: 'admin@mediflow.com', password: 'password123');
+      } catch (e) {
+        debugPrint('Failed to sign back in as admin: $e');
+      }
 
       return null; // Success
     } catch (e) {
