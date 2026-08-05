@@ -114,5 +114,11 @@ service cloud.firestore {
       allow update: if isAdmin();
       allow delete: if isAdmin();
     }
+
+    // Rate limits collection
+    match /rate_limits/{rateLimitId} {
+      allow read: if isAdmin();
+      allow write: if false;
+    }
   }
 }

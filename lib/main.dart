@@ -108,18 +108,23 @@ void main() async {
   runApp(const ProviderScope(child: MediFlowApp()));
 }
 
+/// Returns `'/'` when an unauthenticated user tries to reach a protected route,
+/// `null` otherwise. Extracted so tests can reuse it without duplicating it.
+String? authRedirect(BuildContext context, GoRouterState state) {
+  final isLoggedIn = FirebaseAuth.instance.currentUser != null;
+  final uri = state.uri.toString();
+  final isAuthRoute = uri == '/' ||
+      uri.startsWith('/login') ||
+      uri.startsWith('/forgot-password');
+  if (!isLoggedIn && !isAuthRoute) return '/';
+  return null;
+}
+
 final _router = GoRouter(
   navigatorKey: _rootNavigatorKey,
   initialLocation: '/',
   errorBuilder: (context, state) => const NotFoundPage(),
-  redirect: (context, state) {
-    final isLoggedIn = FirebaseAuth.instance.currentUser != null;
-    final isAuthRoute = state.uri.toString() == '/' ||
-        state.uri.toString().startsWith('/login') ||
-        state.uri.toString().startsWith('/forgot-password');
-    if (!isLoggedIn && !isAuthRoute) return '/';
-    return null;
-  },
+  redirect: authRedirect,
   routes: [
     GoRoute(
       path: '/',
