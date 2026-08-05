@@ -66,8 +66,16 @@ class FakeFirebaseService implements FirebaseService {
   }
 
   @override
-  Future<String?> seedDemoData() async {
-    return null;
+  Future<List<MedRequest>> getRequestsOnce([String? facilityId]) async {
+    if (facilityId != null) {
+      return requests.where((r) => r.facilityId == facilityId).toList();
+    }
+    return requests;
+  }
+
+  @override
+  Future<List<InventoryItem>> getAllMedicinesOnce() async {
+    return inventory;
   }
 
   @override
@@ -105,6 +113,12 @@ class FailingFirebaseService implements FirebaseService {
   Stream<List<MedRequest>> streamRequests(String? facilityId) {
     return Stream.value([]);
   }
+
+  @override
+  Future<List<MedRequest>> getRequestsOnce([String? facilityId]) async => [];
+
+  @override
+  Future<List<InventoryItem>> getAllMedicinesOnce() async => [];
 
   @override
   dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
