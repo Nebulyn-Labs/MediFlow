@@ -57,6 +57,100 @@ List<Map<String, dynamic>> parseVisionJson(String text) {
   return [];
 }
 
+class CsvSkippedRow {
+  final int line;
+  final String reason;
+
+  const CsvSkippedRow({required this.line, required this.reason});
+}
+
+class CsvParseResult {
+  final List<Map<String, dynamic>> items;
+  final List<CsvSkippedRow> skippedRows;
+
+  const CsvParseResult({
+    required this.items,
+    required this.skippedRows,
+  });
+}
+
+CsvParseResult parseCsvContent(List<List<dynamic>> rows) {
+  if (rows.isEmpty) {
+    return const CsvParseResult(items: [], skippedRows: []);
+  }
+
+  int startRow = 0;
+  if (rows[0].isNotEmpty) {
+    final firstCell = rows[0][0].toString().toLowerCase().trim();
+    if (firstCell.contains('medicine') ||
+        firstCell.contains('name') ||
+        firstCell.contains('drug')) {
+      startRow = 1;
+    }
+  }
+
+  final parsed = <Map<String, dynamic>>[];
+  final skippedRows = <CsvSkippedRow>[];
+
+  for (int i = startRow; i < rows.length; i++) {
+    final row = rows[i];
+    final lineNum = i + 1;
+
+    final isRowEmpty = row.isEmpty ||
+        row.every((cell) => cell == null || cell.toString().trim().isEmpty);
+    if (isRowEmpty) {
+      skippedRows.add(CsvSkippedRow(line: lineNum, reason: 'empty row'));
+      continue;
+    }
+
+    final med = row[0].toString().trim();
+    final qtyStr = row.length > 1 ? row[1].toString().trim() : '';
+
+    final List<String> reasons = [];
+
+    if (med.isEmpty) {
+      reasons.add('missing medicine name');
+    }
+
+    int? qtyParsed;
+    if (qtyStr.isEmpty) {
+      reasons.add('missing quantity');
+    } else {
+      qtyParsed = int.tryParse(qtyStr);
+      if (qtyParsed == null) {
+        final dVal = double.tryParse(qtyStr);
+        if (dVal != null) {
+          qtyParsed = dVal.round();
+        }
+      }
+      if (qtyParsed == null) {
+        reasons.add('quantity is not a number');
+      } else if (qtyParsed <= 0) {
+        reasons.add('quantity must be greater than 0');
+      }
+    }
+
+    if (reasons.isNotEmpty) {
+      skippedRows.add(CsvSkippedRow(
+        line: lineNum,
+        reason: reasons.join(', '),
+      ));
+    } else {
+      final pat = row.length > 2
+          ? (int.tryParse(row[2].toString().trim()) ??
+              (double.tryParse(row[2].toString().trim())?.round() ?? 0))
+          : 0;
+      parsed.add({
+        'medicine': med,
+        'quantity': qtyParsed,
+        'patients': pat < 0 ? 0 : pat,
+      });
+    }
+  }
+
+  return CsvParseResult(items: parsed, skippedRows: skippedRows);
+}
+
 class DailyLoggingPage extends ConsumerStatefulWidget {
   final String facilityId;
   const DailyLoggingPage({super.key, required this.facilityId});
@@ -78,7 +172,9 @@ class _DailyLoggingPageState extends ConsumerState<DailyLoggingPage>
   bool _isLoadingInventory = true;
   String? _inventoryError;
   List<Map<String, dynamic>> _csvItems = [];
+  List<CsvSkippedRow> _csvSkippedRows = [];
   String? _csvStatus;
+  bool _csvHasWarning = false;
   bool _isSubmittingCsv = false;
   bool _isScanning = false;
   final List<Map<String, dynamic>> _scannedItems = [];
@@ -295,29 +391,23 @@ class _DailyLoggingPageState extends ConsumerState<DailyLoggingPage>
       final csvString = utf8.decode(bytes);
       final rows = const CsvDecoder().convert(csvString);
       if (rows.isEmpty) return;
-      int startRow = 0;
-      final firstCell = rows[0][0].toString().toLowerCase().trim();
-      if (firstCell.contains('medicine') ||
-          firstCell.contains('name') ||
-          firstCell.contains('drug')) {
-        startRow = 1;
-      }
-      final parsed = <Map<String, dynamic>>[];
-      for (int i = startRow; i < rows.length; i++) {
-        final row = rows[i];
-        if (row.isEmpty) continue;
-        final med = row[0].toString().trim();
-        final qty =
-            row.length > 1 ? int.tryParse(row[1].toString().trim()) ?? 0 : 0;
-        final pat =
-            row.length > 2 ? int.tryParse(row[2].toString().trim()) ?? 0 : 0;
-        if (med.isNotEmpty && qty > 0) {
-          parsed.add({'medicine': med, 'quantity': qty, 'patients': pat});
-        }
-      }
+      final parseResult = parseCsvContent(rows);
       setState(() {
-        _csvItems = parsed;
-        _csvStatus = 'Parsed ${parsed.length} entries from ${file.name}';
+        _csvItems = parseResult.items;
+        _csvSkippedRows = parseResult.skippedRows;
+        final accepted = parseResult.items.length;
+        final skipped = parseResult.skippedRows.length;
+        _csvHasWarning = accepted == 0 && skipped > 0;
+
+        if (accepted > 0) {
+          _csvStatus = skipped > 0
+              ? 'Parsed $accepted entries from ${file.name} ($skipped skipped)'
+              : 'Parsed $accepted entries from ${file.name}';
+        } else if (skipped > 0) {
+          _csvStatus = '0 entries parsed from ${file.name} ($skipped skipped)';
+        } else {
+          _csvStatus = 'No entries found in ${file.name}';
+        }
       });
     } catch (e) {
       if (mounted) {
@@ -361,6 +451,10 @@ class _DailyLoggingPageState extends ConsumerState<DailyLoggingPage>
         }
         setState(() {
           _csvItems = failed;
+          if (failCount == 0) {
+            _csvSkippedRows = [];
+            _csvHasWarning = false;
+          }
           _csvStatus = failCount == 0
               ? null
               : 'Partial success: $successCount saved, $failCount failed.';
@@ -799,17 +893,66 @@ class _DailyLoggingPageState extends ConsumerState<DailyLoggingPage>
           Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                  color: MediColors.successSubtle,
-                  borderRadius: BorderRadius.circular(10)),
+                  color: _csvHasWarning
+                      ? MediColors.warningOverlay
+                      : MediColors.successSubtle,
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(
+                      color: _csvHasWarning
+                          ? MediColors.warning.withValues(alpha: 0.3)
+                          : MediColors.successBorder)),
               child: Row(children: [
-                const Icon(Icons.check_circle_rounded,
-                    color: MediColors.success, size: 18),
+                Icon(
+                    _csvHasWarning
+                        ? Icons.warning_amber_rounded
+                        : Icons.check_circle_rounded,
+                    color: _csvHasWarning
+                        ? MediColors.warning
+                        : MediColors.success,
+                    size: 18),
                 const SizedBox(width: 10),
                 Expanded(
                     child: Text(_csvStatus!,
-                        style: const TextStyle(
-                            color: MediColors.success, fontSize: 13)))
+                        style: TextStyle(
+                            color: _csvHasWarning
+                                ? MediColors.warning
+                                : MediColors.success,
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600)))
               ])),
+        ],
+        if (_csvSkippedRows.isNotEmpty) ...[
+          const SizedBox(height: 12),
+          Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                  color: MediColors.surface,
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(
+                      color: MediColors.warning.withValues(alpha: 0.3))),
+              child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(children: [
+                      const Icon(Icons.warning_amber_rounded,
+                          color: MediColors.warning, size: 16),
+                      const SizedBox(width: 6),
+                      Text('Skipped Rows (${_csvSkippedRows.length})',
+                          style: const TextStyle(
+                              color: MediColors.warning,
+                              fontWeight: FontWeight.w600,
+                              fontSize: 13)),
+                    ]),
+                    const SizedBox(height: 8),
+                    ..._csvSkippedRows.map((skipped) => Padding(
+                        padding: const EdgeInsets.only(bottom: 4),
+                        child: Text(
+                            'row ${skipped.line}: ${skipped.reason}',
+                            style: const TextStyle(
+                                color: MediColors.textSecondary,
+                                fontSize: 12))))
+                  ])),
         ],
         if (_csvItems.isNotEmpty) ...[
           const SizedBox(height: 20),

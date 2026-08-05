@@ -70,4 +70,67 @@ Hope this helps!
       expect(parseVisionJson(''), isEmpty);
     });
   });
+
+  group('Daily Logging - CSV Import Parsing Tests', () {
+    test('parseCsvContent parses valid rows correctly with header', () {
+      final rows = [
+        ['MedicineName', 'UnitsDistributed', 'PatientsServed'],
+        ['Paracetamol', '100', '25'],
+        ['ORS', '50', '10'],
+      ];
+
+      final result = parseCsvContent(rows);
+
+      expect(result.items.length, 2);
+      expect(result.skippedRows, isEmpty);
+      expect(result.items[0]['medicine'], 'Paracetamol');
+      expect(result.items[0]['quantity'], 100);
+      expect(result.items[0]['patients'], 25);
+
+      expect(result.items[1]['medicine'], 'ORS');
+      expect(result.items[1]['quantity'], 50);
+      expect(result.items[1]['patients'], 10);
+    });
+
+    test('parseCsvContent reports skipped rows with line numbers and reasons',
+        () {
+      final rows = [
+        ['MedicineName', 'UnitsDistributed', 'PatientsServed'],
+        ['Paracetamol', '100', '25'], // line 2 (valid)
+        ['', '15', '5'], // line 3 (missing medicine name)
+        ['Aspirin', 'invalid_qty', '10'], // line 4 (quantity is not a number)
+        ['ORS', '0', '0'], // line 5 (quantity must be greater than 0)
+        ['Amoxicillin', '30', '12'], // line 6 (valid)
+      ];
+
+      final result = parseCsvContent(rows);
+
+      expect(result.items.length, 2);
+      expect(result.skippedRows.length, 3);
+
+      expect(result.skippedRows[0].line, 3);
+      expect(result.skippedRows[0].reason, 'missing medicine name');
+
+      expect(result.skippedRows[1].line, 4);
+      expect(result.skippedRows[1].reason, 'quantity is not a number');
+
+      expect(result.skippedRows[2].line, 5);
+      expect(result.skippedRows[2].reason, 'quantity must be greater than 0');
+    });
+
+    test('parseCsvContent handles file where every row is skipped', () {
+      final rows = [
+        ['MedicineName', 'UnitsDistributed', 'PatientsServed'],
+        ['', '100', '25'], // line 2
+        ['Aspirin', 'not_a_number', '10'], // line 3
+      ];
+
+      final result = parseCsvContent(rows);
+
+      expect(result.items, isEmpty);
+      expect(result.skippedRows.length, 2);
+      expect(result.skippedRows[0].line, 2);
+      expect(result.skippedRows[1].line, 3);
+    });
+  });
 }
