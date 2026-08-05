@@ -6,6 +6,7 @@ const logger = require("firebase-functions/logger");
 const admin = require("firebase-admin");
 const { GoogleGenerativeAI } = require("@google/generative-ai");
 const { BigQuery } = require("@google-cloud/bigquery");
+const { cleanupExpiredRateLimitRecords } = require("./helpers/rateLimiter");
 const { checkRateLimit, LIMITS } = require("./helpers/rateLimiter");
 const { createBigQueryRecovery } = require("./helpers/bigQueryRecovery");
 const { createLowStockService } = require("./helpers/lowStock");
@@ -36,20 +37,21 @@ async function getUserFacilityAndRole(auth, db) {
     let userFacilityId = null;
 
     if (!isAdmin) {
-      const docId = userEmail.replace(/@/g, "_").replace(/\./g, "_");
-      const facilityDoc = await db.collection("facilities").doc(docId).get();
-      if (!facilityDoc.exists) {
-        const facilitiesSnapshot = await db.collection("facilities")
-          .where("email", "==", userEmail)
+      const rawEmail = auth.token.email;
+      let facilitiesSnapshot = await db.collection("facilities")
+        .where("email", "==", userEmail)
+        .limit(1)
+        .get();
+      if (facilitiesSnapshot.empty && rawEmail && rawEmail.toLowerCase() !== userEmail) {
+        facilitiesSnapshot = await db.collection("facilities")
+          .where("email", "==", rawEmail)
           .limit(1)
           .get();
-        if (facilitiesSnapshot.empty) {
-          throw new HttpsError("failed-precondition", "No facility assigned to this user");
-        }
-        userFacilityId = facilitiesSnapshot.docs[0].id;
-      } else {
-        userFacilityId = docId;
       }
+      if (facilitiesSnapshot.empty) {
+        throw new HttpsError("failed-precondition", "No facility assigned to this user");
+      }
+      userFacilityId = facilitiesSnapshot.docs[0].id;
     }
 
     return {
@@ -70,20 +72,21 @@ async function getUserFacilityAndRole(auth, db) {
     if (!userFacilityId) {
       // Fallback email lookup if facilityId is not stored in user doc
       const userEmail = auth.token.email.toLowerCase();
-      const docId = userEmail.replace(/@/g, "_").replace(/\./g, "_");
-      const facilityDoc = await db.collection("facilities").doc(docId).get();
-      if (!facilityDoc.exists) {
-        const facilitiesSnapshot = await db.collection("facilities")
-          .where("email", "==", userEmail)
+      const rawEmail = auth.token.email;
+      let facilitiesSnapshot = await db.collection("facilities")
+        .where("email", "==", userEmail)
+        .limit(1)
+        .get();
+      if (facilitiesSnapshot.empty && rawEmail && rawEmail.toLowerCase() !== userEmail) {
+        facilitiesSnapshot = await db.collection("facilities")
+          .where("email", "==", rawEmail)
           .limit(1)
           .get();
-        if (facilitiesSnapshot.empty) {
-          throw new HttpsError("failed-precondition", "No facility assigned to this user");
-        }
-        userFacilityId = facilitiesSnapshot.docs[0].id;
-      } else {
-        userFacilityId = docId;
       }
+      if (facilitiesSnapshot.empty) {
+        throw new HttpsError("failed-precondition", "No facility assigned to this user");
+      }
+      userFacilityId = facilitiesSnapshot.docs[0].id;
     }
   }
 
@@ -962,27 +965,27 @@ exports.callGeminiSecure = onCall({ secrets: [GEMINI_API_KEY] }, async (request)
 
 exports.adminDeleteResource = onCall(async (request) => {
   if (!request.auth) throw new HttpsError("unauthenticated", "User must log in");
-  
+
   const db = admin.firestore();
   const authInfo = await getUserFacilityAndRole(request.auth, db);
-  
+
   if (!authInfo.isAdmin) {
     throw new HttpsError("permission-denied", "Only administrators can perform destructive actions");
   }
 
   const { resourceType, resourceId } = request.data;
-  
+
   if (!["facilities", "requests"].includes(resourceType)) {
     throw new HttpsError("invalid-argument", "Invalid resource type for deletion");
   }
 
   const ref = db.collection(resourceType).doc(resourceId);
   const doc = await ref.get();
-  
+
   if (!doc.exists) {
     throw new HttpsError("not-found", "Resource not found");
   }
-  
+
   const data = doc.data();
 
   // Create audit log and delete resource atomically using a batch
@@ -995,12 +998,26 @@ exports.adminDeleteResource = onCall(async (request) => {
     resourceType: resourceType,
     resourceId: resourceId,
     metadata: data,
-    status: "success"
+    status: "success",
   });
   batch.delete(ref);
   await batch.commit();
 
   return { success: true };
+});
+
+exports.cleanupExpiredRateLimitRecords = onSchedule("every 6 hours", async () => {
+  logger.log("Starting rate-limit cleanup job");
+
+  try {
+    const deleted = await cleanupExpiredRateLimitRecords();
+    logger.log(`Cleaned up ${deleted} expired rate-limit records`);
+
+    return { deleted };
+  } catch (error) {
+    logger.error("Failed to cleanup rate-limit records:", error);
+    throw error;
+  }
 });
 const cspReportLastSeen = new Map();
 

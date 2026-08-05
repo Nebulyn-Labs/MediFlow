@@ -48,8 +48,8 @@ class RouteResult {
 ///
 /// ### Algorithm assumptions
 /// - **Provider order:** OpenRouteService (ORS) is preferred when an API
-///   key is configured (`orsKey`, currently hardcoded to `null` and
-///   therefore always skipped at runtime), falling back to the public
+///   key is configured (`orsKey`, loaded via `--dart-define=ORS_API_KEY=...` or
+///   `--dart-define=ORS_KEY=...`), falling back to the public
 ///   OSRM demo server, and finally to a straight-line fallback route
 ///   (`[start, end]`) if both external services fail or time out (5 s each).
 /// - **Coordinate validation:** requests are only sent to ORS/OSRM when
@@ -117,7 +117,10 @@ class RoutingService {
   }
 
   Future<RouteResult> getRoute(LatLng start, LatLng end) async {
-    final String? orsKey = null;
+    const String orsKey = String.fromEnvironment(
+      'ORS_API_KEY',
+      defaultValue: String.fromEnvironment('ORS_KEY', defaultValue: ''),
+    );
 
     // Validate coordinates before making external API requests.
     if (!_canGenerateRoute(start, end)) {
@@ -136,12 +139,18 @@ class RoutingService {
     }
 
     // 1. Try OpenRouteService (ORS) if API key exists
-    if (orsKey != null && orsKey.isNotEmpty) {
+    if (orsKey.isNotEmpty) {
       try {
         final url =
             '$_orsBaseUrl?api_key=$orsKey&start=${start.longitude},${start.latitude}&end=${end.longitude},${end.latitude}';
 
-        debugPrint('RoutingService: Requesting ORS: $url');
+        // The request URL carries the ORS key as a query parameter, and
+        // debugPrint survives release builds, so log the coordinates only.
+        debugPrint(
+          'RoutingService: Requesting ORS: '
+          '${start.longitude},${start.latitude} '
+          'to ${end.longitude},${end.latitude}',
+        );
 
         final response =
             await http.get(Uri.parse(url)).timeout(const Duration(seconds: 5));
