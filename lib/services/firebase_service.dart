@@ -360,7 +360,11 @@ class FirebaseService {
       // 2. Update Daily Log
       final logDoc = await transaction.get(logRef);
       if (logDoc.exists) {
-        List<dynamic> medicines = (logDoc.data()?['medicines'] as List?) ?? [];
+        // Firestore returns unmodifiable maps; rebuild as mutable copies.
+        final rawList = (logDoc.data()?['medicines'] as List?) ?? [];
+        final List<Map<String, dynamic>> medicines = rawList
+            .map<Map<String, dynamic>>((m) => Map<String, dynamic>.from(m as Map))
+            .toList();
         int totalPatients =
             (logDoc.data()?['totalPatients'] as num?)?.toInt() ?? 0;
 
@@ -368,7 +372,11 @@ class FirebaseService {
         int index =
             medicines.indexWhere((m) => m['medicineName'] == medicineName);
         if (index >= 0) {
-          medicines[index]['unitsDistributed'] += actualDeduction;
+          medicines[index] = {
+            ...medicines[index],
+            'unitsDistributed':
+                (medicines[index]['unitsDistributed'] as int) + actualDeduction,
+          };
         } else {
           medicines.add({
             'medicineName': medicineName,
@@ -380,6 +388,7 @@ class FirebaseService {
           'medicines': medicines,
           'totalPatients': totalPatients + patients,
         });
+
       } else {
         transaction.set(logRef, {
           'date': Timestamp.fromDate(date),
