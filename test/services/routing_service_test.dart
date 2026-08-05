@@ -76,4 +76,21 @@ void main() {
       expect(result.hasRoadData, isFalse);
     });
   });
+
+  group('RoutingService.orsApiKey (#421)', () {
+    test('defaults to null when no API key is provided or environment is empty', () {
+      final service = RoutingService();
+      expect(service.orsApiKey, isNull);
+    });
+
+    test('accepts custom orsApiKey via constructor', () {
+      final service = RoutingService(orsApiKey: 'test-ors-api-key');
+      expect(service.orsApiKey, 'test-ors-api-key');
+    });
+
+    test('treats empty orsApiKey string as null', () {
+      final service = RoutingService(orsApiKey: '');
+      expect(service.orsApiKey, isNull);
+    });
+  });
 }
