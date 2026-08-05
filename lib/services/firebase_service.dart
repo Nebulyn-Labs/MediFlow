@@ -342,53 +342,54 @@ class FirebaseService {
         .doc(medicineId);
 
     await _firestore.runTransaction((transaction) async {
-      // 1. Update Inventory
+      // ── Phase 1: ALL READS FIRST ──────────────────────────────────────────
       final invDoc = await transaction.get(invRef);
+      final logDoc = await transaction.get(logRef);
+
+      // ── Phase 2: BUSINESS LOGIC ───────────────────────────────────────────
       if (!invDoc.exists) {
         throw Exception(
             'Inventory document not found for medicine: $medicineName');
       }
 
-      int remaining =
+      final int remaining =
           (invDoc.data()?['remainingQuantity'] as num?)?.toInt() ?? 0;
-      int actualDeduction = min(quantity, remaining);
+      final int actualDeduction = min(quantity, remaining);
+
+      // Firestore returns unmodifiable maps; rebuild as mutable copies.
+      final rawList = (logDoc.data()?['medicines'] as List?) ?? [];
+      final List<Map<String, dynamic>> medicines = rawList
+          .map<Map<String, dynamic>>((m) => Map<String, dynamic>.from(m as Map))
+          .toList();
+      final int totalPatients =
+          (logDoc.data()?['totalPatients'] as num?)?.toInt() ?? 0;
+
+      final int index =
+          medicines.indexWhere((m) => m['medicineName'] == medicineName);
+      if (index >= 0) {
+        medicines[index] = {
+          ...medicines[index],
+          'unitsDistributed':
+              (medicines[index]['unitsDistributed'] as int) + actualDeduction,
+        };
+      } else {
+        medicines.add({
+          'medicineName': medicineName,
+          'unitsDistributed': actualDeduction,
+        });
+      }
+
+      // ── Phase 3: ALL WRITES LAST ──────────────────────────────────────────
       transaction.update(invRef, {
         'remainingQuantity': remaining - actualDeduction,
         'lastUpdated': Timestamp.now(),
       });
 
-      // 2. Update Daily Log
-      final logDoc = await transaction.get(logRef);
       if (logDoc.exists) {
-        // Firestore returns unmodifiable maps; rebuild as mutable copies.
-        final rawList = (logDoc.data()?['medicines'] as List?) ?? [];
-        final List<Map<String, dynamic>> medicines = rawList
-            .map<Map<String, dynamic>>((m) => Map<String, dynamic>.from(m as Map))
-            .toList();
-        int totalPatients =
-            (logDoc.data()?['totalPatients'] as num?)?.toInt() ?? 0;
-
-        // Update existing medicine usage or add new
-        int index =
-            medicines.indexWhere((m) => m['medicineName'] == medicineName);
-        if (index >= 0) {
-          medicines[index] = {
-            ...medicines[index],
-            'unitsDistributed':
-                (medicines[index]['unitsDistributed'] as int) + actualDeduction,
-          };
-        } else {
-          medicines.add({
-            'medicineName': medicineName,
-            'unitsDistributed': actualDeduction,
-          });
-        }
-
         transaction.update(logRef, {
           'medicines': medicines,
           'totalPatients': totalPatients + patients,
         });
-
       } else {
         transaction.set(logRef, {
           'date': Timestamp.fromDate(date),
