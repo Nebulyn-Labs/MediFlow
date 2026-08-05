@@ -121,6 +121,122 @@ void main() {
       expect(updatedAlerts.first['medicineName'], 'Paracetamol');
       expect(updatedAlerts.first['type'], 'low_stock');
     });
+
+    test(
+        'logUsage records actualDeduction in daily log when quantity > remaining',
+        () async {
+      const facilityId = 'facility_123';
+      const medicineId = 'paracetamol';
+      const medicineName = 'Paracetamol';
+      final date = DateTime(2026, 8, 5);
+
+      // Seed inventory with remainingQuantity = 20
+      await fakeFirestore
+          .collection('inventory')
+          .doc(facilityId)
+          .collection('medicines')
+          .doc(medicineId)
+          .set({
+        'medicineName': medicineName,
+        'remainingQuantity': 20,
+        'lastUpdated': Timestamp.now(),
+      });
+
+      // Attempt to log quantity = 30 (exceeds remaining of 20)
+      await firebaseService.logUsage(
+        facilityId: facilityId,
+        date: date,
+        medicineName: medicineName,
+        quantity: 30,
+        patients: 5,
+      );
+
+      // 1. Verify inventory remainingQuantity floors at 0 (deducted 20)
+      final invDoc = await fakeFirestore
+          .collection('inventory')
+          .doc(facilityId)
+          .collection('medicines')
+          .doc(medicineId)
+          .get();
+      expect(invDoc.data()?['remainingQuantity'], 0);
+
+      // 2. Verify daily log unitsDistributed equals 20 (actualDeduction), NOT 30
+      final dateStr = "2026-08-05";
+      final logDoc = await fakeFirestore
+          .collection('daily_usage_logs')
+          .doc(facilityId)
+          .collection('logs')
+          .doc(dateStr)
+          .get();
+      final medicines = logDoc.data()?['medicines'] as List;
+      expect(medicines.length, 1);
+      expect(medicines.first['medicineName'], medicineName);
+      expect(medicines.first['unitsDistributed'], 20);
+    });
+
+    test(
+        'logUsage updates existing daily log with actualDeduction when quantity > remaining',
+        () async {
+      const facilityId = 'facility_123';
+      const medicineId = 'amoxicillin';
+      const medicineName = 'Amoxicillin';
+      final date = DateTime(2026, 8, 5);
+      final dateStr = "2026-08-05";
+
+      // Seed inventory with remainingQuantity = 15
+      await fakeFirestore
+          .collection('inventory')
+          .doc(facilityId)
+          .collection('medicines')
+          .doc(medicineId)
+          .set({
+        'medicineName': medicineName,
+        'remainingQuantity': 15,
+        'lastUpdated': Timestamp.now(),
+      });
+
+      // Seed existing log document with unitsDistributed = 5
+      await fakeFirestore
+          .collection('daily_usage_logs')
+          .doc(facilityId)
+          .collection('logs')
+          .doc(dateStr)
+          .set({
+        'date': Timestamp.fromDate(date),
+        'medicines': [
+          {'medicineName': medicineName, 'unitsDistributed': 5}
+        ],
+        'totalPatients': 2,
+      });
+
+      // Attempt to log quantity = 25 (exceeds remaining of 15)
+      await firebaseService.logUsage(
+        facilityId: facilityId,
+        date: date,
+        medicineName: medicineName,
+        quantity: 25,
+        patients: 3,
+      );
+
+      // 1. Verify inventory remainingQuantity floors at 0 (deducted 15)
+      final invDoc = await fakeFirestore
+          .collection('inventory')
+          .doc(facilityId)
+          .collection('medicines')
+          .doc(medicineId)
+          .get();
+      expect(invDoc.data()?['remainingQuantity'], 0);
+
+      // 2. Verify daily log unitsDistributed is updated by actualDeduction (5 + 15 = 20), NOT (5 + 25 = 30)
+      final logDoc = await fakeFirestore
+          .collection('daily_usage_logs')
+          .doc(facilityId)
+          .collection('logs')
+          .doc(dateStr)
+          .get();
+      final medicines = logDoc.data()?['medicines'] as List;
+      expect(medicines.first['unitsDistributed'], 20);
+    });
   });
 
   group('FirebaseService - getPaginatedMedicines', () {
