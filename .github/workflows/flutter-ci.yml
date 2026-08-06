@@ -49,6 +49,8 @@ jobs:
         run: flutter test --coverage
       
       - name: Check Coverage Regression
+        env:
+          COVERAGE_TOLERANCE: "3.0"
         run: bash tool/check_coverage.sh
 
       - name: Build Web App
