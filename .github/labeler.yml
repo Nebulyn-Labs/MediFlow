@@ -1,0 +1,17 @@
+backend:
+  - changed-files:
+      - any-glob-to-any-file: "functions/**"
+
+frontend:
+  - changed-files:
+      - any-glob-to-any-file: "lib/**"
+
+documentation:
+  - changed-files:
+      - any-glob-to-any-file: "**/*.md"
+
+testing:
+  - changed-files:
+      - any-glob-to-any-file:
+          - "test/**"
+          - "functions/test/**"
