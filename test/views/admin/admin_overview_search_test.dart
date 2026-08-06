@@ -8,13 +8,16 @@ import 'package:med_supply_prototype/models/facility.dart';
 import 'package:med_supply_prototype/models/inventory_item.dart';
 import 'package:med_supply_prototype/models/request.dart';
 import 'package:med_supply_prototype/models/daily_usage_log.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:med_supply_prototype/services/firebase_service.dart';
 import 'package:med_supply_prototype/services/ai_service.dart';
 import 'package:med_supply_prototype/views/admin/admin_overview.dart';
 
 class _FakeAIService implements AIService {
   @override
-  Future<List<String>> generateSmartAlerts(List<InventoryItem> inventory) async => [];
+  Future<List<Map<String, dynamic>>> generateSmartAlerts(
+          List<InventoryItem> inventory) async =>
+      [];
 
   @override
   dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
@@ -36,11 +39,14 @@ class _FakeFirebaseService implements FirebaseService {
   Future<List<InventoryItem>> getInventoryOnce(String facilityId) async => [];
 
   @override
-  Stream<List<MedRequest>> streamRequests(String? facilityId) => Stream.value([]);
+  Stream<List<MedRequest>> streamRequests(String? facilityId) =>
+      Stream.value([]);
 
   @override
-  Future<PaginatedMedicinesResult> getPaginatedMedicines(
-          {int limit = 10, dynamic startAfter}) async =>
+  Future<PaginatedMedicinesResult> getPaginatedMedicines({
+    int pageSize = 20,
+    DocumentSnapshot? startAfter,
+  }) async =>
       PaginatedMedicinesResult(
         medicines: medicines,
         lastDocument: null,
@@ -102,7 +108,8 @@ void main() {
     );
   }
 
-  testWidgets('AdminOverview global search filters facilities and medicines by query',
+  testWidgets(
+      'AdminOverview global search filters facilities and medicines by query',
       (WidgetTester tester) async {
     final fakeFirebase = _FakeFirebaseService(
       facilities: [facility1, facility2],
