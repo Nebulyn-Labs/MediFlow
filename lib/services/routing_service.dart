@@ -144,7 +144,13 @@ class RoutingService {
         final url =
             '$_orsBaseUrl?api_key=$orsKey&start=${start.longitude},${start.latitude}&end=${end.longitude},${end.latitude}';
 
-        debugPrint('RoutingService: Requesting ORS: $url');
+        // The request URL carries the ORS key as a query parameter, and
+        // debugPrint survives release builds, so log the coordinates only.
+        debugPrint(
+          'RoutingService: Requesting ORS: '
+          '${start.longitude},${start.latitude} '
+          'to ${end.longitude},${end.latitude}',
+        );
 
         final response =
             await http.get(Uri.parse(url)).timeout(const Duration(seconds: 5));
