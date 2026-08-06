@@ -1,4 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:csv/csv.dart';
 import 'package:med_supply_prototype/views/facility/daily_logging_page.dart';
 
 void main() {
@@ -131,6 +132,30 @@ Hope this helps!
       expect(result.skippedRows.length, 2);
       expect(result.skippedRows[0].line, 2);
       expect(result.skippedRows[1].line, 3);
+    });
+
+    test(
+        'parseCsvContent with raw CSV string decoder preserves line numbers with blank lines',
+        () {
+      const rawCsv = '''MedicineName,UnitsDistributed,PatientsServed
+Paracetamol,100,25
+
+Aspirin,not_a_number,10''';
+
+      final rows = const CsvDecoder(skipEmptyLines: false).convert(rawCsv);
+      final result = parseCsvContent(rows);
+
+      expect(result.items.length, 1);
+      expect(result.items[0]['medicine'], 'Paracetamol');
+
+      expect(result.skippedRows.length, 2);
+      // Line 3 is the blank line
+      expect(result.skippedRows[0].line, 3);
+      expect(result.skippedRows[0].reason, 'empty row');
+
+      // Line 4 is Aspirin with invalid quantity (must not drift to line 3!)
+      expect(result.skippedRows[1].line, 4);
+      expect(result.skippedRows[1].reason, 'quantity is not a number');
     });
   });
 }

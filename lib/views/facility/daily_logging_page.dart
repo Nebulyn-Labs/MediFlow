@@ -389,7 +389,7 @@ class _DailyLoggingPageState extends ConsumerState<DailyLoggingPage>
       final bytes = file.bytes;
       if (bytes == null) return;
       final csvString = utf8.decode(bytes);
-      final rows = const CsvDecoder().convert(csvString);
+      final rows = const CsvDecoder(skipEmptyLines: false).convert(csvString);
       if (rows.isEmpty) return;
       final parseResult = parseCsvContent(rows);
       setState(() {
