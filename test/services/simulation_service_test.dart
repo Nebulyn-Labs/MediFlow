@@ -15,7 +15,9 @@ void main() {
   });
 
   group('SimulationService - Profile Generation', () {
-    test('generateRealisticProfile generates valid fields with random type when unassigned', () {
+    test(
+        'generateRealisticProfile generates valid fields with random type when unassigned',
+        () {
       final profile = simulationService.generateRealisticProfile();
 
       expect(profile['type'], anyOf('urban', 'rural'));
@@ -38,17 +40,22 @@ void main() {
       expect(profile['createdAt'], isA<Timestamp>());
     });
 
-    test('generateRealisticProfile respects explicit facility type parameter', () {
-      final urbanProfile = simulationService.generateRealisticProfile(type: 'urban');
+    test('generateRealisticProfile respects explicit facility type parameter',
+        () {
+      final urbanProfile =
+          simulationService.generateRealisticProfile(type: 'urban');
       expect(urbanProfile['type'], equals('urban'));
 
-      final ruralProfile = simulationService.generateRealisticProfile(type: 'rural');
+      final ruralProfile =
+          simulationService.generateRealisticProfile(type: 'rural');
       expect(ruralProfile['type'], equals('rural'));
     });
   });
 
   group('SimulationService - Full Simulation Workflow', () {
-    test('runFullSimulation creates inventory and 31 days of logs for urban facility', () async {
+    test(
+        'runFullSimulation creates inventory and 31 days of logs for urban facility',
+        () async {
       const facilityId = 'facility_urban_test';
       await simulationService.runFullSimulation(facilityId, 'urban');
 
@@ -72,8 +79,9 @@ void main() {
         'Amoxicillin 250mg'
       ];
 
-      final medicineNames =
-          inventorySnapshot.docs.map((doc) => doc.data()['medicineName']).toList();
+      final medicineNames = inventorySnapshot.docs
+          .map((doc) => doc.data()['medicineName'])
+          .toList();
       for (final med in expectedMedicines) {
         expect(medicineNames, contains(med));
       }
@@ -110,7 +118,8 @@ void main() {
         expect(medicinesList.length, equals(8));
 
         final usages = medicinesList
-            .map((m) => MedicineUsage.fromMap(Map<String, dynamic>.from(m as Map)))
+            .map((m) =>
+                MedicineUsage.fromMap(Map<String, dynamic>.from(m as Map)))
             .toList();
         for (final usage in usages) {
           expect(usage.medicineName, isNotEmpty);
@@ -119,7 +128,8 @@ void main() {
       }
     });
 
-    test('runFullSimulation generates patient counts scaled for rural facility', () async {
+    test('runFullSimulation generates patient counts scaled for rural facility',
+        () async {
       const facilityId = 'facility_rural_test';
       await simulationService.runFullSimulation(facilityId, 'rural');
 
@@ -139,7 +149,9 @@ void main() {
       }
     });
 
-    test('runFullSimulation applies hardcoded health persona for rampur_mediflow_com', () async {
+    test(
+        'runFullSimulation applies hardcoded health persona for rampur_mediflow_com',
+        () async {
       const facilityId = 'rampur_mediflow_com';
       await simulationService.runFullSimulation(facilityId, 'rural');
 
@@ -157,7 +169,8 @@ void main() {
       // Antibiotic: low stock (15%)
       final antibiotic = itemsByMedName['Antibiotic']!;
       final antInitial = antibiotic['initialQuantity'] as int;
-      expect(antibiotic['remainingQuantity'], equals((antInitial * 0.15).round()));
+      expect(
+          antibiotic['remainingQuantity'], equals((antInitial * 0.15).round()));
 
       // Paracetamol: expired (-5 days to expiry)
       final paracetamol = itemsByMedName['Paracetamol']!;
@@ -172,10 +185,13 @@ void main() {
       // Cough Syrup: 45% remaining
       final coughSyrup = itemsByMedName['Cough Syrup']!;
       final csInitial = coughSyrup['initialQuantity'] as int;
-      expect(coughSyrup['remainingQuantity'], equals((csInitial * 0.45).round()));
+      expect(
+          coughSyrup['remainingQuantity'], equals((csInitial * 0.45).round()));
     });
 
-    test('re-running simulation updates inventory without creating duplicate docs', () async {
+    test(
+        're-running simulation updates inventory without creating duplicate docs',
+        () async {
       const facilityId = 'repeat_sim_facility';
       await simulationService.runFullSimulation(facilityId, 'urban');
 
@@ -204,9 +220,12 @@ void main() {
 
   group('simulationServiceProvider', () {
     test('provides SimulationService instance via Riverpod container', () {
+      // Override with the fake-backed instance so the provider does not
+      // construct a real Firestore connection (which would throw
+      // "No Firebase App '[DEFAULT]' has been created").
       final container = ProviderContainer(
         overrides: [
-          // Override Firestore instance to avoid real connection
+          simulationServiceProvider.overrideWithValue(simulationService),
         ],
       );
       addTearDown(container.dispose);
