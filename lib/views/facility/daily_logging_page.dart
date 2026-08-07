@@ -33,16 +33,22 @@ List<Map<String, dynamic>> parseVisionJson(String text) {
       final jsonSub = text.substring(start, end + 1);
       final decoded = jsonDecode(jsonSub);
       if (decoded is List) {
-        return decoded.map<Map<String, dynamic>>((item) {
+        final result = <Map<String, dynamic>>[];
+        for (final item in decoded) {
           if (item is Map) {
-            return {
-              'medicine': item['medicine']?.toString().trim() ?? '',
-              'quantity': _parseNumber(item['quantity']),
-              'patients': _parseNumber(item['patients']),
-            };
+            final med = item['medicine']?.toString().trim() ?? '';
+            final qty = _parseNumber(item['quantity']);
+            final pat = _parseNumber(item['patients']);
+            if (med.isNotEmpty || qty > 0) {
+              result.add({
+                'medicine': med,
+                'quantity': qty,
+                'patients': pat,
+              });
+            }
           }
-          return {'medicine': '', 'quantity': 0, 'patients': 0};
-        }).toList();
+        }
+        return result;
       }
     }
   } catch (e) {
@@ -599,137 +605,148 @@ class _DailyLoggingPageState extends ConsumerState<DailyLoggingPage>
 
   Widget _buildManualTab(bool isOnline) {
     return Center(
-      child: Container(
-        width: 480,
-        margin: const EdgeInsets.all(28),
-        padding: const EdgeInsets.all(32),
-        decoration: BoxDecoration(
-            color: MediColors.surface,
-            borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: MediColors.border)),
-        child: SingleChildScrollView(
-          child: Form(
-            key: _formKey,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text('Log Medicine Usage',
-                    style: TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.w700,
-                        color: MediColors.textPrimary)),
-                const SizedBox(height: 6),
-                const Text('Feeds into AI forecasting model',
-                    style:
-                        TextStyle(color: MediColors.textMuted, fontSize: 13)),
-                const SizedBox(height: 28),
-                // The surrounding Container paints its own background, which
-                // would swallow the tile's ink splash without a Material of
-                // its own.
-                Material(
-                  type: MaterialType.transparency,
-                  child: ListTile(
-                    contentPadding: EdgeInsets.zero,
-                    title: const Text('Date',
-                        style: TextStyle(
-                            color: MediColors.textSecondary, fontSize: 13)),
-                    subtitle: Text(
-                        '${_selectedDate.day}/${_selectedDate.month}/${_selectedDate.year}',
-                        style: const TextStyle(
-                            color: MediColors.textPrimary,
-                            fontSize: 16,
-                            fontWeight: FontWeight.w600)),
-                    trailing: const Icon(Icons.calendar_today_rounded,
-                        color: MediColors.textMuted),
-                    onTap: () async {
-                      final date = await showDatePicker(
-                          context: context,
-                          initialDate: _selectedDate,
-                          firstDate: DateTime(2020),
-                          lastDate: DateTime.now());
-                      if (date != null) setState(() => _selectedDate = date);
-                    },
-                  ),
-                ),
-                const SizedBox(height: 16),
-                if (_isLoadingInventory)
-                  const Column(
-                    children: [
-                      SkeletonTableRow(),
-                      SkeletonTableRow(),
-                      SkeletonTableRow(),
-                    ],
-                  )
-                else if (_inventoryError != null)
-                  Container(
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                          color: MediColors.error.withValues(alpha: 0.08),
-                          borderRadius: BorderRadius.circular(10)),
-                      child: Text(_inventoryError!,
-                          style: const TextStyle(
-                              color: MediColors.error, fontSize: 13)))
-                else if (_availableMedicines.isEmpty)
-                  Container(
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                          color: MediColors.warning.withValues(alpha: 0.08),
-                          borderRadius: BorderRadius.circular(10)),
-                      child: const Text('No active inventory found.',
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 480),
+        child: Container(
+          margin: const EdgeInsets.all(28),
+          padding: const EdgeInsets.all(32),
+          decoration: BoxDecoration(
+              color: MediColors.surface,
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: MediColors.border)),
+          child: SingleChildScrollView(
+            child: Form(
+              key: _formKey,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text('Log Medicine Usage',
+                      style: TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.w700,
+                          color: MediColors.textPrimary)),
+                  const SizedBox(height: 6),
+                  const Text('Feeds into AI forecasting model',
+                      style:
+                          TextStyle(color: MediColors.textMuted, fontSize: 13)),
+                  const SizedBox(height: 28),
+                  // The surrounding Container paints its own background, which
+                  // would swallow the tile's ink splash without a Material of
+                  // its own.
+                  Material(
+                    type: MaterialType.transparency,
+                    child: ListTile(
+                      contentPadding: EdgeInsets.zero,
+                      title: const Text('Date',
                           style: TextStyle(
-                              color: MediColors.warning, fontSize: 13)))
-                else
-                  DropdownButtonFormField<String>(
-                    decoration: const InputDecoration(labelText: 'Medicine'),
-                    dropdownColor: MediColors.surfaceLight,
-                    initialValue: _medName,
-                    style: const TextStyle(color: MediColors.textPrimary),
-                    items: _availableMedicines
-                        .map((m) => DropdownMenuItem(value: m, child: Text(m)))
-                        .toList(),
-                    onChanged: (v) => setState(() => _medName = v),
-                    validator: (v) => v == null ? 'Select a medicine' : null,
+                              color: MediColors.textSecondary, fontSize: 13)),
+                      subtitle: Text(
+                          '${_selectedDate.day}/${_selectedDate.month}/${_selectedDate.year}',
+                          style: const TextStyle(
+                              color: MediColors.textPrimary,
+                              fontSize: 16,
+                              fontWeight: FontWeight.w600)),
+                      trailing: const Icon(Icons.calendar_today_rounded,
+                          color: MediColors.textMuted),
+                      onTap: () async {
+                        final date = await showDatePicker(
+                            context: context,
+                            initialDate: _selectedDate,
+                            firstDate: DateTime(2020),
+                            lastDate: DateTime.now());
+                        if (date != null) setState(() => _selectedDate = date);
+                      },
+                    ),
                   ),
-                const SizedBox(height: 16),
-                TextFormField(
-                    decoration:
-                        const InputDecoration(labelText: 'Units Distributed'),
-                    keyboardType: TextInputType.number,
-                    style: const TextStyle(color: MediColors.textPrimary),
-                    validator: (v) => (int.tryParse(v ?? '') == null)
-                        ? 'Enter valid number'
-                        : null,
-                    onSaved: (v) => _quantity = int.parse(v!)),
-                const SizedBox(height: 16),
-                TextFormField(
-                    decoration:
-                        const InputDecoration(labelText: 'Patients Served'),
-                    keyboardType: TextInputType.number,
-                    style: const TextStyle(color: MediColors.textPrimary),
-                    validator: (v) => (int.tryParse(v ?? '') == null)
-                        ? 'Enter valid number'
-                        : null,
-                    onSaved: (v) => _patients = int.parse(v!)),
-                const SizedBox(height: 28),
-                SizedBox(
-                    width: double.infinity,
-                    height: 50,
-                    child: FilledButton(
-                        onPressed: (_isSubmitting ||
-                                _availableMedicines.isEmpty ||
-                                !isOnline)
-                            ? null
-                            : _submitLog,
-                        child: _isSubmitting
-                            ? const SizedBox(
-                                width: 20,
-                                height: 20,
-                                child: CircularProgressIndicator(
-                                    color: Colors.white, strokeWidth: 2))
-                            : Text(
-                                isOnline ? 'Save Log' : 'Save Log (offline)'))),
-              ],
+                  const SizedBox(height: 16),
+                  if (_isLoadingInventory)
+                    const Column(
+                      children: [
+                        SkeletonTableRow(),
+                        SkeletonTableRow(),
+                        SkeletonTableRow(),
+                      ],
+                    )
+                  else if (_inventoryError != null)
+                    Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                            color: MediColors.error.withValues(alpha: 0.08),
+                            borderRadius: BorderRadius.circular(10)),
+                        child: Text(_inventoryError!,
+                            style: const TextStyle(
+                                color: MediColors.error, fontSize: 13)))
+                  else if (_availableMedicines.isEmpty)
+                    Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                            color: MediColors.warning.withValues(alpha: 0.08),
+                            borderRadius: BorderRadius.circular(10)),
+                        child: const Text('No active inventory found.',
+                            style: TextStyle(
+                                color: MediColors.warning, fontSize: 13)))
+                  else
+                    DropdownButtonFormField<String>(
+                      decoration: const InputDecoration(labelText: 'Medicine'),
+                      dropdownColor: MediColors.surfaceLight,
+                      initialValue: _medName,
+                      isExpanded: true,
+                      style: const TextStyle(color: MediColors.textPrimary),
+                      items: _availableMedicines
+                          .map((m) => DropdownMenuItem(
+                                value: m,
+                                child: Text(
+                                  m,
+                                  overflow: TextOverflow.ellipsis,
+                                  maxLines: 1,
+                                ),
+                              ))
+                          .toList(),
+                      onChanged: (v) => setState(() => _medName = v),
+                      validator: (v) => v == null ? 'Select a medicine' : null,
+                    ),
+                  const SizedBox(height: 16),
+                  TextFormField(
+                      decoration:
+                          const InputDecoration(labelText: 'Units Distributed'),
+                      keyboardType: TextInputType.number,
+                      style: const TextStyle(color: MediColors.textPrimary),
+                      validator: (v) => (int.tryParse(v ?? '') == null)
+                          ? 'Enter valid number'
+                          : null,
+                      onSaved: (v) => _quantity = int.parse(v!)),
+                  const SizedBox(height: 16),
+                  TextFormField(
+                      decoration:
+                          const InputDecoration(labelText: 'Patients Served'),
+                      keyboardType: TextInputType.number,
+                      style: const TextStyle(color: MediColors.textPrimary),
+                      validator: (v) => (int.tryParse(v ?? '') == null)
+                          ? 'Enter valid number'
+                          : null,
+                      onSaved: (v) => _patients = int.parse(v!)),
+                  const SizedBox(height: 28),
+                  SizedBox(
+                      width: double.infinity,
+                      height: 50,
+                      child: FilledButton(
+                          onPressed: (_isSubmitting ||
+                                  _availableMedicines.isEmpty ||
+                                  !isOnline)
+                              ? null
+                              : _submitLog,
+                          child: _isSubmitting
+                              ? const SizedBox(
+                                  width: 20,
+                                  height: 20,
+                                  child: CircularProgressIndicator(
+                                      color: Colors.white, strokeWidth: 2))
+                              : Text(isOnline
+                                  ? 'Save Log'
+                                  : 'Save Log (offline)'))),
+                ],
+              ),
             ),
           ),
         ),

@@ -61,5 +61,5 @@ jobs:
       - name: Deploy to Firebase Production
         run: |
           firebase deploy \
-            --only hosting,functions,firestore:rules,storage \
+            --only hosting,functions,firestore:rules \
             --project ${{ secrets.PROJECT_ID }}
