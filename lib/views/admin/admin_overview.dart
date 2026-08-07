@@ -9,6 +9,7 @@ import '../../models/facility.dart';
 import '../../models/request.dart';
 import '../../models/inventory_item.dart';
 import 'package:med_supply_prototype/theme/medi_flow_theme.dart';
+import '../shared/kpi_card.dart';
 import '../shared/skeleton_loaders.dart';
 
 class AdminOverview extends ConsumerStatefulWidget {
@@ -470,23 +471,25 @@ class _AdminOverviewState extends ConsumerState<AdminOverview> {
                           spacing: 20,
                           runSpacing: 20,
                           children: [
-                            _buildKpiCard(
-                                'TOTAL FACILITIES',
-                                '${_facilities.length}',
-                                Icons.business_rounded),
-                            _buildKpiCard(
-                                'OPEN SHORTAGE REQUESTS',
-                                '$_openShortageRequests',
-                                Icons.warning_amber_rounded,
-                                isAlert: true),
-                            _buildKpiCard('SURPLUS / EXPIRY OFFERS',
-                                '$_surplusOffers', Icons.swap_horiz_rounded,
-                                isAlert: false, iconColor: colors.warning),
-                            _buildKpiCard(
-                                'PENDING APPROVALS',
-                                '$_pendingApprovals',
-                                Icons.assignment_turned_in_rounded,
-                                iconColor: colors.info,
+                            KpiCard.compact(
+                                title: 'TOTAL FACILITIES',
+                                value: '${_facilities.length}',
+                                icon: Icons.business_rounded),
+                            KpiCard.compact(
+                                title: 'OPEN SHORTAGE REQUESTS',
+                                value: '$_openShortageRequests',
+                                icon: Icons.warning_amber_rounded,
+                                accent: colors.error),
+                            KpiCard.compact(
+                                title: 'SURPLUS / EXPIRY OFFERS',
+                                value: '$_surplusOffers',
+                                icon: Icons.swap_horiz_rounded,
+                                accent: colors.warning),
+                            KpiCard.compact(
+                                title: 'PENDING APPROVALS',
+                                value: '$_pendingApprovals',
+                                icon: Icons.assignment_turned_in_rounded,
+                                accent: colors.info,
                                 onTap: () => context.go('/admin/approvals')),
                           ],
                         ),
@@ -568,51 +571,6 @@ class _AdminOverviewState extends ConsumerState<AdminOverview> {
                 ),
               ),
             ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildKpiCard(String title, String value, IconData icon,
-      {bool isAlert = false, Color? iconColor, VoidCallback? onTap}) {
-    final colors = context.mediTheme;
-    final finalIconColor = isAlert ? colors.error : (iconColor ?? colors.info);
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(12),
-      child: Container(
-        constraints: const BoxConstraints(minWidth: 160, maxWidth: 250),
-        padding: const EdgeInsets.all(24),
-        decoration: BoxDecoration(
-          color: colors.surface,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: colors.border),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Expanded(
-                    child: Text(title,
-                        style: TextStyle(
-                            fontSize: 11,
-                            fontWeight: FontWeight.w700,
-                            color: colors.textSecondary,
-                            letterSpacing: 0.5),
-                        overflow: TextOverflow.ellipsis)),
-                const SizedBox(width: 8),
-                Icon(icon, color: finalIconColor, size: 20),
-              ],
-            ),
-            const SizedBox(height: 16),
-            Text(value,
-                style: TextStyle(
-                    fontSize: 28,
-                    fontWeight: FontWeight.w800,
-                    color: colors.textPrimary)),
           ],
         ),
       ),
