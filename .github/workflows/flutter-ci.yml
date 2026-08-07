@@ -45,8 +45,13 @@ jobs:
       - name: Analyze Code
         run: flutter analyze
 
-      - name: Run Unit Tests
-        run: flutter test
+      - name: Run Unit Tests with Coverage
+        run: flutter test --coverage
+      
+      - name: Check Coverage Regression
+        env:
+          COVERAGE_TOLERANCE: "3.0"
+        run: bash tool/check_coverage.sh
 
       - name: Build Web App
         run: flutter build web --release
