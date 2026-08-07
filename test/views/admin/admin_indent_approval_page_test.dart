@@ -86,7 +86,10 @@ void main() {
         firebaseServiceProvider.overrideWithValue(firebase),
         aiServiceProvider.overrideWithValue(aiService ?? _HangingAIService()),
       ],
-      child: const MaterialApp(home: AdminIndentApprovalPage()),
+      child: MaterialApp(
+        theme: ThemeData(splashFactory: InkRipple.splashFactory),
+        home: const AdminIndentApprovalPage(),
+      ),
     );
   }
 
@@ -342,6 +345,77 @@ void main() {
       find.text('Bulk AI analysis completed for 1 request(s)!'),
       findsOneWidget,
     );
+  });
+
+  testWidgets(
+      'single approve shows confirmation dialog before approving request (#249)',
+      (WidgetTester tester) async {
+    final streamFirebase = _StreamFirebaseService(requests: [request]);
+
+    tester.view.physicalSize = const Size(1400, 1000);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    await tester.pumpWidget(pump(streamFirebase));
+    await tester.pumpAndSettle();
+
+    // Tap single Approve button
+    await tester.tap(find.widgetWithText(FilledButton, 'Approve'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Confirm Approval'), findsOneWidget);
+    expect(
+      find.text('Are you sure you want to approve the request for Paracetamol?'),
+      findsOneWidget,
+    );
+
+    // Cancel dialog
+    await tester.tap(find.text('Cancel'));
+    await tester.pumpAndSettle();
+
+    expect(streamFirebase.updatedStatuses.containsKey('req-1'), false);
+
+    // Tap Approve again and confirm
+    await tester.tap(find.widgetWithText(FilledButton, 'Approve'));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.descendant(
+        of: find.byType(AlertDialog), matching: find.widgetWithText(FilledButton, 'Approve')));
+    await tester.pumpAndSettle();
+
+    expect(streamFirebase.updatedStatuses['req-1'], RequestStatus.approved);
+  });
+
+  testWidgets(
+      'single decline shows confirmation dialog before declining request (#249)',
+      (WidgetTester tester) async {
+    final streamFirebase = _StreamFirebaseService(requests: [request]);
+
+    tester.view.physicalSize = const Size(1400, 1000);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    await tester.pumpWidget(pump(streamFirebase));
+    await tester.pumpAndSettle();
+
+    // Tap single Decline button
+    await tester.tap(find.widgetWithText(TextButton, 'Decline'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Confirm Decline'), findsOneWidget);
+    expect(
+      find.text('Are you sure you want to decline the request for Paracetamol?'),
+      findsOneWidget,
+    );
+
+    // Confirm decline
+    await tester.tap(find.descendant(
+        of: find.byType(AlertDialog), matching: find.widgetWithText(FilledButton, 'Decline')));
+    await tester.pumpAndSettle();
+
+    expect(streamFirebase.updatedStatuses['req-1'], RequestStatus.rejected);
   });
 }
 

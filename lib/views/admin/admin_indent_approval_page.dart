@@ -79,12 +79,26 @@ class _AdminIndentApprovalPageState
     }
   }
 
-  Future<void> _updateStatus(String requestId, RequestStatus status) async {
+  Future<void> _updateStatus(MedRequest request, RequestStatus status) async {
+    final actionVerb = status == RequestStatus.approved ? 'approve' : 'decline';
+    final actionNoun = status == RequestStatus.approved ? 'Approval' : 'Decline';
+    final confirmed = await _showConfirmationDialog(
+      title: 'Confirm $actionNoun',
+      message:
+          'Are you sure you want to $actionVerb the request for ${request.medicineName}?',
+      confirmLabel: status == RequestStatus.approved ? 'Approve' : 'Decline',
+      confirmColor: status == RequestStatus.approved
+          ? MediColors.success
+          : MediColors.error,
+    );
+
+    if (confirmed != true || !mounted) return;
+
     setState(() => _isActionInProgress = true);
     try {
       await ref
           .read(firebaseServiceProvider)
-          .updateRequestStatus(requestId, status);
+          .updateRequestStatus(request.id, status);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(content: Text('Request ${status.name} successfully!')));
@@ -479,7 +493,7 @@ class _AdminIndentApprovalPageState
                                   onPressed: _isActionInProgress
                                       ? null
                                       : () => _updateStatus(
-                                          req.id, RequestStatus.rejected),
+                                          req, RequestStatus.rejected),
                                   style: TextButton.styleFrom(
                                       foregroundColor: MediColors.error),
                                   child: const Text('Decline'),
@@ -489,7 +503,7 @@ class _AdminIndentApprovalPageState
                                   onPressed: _isActionInProgress
                                       ? null
                                       : () => _updateStatus(
-                                          req.id, RequestStatus.approved),
+                                          req, RequestStatus.approved),
                                   style: FilledButton.styleFrom(
                                       backgroundColor: MediColors.success),
                                   child: const Text('Approve'),
