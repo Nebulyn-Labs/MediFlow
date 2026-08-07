@@ -28,6 +28,15 @@ class _AdminIndentApprovalPageState
     _requestsStream = ref.read(firebaseServiceProvider).streamRequests(null);
   }
 
+  // Cached Firestore stream
+  late final Stream<List<MedRequest>> _requestsStream;
+
+  @override
+  void initState() {
+    super.initState();
+    _requestsStream = ref.read(firebaseServiceProvider).streamRequests(null);
+  }
+
   Future<void> _analyzeRequest(MedRequest request) async {
     setState(() => _aiLoading[request.id] = true);
     try {

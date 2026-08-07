@@ -42,10 +42,25 @@ class _ActiveIndentsPageState extends ConsumerState<ActiveIndentsPage> {
   RequestStatus? _selectedHistoryStatus;
   _IndentSortOption _selectedHistorySort = _IndentSortOption.newestFirst;
 
+  // Cached Firestore stream for requests (fixes #322)
+  late final Stream<List<MedRequest>> _requestsStream;
+
   @override
   void initState() {
     super.initState();
+    _requestsStream =
+        ref.read(firebaseServiceProvider).streamRequests(widget.facilityId);
     _fetchInventory();
+  }
+
+  @override
+  void didUpdateWidget(covariant ActiveIndentsPage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // Recreate stream if facilityId changes
+    if (oldWidget.facilityId != widget.facilityId) {
+      _requestsStream =
+          ref.read(firebaseServiceProvider).streamRequests(widget.facilityId);
+    }
   }
 
   @override
@@ -730,8 +745,7 @@ class _ActiveIndentsPageState extends ConsumerState<ActiveIndentsPage> {
   // ----- Drafts List -----
   Widget _draftsList() {
     return StreamBuilder<List<MedRequest>>(
-      stream:
-          ref.read(firebaseServiceProvider).streamRequests(widget.facilityId),
+      stream: _requestsStream,
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const Column(
@@ -962,8 +976,7 @@ class _ActiveIndentsPageState extends ConsumerState<ActiveIndentsPage> {
 
   Widget _historyList() {
     return StreamBuilder<List<MedRequest>>(
-      stream:
-          ref.read(firebaseServiceProvider).streamRequests(widget.facilityId),
+      stream: _requestsStream,
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const SizedBox.shrink();
