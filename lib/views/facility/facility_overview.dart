@@ -439,7 +439,8 @@ class _FacilityOverviewState extends ConsumerState<FacilityOverview> {
   Widget _buildKpiCard(String title, String value, IconData icon, Color accent,
       LinearGradient bg, VoidCallback? onTap) {
     return MouseRegion(
-      cursor: onTap != null ? SystemMouseCursors.click : SystemMouseCursors.basic,
+      cursor:
+          onTap != null ? SystemMouseCursors.click : SystemMouseCursors.basic,
       child: GestureDetector(
         onTap: onTap,
         child: Container(
@@ -464,7 +465,9 @@ class _FacilityOverviewState extends ConsumerState<FacilityOverview> {
               const SizedBox(height: 18),
               Text(value,
                   style: TextStyle(
-                      fontSize: 28, fontWeight: FontWeight.w800, color: accent)),
+                      fontSize: 28,
+                      fontWeight: FontWeight.w800,
+                      color: accent)),
               const SizedBox(height: 4),
               Text(title,
                   style: const TextStyle(

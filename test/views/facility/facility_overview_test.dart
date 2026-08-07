@@ -34,7 +34,9 @@ void main() {
     ),
   ];
 
-  testWidgets('Total Meds in Inv KPI card is non-interactive while alert cards are clickable', (tester) async {
+  testWidgets(
+      'Total Meds in Inv KPI card is non-interactive while alert cards are clickable',
+      (tester) async {
     tester.view.physicalSize = const Size(1400, 900);
     tester.view.devicePixelRatio = 1.0;
     addTearDown(tester.view.resetPhysicalSize);
@@ -59,9 +61,12 @@ void main() {
     expect(totalMedsCard, findsOneWidget);
 
     // Verify MouseRegion cursors
-    final mouseRegions = tester.widgetList<MouseRegion>(find.byType(MouseRegion));
-    final nonInteractiveRegions = mouseRegions.where((m) => m.cursor == SystemMouseCursors.basic);
-    final clickRegions = mouseRegions.where((m) => m.cursor == SystemMouseCursors.click);
+    final mouseRegions =
+        tester.widgetList<MouseRegion>(find.byType(MouseRegion));
+    final nonInteractiveRegions =
+        mouseRegions.where((m) => m.cursor == SystemMouseCursors.basic);
+    final clickRegions =
+        mouseRegions.where((m) => m.cursor == SystemMouseCursors.click);
 
     expect(nonInteractiveRegions, isNotEmpty);
     expect(clickRegions, isNotEmpty);
