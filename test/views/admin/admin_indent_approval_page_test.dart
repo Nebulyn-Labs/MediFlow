@@ -366,7 +366,8 @@ void main() {
 
     expect(find.text('Confirm Approval'), findsOneWidget);
     expect(
-      find.text('Are you sure you want to approve the request for Paracetamol?'),
+      find.text(
+          'Are you sure you want to approve the request for Paracetamol?'),
       findsOneWidget,
     );
 
@@ -381,7 +382,8 @@ void main() {
     await tester.pumpAndSettle();
 
     await tester.tap(find.descendant(
-        of: find.byType(AlertDialog), matching: find.widgetWithText(FilledButton, 'Approve')));
+        of: find.byType(AlertDialog),
+        matching: find.widgetWithText(FilledButton, 'Approve')));
     await tester.pumpAndSettle();
 
     expect(streamFirebase.updatedStatuses['req-1'], RequestStatus.approved);
@@ -406,13 +408,15 @@ void main() {
 
     expect(find.text('Confirm Decline'), findsOneWidget);
     expect(
-      find.text('Are you sure you want to decline the request for Paracetamol?'),
+      find.text(
+          'Are you sure you want to decline the request for Paracetamol?'),
       findsOneWidget,
     );
 
     // Confirm decline
     await tester.tap(find.descendant(
-        of: find.byType(AlertDialog), matching: find.widgetWithText(FilledButton, 'Decline')));
+        of: find.byType(AlertDialog),
+        matching: find.widgetWithText(FilledButton, 'Decline')));
     await tester.pumpAndSettle();
 
     expect(streamFirebase.updatedStatuses['req-1'], RequestStatus.rejected);

@@ -81,7 +81,8 @@ class _AdminIndentApprovalPageState
 
   Future<void> _updateStatus(MedRequest request, RequestStatus status) async {
     final actionVerb = status == RequestStatus.approved ? 'approve' : 'decline';
-    final actionNoun = status == RequestStatus.approved ? 'Approval' : 'Decline';
+    final actionNoun =
+        status == RequestStatus.approved ? 'Approval' : 'Decline';
     final confirmed = await _showConfirmationDialog(
       title: 'Confirm $actionNoun',
       message:
