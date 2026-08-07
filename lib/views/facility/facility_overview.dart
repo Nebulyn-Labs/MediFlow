@@ -21,6 +21,7 @@ class FacilityOverview extends ConsumerStatefulWidget {
 
 class _FacilityOverviewState extends ConsumerState<FacilityOverview> {
   bool _isSimulating = false;
+  final GlobalKey _inventoryTableKey = GlobalKey();
 
   @override
   Widget build(BuildContext context) {
@@ -362,7 +363,7 @@ class _FacilityOverviewState extends ConsumerState<FacilityOverview> {
                             MediColors.info,
                             const LinearGradient(
                                 colors: [Color(0xFF1E3A5F), Color(0xFF1E293B)]),
-                            () {}),
+                            null),
                         _buildKpiCard(
                             'Stock Health',
                             stockHealthText,
@@ -436,37 +437,40 @@ class _FacilityOverviewState extends ConsumerState<FacilityOverview> {
   }
 
   Widget _buildKpiCard(String title, String value, IconData icon, Color accent,
-      LinearGradient bg, VoidCallback onTap) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        width: 240,
-        padding: const EdgeInsets.all(22),
-        decoration: BoxDecoration(
-          gradient: bg,
-          borderRadius: BorderRadius.circular(18),
-          border: Border.all(color: accent.withValues(alpha: 0.2)),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Container(
-              padding: const EdgeInsets.all(10),
-              decoration: BoxDecoration(
-                color: accent.withValues(alpha: 0.15),
-                borderRadius: BorderRadius.circular(12),
+      LinearGradient bg, VoidCallback? onTap) {
+    return MouseRegion(
+      cursor: onTap != null ? SystemMouseCursors.click : SystemMouseCursors.basic,
+      child: GestureDetector(
+        onTap: onTap,
+        child: Container(
+          width: 240,
+          padding: const EdgeInsets.all(22),
+          decoration: BoxDecoration(
+            gradient: bg,
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(color: accent.withValues(alpha: 0.2)),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: accent.withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Icon(icon, color: accent, size: 22),
               ),
-              child: Icon(icon, color: accent, size: 22),
-            ),
-            const SizedBox(height: 18),
-            Text(value,
-                style: TextStyle(
-                    fontSize: 28, fontWeight: FontWeight.w800, color: accent)),
-            const SizedBox(height: 4),
-            Text(title,
-                style: const TextStyle(
-                    fontSize: 13, color: MediColors.textSecondary)),
-          ],
+              const SizedBox(height: 18),
+              Text(value,
+                  style: TextStyle(
+                      fontSize: 28, fontWeight: FontWeight.w800, color: accent)),
+              const SizedBox(height: 4),
+              Text(title,
+                  style: const TextStyle(
+                      fontSize: 13, color: MediColors.textSecondary)),
+            ],
+          ),
         ),
       ),
     );
@@ -475,6 +479,7 @@ class _FacilityOverviewState extends ConsumerState<FacilityOverview> {
   Widget _buildInventoryTable(
       BuildContext context, WidgetRef ref, List<InventoryItem> inventory) {
     return Column(
+      key: _inventoryTableKey,
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Row(
