@@ -7,10 +7,22 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:med_supply_prototype/constants/colors.dart';
+import 'firebase_options.dart';
+import 'services/firebase_setup.dart';
+import 'views/auth/role_selection_screen.dart';
+import 'views/auth/login_screen.dart';
+import 'views/shared/sidebar_layout.dart';
+import 'views/shared/help_page.dart';
+
+// Facility Pages
+import 'views/facility/facility_overview.dart';
+import 'views/facility/ai_forecast_page.dart';
+import 'views/facility/active_indents_page.dart';
+import 'views/facility/daily_logging_page.dart';
 import 'package:med_supply_prototype/theme/medi_flow_theme.dart';
 import 'package:med_supply_prototype/views/shared/not_found_page.dart';
 
-import 'services/firebase_setup.dart';
 import 'views/admin/admin_indent_approval_page.dart';
 import 'views/admin/admin_indent_status_page.dart';
 // Admin Pages
@@ -18,18 +30,10 @@ import 'views/admin/admin_overview.dart';
 import 'views/admin/audit_trail_page.dart';
 import 'views/admin/route_optimization_map.dart';
 import 'views/auth/forgot_password_page.dart';
-import 'views/auth/login_screen.dart';
-import 'views/auth/role_selection_screen.dart';
-import 'views/facility/active_indents_page.dart';
-import 'views/facility/ai_forecast_page.dart';
-import 'views/facility/daily_logging_page.dart';
-import 'views/facility/facility_overview.dart';
 import 'views/facility/wastage_report_page.dart';
 import 'views/facility/facility_profile_page.dart';
 import 'views/facility/alerts_hub_page.dart';
 import 'views/shared/ai_chat_page.dart';
-import 'views/shared/help_page.dart';
-import 'views/shared/sidebar_layout.dart';
 
 final GlobalKey<NavigatorState> _rootNavigatorKey = GlobalKey<NavigatorState>();
 final GlobalKey<NavigatorState> _facilityShellNavigatorKey =
@@ -45,6 +49,16 @@ void _handleGlobalError(Object error, StackTrace? stack) {
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
+  // Initialize Firebase immediately with hardcoded options
+  try {
+    await Firebase.initializeApp(
+      options: DefaultFirebaseOptions.currentPlatform,
+    );
+    await setupFirebaseEmulator();
+    debugPrint('Firebase initialized successfully');
+  } catch (e) {
+    debugPrint('Firebase initialization error: $e');
+  }
   // Initialize Firebase and App Check securely
   await initializeFirebaseServices();
 

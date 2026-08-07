@@ -1,7 +1,31 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_functions/cloud_functions.dart';
 import 'package:flutter/foundation.dart';
 import 'package:firebase_core/firebase_core.dart';
+export 'package:firebase_core/firebase_core.dart'; // Export it for main.dart
 import 'package:firebase_app_check/firebase_app_check.dart';
+import 'dart:io' show Platform;
 import '../firebase_options.dart';
+
+const useFirebaseEmulator = bool.fromEnvironment('USE_FIREBASE_EMULATOR');
+
+Future<void> setupFirebaseEmulator() async {
+  if (useFirebaseEmulator && kDebugMode) {
+    try {
+      final String host =
+          !kIsWeb && Platform.isAndroid ? '10.0.2.2' : '127.0.0.1';
+
+      await FirebaseAuth.instance.useAuthEmulator(host, 9099);
+      FirebaseFirestore.instance.useFirestoreEmulator(host, 8080);
+      FirebaseFunctions.instance.useFunctionsEmulator(host, 5001);
+
+      debugPrint('Connected to Firebase Emulators at $host');
+    } catch (e) {
+      debugPrint('Failed to connect to Firebase Emulators: $e');
+    }
+  }
+}
 
 Future<void> initializeFirebaseServices() async {
   try {
