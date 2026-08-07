@@ -8,6 +8,7 @@ import '../../services/simulation_service.dart';
 import '../../services/csv_export_service.dart';
 import 'package:med_supply_prototype/constants/colors.dart';
 import '../shared/confirm_logout_dialog.dart';
+import '../shared/kpi_card.dart';
 import '../shared/skeleton_loaders.dart';
 import '../../utils/date_formatter.dart';
 
@@ -355,50 +356,50 @@ class _FacilityOverviewState extends ConsumerState<FacilityOverview> {
                       spacing: 20,
                       runSpacing: 20,
                       children: [
-                        _buildKpiCard(
-                            'Total Meds in Inv',
-                            '${inventory.length}',
-                            Icons.medication_rounded,
-                            MediColors.info,
-                            const LinearGradient(
+                        KpiCard.gradient(
+                            title: 'Total Meds in Inv',
+                            value: '${inventory.length}',
+                            icon: Icons.medication_rounded,
+                            accent: MediColors.info,
+                            gradient: const LinearGradient(
                                 colors: [Color(0xFF1E3A5F), Color(0xFF1E293B)]),
-                            () {}),
-                        _buildKpiCard(
-                            'Stock Health',
-                            stockHealthText,
-                            Icons.health_and_safety_rounded,
-                            stockHealthColor,
-                            stockHealthGradient, () {
+                            onTap: () {}),
+                        KpiCard.gradient(
+                            title: 'Stock Health',
+                            value: stockHealthText,
+                            icon: Icons.health_and_safety_rounded,
+                            accent: stockHealthColor,
+                            gradient: stockHealthGradient, onTap: () {
                           context.go('/facility/${widget.facilityId}/alerts');
                         }),
-                        _buildKpiCard(
-                            'Expired',
-                            '$expired',
-                            Icons.error_outline_rounded,
-                            MediColors.error,
-                            const LinearGradient(
+                        KpiCard.gradient(
+                            title: 'Expired',
+                            value: '$expired',
+                            icon: Icons.error_outline_rounded,
+                            accent: MediColors.error,
+                            gradient: const LinearGradient(
                                 colors: [Color(0xFF3D1519), Color(0xFF1E293B)]),
-                            () {
+                            onTap: () {
                           context.go('/facility/${widget.facilityId}/alerts');
                         }),
-                        _buildKpiCard(
-                            'Wastage Risk',
-                            '$wastageRisk',
-                            Icons.warning_amber_rounded,
-                            const Color(0xFFF59E0B),
-                            const LinearGradient(
+                        KpiCard.gradient(
+                            title: 'Wastage Risk',
+                            value: '$wastageRisk',
+                            icon: Icons.warning_amber_rounded,
+                            accent: const Color(0xFFF59E0B),
+                            gradient: const LinearGradient(
                                 colors: [Color(0xFF3D2E0A), Color(0xFF1E293B)]),
-                            () {
+                            onTap: () {
                           context.go('/facility/${widget.facilityId}/alerts');
                         }),
-                        _buildKpiCard(
-                            'Low Stock',
-                            '$lowStock',
-                            Icons.trending_down_rounded,
-                            MediColors.error,
-                            const LinearGradient(
+                        KpiCard.gradient(
+                            title: 'Low Stock',
+                            value: '$lowStock',
+                            icon: Icons.trending_down_rounded,
+                            accent: MediColors.error,
+                            gradient: const LinearGradient(
                                 colors: [Color(0xFF3D1519), Color(0xFF1E293B)]),
-                            () {
+                            onTap: () {
                           context.go('/facility/${widget.facilityId}/alerts');
                         }),
                       ],
@@ -433,43 +434,6 @@ class _FacilityOverviewState extends ConsumerState<FacilityOverview> {
             .showSnackBar(SnackBar(content: Text('Export failed: $e')));
       }
     }
-  }
-
-  Widget _buildKpiCard(String title, String value, IconData icon, Color accent,
-      LinearGradient bg, VoidCallback onTap) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        width: 240,
-        padding: const EdgeInsets.all(22),
-        decoration: BoxDecoration(
-          gradient: bg,
-          borderRadius: BorderRadius.circular(18),
-          border: Border.all(color: accent.withValues(alpha: 0.2)),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Container(
-              padding: const EdgeInsets.all(10),
-              decoration: BoxDecoration(
-                color: accent.withValues(alpha: 0.15),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Icon(icon, color: accent, size: 22),
-            ),
-            const SizedBox(height: 18),
-            Text(value,
-                style: TextStyle(
-                    fontSize: 28, fontWeight: FontWeight.w800, color: accent)),
-            const SizedBox(height: 4),
-            Text(title,
-                style: const TextStyle(
-                    fontSize: 13, color: MediColors.textSecondary)),
-          ],
-        ),
-      ),
-    );
   }
 
   Widget _buildInventoryTable(

@@ -4,6 +4,7 @@ import '../../services/firebase_service.dart';
 import '../../services/ai_service.dart';
 import '../../services/csv_export_service.dart';
 import 'package:med_supply_prototype/constants/colors.dart';
+import '../shared/kpi_card.dart';
 import '../shared/skeleton_loaders.dart';
 import '../../models/inventory_item.dart';
 
@@ -166,39 +167,39 @@ class _WastageReportPageState extends ConsumerState<WastageReportPage> {
                   Row(
                     children: [
                       Expanded(
-                        child: _buildSummaryCard(
+                        child: KpiCard.summary(
                           title: 'Expired Units',
                           value: _totalExpired.toString(),
                           icon: Icons.error_outline,
-                          color: MediColors.error,
+                          accent: MediColors.error,
                         ),
                       ),
                       const SizedBox(width: 16),
                       Expanded(
-                        child: _buildSummaryCard(
+                        child: KpiCard.summary(
                           title: 'Est. Lost',
                           value: '\$${_totalLostCost.toStringAsFixed(2)}',
                           icon: Icons.money_off,
-                          color: MediColors.error,
+                          accent: MediColors.error,
                           subtitle: 'assumes \$1.50/unit',
                         ),
                       ),
                       const SizedBox(width: 16),
                       Expanded(
-                        child: _buildSummaryCard(
+                        child: KpiCard.summary(
                           title: 'Near Expiry (≤30 Days)',
                           value: _totalNearExpiry.toString(),
                           icon: Icons.warning_amber_rounded,
-                          color: MediColors.warning,
+                          accent: MediColors.warning,
                         ),
                       ),
                       const SizedBox(width: 16),
                       Expanded(
-                        child: _buildSummaryCard(
+                        child: KpiCard.summary(
                           title: 'Est. At Risk',
                           value: '\$${_totalAtRiskCost.toStringAsFixed(2)}',
                           icon: Icons.attach_money,
-                          color: MediColors.warning,
+                          accent: MediColors.warning,
                           subtitle: 'assumes \$1.50/unit',
                         ),
                       ),
@@ -342,65 +343,6 @@ class _WastageReportPageState extends ConsumerState<WastageReportPage> {
                 ],
               ),
             ),
-    );
-  }
-
-  Widget _buildSummaryCard({
-    required String title,
-    required String value,
-    required IconData icon,
-    required Color color,
-    String? subtitle,
-  }) {
-    return Container(
-      padding: const EdgeInsets.all(24),
-      decoration: BoxDecoration(
-        color: MediColors.surfaceLight,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: color.withValues(alpha: 0.3)),
-        boxShadow: [
-          BoxShadow(
-            color: color.withValues(alpha: 0.05),
-            blurRadius: 10,
-            spreadRadius: 1,
-          )
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: color.withValues(alpha: 0.15),
-                  shape: BoxShape.circle,
-                ),
-                child: Icon(icon, color: color, size: 20),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Text(title,
-                    style: const TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w600,
-                        color: MediColors.textSecondary)),
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          Text(value,
-              style: TextStyle(
-                  fontSize: 28, fontWeight: FontWeight.w800, color: color)),
-          if (subtitle != null) ...[
-            const SizedBox(height: 4),
-            Text(subtitle,
-                style: const TextStyle(
-                    fontSize: 11, color: MediColors.textSecondary)),
-          ],
-        ],
-      ),
     );
   }
 }
