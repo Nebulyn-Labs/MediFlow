@@ -547,7 +547,8 @@ exports.onIndentApproved = onDocumentUpdated("requests/{requestId}", async (even
               `Source stock for ${medicineName} at ${sourceFacility} not found`
             );
           }
-          const currentSourceQty = Number(sourceDoc.data()?.remainingQuantity || 0);
+          const sourceData = sourceDoc.data() || {};
+          const currentSourceQty = Number(sourceData.remainingQuantity || 0);
           if (currentSourceQty < qty) {
             throw new Error(
               `Insufficient stock at donor ${sourceFacility}: available ${currentSourceQty}, requested ${qty}`
@@ -564,22 +565,37 @@ exports.onIndentApproved = onDocumentUpdated("requests/{requestId}", async (even
 
           // Increment or initialize recipient stock
           if (destDoc.exists) {
-            const currentDestQty = Number(destDoc.data()?.remainingQuantity || 0);
+            const destData = destDoc.data() || {};
+            const currentDestQty = Number(destData.remainingQuantity || 0);
+            const currentDestInit = Number(
+              destData.initialQuantity !== undefined ? destData.initialQuantity : currentDestQty
+            );
             transaction.update(destRef, {
+              initialQuantity: currentDestInit + qty,
               remainingQuantity: currentDestQty + qty,
               lastUpdated: admin.firestore.FieldValue.serverTimestamp(),
             });
           } else {
+            const donorBatchId =
+              sourceData.batchId ||
+              afterData.batchId ||
+              `B-${Math.floor(1000 + Math.random() * 9000)}`;
+            const donorUnit = sourceData.unit || afterData.unit || "units";
+            const donorExpiry =
+              sourceData.expiryDate ||
+              afterData.expiryDate ||
+              admin.firestore.Timestamp.fromDate(
+                new Date(Date.now() + 180 * 86400000)
+              );
+
             transaction.set(destRef, {
               medicineName: medicineName,
-              batchId: `B-${Math.floor(1000 + Math.random() * 9000)}`,
+              batchId: donorBatchId,
               initialQuantity: qty,
               remainingQuantity: qty,
-              unit: "units",
+              unit: donorUnit,
               arrivalDate: admin.firestore.FieldValue.serverTimestamp(),
-              expiryDate: admin.firestore.Timestamp.fromDate(
-                new Date(Date.now() + 180 * 86400000)
-              ),
+              expiryDate: donorExpiry,
               lastUpdated: admin.firestore.FieldValue.serverTimestamp(),
             });
           }
@@ -625,22 +641,35 @@ exports.onIndentApproved = onDocumentUpdated("requests/{requestId}", async (even
           } else {
             // Indent / Shortage approved: add stock to facility
             if (medDoc.exists) {
-              const currentQty = Number(medDoc.data()?.remainingQuantity || 0);
+              const medData = medDoc.data() || {};
+              const currentQty = Number(medData.remainingQuantity || 0);
+              const currentInit = Number(
+                medData.initialQuantity !== undefined ? medData.initialQuantity : currentQty
+              );
               transaction.update(medRef, {
+                initialQuantity: currentInit + qty,
                 remainingQuantity: currentQty + qty,
                 lastUpdated: admin.firestore.FieldValue.serverTimestamp(),
               });
             } else {
+              const requestBatchId =
+                afterData.batchId ||
+                `B-${Math.floor(1000 + Math.random() * 9000)}`;
+              const requestUnit = afterData.unit || "units";
+              const requestExpiry =
+                afterData.expiryDate ||
+                admin.firestore.Timestamp.fromDate(
+                  new Date(Date.now() + 180 * 86400000)
+                );
+
               transaction.set(medRef, {
                 medicineName: medicineName,
-                batchId: `B-${Math.floor(1000 + Math.random() * 9000)}`,
+                batchId: requestBatchId,
                 initialQuantity: qty,
                 remainingQuantity: qty,
-                unit: "units",
+                unit: requestUnit,
                 arrivalDate: admin.firestore.FieldValue.serverTimestamp(),
-                expiryDate: admin.firestore.Timestamp.fromDate(
-                  new Date(Date.now() + 180 * 86400000)
-                ),
+                expiryDate: requestExpiry,
                 lastUpdated: admin.firestore.FieldValue.serverTimestamp(),
               });
             }
