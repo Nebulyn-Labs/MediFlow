@@ -16,6 +16,7 @@ const { isValidQuantity } = require("./helpers/quantityValidation");
 const {
   ApprovalBusinessRuleError,
   handleApprovalFailure,
+  isStaleApprovalRetry,
 } = require("./helpers/approvalErrors");
 
 admin.initializeApp();
@@ -550,6 +551,19 @@ exports.onIndentApproved = onDocumentUpdated(
 
       try {
         await db.runTransaction(async (transaction) => {
+          // Guard against Cloud Functions redelivering this event after an
+          // earlier attempt's transaction already committed (the ack can be
+          // lost even on success once retry:true is set). Re-read the
+          // request's live status inside the transaction rather than
+          // trusting the "approved" snapshot captured in the event payload.
+          const currentRequestDoc = await transaction.get(event.data.after.ref);
+          if (isStaleApprovalRetry(currentRequestDoc.data()?.status)) {
+            logger.log(
+              `Skipping redistribution for request ${requestId}: already processed (status=${currentRequestDoc.data()?.status})`
+            );
+            return;
+          }
+
           const sourceDoc = await transaction.get(sourceRef);
           if (!sourceDoc.exists) {
             throw new ApprovalBusinessRuleError(
@@ -621,6 +635,17 @@ exports.onIndentApproved = onDocumentUpdated(
 
       try {
         await db.runTransaction(async (transaction) => {
+          // Same idempotency guard as the redistribution path above: don't
+          // reapply the stock move if a prior (redelivered) attempt already
+          // resolved this request.
+          const currentRequestDoc = await transaction.get(event.data.after.ref);
+          if (isStaleApprovalRetry(currentRequestDoc.data()?.status)) {
+            logger.log(
+              `Skipping stock update for request ${requestId}: already processed (status=${currentRequestDoc.data()?.status})`
+            );
+            return;
+          }
+
           const medDoc = await transaction.get(medRef);
 
           if (type === "surplus") {

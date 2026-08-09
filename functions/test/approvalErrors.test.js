@@ -7,6 +7,7 @@ const {
   APPROVAL_REJECTION_REASONS,
   ApprovalBusinessRuleError,
   isTransientFirestoreError,
+  isStaleApprovalRetry,
   handleApprovalFailure,
 } = require("../helpers/approvalErrors");
 
@@ -152,7 +153,7 @@ describe("approval failure handling", () => {
 
     assert.deepEqual(updates, [
       {
-        status: "approval_failed",
+        status: "needsManualReview",
         needsManualReview: true,
       },
     ]);
@@ -184,7 +185,7 @@ describe("approval failure handling", () => {
 
     assert.deepEqual(updates, [
       {
-        status: "approval_failed",
+        status: "needsManualReview",
         needsManualReview: true,
       },
     ]);
@@ -202,5 +203,23 @@ describe("approval failure handling", () => {
           "Unknown approval rejection reason: projects/secret/document/id",
       }
     );
+  });
+});
+
+describe("isStaleApprovalRetry", () => {
+  it("returns false while the request is still 'approved' (first attempt)", () => {
+    assert.equal(isStaleApprovalRetry("approved"), false);
+  });
+
+  it("returns true once the request has already moved to 'fulfilled'", () => {
+    // A prior attempt's transaction committed the stock move and set
+    // status to "fulfilled" before Cloud Functions redelivered the event.
+    assert.equal(isStaleApprovalRetry("fulfilled"), true);
+  });
+
+  it("returns true for any other non-'approved' status", () => {
+    assert.equal(isStaleApprovalRetry("rejected"), true);
+    assert.equal(isStaleApprovalRetry("needsManualReview"), true);
+    assert.equal(isStaleApprovalRetry(undefined), true);
   });
 });

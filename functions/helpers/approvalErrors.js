@@ -37,6 +37,19 @@ function isTransientFirestoreError(error) {
   );
 }
 
+// With retry:true, Cloud Functions redelivers an event whenever the
+// original invocation's ack was lost — even if the Firestore transaction it
+// triggered already committed successfully. A redelivered onIndentApproved
+// event carries the same "approved" snapshot as the first attempt, so the
+// handler must not blindly reapply the stock transfer a second time.
+//
+// Callers should re-read the request's *current* status transactionally
+// (not the status captured in the event payload) and treat anything other
+// than "approved" as evidence a prior attempt already ran to completion.
+function isStaleApprovalRetry(currentStatus) {
+  return currentStatus !== "approved";
+}
+
 async function handleApprovalFailure({
   error,
   requestRef,
@@ -74,7 +87,10 @@ async function handleApprovalFailure({
     error
   );
   await requestRef.update({
-    status: "approval_failed",
+    // "needsManualReview" (rather than the old "approval_failed") matches
+    // the RequestStatus enum on the client 1:1, so MedRequest.fromMap no
+    // longer needs to fall back to "pending" for this value — see #314.
+    status: "needsManualReview",
     needsManualReview: true,
   });
 }
@@ -83,5 +99,6 @@ module.exports = {
   APPROVAL_REJECTION_REASONS,
   ApprovalBusinessRuleError,
   isTransientFirestoreError,
+  isStaleApprovalRetry,
   handleApprovalFailure,
 };
