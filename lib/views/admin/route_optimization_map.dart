@@ -314,11 +314,46 @@ class _RouteOptimizationMapState extends ConsumerState<RouteOptimizationMap> {
                                   label: const Text('Simulate Demo Scenario',
                                       style: TextStyle(fontSize: 12)),
                                   onPressed: () async {
+                                    final confirmed = await showDialog<bool>(
+                                      context: context,
+                                      builder: (ctx) => AlertDialog(
+                                        title: const Text('Confirm Demo Simulation'),
+                                        content: const Text(
+                                          'Warning: Simulating demo scenario will wipe existing data and reseed demo data. Are you sure you want to proceed?',
+                                        ),
+                                        actions: [
+                                          TextButton(
+                                            onPressed: () =>
+                                                Navigator.of(ctx).pop(false),
+                                            child: const Text('Cancel'),
+                                          ),
+                                          FilledButton(
+                                            style: FilledButton.styleFrom(
+                                              backgroundColor: Colors.red,
+                                            ),
+                                            onPressed: () =>
+                                                Navigator.of(ctx).pop(true),
+                                            child: const Text('Wipe & Reseed'),
+                                          ),
+                                        ],
+                                      ),
+                                    );
+
+                                    if (confirmed != true) return;
+
                                     setState(() => _isGenerating = true);
                                     try {
-                                      await ref
+                                      final error = await ref
                                           .read(firebaseServiceProvider)
                                           .seedDemoData();
+                                      if (error != null) {
+                                        if (mounted) {
+                                          ScaffoldMessenger.of(context)
+                                              .showSnackBar(SnackBar(
+                                                  content: Text(error)));
+                                        }
+                                        return;
+                                      }
                                       // RE-LOAD FACILITIES & AUTO GENERATE ROUTES AFTER SEEDING
                                       await _loadData();
                                       await _generateOptimalRoutes([], []);
