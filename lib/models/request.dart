@@ -2,7 +2,38 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 
 enum RequestType { shortage, surplus, regularIndent }
 
-enum RequestStatus { draft, pending, approved, fulfilled, rejected }
+/// [needsManualReview] is written server-side by `onIndentApproved` (see
+/// functions/helpers/approvalErrors.js) when approval processing hits a
+/// non-retryable, non-business-rule failure — e.g. a permissions error or a
+/// plain bug — rather than a transient Firestore/infra hiccup. It is
+/// distinct from [rejected]: the request was never evaluated against
+/// business rules, so no curated rejection reason exists, and an admin
+/// needs to look at it manually (#314).
+enum RequestStatus { draft, pending, approved, fulfilled, rejected, needsManualReview }
+
+/// Human-readable labels for [RequestStatus], centralized so every screen
+/// that displays a status (admin approvals, supply status table, facility
+/// history) renders it the same way. Falling back to the raw enum name via
+/// `.name` reads fine for single-word statuses but produces an ugly
+/// run-together word for multi-word ones like [RequestStatus.needsManualReview].
+extension RequestStatusLabel on RequestStatus {
+  String get label {
+    switch (this) {
+      case RequestStatus.draft:
+        return 'Draft';
+      case RequestStatus.pending:
+        return 'Pending';
+      case RequestStatus.approved:
+        return 'Approved';
+      case RequestStatus.fulfilled:
+        return 'Fulfilled';
+      case RequestStatus.rejected:
+        return 'Rejected';
+      case RequestStatus.needsManualReview:
+        return 'Needs Review';
+    }
+  }
+}
 
 class MedRequest {
   final String id;
@@ -34,6 +65,11 @@ class MedRequest {
   /// the "Pending Approvals" KPI on the admin dashboard and the row count
   /// on the /admin/approvals page; keeping it in one place means the two
   /// cannot drift out of sync (#334).
+  ///
+  /// [RequestStatus.needsManualReview] requests are intentionally excluded:
+  /// they already failed automatic processing once, so lumping them back
+  /// into "pending" would misrepresent both this count and the
+  /// /admin/approvals list, which re-attempts approval processing (#314).
   static int countPending(Iterable<MedRequest> requests) {
     var count = 0;
     for (final r in requests) {
@@ -50,6 +86,19 @@ class MedRequest {
     return requests
         .where((r) => r.status == RequestStatus.pending)
         .toList(growable: false);
+  }
+
+  /// Counts every request whose [RequestStatus] is
+  /// [RequestStatus.needsManualReview]. Pair with the "NEEDS REVIEW" KPI
+  /// card on the admin dashboard so requests that failed automatic
+  /// approval processing are surfaced instead of sitting invisibly in
+  /// Firestore (#314).
+  static int countNeedsManualReview(Iterable<MedRequest> requests) {
+    var count = 0;
+    for (final r in requests) {
+      if (r.status == RequestStatus.needsManualReview) count++;
+    }
+    return count;
   }
 
   factory MedRequest.fromMap(Map<String, dynamic> map, String id) {
