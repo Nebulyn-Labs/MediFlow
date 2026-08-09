@@ -59,11 +59,18 @@ class FirebaseService {
     double? fixedLat,
     double? fixedLng,
     String? fixedRegion,
+    String? customFacilityId,
   }) async {
-    // 1. Generate a deterministic ID from email to bypass Auth dependency
-    // This ensures Firestore docs are created even if Auth rate limits hit.
-    final String facilityId =
-        email.toLowerCase().replaceAll('@', '_').replaceAll('.', '_');
+    // 1. Generate facility ID (use custom ID, or fallback strategy)
+    final String facilityId;
+    if (customFacilityId != null) {
+      facilityId = customFacilityId;
+    } else if (email.isNotEmpty && email.contains('@')) {
+      facilityId =
+          email.toLowerCase().replaceAll('@', '_').replaceAll('.', '_');
+    } else {
+      facilityId = _firestore.collection('facilities').doc().id;
+    }
 
     // 2. Authenticate User (create account or fallback to sign-in)
     auth.UserCredential credential;
@@ -100,7 +107,9 @@ class FirebaseService {
       longitude: fixedLng ?? (profile['longitude'] as num?)?.toDouble() ?? 0.0,
       createdAt: profile['createdAt'] is Timestamp
           ? (profile['createdAt'] as Timestamp).toDate()
-          : DateTime.now(),
+          : (profile['createdAt'] is DateTime
+              ? profile['createdAt'] as DateTime
+              : DateTime.now()),
     );
 
     await _firestore
@@ -131,6 +140,61 @@ class FirebaseService {
     final doc = await _firestore.collection('facilities').doc(id).get();
     if (!doc.exists) return null;
     return Facility.fromMap(doc.data()!, doc.id);
+  }
+
+  /// Looks up a facility by user email address.
+  /// Does NOT rely on email-derived document IDs.
+  /// Queries the facilities collection by the stored 'email' field.
+  Future<Facility?> getFacilityByEmail(String email) async {
+    final cleanEmail = email.trim();
+    if (cleanEmail.isEmpty) return null;
+    final lowerEmail = cleanEmail.toLowerCase();
+
+    // 1. Check if authenticated user has a facilityId in their user document
+    final currentUser = _auth.currentUser;
+    if (currentUser != null) {
+      try {
+        final userDoc =
+            await _firestore.collection('users').doc(currentUser.uid).get();
+        if (userDoc.exists) {
+          final userFacId = userDoc.data()?['facilityId']?.toString();
+          if (userFacId != null && userFacId.isNotEmpty) {
+            final fac = await getFacility(userFacId);
+            if (fac != null && fac.email.trim().toLowerCase() == lowerEmail) {
+              return fac;
+            }
+          }
+        }
+      } catch (e) {
+        debugPrint('Error reading user profile for facility lookup: $e');
+      }
+    }
+
+    // 2. Query facilities collection by normalized email
+    final lowerSnapshot = await _firestore
+        .collection('facilities')
+        .where('email', isEqualTo: lowerEmail)
+        .limit(1)
+        .get();
+    if (lowerSnapshot.docs.isNotEmpty) {
+      final doc = lowerSnapshot.docs.first;
+      return Facility.fromMap(doc.data(), doc.id);
+    }
+
+    // 3. Fallback: query facilities collection by exact raw email string
+    if (lowerEmail != cleanEmail) {
+      final exactSnapshot = await _firestore
+          .collection('facilities')
+          .where('email', isEqualTo: cleanEmail)
+          .limit(1)
+          .get();
+      if (exactSnapshot.docs.isNotEmpty) {
+        final doc = exactSnapshot.docs.first;
+        return Facility.fromMap(doc.data(), doc.id);
+      }
+    }
+
+    return null;
   }
 
   Future<void> updateFacility(String id, Map<String, dynamic> data) async {
@@ -351,38 +415,50 @@ class FirebaseService {
         .doc(medicineId);
 
     await _firestore.runTransaction((transaction) async {
-      // 1. Update Inventory
+      // ── Phase 1: ALL READS FIRST ──────────────────────────────────────────
       final invDoc = await transaction.get(invRef);
+      final logDoc = await transaction.get(logRef);
+
+      // ── Phase 2: BUSINESS LOGIC ───────────────────────────────────────────
       if (!invDoc.exists) {
         throw Exception(
             'Inventory document not found for medicine: $medicineName');
       }
 
-      int remaining =
+      final int remaining =
           (invDoc.data()?['remainingQuantity'] as num?)?.toInt() ?? 0;
-      int actualDeduction = min(quantity, remaining);
+      final int actualDeduction = min(quantity, remaining);
+
+      // Firestore returns unmodifiable maps; rebuild as mutable copies.
+      final rawList = (logDoc.data()?['medicines'] as List?) ?? [];
+      final List<Map<String, dynamic>> medicines = rawList
+          .map<Map<String, dynamic>>((m) => Map<String, dynamic>.from(m as Map))
+          .toList();
+      final int totalPatients =
+          (logDoc.data()?['totalPatients'] as num?)?.toInt() ?? 0;
+
+      final int index =
+          medicines.indexWhere((m) => m['medicineName'] == medicineName);
+      if (index >= 0) {
+        medicines[index] = {
+          ...medicines[index],
+          'unitsDistributed':
+              (medicines[index]['unitsDistributed'] as int) + actualDeduction,
+        };
+      } else {
+        medicines.add({
+          'medicineName': medicineName,
+          'unitsDistributed': actualDeduction,
+        });
+      }
+
+      // ── Phase 3: ALL WRITES LAST ──────────────────────────────────────────
       transaction.update(invRef, {
         'remainingQuantity': remaining - actualDeduction,
         'lastUpdated': Timestamp.now(),
       });
 
-      // 2. Update Daily Log
-      final logDoc = await transaction.get(logRef);
       if (logDoc.exists) {
-        List<dynamic> medicines = (logDoc.data()?['medicines'] as List?) ?? [];
-        int totalPatients =
-            (logDoc.data()?['totalPatients'] as num?)?.toInt() ?? 0;
-
-        // Update existing medicine usage or add new
-        int index =
-            medicines.indexWhere((m) => m['medicineName'] == medicineName);
-        if (index >= 0) {
-          medicines[index]['unitsDistributed'] += quantity;
-        } else {
-          medicines.add(
-              {'medicineName': medicineName, 'unitsDistributed': quantity});
-        }
-
         transaction.update(logRef, {
           'medicines': medicines,
           'totalPatients': totalPatients + patients,
@@ -391,7 +467,10 @@ class FirebaseService {
         transaction.set(logRef, {
           'date': Timestamp.fromDate(date),
           'medicines': [
-            {'medicineName': medicineName, 'unitsDistributed': quantity}
+            {
+              'medicineName': medicineName,
+              'unitsDistributed': actualDeduction,
+            }
           ],
           'totalPatients': patients,
         });

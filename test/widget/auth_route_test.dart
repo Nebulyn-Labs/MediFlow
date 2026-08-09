@@ -118,8 +118,9 @@ void main() {
         (tester) async {
       const email = 'rampur@mediflow.com';
       const password = 'password123';
-      final facilityId =
-          email.toLowerCase().replaceAll('@', '_').replaceAll('.', '_');
+      // Facilities are resolved by their stored email, so the document ID is
+      // opaque and must not be derived from the address.
+      const facilityId = 'A1b2C3d4E5f6G7h8I9j0';
 
       final mockService = MockFirebaseService();
       final mockCredential = MockUserCredential();
@@ -129,7 +130,7 @@ void main() {
 
       final mockFacility = MockFacility();
       when(() => mockFacility.id).thenReturn(facilityId);
-      when(() => mockService.getFacility(facilityId))
+      when(() => mockService.getFacilityByEmail(email))
           .thenAnswer((_) async => mockFacility);
 
       final router = createTestRouter(
