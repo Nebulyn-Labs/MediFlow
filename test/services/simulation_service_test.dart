@@ -1,3 +1,4 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:fake_cloud_firestore/fake_cloud_firestore.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:med_supply_prototype/services/simulation_service.dart';
@@ -62,7 +63,8 @@ void main() {
       );
       expect(paracetamolDoc.data()['unit'], equals('tablets'));
       // Demo persona profile for Paracetamol sets expired date (-5 days)
-      final DateTime expiry = (paracetamolDoc.data()['expiryDate']).toDate();
+      final DateTime expiry =
+          (paracetamolDoc.data()['expiryDate'] as Timestamp).toDate();
       expect(expiry.isBefore(DateTime.now()), isTrue);
 
       // Verify 31 daily logs were seeded
