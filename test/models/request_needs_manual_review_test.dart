@@ -48,8 +48,7 @@ void main() {
       expect(request.status, isNot(RequestStatus.pending));
     });
 
-    test('still falls back to pending for a genuinely unrecognised status',
-        () {
+    test('still falls back to pending for a genuinely unrecognised status', () {
       final request = MedRequest.fromMap({
         'facilityId': 'fac-1',
         'medicineName': 'Paracetamol',
@@ -103,8 +102,7 @@ void main() {
   });
 
   group('RequestStatusLabel (#314)', () {
-    test('needsManualReview reads as "Needs Review", not a raw enum name',
-        () {
+    test('needsManualReview reads as "Needs Review", not a raw enum name', () {
       expect(RequestStatus.needsManualReview.label, 'Needs Review');
     });
 

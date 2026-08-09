@@ -9,7 +9,14 @@ enum RequestType { shortage, surplus, regularIndent }
 /// distinct from [rejected]: the request was never evaluated against
 /// business rules, so no curated rejection reason exists, and an admin
 /// needs to look at it manually (#314).
-enum RequestStatus { draft, pending, approved, fulfilled, rejected, needsManualReview }
+enum RequestStatus {
+  draft,
+  pending,
+  approved,
+  fulfilled,
+  rejected,
+  needsManualReview
+}
 
 /// Human-readable labels for [RequestStatus], centralized so every screen
 /// that displays a status (admin approvals, supply status table, facility

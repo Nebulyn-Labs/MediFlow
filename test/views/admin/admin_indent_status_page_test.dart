@@ -195,8 +195,7 @@ void main() {
     await tester.tap(find.widgetWithText(FilledButton, 'PENDING'));
     await tester.pumpAndSettle();
 
-    expect(
-        firebase.updatedStatuses['req-needs-review'], RequestStatus.pending);
+    expect(firebase.updatedStatuses['req-needs-review'], RequestStatus.pending);
   });
 
   testWidgets('disables popup menu for fulfilled request (#249)',
