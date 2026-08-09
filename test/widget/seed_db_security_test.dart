@@ -35,7 +35,8 @@ void main() {
       }
     });
 
-    test('clearDatabase throws error when unauthenticated in non-debug environment',
+    test(
+        'clearDatabase throws error when unauthenticated in non-debug environment',
         () async {
       final mockFirestore = MockFirebaseFirestore();
       final mockAuth = MockFirebaseAuth();
@@ -97,8 +98,7 @@ void main() {
     });
 
     testWidgets('Tapping Wipe & Reseed invokes seedDemoData', (tester) async {
-      when(() => mockService.seedDemoData())
-          .thenAnswer((_) async => null);
+      when(() => mockService.seedDemoData()).thenAnswer((_) async => null);
 
       await tester.pumpWidget(
         ProviderScope(

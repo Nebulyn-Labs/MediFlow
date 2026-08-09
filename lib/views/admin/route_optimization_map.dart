@@ -319,7 +319,8 @@ class _RouteOptimizationMapState extends ConsumerState<RouteOptimizationMap> {
                                     final confirmed = await showDialog<bool>(
                                       context: context,
                                       builder: (ctx) => AlertDialog(
-                                        title: const Text('Confirm Demo Simulation'),
+                                        title: const Text(
+                                            'Confirm Demo Simulation'),
                                         content: const Text(
                                           'Warning: Simulating demo scenario will wipe existing data and reseed demo data. Are you sure you want to proceed?',
                                         ),
