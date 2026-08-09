@@ -703,8 +703,8 @@ class _DailyLoggingPageState extends ConsumerState<DailyLoggingPage>
       child: ListTile(
         contentPadding: EdgeInsets.zero,
         title: Text(title,
-            style: const TextStyle(
-                color: MediColors.textSecondary, fontSize: 13)),
+            style:
+                const TextStyle(color: MediColors.textSecondary, fontSize: 13)),
         subtitle: Text(
             '${_selectedDate.day}/${_selectedDate.month}/${_selectedDate.year}',
             style: const TextStyle(
