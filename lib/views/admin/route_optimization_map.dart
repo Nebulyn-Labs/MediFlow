@@ -314,6 +314,8 @@ class _RouteOptimizationMapState extends ConsumerState<RouteOptimizationMap> {
                                   label: const Text('Simulate Demo Scenario',
                                       style: TextStyle(fontSize: 12)),
                                   onPressed: () async {
+                                    final messenger =
+                                        ScaffoldMessenger.of(context);
                                     final confirmed = await showDialog<bool>(
                                       context: context,
                                       builder: (ctx) => AlertDialog(
@@ -347,11 +349,8 @@ class _RouteOptimizationMapState extends ConsumerState<RouteOptimizationMap> {
                                           .read(firebaseServiceProvider)
                                           .seedDemoData();
                                       if (error != null) {
-                                        if (mounted) {
-                                          ScaffoldMessenger.of(context)
-                                              .showSnackBar(SnackBar(
-                                                  content: Text(error)));
-                                        }
+                                        messenger.showSnackBar(
+                                            SnackBar(content: Text(error)));
                                         return;
                                       }
                                       // RE-LOAD FACILITIES & AUTO GENERATE ROUTES AFTER SEEDING
@@ -365,12 +364,9 @@ class _RouteOptimizationMapState extends ConsumerState<RouteOptimizationMap> {
                                         setState(() => _isGenerating = false);
                                       }
                                     }
-                                    if (context.mounted) {
-                                      ScaffoldMessenger.of(context)
-                                          .showSnackBar(const SnackBar(
-                                              content: Text(
-                                                  'Demo scenario seeded! Click Generate to see routes.')));
-                                    }
+                                    messenger.showSnackBar(const SnackBar(
+                                        content: Text(
+                                            'Demo scenario seeded! Click Generate to see routes.')));
                                   },
                                 ),
                               ),

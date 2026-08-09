@@ -218,6 +218,7 @@ class _RoleSelectionScreenState extends State<RoleSelectionScreen>
                         builder: (context, ref, child) {
                           return TextButton.icon(
                             onPressed: () async {
+                              final messenger = ScaffoldMessenger.of(context);
                               final confirmed = await showDialog<bool>(
                                 context: context,
                                 builder: (ctx) => AlertDialog(
@@ -245,23 +246,17 @@ class _RoleSelectionScreenState extends State<RoleSelectionScreen>
 
                               if (confirmed != true) return;
 
-                              if (context.mounted) {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                    const SnackBar(
-                                        content: Text('Seeding demo data...')));
-                              }
+                              messenger.showSnackBar(const SnackBar(
+                                  content: Text('Seeding demo data...')));
                               final error = await ref
                                   .read(firebaseServiceProvider)
                                   .seedDemoData();
-                              if (context.mounted) {
-                                if (error != null) {
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                      SnackBar(content: Text(error)));
-                                } else {
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                      const SnackBar(
-                                          content: Text('Demo data seeded ✓')));
-                                }
+                              if (error != null) {
+                                messenger.showSnackBar(
+                                    SnackBar(content: Text(error)));
+                              } else {
+                                messenger.showSnackBar(const SnackBar(
+                                    content: Text('Demo data seeded ✓')));
                               }
                             },
                             icon: const Icon(Icons.data_saver_on_rounded,

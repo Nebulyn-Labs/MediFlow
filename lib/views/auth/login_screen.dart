@@ -27,6 +27,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   }
 
   Future<void> _seedDatabase() async {
+    final messenger = ScaffoldMessenger.of(context);
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -55,23 +56,17 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     setState(() => _isLoading = true);
     try {
       final error = await ref.read(firebaseServiceProvider).seedDemoData();
-      if (mounted) {
-        if (error != null) {
-          ScaffoldMessenger.of(context)
-              .showSnackBar(SnackBar(content: Text(error)));
-        } else {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-                content: Text(
-                    'Database seeded ✓ Use rampur@mediflow.com / password123')),
-          );
-        }
+      if (error != null) {
+        messenger.showSnackBar(SnackBar(content: Text(error)));
+      } else {
+        messenger.showSnackBar(
+          const SnackBar(
+              content: Text(
+                  'Database seeded ✓ Use rampur@mediflow.com / password123')),
+        );
       }
     } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text('Error: $e')));
-      }
+      messenger.showSnackBar(SnackBar(content: Text('Error: $e')));
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
