@@ -697,6 +697,47 @@ class _DailyLoggingPageState extends ConsumerState<DailyLoggingPage>
     );
   }
 
+  Widget _buildDateSelectorTile({String title = 'Date'}) {
+    return Material(
+      type: MaterialType.transparency,
+      child: ListTile(
+        contentPadding: EdgeInsets.zero,
+        title: Text(title,
+            style: const TextStyle(
+                color: MediColors.textSecondary, fontSize: 13)),
+        subtitle: Text(
+            '${_selectedDate.day}/${_selectedDate.month}/${_selectedDate.year}',
+            style: const TextStyle(
+                color: MediColors.textPrimary,
+                fontSize: 16,
+                fontWeight: FontWeight.w600)),
+        trailing: const Icon(Icons.calendar_today_rounded,
+            color: MediColors.textMuted),
+        onTap: () async {
+          final date = await showDatePicker(
+              context: context,
+              initialDate: _selectedDate,
+              firstDate: DateTime(2020),
+              lastDate: DateTime.now());
+          if (date != null) setState(() => _selectedDate = date);
+        },
+      ),
+    );
+  }
+
+  Widget _buildDateSelectorCard({String title = 'Effective Log Date'}) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+      decoration: BoxDecoration(
+        color: MediColors.surface,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: MediColors.border),
+      ),
+      child: _buildDateSelectorTile(title: title),
+    );
+  }
+
   Widget _buildManualTab(bool isOnline) {
     return Center(
       child: ConstrainedBox(
@@ -728,31 +769,7 @@ class _DailyLoggingPageState extends ConsumerState<DailyLoggingPage>
                   // The surrounding Container paints its own background, which
                   // would swallow the tile's ink splash without a Material of
                   // its own.
-                  Material(
-                    type: MaterialType.transparency,
-                    child: ListTile(
-                      contentPadding: EdgeInsets.zero,
-                      title: const Text('Date',
-                          style: TextStyle(
-                              color: MediColors.textSecondary, fontSize: 13)),
-                      subtitle: Text(
-                          '${_selectedDate.day}/${_selectedDate.month}/${_selectedDate.year}',
-                          style: const TextStyle(
-                              color: MediColors.textPrimary,
-                              fontSize: 16,
-                              fontWeight: FontWeight.w600)),
-                      trailing: const Icon(Icons.calendar_today_rounded,
-                          color: MediColors.textMuted),
-                      onTap: () async {
-                        final date = await showDatePicker(
-                            context: context,
-                            initialDate: _selectedDate,
-                            firstDate: DateTime(2020),
-                            lastDate: DateTime.now());
-                        if (date != null) setState(() => _selectedDate = date);
-                      },
-                    ),
-                  ),
+                  _buildDateSelectorTile(),
                   const SizedBox(height: 16),
                   if (_isLoadingInventory)
                     const Column(
@@ -852,6 +869,8 @@ class _DailyLoggingPageState extends ConsumerState<DailyLoggingPage>
     return SingleChildScrollView(
       padding: const EdgeInsets.all(28),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        _buildDateSelectorCard(),
+        const SizedBox(height: 16),
         Container(
           width: double.infinity,
           padding: const EdgeInsets.all(24),
@@ -1011,6 +1030,8 @@ class _DailyLoggingPageState extends ConsumerState<DailyLoggingPage>
     return SingleChildScrollView(
       padding: const EdgeInsets.all(28),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        _buildDateSelectorCard(),
+        const SizedBox(height: 16),
         Container(
           width: double.infinity,
           height: 260,
@@ -1123,6 +1144,8 @@ class _DailyLoggingPageState extends ConsumerState<DailyLoggingPage>
     return SingleChildScrollView(
       padding: const EdgeInsets.all(28),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        _buildDateSelectorCard(),
+        const SizedBox(height: 16),
         Container(
           width: double.infinity,
           padding: const EdgeInsets.all(24),
