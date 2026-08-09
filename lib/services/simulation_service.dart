@@ -154,8 +154,7 @@ class SimulationService {
     String facilityId, {
     bool? isDemoFacility,
   }) async {
-    final bool isDemo =
-        isDemoFacility ?? (facilityId == defaultDemoFacilityId);
+    final bool isDemo = isDemoFacility ?? (facilityId == defaultDemoFacilityId);
     final medsSnapshot = await _firestore
         .collection('inventory')
         .doc(facilityId)
@@ -210,8 +209,7 @@ class SimulationService {
     String facilityId, {
     bool? isDemoFacility,
   }) async {
-    final bool isDemo =
-        isDemoFacility ?? (facilityId == defaultDemoFacilityId);
+    final bool isDemo = isDemoFacility ?? (facilityId == defaultDemoFacilityId);
 
     for (var entry in demoMedicineCatalog.entries) {
       final med = entry.key;

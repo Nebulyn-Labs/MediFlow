@@ -32,7 +32,8 @@ void main() {
         SimulationService.demoMedicineNames,
         equals(SimulationService.demoMedicineCatalog.keys.toList()),
       );
-      expect(SimulationService.defaultDemoFacilityId, equals('rampur_mediflow_com'));
+      expect(SimulationService.defaultDemoFacilityId,
+          equals('rampur_mediflow_com'));
     });
 
     test('generateRealisticProfile returns valid facility map', () {
@@ -44,7 +45,8 @@ void main() {
       expect(profile['createdAt'], isNotNull);
     });
 
-    test('runFullSimulation seeds inventory and daily logs for demo facility', () async {
+    test('runFullSimulation seeds inventory and daily logs for demo facility',
+        () async {
       const demoId = SimulationService.defaultDemoFacilityId;
 
       await simulationService.runFullSimulation(demoId, 'rural');
@@ -56,7 +58,8 @@ void main() {
           .collection('medicines')
           .get();
 
-      expect(invSnapshot.docs.length, equals(SimulationService.demoMedicineCatalog.length));
+      expect(invSnapshot.docs.length,
+          equals(SimulationService.demoMedicineCatalog.length));
 
       final paracetamolDoc = invSnapshot.docs.firstWhere(
         (doc) => doc.data()['medicineName'] == 'Paracetamol',
@@ -77,7 +80,9 @@ void main() {
       expect(logsSnapshot.docs.length, equals(31));
     });
 
-    test('runFullSimulation with custom demoFacilityId parameter applies demo persona', () async {
+    test(
+        'runFullSimulation with custom demoFacilityId parameter applies demo persona',
+        () async {
       const customDemoId = 'custom_demo_facility';
 
       await simulationService.runFullSimulation(
@@ -92,7 +97,8 @@ void main() {
           .collection('medicines')
           .get();
 
-      expect(invSnapshot.docs.length, equals(SimulationService.demoMedicineCatalog.length));
+      expect(invSnapshot.docs.length,
+          equals(SimulationService.demoMedicineCatalog.length));
 
       // ORS demo persona sets remaining to 95% of initial
       final orsDoc = invSnapshot.docs.firstWhere(
