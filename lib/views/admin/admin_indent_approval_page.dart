@@ -102,7 +102,7 @@ class _AdminIndentApprovalPageState
           .updateRequestStatus(request.id, status);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Request ${status.name} successfully!')));
+            SnackBar(content: Text('Request ${status.label} successfully!')));
       }
     } catch (e) {
       if (mounted) {

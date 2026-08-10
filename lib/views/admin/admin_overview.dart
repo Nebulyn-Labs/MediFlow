@@ -27,6 +27,7 @@ class _AdminOverviewState extends ConsumerState<AdminOverview> {
   int _openShortageRequests = 0;
   int _surplusOffers = 0;
   int _pendingApprovals = 0;
+  int _needsManualReview = 0;
 
   bool _isInitialLoading = true;
   String? _errorMessage;
@@ -161,10 +162,16 @@ class _AdminOverviewState extends ConsumerState<AdminOverview> {
         // MedRequest.countPending keeps the card and the page in lockstep
         // (#334).
         final pending = MedRequest.countPending(reqs);
+        // Requests onIndentApproved couldn't process automatically (a
+        // non-retryable, non-business-rule failure) land here instead of
+        // silently reappearing as "pending" — surface them so they don't
+        // sit invisibly in Firestore (#314).
+        final needsReview = MedRequest.countNeedsManualReview(reqs);
         setState(() {
           _openShortageRequests = shortage;
           _surplusOffers = surplus;
           _pendingApprovals = pending;
+          _needsManualReview = needsReview;
         });
       },
       onError: (e) {
@@ -488,6 +495,14 @@ class _AdminOverviewState extends ConsumerState<AdminOverview> {
                                 Icons.assignment_turned_in_rounded,
                                 iconColor: colors.info,
                                 onTap: () => context.go('/admin/approvals')),
+                            if (_needsManualReview > 0)
+                              _buildKpiCard(
+                                  'NEEDS REVIEW',
+                                  '$_needsManualReview',
+                                  Icons.report_problem_rounded,
+                                  isAlert: true,
+                                  onTap: () =>
+                                      context.go('/admin/supply-status')),
                           ],
                         ),
                         const SizedBox(height: 36),

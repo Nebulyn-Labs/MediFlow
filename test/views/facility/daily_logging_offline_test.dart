@@ -269,4 +269,29 @@ void main() {
       expect(tester.takeException(), isNull);
     });
   });
+
+  group('Daily Logging - effective date visibility and editability (#202)', () {
+    testWidgets('shows Date selector on Manual, CSV, Scan, and Image tabs',
+        (tester) async {
+      await _pumpPage(tester, status: Stream.value(true));
+
+      // Manual tab (default tab)
+      expect(find.text('Date'), findsOneWidget);
+
+      // CSV tab
+      await tester.tap(find.text('CSV'));
+      await tester.pumpAndSettle();
+      expect(find.text('Effective Log Date'), findsOneWidget);
+
+      // Scan tab
+      await tester.tap(find.text('Scan'));
+      await tester.pumpAndSettle();
+      expect(find.text('Effective Log Date'), findsOneWidget);
+
+      // Image tab
+      await tester.tap(find.text('Image'));
+      await tester.pumpAndSettle();
+      expect(find.text('Effective Log Date'), findsOneWidget);
+    });
+  });
 }
