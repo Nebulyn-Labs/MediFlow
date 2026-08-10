@@ -369,9 +369,11 @@ class _FacilityOverviewState extends ConsumerState<FacilityOverview> {
                             value: stockHealthText,
                             icon: Icons.health_and_safety_rounded,
                             accent: stockHealthColor,
-                            gradient: stockHealthGradient, onTap: () {
-                          context.go('/facility/${widget.facilityId}/alerts');
-                        }),
+                            gradient: stockHealthGradient,
+                            onTap: () {
+                              context
+                                  .go('/facility/${widget.facilityId}/alerts');
+                            }),
                         KpiCard.gradient(
                             title: 'Expired',
                             value: '$expired',
@@ -380,8 +382,9 @@ class _FacilityOverviewState extends ConsumerState<FacilityOverview> {
                             gradient: const LinearGradient(
                                 colors: [Color(0xFF3D1519), Color(0xFF1E293B)]),
                             onTap: () {
-                          context.go('/facility/${widget.facilityId}/alerts');
-                        }),
+                              context
+                                  .go('/facility/${widget.facilityId}/alerts');
+                            }),
                         KpiCard.gradient(
                             title: 'Wastage Risk',
                             value: '$wastageRisk',
@@ -390,8 +393,9 @@ class _FacilityOverviewState extends ConsumerState<FacilityOverview> {
                             gradient: const LinearGradient(
                                 colors: [Color(0xFF3D2E0A), Color(0xFF1E293B)]),
                             onTap: () {
-                          context.go('/facility/${widget.facilityId}/alerts');
-                        }),
+                              context
+                                  .go('/facility/${widget.facilityId}/alerts');
+                            }),
                         KpiCard.gradient(
                             title: 'Low Stock',
                             value: '$lowStock',
@@ -400,8 +404,9 @@ class _FacilityOverviewState extends ConsumerState<FacilityOverview> {
                             gradient: const LinearGradient(
                                 colors: [Color(0xFF3D1519), Color(0xFF1E293B)]),
                             onTap: () {
-                          context.go('/facility/${widget.facilityId}/alerts');
-                        }),
+                              context
+                                  .go('/facility/${widget.facilityId}/alerts');
+                            }),
                       ],
                     );
                   },
