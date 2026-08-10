@@ -1,6 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart' as auth;
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -18,38 +17,26 @@ void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
   group('FirebaseService Seed & Clear Database Security', () {
-    test('seedDemoData blocks unauthenticated seeding in non-debug environment',
-        () async {
+    test('seedDemoData blocks seeding in non-debug environment', () async {
       final mockFirestore = MockFirebaseFirestore();
       final mockAuth = MockFirebaseAuth();
-      when(() => mockAuth.currentUser).thenReturn(null);
+      final service =
+          FirebaseService(mockFirestore, mockAuth, isDebugMode: false);
 
-      final service = FirebaseService(mockFirestore, mockAuth);
-
-      // In unit test environment, kDebugMode is true by default.
-      // But we verify that if currentUser is null and !kDebugMode condition is evaluated,
-      // it rejects anonymous seeding appropriately.
-      if (!kDebugMode) {
-        final result = await service.seedDemoData();
-        expect(result, contains('disabled in production builds'));
-      }
+      final result = await service.seedDemoData();
+      expect(result, contains('disabled in production builds'));
     });
 
-    test(
-        'clearDatabase throws error when unauthenticated in non-debug environment',
-        () async {
+    test('clearDatabase throws error in non-debug environment', () async {
       final mockFirestore = MockFirebaseFirestore();
       final mockAuth = MockFirebaseAuth();
-      when(() => mockAuth.currentUser).thenReturn(null);
+      final service =
+          FirebaseService(mockFirestore, mockAuth, isDebugMode: false);
 
-      final service = FirebaseService(mockFirestore, mockAuth);
-
-      if (!kDebugMode) {
-        expect(
-          () => service.clearDatabase(),
-          throwsA(isA<Exception>()),
-        );
-      }
+      expect(
+        () => service.clearDatabase(),
+        throwsA(isA<Exception>()),
+      );
     });
   });
 

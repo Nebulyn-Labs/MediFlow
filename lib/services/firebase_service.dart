@@ -20,9 +20,11 @@ final firebaseServiceProvider = Provider<FirebaseService>((ref) {
 class FirebaseService {
   final FirebaseFirestore _firestore;
   final auth.FirebaseAuth _auth;
+  final bool isDebugMode;
   late final SimulationService _simulation;
 
-  FirebaseService(this._firestore, this._auth) {
+  FirebaseService(this._firestore, this._auth,
+      {this.isDebugMode = kDebugMode}) {
     _simulation = SimulationService(_firestore);
   }
 
@@ -590,9 +592,8 @@ class FirebaseService {
   Future<void> clearDatabase() async {
     // Note: This is for demo purposes to provide a clean state.
     // In production, you would never wipe collections like this.
-    if (!kDebugMode && _auth.currentUser == null) {
-      throw Exception(
-          'Database wiping from an unauthenticated session is disabled in production builds.');
+    if (!isDebugMode) {
+      throw Exception('Database wiping is disabled in production builds.');
     }
 
     final collections = [
@@ -650,8 +651,8 @@ class FirebaseService {
   }
 
   Future<String?> seedDemoData() async {
-    if (!kDebugMode && _auth.currentUser == null) {
-      return 'Seeding demo data from an unauthenticated session is disabled in production builds.';
+    if (!isDebugMode) {
+      return 'Seeding demo data is disabled in production builds.';
     }
     try {
       // 1. Seed/Login Admin first to ensure authorization for database clearing/seeding
