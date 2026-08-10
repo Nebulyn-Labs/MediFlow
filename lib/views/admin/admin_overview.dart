@@ -510,12 +510,24 @@ class _AdminOverviewState extends ConsumerState<AdminOverview> {
                           controller: _searchController,
                           onChanged: (value) {
                             setState(() {
-                              _searchQuery = value.toLowerCase();
+                              _searchQuery = value.trim().toLowerCase();
                             });
                           },
                           decoration: InputDecoration(
-                            hintText: 'Search medicines by name...',
-                            prefixIcon: Icon(Icons.search),
+                            hintText:
+                                'Search facilities, regions, or medicines...',
+                            prefixIcon: const Icon(Icons.search),
+                            suffixIcon: _searchController.text.isNotEmpty
+                                ? IconButton(
+                                    icon: const Icon(Icons.clear, size: 18),
+                                    onPressed: () {
+                                      _searchController.clear();
+                                      setState(() {
+                                        _searchQuery = '';
+                                      });
+                                    },
+                                  )
+                                : null,
                             filled: true,
                             fillColor: colors.surface,
                             border: OutlineInputBorder(
@@ -636,20 +648,50 @@ class _AdminOverviewState extends ConsumerState<AdminOverview> {
 
   Widget _buildFacilityHealthGrid() {
     final colors = context.mediTheme;
+    final filteredFacilities = _facilities.where((f) {
+      if (_searchQuery.isEmpty) return true;
+      final q = _searchQuery;
+      return f.name.toLowerCase().contains(q) ||
+          f.region.toLowerCase().contains(q) ||
+          f.type.toLowerCase().contains(q) ||
+          f.id.toLowerCase().contains(q) ||
+          f.email.toLowerCase().contains(q);
+    }).toList();
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text('Facility Health Overview',
-            style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.w700,
-                color: colors.textPrimary)),
-        const SizedBox(height: 16),
-        Wrap(
-          spacing: 16,
-          runSpacing: 16,
-          children: _facilities.map((f) => _buildHealthCard(f)).toList(),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text('Facility Health Overview',
+                style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w700,
+                    color: colors.textPrimary)),
+            if (_searchQuery.isNotEmpty)
+              Text(
+                '${filteredFacilities.length} of ${_facilities.length} facilities shown',
+                style: TextStyle(fontSize: 12, color: colors.textSecondary),
+              ),
+          ],
         ),
+        const SizedBox(height: 16),
+        if (filteredFacilities.isEmpty)
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 16),
+            child: Text(
+              'No facilities match your search query.',
+              style: TextStyle(color: colors.textSecondary),
+            ),
+          )
+        else
+          Wrap(
+            spacing: 16,
+            runSpacing: 16,
+            children:
+                filteredFacilities.map((f) => _buildHealthCard(f)).toList(),
+          ),
       ],
     );
   }
