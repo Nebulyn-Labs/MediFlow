@@ -58,6 +58,12 @@ class _AdminIndentStatusPageState extends ConsumerState<AdminIndentStatusPage> {
         return [RequestStatus.fulfilled, RequestStatus.rejected];
       case RequestStatus.rejected:
         return [RequestStatus.pending];
+      case RequestStatus.needsManualReview:
+        // Flagged by onIndentApproved when approval processing hit a
+        // non-retryable, non-business-rule failure (#314). Give the admin
+        // an explicit way to unstick it: retry it as a fresh pending
+        // request, or reject it outright if it shouldn't be retried.
+        return [RequestStatus.pending, RequestStatus.rejected];
       case RequestStatus.fulfilled:
       case RequestStatus.draft:
         return [];
@@ -95,7 +101,7 @@ class _AdminIndentStatusPageState extends ConsumerState<AdminIndentStatusPage> {
   }
 
   Future<void> _updateStatus(MedRequest request, RequestStatus status) async {
-    final statusLabel = status.name.toUpperCase();
+    final statusLabel = status.label.toUpperCase();
     final confirmed = await _showConfirmationDialog(
       title: 'Confirm Status Change',
       message:
@@ -134,6 +140,8 @@ class _AdminIndentStatusPageState extends ConsumerState<AdminIndentStatusPage> {
         return MediColors.warning;
       case RequestStatus.fulfilled:
         return MediColors.info;
+      case RequestStatus.needsManualReview:
+        return MediColors.violet;
       case RequestStatus.draft:
         return MediColors.textMuted;
     }
@@ -304,7 +312,7 @@ class _AdminIndentStatusPageState extends ConsumerState<AdminIndentStatusPage> {
                 color: _getStatusColor(req.status).withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(6),
               ),
-              child: Text(req.status.name.toUpperCase(),
+              child: Text(req.status.label.toUpperCase(),
                   style: TextStyle(
                       color: _getStatusColor(req.status),
                       fontSize: 10,
@@ -352,7 +360,7 @@ class _AdminIndentStatusPageState extends ConsumerState<AdminIndentStatusPage> {
               itemBuilder: (context) => validTransitions.map((status) {
                 return PopupMenuItem(
                   value: status,
-                  child: Text(status.name.toUpperCase(),
+                  child: Text(status.label.toUpperCase(),
                       style: const TextStyle(fontSize: 12)),
                 );
               }).toList(),
