@@ -160,32 +160,41 @@ class _SidebarLayoutState extends ConsumerState<SidebarLayout> {
               width: _isExpanded ? 220 : 72,
               decoration: BoxDecoration(
                 color: colors.surface,
-                border:
-                    Border(right: BorderSide(color: colors.border, width: 1)),
+                border: Border(
+                  right: BorderSide(color: colors.border, width: 1),
+                ),
               ),
               child: Column(
                 children: [
                   // Logo
-                  Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 24),
-                    child: AnimatedContainer(
-                      duration: const Duration(milliseconds: 200),
-                      width: 44,
-                      height: 44,
-                      decoration: BoxDecoration(
-                        gradient: colors.primaryGradient,
-                        borderRadius: BorderRadius.circular(14),
+                  Semantics(
+                    label: 'MediFlow home',
+                    button: true,
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 24),
+                      child: AnimatedContainer(
+                        duration: const Duration(milliseconds: 200),
+                        width: 44,
+                        height: 44,
+                        decoration: BoxDecoration(
+                          gradient: colors.primaryGradient,
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                        child: Icon(
+                          Icons.health_and_safety_rounded,
+                          color: colors.onAccent,
+                          size: 24,
+                        ),
                       ),
-                      child: Icon(Icons.health_and_safety_rounded,
-                          color: colors.onAccent, size: 24),
                     ),
                   ),
 
                   // Nav Items
                   Expanded(
                     child: ScrollConfiguration(
-                      behavior: ScrollConfiguration.of(context)
-                          .copyWith(scrollbars: false),
+                      behavior: ScrollConfiguration.of(
+                        context,
+                      ).copyWith(scrollbars: false),
                       child: SingleChildScrollView(
                         child: StreamBuilder<List<notif.NotificationModel>>(
                           stream: widget.role == 'facility' &&
@@ -211,8 +220,9 @@ class _SidebarLayoutState extends ConsumerState<SidebarLayout> {
                                 // Use the centralized hasAlert getter from
                                 // InventoryItem to avoid duplicating
                                 // threshold logic.
-                                final hasAlerts =
-                                    inventory.any((i) => i.hasAlert);
+                                final hasAlerts = inventory.any(
+                                  (i) => i.hasAlert,
+                                );
 
                                 return Column(
                                   children: List.generate(items.length, (i) {
@@ -290,117 +300,139 @@ class _SidebarLayoutState extends ConsumerState<SidebarLayout> {
     );
   }
 
-  Widget _buildNavItem(_NavItem item, bool isSelected, VoidCallback onTap,
-      {bool isLogout = false, bool showBadge = false, int badgeCount = 0}) {
+  Widget _buildNavItem(
+    _NavItem item,
+    bool isSelected,
+    VoidCallback onTap, {
+    bool isLogout = false,
+    bool showBadge = false,
+    int badgeCount = 0,
+  }) {
     final colors = context.mediTheme;
 
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          onTap: onTap,
-          borderRadius: BorderRadius.circular(12),
-          hoverColor: colors.surfaceHover,
-          child: AnimatedContainer(
-            duration: const Duration(milliseconds: 200),
-            padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 12),
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(12),
-              color: isSelected
-                  ? colors.primary.withValues(alpha: 0.12)
-                  : Colors.transparent,
-              border: isSelected
-                  ? Border.all(color: colors.primary.withValues(alpha: 0.25))
-                  : null,
-            ),
-            child: ClipRect(
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Stack(
-                    clipBehavior: Clip.none,
-                    children: [
-                      SizedBox(
-                        width: 24,
-                        child: Center(
-                          child: Icon(
-                            item.icon,
-                            size: 22,
-                            color: isLogout
-                                ? colors.error
-                                : isSelected
-                                    ? colors.primary
-                                    : colors.textMuted,
-                          ),
-                        ),
-                      ),
-                      if (badgeCount > 0)
-                        Positioned(
-                          right: -4,
-                          top: -4,
-                          child: Container(
-                            padding: const EdgeInsets.all(3),
-                            decoration: BoxDecoration(
-                              color: colors.error,
-                              shape: BoxShape.circle,
-                            ),
-                            child: Text(
-                              badgeCount > 99 ? '99+' : badgeCount.toString(),
-                              style: TextStyle(
-                                color: colors.onAccent,
-                                fontSize: 9,
-                                fontWeight: FontWeight.bold,
-                                height: 1.0,
-                              ),
-                              textAlign: TextAlign.center,
-                            ),
-                          ),
-                        )
-                      else if (showBadge)
-                        Positioned(
-                          right: -2,
-                          top: -2,
-                          child: Container(
-                            width: 10,
-                            height: 10,
-                            decoration: BoxDecoration(
-                              color: colors.error,
-                              shape: BoxShape.circle,
-                            ),
-                          ),
-                        ),
-                    ],
-                  ),
-                  AnimatedContainer(
-                    duration: const Duration(milliseconds: 200),
-                    curve: Curves.easeOutCubic,
-                    width: _isExpanded ? 14 : 0,
-                  ),
-                  if (_isExpanded)
-                    Expanded(
-                      child: Text(
-                        item.label,
-                        style: TextStyle(
-                          fontSize: 13,
-                          fontWeight:
-                              isSelected ? FontWeight.w600 : FontWeight.w500,
+    Widget navItem = Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(12),
+        hoverColor: colors.surfaceHover,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 200),
+          padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 12),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(12),
+            color: isSelected
+                ? colors.primary.withValues(alpha: 0.12)
+                : Colors.transparent,
+            border: isSelected
+                ? Border.all(color: colors.primary.withValues(alpha: 0.25))
+                : null,
+          ),
+          child: ClipRect(
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Stack(
+                  clipBehavior: Clip.none,
+                  children: [
+                    SizedBox(
+                      width: 24,
+                      child: Center(
+                        child: Icon(
+                          item.icon,
+                          size: 22,
                           color: isLogout
                               ? colors.error
                               : isSelected
                                   ? colors.primary
-                                  : colors.textSecondary,
+                                  : colors.textMuted,
                         ),
-                        overflow: TextOverflow.ellipsis,
-                        maxLines: 1,
                       ),
                     ),
-                ],
-              ),
+                    if (badgeCount > 0)
+                      Positioned(
+                        right: -4,
+                        top: -4,
+                        child: Container(
+                          padding: const EdgeInsets.all(3),
+                          decoration: BoxDecoration(
+                            color: colors.error,
+                            shape: BoxShape.circle,
+                          ),
+                          child: Text(
+                            badgeCount > 99 ? '99+' : badgeCount.toString(),
+                            style: TextStyle(
+                              color: colors.onAccent,
+                              fontSize: 9,
+                              fontWeight: FontWeight.bold,
+                              height: 1.0,
+                            ),
+                            textAlign: TextAlign.center,
+                          ),
+                        ),
+                      )
+                    else if (showBadge)
+                      Positioned(
+                        right: -2,
+                        top: -2,
+                        child: Container(
+                          width: 10,
+                          height: 10,
+                          decoration: BoxDecoration(
+                            color: colors.error,
+                            shape: BoxShape.circle,
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+                AnimatedContainer(
+                  duration: const Duration(milliseconds: 200),
+                  curve: Curves.easeOutCubic,
+                  width: _isExpanded ? 14 : 0,
+                ),
+                if (_isExpanded)
+                  Expanded(
+                    child: Text(
+                      item.label,
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight:
+                            isSelected ? FontWeight.w600 : FontWeight.w500,
+                        color: isLogout
+                            ? colors.error
+                            : isSelected
+                                ? colors.primary
+                                : colors.textSecondary,
+                      ),
+                      overflow: TextOverflow.ellipsis,
+                      maxLines: 1,
+                    ),
+                  ),
+              ],
             ),
           ),
         ),
       ),
+    );
+
+    // When collapsed the labels are hidden, so expose each item's purpose as
+    // a hover/long-press tooltip and as a semantic label for assistive
+    // technologies. When expanded, the visible text label is sufficient for
+    // sighted users, but we still wrap with Semantics for screen readers.
+    if (!_isExpanded) {
+      navItem = Tooltip(
+        message: item.label,
+        waitDuration: const Duration(milliseconds: 300),
+        child: Semantics(label: item.label, button: true, child: navItem),
+      );
+    } else {
+      navItem = Semantics(label: item.label, button: true, child: navItem);
+    }
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+      child: navItem,
     );
   }
 }
