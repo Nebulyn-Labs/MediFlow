@@ -145,8 +145,7 @@ class CsvExportService {
     List<MedRequest> requests,
   ) async {
     final rows = buildIndentRequestRows(requests);
-    final fileName =
-        'indent_requests_${_stampFmt.format(DateTime.now())}.csv';
+    final fileName = 'indent_requests_${_stampFmt.format(DateTime.now())}.csv';
     return _saveCsv(rows, fileName);
   }
 
