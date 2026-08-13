@@ -187,7 +187,8 @@ class _IndentCreationPageState extends ConsumerState<IndentCreationPage> {
 
     if (itemsToSubmit.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-          content: Text('Please enter quantities greater than 0 for at least one medicine.')));
+          content: Text(
+              'Please enter quantities greater than 0 for at least one medicine.')));
       return;
     }
 
