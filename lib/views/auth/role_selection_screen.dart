@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -211,36 +212,62 @@ class _RoleSelectionScreenState extends State<RoleSelectionScreen>
                           setState(() => _isFocusedAdmin = val),
                       onTap: () => context.go('/login/admin'),
                     ),
-                    const SizedBox(height: 48),
-                    Consumer(
-                      builder: (context, ref, child) {
-                        return TextButton.icon(
-                          onPressed: () async {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
-                                    content: Text('Seeding demo data...')));
-                            final error = await ref
-                                .read(firebaseServiceProvider)
-                                .seedDemoData();
-                            if (context.mounted) {
+                    if (kDebugMode) ...[
+                      const SizedBox(height: 48),
+                      Consumer(
+                        builder: (context, ref, child) {
+                          return TextButton.icon(
+                            onPressed: () async {
+                              final messenger = ScaffoldMessenger.of(context);
+                              final confirmed = await showDialog<bool>(
+                                context: context,
+                                builder: (ctx) => AlertDialog(
+                                  title: const Text('Confirm Database Reseed'),
+                                  content: const Text(
+                                    'Warning: This deletes all live data (facilities, inventory, usage logs, and requests) and repopulates demo data. This action cannot be undone.\n\nAre you sure you want to proceed?',
+                                  ),
+                                  actions: [
+                                    TextButton(
+                                      onPressed: () =>
+                                          Navigator.of(ctx).pop(false),
+                                      child: const Text('Cancel'),
+                                    ),
+                                    FilledButton(
+                                      style: FilledButton.styleFrom(
+                                        backgroundColor: Colors.red,
+                                      ),
+                                      onPressed: () =>
+                                          Navigator.of(ctx).pop(true),
+                                      child: const Text('Wipe & Reseed'),
+                                    ),
+                                  ],
+                                ),
+                              );
+
+                              if (confirmed != true) return;
+
+                              messenger.showSnackBar(const SnackBar(
+                                  content: Text('Seeding demo data...')));
+                              final error = await ref
+                                  .read(firebaseServiceProvider)
+                                  .seedDemoData();
                               if (error != null) {
-                                ScaffoldMessenger.of(context).showSnackBar(
+                                messenger.showSnackBar(
                                     SnackBar(content: Text(error)));
                               } else {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                    const SnackBar(
-                                        content: Text('Demo data seeded ✓')));
+                                messenger.showSnackBar(const SnackBar(
+                                    content: Text('Demo data seeded ✓')));
                               }
-                            }
-                          },
-                          icon:
-                              const Icon(Icons.data_saver_on_rounded, size: 16),
-                          label: const Text('Seed Demo Data'),
-                          style: TextButton.styleFrom(
-                              foregroundColor: MediColors.textMuted),
-                        );
-                      },
-                    ),
+                            },
+                            icon: const Icon(Icons.data_saver_on_rounded,
+                                size: 16),
+                            label: const Text('Seed Demo Data'),
+                            style: TextButton.styleFrom(
+                                foregroundColor: MediColors.textMuted),
+                          );
+                        },
+                      ),
+                    ],
                   ],
                 ),
               ),
