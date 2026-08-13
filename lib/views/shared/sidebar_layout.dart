@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import '../../services/firebase_service.dart';
 import '../../models/inventory_item.dart';
 import 'package:med_supply_prototype/theme/medi_flow_theme.dart';
@@ -241,23 +240,7 @@ class _SidebarLayoutState extends ConsumerState<SidebarLayout> {
                   _buildNavItem(
                     _NavItem(Icons.logout_rounded, 'Logout'),
                     false,
-                    () async {
-                      final confirmed = await confirmLogout(context);
-                      if (!confirmed) return;
-                      try {
-                        await FirebaseAuth.instance.signOut();
-                        if (context.mounted) context.go('/');
-                      } catch (e) {
-                        if (context.mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Text('Sign out failed: ${e.toString()}'),
-                              backgroundColor: colors.error,
-                            ),
-                          );
-                        }
-                      }
-                    },
+                    () => signOutWithConfirmation(context),
                     isLogout: true,
                   ),
                   const SizedBox(height: 16),
