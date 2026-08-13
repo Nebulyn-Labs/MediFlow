@@ -276,6 +276,14 @@ class _ActiveIndentsPageState extends ConsumerState<ActiveIndentsPage> {
 
   // ---------- Draft actions ----------
   Future<void> _updateQuantity(String requestId, int quantity) async {
+    if (quantity <= 0) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+            content: Text('Quantity must be greater than 0.'),
+            backgroundColor: MediColors.error));
+      }
+      return;
+    }
     setState(() => _isDraftActionInProgress = true);
     try {
       await ref

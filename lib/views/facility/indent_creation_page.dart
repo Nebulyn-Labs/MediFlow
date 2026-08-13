@@ -162,6 +162,24 @@ class _IndentCreationPageState extends ConsumerState<IndentCreationPage> {
   }
 
   Future<void> _submitIndent() async {
+    bool hasInvalidQuantity = false;
+    for (var item in _inventory) {
+      final text = _controllers[item.id]?.text.trim() ?? '0';
+      if (text.isEmpty) continue;
+      final val = int.tryParse(text);
+      if (val == null || val < 0) {
+        hasInvalidQuantity = true;
+        break;
+      }
+    }
+
+    if (hasInvalidQuantity) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text('Please enter valid, non-negative quantities.'),
+          backgroundColor: MediColors.error));
+      return;
+    }
+
     final itemsToSubmit = _inventory.where((item) {
       final qty = int.tryParse(_controllers[item.id]?.text ?? '0') ?? 0;
       return qty > 0;
@@ -169,7 +187,7 @@ class _IndentCreationPageState extends ConsumerState<IndentCreationPage> {
 
     if (itemsToSubmit.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-          content: Text('Please enter quantities for at least one medicine.')));
+          content: Text('Please enter quantities greater than 0 for at least one medicine.')));
       return;
     }
 
@@ -553,33 +571,60 @@ class _IndentCreationPageState extends ConsumerState<IndentCreationPage> {
           ),
           Expanded(
             flex: 2,
-            child: Container(
-                height: 40,
-                decoration: BoxDecoration(
-                    color: MediColors.surfaceLight,
-                    borderRadius: BorderRadius.circular(20),
-                    border: Border.all(color: MediColors.border)),
-                child: Row(children: [
-                  Expanded(
-                    child: TextField(
-                      controller: _controllers[item.id],
-                      keyboardType: TextInputType.number,
-                      textAlign: TextAlign.center,
-                      style: const TextStyle(
-                          fontSize: 14, color: MediColors.textPrimary),
-                      decoration: const InputDecoration(
-                        border: InputBorder.none,
-                        contentPadding: EdgeInsets.zero,
+            child: Builder(builder: (context) {
+              final textVal = _controllers[item.id]?.text.trim() ?? '';
+              final parsedVal = int.tryParse(textVal);
+              final bool isNegativeOrInvalid =
+                  textVal.isNotEmpty && (parsedVal == null || parsedVal < 0);
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                      height: 40,
+                      decoration: BoxDecoration(
+                          color: MediColors.surfaceLight,
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(
+                              color: isNegativeOrInvalid
+                                  ? MediColors.error
+                                  : MediColors.border)),
+                      child: Row(children: [
+                        Expanded(
+                          child: TextField(
+                            controller: _controllers[item.id],
+                            keyboardType: TextInputType.number,
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                                fontSize: 14,
+                                color: isNegativeOrInvalid
+                                    ? MediColors.error
+                                    : MediColors.textPrimary),
+                            decoration: const InputDecoration(
+                              border: InputBorder.none,
+                              contentPadding: EdgeInsets.zero,
+                            ),
+                            onChanged: (_) => setState(() {}),
+                          ),
+                        ),
+                        Padding(
+                          padding: const EdgeInsets.only(right: 12.0),
+                          child: Text(item.unit,
+                              style: const TextStyle(
+                                  color: MediColors.textMuted, fontSize: 11)),
+                        ),
+                      ])),
+                  if (isNegativeOrInvalid)
+                    const Padding(
+                      padding: EdgeInsets.only(top: 2, left: 8),
+                      child: Text(
+                        'Enter a number > 0',
+                        style: TextStyle(color: MediColors.error, fontSize: 10),
                       ),
                     ),
-                  ),
-                  Padding(
-                    padding: const EdgeInsets.only(right: 12.0),
-                    child: Text(item.unit,
-                        style: const TextStyle(
-                            color: MediColors.textMuted, fontSize: 11)),
-                  ),
-                ])),
+                ],
+              );
+            }),
           ),
         ],
       ),
