@@ -26,10 +26,11 @@ donor, with an ordered list of stops).
    by descending quantity.
 3. For each deficit, score every candidate donor using the Optimal
    Transfer Score: proximity (capped contribution at 200km), a flat +150
-   bonus for rural recipients, and a fulfillment bonus (+50 full, +25
-   partial). Pick the highest-scoring donor, repeat until the deficit is
-   met or donors are exhausted, allowing a single indent to be split
-   across multiple donors.
+   bonus for rural recipients, a fulfillment bonus (+50 full, +25
+   partial), and a near-expiry bonus (+100 when the donor's soonest valid
+   batch expires within 90 days, excluding already-expired stock). Pick the
+   highest-scoring donor, repeat until the deficit is met or donors are
+   exhausted, allowing a single indent to be split across multiple donors.
 4. Group the resulting transfers by donor and hand each donor's transfer
    list to a `RoutingStrategy` (the nearest-neighbor greedy heuristic by
    default) to produce an ordered stop list.
@@ -54,8 +55,10 @@ per-segment routes concatenated for multi-stop requests.
 **Flow:** coordinates are validated first (rejecting placeholder or
 out-of-range coordinates without an external call). ORS is tried first if
 an API key is configured, then OSRM, then a straight-line fallback if both
-fail or time out. Each segment is fetched independently with no caching or
-retries.
+fail or time out. Route segments are stored in a bounded in-memory cache
+(up to 100 entries, evicting the oldest entry when full). On a cache miss,
+if external calls fail or time out, the segment falls back to a straight
+line without retries.
 
 **Key assumption:** a failed or skipped external call degrades to a
 straight line rather than blocking the UI, so a rendered multi-stop route

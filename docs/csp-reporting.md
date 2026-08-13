@@ -108,3 +108,13 @@ The endpoint accepts three standardized CSP report formats:
 | **413 Payload Too Large** | Size Exceeded | Request size or `Content-Length` header exceeds 10 KB limit. |
 | **415 Unsupported Media Type** | Invalid Content-Type | `Content-Type` header is missing or unsupported. |
 | **429 Too Many Requests** | Rate Limited | Client IP has sent more than 1 report within the 5-second interval window. |
+
+---
+
+## Related documentation
+
+- [README](../README.md) provides the project overview and local setup guide.
+- [BigQuery Integration](bigquery.md) documents the analytics pipeline that
+  sits alongside the Cloud Functions backend.
+- [AI Tool-Calling Architecture](ai-tool-calling.md) covers the secure,
+  authenticated callable-function pattern used elsewhere in the backend.

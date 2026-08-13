@@ -6,6 +6,7 @@ import '../../services/csv_export_service.dart';
 import '../../models/request.dart';
 import 'package:med_supply_prototype/constants/colors.dart';
 import '../shared/skeleton_loaders.dart';
+import '../../utils/date_formatter.dart';
 
 class AdminIndentStatusPage extends ConsumerStatefulWidget {
   const AdminIndentStatusPage({super.key});
@@ -49,11 +50,78 @@ class _AdminIndentStatusPageState extends ConsumerState<AdminIndentStatusPage> {
     }
   }
 
-  Future<void> _updateStatus(String requestId, RequestStatus status) async {
+  List<RequestStatus> _getValidTransitions(RequestStatus currentStatus) {
+    switch (currentStatus) {
+      case RequestStatus.pending:
+        return [RequestStatus.approved, RequestStatus.rejected];
+      case RequestStatus.approved:
+        return [RequestStatus.fulfilled, RequestStatus.rejected];
+      case RequestStatus.rejected:
+        return [RequestStatus.pending];
+      case RequestStatus.needsManualReview:
+        // Flagged by onIndentApproved when approval processing hit a
+        // non-retryable, non-business-rule failure (#314). Give the admin
+        // an explicit way to unstick it: retry it as a fresh pending
+        // request, or reject it outright if it shouldn't be retried.
+        return [RequestStatus.pending, RequestStatus.rejected];
+      case RequestStatus.fulfilled:
+      case RequestStatus.draft:
+        return [];
+    }
+  }
+
+  Future<bool?> _showConfirmationDialog({
+    required String title,
+    required String message,
+    required String confirmLabel,
+    required Color confirmColor,
+  }) {
+    return showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: MediColors.surface,
+        title:
+            Text(title, style: const TextStyle(color: MediColors.textPrimary)),
+        content: Text(message,
+            style: const TextStyle(color: MediColors.textSecondary)),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Cancel',
+                style: TextStyle(color: MediColors.textMuted)),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            style: FilledButton.styleFrom(backgroundColor: confirmColor),
+            child: Text(confirmLabel),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _updateStatus(MedRequest request, RequestStatus status) async {
+    final statusLabel = status.label.toUpperCase();
+    final confirmed = await _showConfirmationDialog(
+      title: 'Confirm Status Change',
+      message:
+          'Are you sure you want to change the status of ${request.medicineName} request to $statusLabel?',
+      confirmLabel: statusLabel,
+      confirmColor: _getStatusColor(status),
+    );
+
+    if (confirmed != true || !mounted) return;
+
     try {
       await ref
           .read(firebaseServiceProvider)
-          .updateRequestStatus(requestId, status);
+          .updateRequestStatus(request.id, status);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+              content: Text('Request updated to $statusLabel successfully!')),
+        );
+      }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context)
@@ -72,6 +140,8 @@ class _AdminIndentStatusPageState extends ConsumerState<AdminIndentStatusPage> {
         return MediColors.warning;
       case RequestStatus.fulfilled:
         return MediColors.info;
+      case RequestStatus.needsManualReview:
+        return MediColors.violet;
       case RequestStatus.draft:
         return MediColors.textMuted;
     }
@@ -209,6 +279,7 @@ class _AdminIndentStatusPageState extends ConsumerState<AdminIndentStatusPage> {
 
   Widget _buildTableRow(MedRequest req) {
     final isApproved = req.status == RequestStatus.approved;
+    final validTransitions = _getValidTransitions(req.status);
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
@@ -216,7 +287,7 @@ class _AdminIndentStatusPageState extends ConsumerState<AdminIndentStatusPage> {
         children: [
           Expanded(
               flex: 2,
-              child: Text('${req.requestDate.day}/${req.requestDate.month}',
+              child: Text(DateFormatter.formatDate(req.requestDate),
                   style: const TextStyle(color: MediColors.textSecondary))),
           Expanded(
               flex: 3,
@@ -241,7 +312,7 @@ class _AdminIndentStatusPageState extends ConsumerState<AdminIndentStatusPage> {
                 color: _getStatusColor(req.status).withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(6),
               ),
-              child: Text(req.status.name.toUpperCase(),
+              child: Text(req.status.label.toUpperCase(),
                   style: TextStyle(
                       color: _getStatusColor(req.status),
                       fontSize: 10,
@@ -277,15 +348,19 @@ class _AdminIndentStatusPageState extends ConsumerState<AdminIndentStatusPage> {
           Expanded(
             flex: 1,
             child: PopupMenuButton<RequestStatus>(
-              icon: const Icon(Icons.more_vert_rounded,
-                  color: MediColors.textMuted, size: 20),
-              onSelected: (status) => _updateStatus(req.id, status),
-              itemBuilder: (context) => RequestStatus.values
-                  .where((s) => s != RequestStatus.draft)
-                  .map((status) {
+              enabled: validTransitions.isNotEmpty,
+              icon: Icon(
+                Icons.more_vert_rounded,
+                color: validTransitions.isNotEmpty
+                    ? MediColors.textMuted
+                    : MediColors.textMuted.withValues(alpha: 0.3),
+                size: 20,
+              ),
+              onSelected: (status) => _updateStatus(req, status),
+              itemBuilder: (context) => validTransitions.map((status) {
                 return PopupMenuItem(
                   value: status,
-                  child: Text(status.name.toUpperCase(),
+                  child: Text(status.label.toUpperCase(),
                       style: const TextStyle(fontSize: 12)),
                 );
               }).toList(),

@@ -20,6 +20,7 @@ jobs:
       - name: Set up Flutter
         uses: subosito/flutter-action@v2
         with:
+          flutter-version: '3.41.0'
           channel: 'stable'
           cache: true
           pub-cache: true
@@ -27,22 +28,43 @@ jobs:
       - name: Install Dependencies
         run: flutter pub get
 
+      # Recorded rather than fatal, so a whitespace problem does not hide the
+      # analyze/test/build results. The job is failed again at the end.
       - name: Verify Code Formatting
-        run: dart format .
+        id: format
+        continue-on-error: true
+        run: dart format --output=none --set-exit-if-changed .
+
+      - name: Show Required Formatting Changes
+        if: steps.format.outcome == 'failure'
+        run: |
+          echo "::error::Code is not formatted. Run 'dart format .' locally and commit the result."
+          dart format .
+          git --no-pager diff
 
       - name: Analyze Code
         run: flutter analyze
 
-      - name: Run Unit Tests
-        run: flutter test
+      - name: Run Unit Tests with Coverage
+        run: flutter test --coverage
+      
+      - name: Check Coverage Regression
+        env:
+          COVERAGE_TOLERANCE: "3.0"
+        run: bash tool/check_coverage.sh
 
       - name: Build Web App
         run: flutter build web --release
 
+      - name: Fail If Formatting Was Wrong
+        if: steps.format.outcome == 'failure'
+        run: |
+          echo "::error::Formatting check failed. The exact diff is in the 'Show Required Formatting Changes' step above."
+          exit 1
+
   functions_ci:
     name: Cloud Functions CI
     runs-on: ubuntu-latest
-    # Run only if files in functions/ have changed to avoid unnecessary runs
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
@@ -54,6 +76,15 @@ jobs:
           filters: |
             functions:
               - 'functions/**'
+              - 'firestore.rules'
+              - '.github/workflows/flutter-ci.yml'
+
+      - name: Set up JDK 21
+        if: steps.filter.outputs.functions == 'true'
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
 
       - name: Set up Node.js
         if: steps.filter.outputs.functions == 'true'
@@ -68,12 +99,16 @@ jobs:
         working-directory: functions
         run: npm ci
 
+      - name: Install Firebase CLI
+        if: steps.filter.outputs.functions == 'true'
+        run: npm install -g firebase-tools
+
       - name: Run Linter
         if: steps.filter.outputs.functions == 'true'
         working-directory: functions
         run: npm run lint
 
-      - name: Run Tests
+      - name: Run Tests with Firestore Emulator
         if: steps.filter.outputs.functions == 'true'
         working-directory: functions
-        run: npm test
+        run: firebase emulators:exec --only firestore --project mediflow-test 'node --test test/*.test.js'

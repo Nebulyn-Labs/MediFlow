@@ -3,8 +3,16 @@
 AI-powered medical logistics platform focused on smart resource allocation
 
 ![Flutter](https://img.shields.io/badge/Flutter-%2302569B.svg?style=for-the-badge&logo=Flutter&logoColor=white)
+![Dart](https://img.shields.io/badge/Dart-0175C2?style=for-the-badge&logo=Dart&logoColor=white)
 ![Firebase](https://img.shields.io/badge/Firebase-039BE5?style=for-the-badge&logo=Firebase&logoColor=white)
 ![Gemini AI](https://img.shields.io/badge/Gemini%20AI-8E75B2?style=for-the-badge&logo=google-gemini&logoColor=white)
+
+![License](https://img.shields.io/github/license/Nebulyn-Labs/MediFlow?style=for-the-badge)
+![Stars](https://img.shields.io/github/stars/Nebulyn-Labs/MediFlow?style=for-the-badge&logo=github&logoColor=white)
+![Forks](https://img.shields.io/github/forks/Nebulyn-Labs/MediFlow?style=for-the-badge&logo=github&logoColor=white)
+![Contributors](https://img.shields.io/github/contributors/Nebulyn-Labs/MediFlow?style=for-the-badge&logo=github&logoColor=white)
+![Open Issues](https://img.shields.io/github/issues/Nebulyn-Labs/MediFlow?style=for-the-badge)
+![Open PRs](https://img.shields.io/github/issues-pr/Nebulyn-Labs/MediFlow?style=for-the-badge)
 
 ---
 
@@ -127,11 +135,13 @@ graph TD
    ensures that redistribution is both efficient and equitable:
 
    $$OTS = (w_{dist} \cdot Proximity) + (w_{prior} \cdot RuralPriority) +
-   (w_{qty} \cdot QtyMatch)$$
+   (w_{qty} \cdot QtyMatch) + (w_{exp} \cdot NearExpiry)$$
 
-   - **Proximity:** Minimizes logistics cost and time.
-   - **Rural Priority:** A weight multiplier ensuring that remote facilities are
-     never starved by the algorithm.
+   - **Proximity:** Minimizes logistics cost and time (scored up to 200 points based on distance).
+   - **Rural Priority:** A flat +150 bonus ensuring remote facilities are prioritized.
+   - **Quantity Match:** A fulfillment bonus (+50 full, +25 partial) based on demand met.
+   - **Near Expiry:** A flat +100 bonus when the donor's soonest valid batch
+     expires within 90 days (excluding already-expired stock).
 
 3. **Geospatial Routing System:** Integrated with **flutter_map** and
    **OSRM/OpenRouteService**, our routing engine decodes complex polylines to
@@ -143,7 +153,9 @@ and demo data algorithms, see
 For a detailed walkthrough of how the AI chat assistant flows from the
 client to Gemini and on to backend actions, including authorization checks,
 see [AI Tool-Calling Architecture](docs/ai-tool-calling.md). For the
-BigQuery data pipeline, see [BigQuery Integration](docs/bigquery.md).
+BigQuery data pipeline, see [BigQuery Integration](docs/bigquery.md). For
+the public Content Security Policy reporting endpoint, see
+[CSP Reporting](docs/csp-reporting.md).
 
 ---
 
@@ -163,7 +175,6 @@ lib/
 │
 ├── services/                   # Business Logic & Intelligence Layer
 │   ├── ai_service.dart         # Gemini-1.5-Flash forecasting & reasoning
-│   ├── chat_service.dart       # NLP pipeline for the AI Assistant
 │   ├── firebase_service.dart   # Firestore infrastructure & transactions
 │   ├── optimization_service.dart # OTS heuristic & matching algorithm
 │   ├── routing_service.dart    # Geospatial OSRM/ORS pathfinding logic
@@ -229,7 +240,19 @@ high-concurrency performance:
 
 > [!NOTE]
 > If the dashboard appears empty, use the **"Seed DB"** button on the
-> Login/Role Selection screen to populate the database with demo records.
+> Login screen to populate the database with demo records.
+
+### How to Use the Demo
+
+1. **Choose a role** on the Role Selection screen, which is the landing
+   page:
+   - **CMS Admin** — approve redistribution plans, inspect regional
+     analytics, and run route optimization.
+   - **Facility Head** — log daily medicine usage, review AI demand
+     forecasts, file restock indents, and chat with the AI assistant.
+2. **Log in** with the matching demo credentials above.
+3. **(Optional) Seed the database** with the **"Seed DB"** button if no
+   data is shown.
 
 ---
 
@@ -268,7 +291,7 @@ high-concurrency performance:
    No additional client configuration is required.
 
    For Flutter Web, see **Step 6** for configuring the
-  `RECAPTCHA_SITE_KEY` using `--dart-define`.
+   `RECAPTCHA_SITE_KEY` using `--dart-define`.
 
    If you are modifying Cloud Functions, configure the required Firebase
    Secrets as described in the Troubleshooting section.
@@ -297,17 +320,16 @@ high-concurrency performance:
      uses a Debug token. You must register your app's SHA-256 certificate
      in the Firebase Console under App Check.
 
-   - **Web:** We use reCAPTCHA v3. Provide your site key during build or run
-     time:
+   - **Web & Routing:** Provide your reCAPTCHA site key and optional OpenRouteService API key during build or run time:
 
      ```bash
      flutter run -d chrome \
-       --dart-define=RECAPTCHA_SITE_KEY=your_recaptcha_site_key
+       --dart-define=RECAPTCHA_SITE_KEY=your_recaptcha_site_key \
+       --dart-define=ORS_API_KEY=your_openrouteservice_api_key
      ```
 
-     *Note: If no key is provided, the app will continue to run, but App
-     Check will remain inactive for web. If App Check enforcement is enabled
-     in the Firebase Console, requests may be rejected.*
+     *Note: If no ORS API key is provided, the app dynamically falls back to the public OSRM demo*
+     *server and straight-line routing.*
 
 ---
 

@@ -123,10 +123,11 @@ class NearestNeighborRoutingStrategy implements RoutingStrategy {
 /// - **Scoring (Optimal Transfer Score):** for each candidate donor of a
 ///   given medicine, a score is computed from proximity (closer is worth
 ///   more, capped at 200km), a flat +150 bonus when the recipient is rural,
-///   and a fulfillment bonus (+50 full, +25 partial). The highest-scoring
-///   donor is chosen per iteration; this repeats until the deficit is met
-///   or no donor has stock left, allowing a single indent to be split
-///   across multiple donors.
+///   a fulfillment bonus (+50 full, +25 partial), and a near-expiry bonus
+///   (+100 when the donor's soonest valid batch expires within 90 days,
+///   excluding already-expired stock). The highest-scoring donor is chosen
+///   per iteration; this repeats until the deficit is met or no donor has
+///   stock left, allowing a single indent to be split across multiple donors.
 /// - **Routing** ([NearestNeighborRoutingStrategy]): stops for a donor are
 ///   ordered with a simple greedy nearest-neighbor heuristic starting from
 ///   the donor's own location. This is not a shortest-path/TSP solver — it
@@ -146,15 +147,14 @@ class OptimizationService {
   }) {
     List<TransferRecommendation> recommendations = [];
     final Distance distanceCalc = const Distance();
-    final facilityById = {for (final facility in facilities) facility.id: facility};
+    final facilityById = {
+      for (final facility in facilities) facility.id: facility
+    };
 
     // 1. Group needs (shortage or regular indent) by medicine
     final pendingIndents = <MedRequest>[];
     for (final request in requests) {
-      if (!((request.status == RequestStatus.pending ||
-              request.status == RequestStatus.approved) &&
-          (request.type == RequestType.regularIndent ||
-              request.type == RequestType.shortage))) {
+      if (!request.isDeficit) {
         continue;
       }
 
@@ -196,6 +196,12 @@ class OptimizationService {
       workingSurpluses[f.id] = {};
       final inv = inventories[f.id] ?? [];
       for (var item in inv) {
+        if (item.initialQuantity <= 0) {
+          debugPrint(
+            'OptimizationService: Skipping item ${item.medicineName} with non-positive initial quantity ${item.initialQuantity}.',
+          );
+          continue;
+        }
         int surplus =
             item.remainingQuantity - (item.initialQuantity * 0.3).toInt();
         if (surplus > 0) {
@@ -295,6 +301,30 @@ class OptimizationService {
             reasons.add('Partial Fulfillment');
           }
 
+          // D. Near-Expiry Priority (+100 when soonest valid batch expires ≤90 days)
+          // Prefer donors whose surplus expires soonest so stock is redistributed
+          // before wastage, matching the documented heuristic in the AI prompt.
+          // Only non-expired batches are considered: a batch that already expired
+          // gives a negative daysUntilExpiry which would satisfy <= 90 and
+          // incorrectly rank expired stock above fresh stock.
+          final donorBatches = inventories[donorFac.id] ?? [];
+          final validMedicineBatches = donorBatches
+              .where((item) =>
+                  item.medicineName == medicine &&
+                  item.expiryDate.isAfter(DateTime.now()))
+              .toList();
+          if (validMedicineBatches.isNotEmpty) {
+            final soonestExpiry = validMedicineBatches
+                .map((item) => item.expiryDate)
+                .reduce((a, b) => a.isBefore(b) ? a : b);
+            final daysUntilExpiry =
+                soonestExpiry.difference(DateTime.now()).inDays;
+            if (daysUntilExpiry >= 0 && daysUntilExpiry <= 90) {
+              score += 100;
+              reasons.add('Near Expiry (${daysUntilExpiry}d)');
+            }
+          }
+
           if (score > highestScore) {
             highestScore = score;
             bestDonorMatch = {
@@ -315,8 +345,8 @@ class OptimizationService {
             recipient: recipientFac,
             medicine: medicine,
             quantity: qtyTaken,
-            score: bestDonorMatch['score'],
-            reasoning: bestDonorMatch['reasoning'],
+            score: (bestDonorMatch['score'] as num?)?.toDouble() ?? 0.0,
+            reasoning: bestDonorMatch['reasoning']?.toString() ?? '',
           ));
 
           // Update state
