@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import '../../models/inventory_item.dart';
 import '../../services/firebase_service.dart';
 import '../../services/simulation_service.dart';
@@ -201,21 +200,7 @@ class _FacilityOverviewState extends ConsumerState<FacilityOverview> {
                 ],
                 onSelected: (v) async {
                   if (v == 'out') {
-                    final confirmed = await confirmLogout(context);
-                    if (confirmed != true) return;
-                    try {
-                      await FirebaseAuth.instance.signOut();
-                      if (context.mounted) context.go('/');
-                    } catch (e) {
-                      if (context.mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text('Sign out failed: ${e.toString()}'),
-                            backgroundColor: MediColors.error,
-                          ),
-                        );
-                      }
-                    }
+                    await signOutWithConfirmation(context);
                   }
                 },
               ),

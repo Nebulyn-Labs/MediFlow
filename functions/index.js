@@ -13,6 +13,7 @@ const { createLowStockService } = require("./helpers/lowStock");
 const { handleCspReport, getClientIp } = require("./helpers/cspReport");
 const { wrapUserContent, wrapDataContent } = require("./helpers/promptHardener");
 const { isValidQuantity } = require("./helpers/quantityValidation");
+const { runToolCallLoop } = require("./helpers/toolCallLoop");
 const {
   ApprovalBusinessRuleError,
   handleApprovalFailure,
@@ -963,28 +964,11 @@ exports.getChatResponseSecure = onCall({ secrets: [GEMINI_API_KEY] }, async (req
       history: formattedHistory
     });
 
-    let result = await chat.sendMessage(prompt);
+    const result = await chat.sendMessage(prompt);
 
-    while (result.response.functionCalls && result.response.functionCalls.length > 0) {
-      const functionResponses = [];
-      for (const call of result.response.functionCalls) {
-        let executionResult;
-        try {
-          executionResult = await executeTool(call.name, call.args, authInfo);
-        } catch (e) {
-          executionResult = { error: e.message };
-        }
-        functionResponses.push({
-          functionResponse: {
-            name: call.name,
-            response: executionResult
-          }
-        });
-      }
-      result = await chat.sendMessage(functionResponses);
-    }
-
-    return result.response.text();
+    return await runToolCallLoop(chat, result, (name, args) =>
+      executeTool(name, args, authInfo)
+    );
   } catch (error) {
     logger.error("Chat Error:", error);
     throw new HttpsError('internal', 'AI chat failed');

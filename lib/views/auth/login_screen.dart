@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -26,21 +27,46 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   }
 
   Future<void> _seedDatabase() async {
+    final messenger = ScaffoldMessenger.of(context);
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Confirm Database Reseed'),
+        content: const Text(
+          'Warning: This deletes all live data (facilities, inventory, usage logs, and requests) and repopulates demo data. This action cannot be undone.\n\nAre you sure you want to proceed?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(
+              backgroundColor: Colors.red,
+            ),
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: const Text('Wipe & Reseed'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) return;
+
     setState(() => _isLoading = true);
     try {
-      await ref.read(firebaseServiceProvider).seedDemoData();
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
+      final error = await ref.read(firebaseServiceProvider).seedDemoData();
+      if (error != null) {
+        messenger.showSnackBar(SnackBar(content: Text(error)));
+      } else {
+        messenger.showSnackBar(
           const SnackBar(
               content: Text(
                   'Database seeded ✓ Use rampur@mediflow.com / password123')),
         );
       }
     } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text('Error: $e')));
-      }
+      messenger.showSnackBar(SnackBar(content: Text('Error: $e')));
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
@@ -326,14 +352,16 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
             Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                TextButton.icon(
-                  onPressed: _isLoading ? null : _seedDatabase,
-                  icon: const Icon(Icons.dataset_rounded, size: 16),
-                  label: const Text('Seed DB'),
-                  style: TextButton.styleFrom(
-                      foregroundColor: MediColors.textMuted),
-                ),
-                const SizedBox(width: 8),
+                if (kDebugMode) ...[
+                  TextButton.icon(
+                    onPressed: _isLoading ? null : _seedDatabase,
+                    icon: const Icon(Icons.dataset_rounded, size: 16),
+                    label: const Text('Seed DB'),
+                    style: TextButton.styleFrom(
+                        foregroundColor: MediColors.textMuted),
+                  ),
+                  const SizedBox(width: 8),
+                ],
                 TextButton.icon(
                   onPressed: () => context.go('/'),
                   icon: const Icon(Icons.arrow_back_rounded, size: 16),
