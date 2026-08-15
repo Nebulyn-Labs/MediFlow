@@ -36,8 +36,7 @@ void main() {
     service = NotificationService(firestore, mockAuth, mockMessaging);
   });
 
-  test(
-      'persists fcmToken on users/{uid} via merge when permission is granted',
+  test('persists fcmToken on users/{uid} via merge when permission is granted',
       () async {
     final settings = MockNotificationSettings();
     when(() => settings.authorizationStatus)
