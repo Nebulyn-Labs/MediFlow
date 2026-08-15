@@ -445,7 +445,7 @@ class _RouteOptimizationMapState extends ConsumerState<RouteOptimizationMap> {
                                               LatLng(s.latitude, s.longitude))
                                           .toList();
                                   bool hasRural = mr.stops.any((s) =>
-                                      s.type == 'rural' && s.id != donorId);
+                                      s.type == FacilityType.rural && s.id != donorId);
                                   return Polyline(
                                     points: points,
                                     color: (hasRural
@@ -734,7 +734,7 @@ class _RouteOptimizationMapState extends ConsumerState<RouteOptimizationMap> {
                         fontWeight: FontWeight.bold,
                         fontSize: 12)),
               ),
-              if (rec.recipient.type == 'rural')
+              if (rec.recipient.type == FacilityType.rural)
                 Container(
                   padding:
                       const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
