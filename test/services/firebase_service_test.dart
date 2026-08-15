@@ -237,6 +237,20 @@ void main() {
       final medicines = logDoc.data()?['medicines'] as List;
       expect(medicines.first['unitsDistributed'], 20);
     });
+
+    test('hasPendingWritesStream starts as false with no pending writes',
+        () async {
+      final result = await firebaseService.hasPendingWritesStream.first;
+      expect(result, isFalse);
+    });
+
+    test('forceSyncPendingWrites completes without hanging', () async {
+      // fake_cloud_firestore doesn't implement waitForPendingWrites, so we
+      // can't assert the return value here — only that the timeout/catch
+      // path means this always resolves instead of hanging forever.
+      final synced = await firebaseService.forceSyncPendingWrites();
+      expect(synced, isA<bool>());
+    });
   });
 
   group('FirebaseService - getPaginatedMedicines', () {
