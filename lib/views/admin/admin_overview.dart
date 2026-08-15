@@ -27,6 +27,7 @@ class _AdminOverviewState extends ConsumerState<AdminOverview> {
   int _openShortageRequests = 0;
   int _surplusOffers = 0;
   int _pendingApprovals = 0;
+  int _needsManualReview = 0;
 
   bool _isInitialLoading = true;
   String? _errorMessage;
@@ -176,6 +177,39 @@ class _AdminOverviewState extends ConsumerState<AdminOverview> {
           failedFacilityNames.add(f.name);
         }
       }),
+    );
+
+    _requestsSub = firebaseService.streamRequests(null).listen(
+      (reqs) {
+        if (!mounted) return;
+        int shortage = 0;
+        int surplus = 0;
+        for (var r in reqs) {
+          if (r.status == RequestStatus.pending) {
+            if (r.type == RequestType.shortage) shortage++;
+            if (r.type == RequestType.surplus) surplus++;
+          }
+        }
+        // The "Pending Approvals" KPI mirrors the /admin/approvals page,
+        // which lists every pending request regardless of type. Using
+        // MedRequest.countPending keeps the card and the page in lockstep
+        // (#334).
+        final pending = MedRequest.countPending(reqs);
+        // Requests onIndentApproved couldn't process automatically (a
+        // non-retryable, non-business-rule failure) land here instead of
+        // silently reappearing as "pending" — surface them so they don't
+        // sit invisibly in Firestore (#314).
+        final needsReview = MedRequest.countNeedsManualReview(reqs);
+        setState(() {
+          _openShortageRequests = shortage;
+          _surplusOffers = surplus;
+          _pendingApprovals = pending;
+          _needsManualReview = needsReview;
+        });
+      },
+      onError: (e) {
+        debugPrint('Failed to stream facility requests: $e');
+      },
     );
 
     if (mounted) {
@@ -494,6 +528,14 @@ class _AdminOverviewState extends ConsumerState<AdminOverview> {
                                 Icons.assignment_turned_in_rounded,
                                 iconColor: colors.info,
                                 onTap: () => context.go('/admin/approvals')),
+                            if (_needsManualReview > 0)
+                              _buildKpiCard(
+                                  'NEEDS REVIEW',
+                                  '$_needsManualReview',
+                                  Icons.report_problem_rounded,
+                                  isAlert: true,
+                                  onTap: () =>
+                                      context.go('/admin/supply-status')),
                           ],
                         ),
                         const SizedBox(height: 36),
@@ -501,12 +543,24 @@ class _AdminOverviewState extends ConsumerState<AdminOverview> {
                           controller: _searchController,
                           onChanged: (value) {
                             setState(() {
-                              _searchQuery = value.toLowerCase();
+                              _searchQuery = value.trim().toLowerCase();
                             });
                           },
                           decoration: InputDecoration(
-                            hintText: 'Search medicines by name...',
-                            prefixIcon: Icon(Icons.search),
+                            hintText:
+                                'Search facilities, regions, or medicines...',
+                            prefixIcon: const Icon(Icons.search),
+                            suffixIcon: _searchController.text.isNotEmpty
+                                ? IconButton(
+                                    icon: const Icon(Icons.clear, size: 18),
+                                    onPressed: () {
+                                      _searchController.clear();
+                                      setState(() {
+                                        _searchQuery = '';
+                                      });
+                                    },
+                                  )
+                                : null,
                             filled: true,
                             fillColor: colors.surface,
                             border: OutlineInputBorder(
@@ -627,20 +681,50 @@ class _AdminOverviewState extends ConsumerState<AdminOverview> {
 
   Widget _buildFacilityHealthGrid() {
     final colors = context.mediTheme;
+    final filteredFacilities = _facilities.where((f) {
+      if (_searchQuery.isEmpty) return true;
+      final q = _searchQuery;
+      return f.name.toLowerCase().contains(q) ||
+          f.region.toLowerCase().contains(q) ||
+          f.type.toLowerCase().contains(q) ||
+          f.id.toLowerCase().contains(q) ||
+          f.email.toLowerCase().contains(q);
+    }).toList();
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text('Facility Health Overview',
-            style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.w700,
-                color: colors.textPrimary)),
-        const SizedBox(height: 16),
-        Wrap(
-          spacing: 16,
-          runSpacing: 16,
-          children: _facilities.map((f) => _buildHealthCard(f)).toList(),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text('Facility Health Overview',
+                style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w700,
+                    color: colors.textPrimary)),
+            if (_searchQuery.isNotEmpty)
+              Text(
+                '${filteredFacilities.length} of ${_facilities.length} facilities shown',
+                style: TextStyle(fontSize: 12, color: colors.textSecondary),
+              ),
+          ],
         ),
+        const SizedBox(height: 16),
+        if (filteredFacilities.isEmpty)
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 16),
+            child: Text(
+              'No facilities match your search query.',
+              style: TextStyle(color: colors.textSecondary),
+            ),
+          )
+        else
+          Wrap(
+            spacing: 16,
+            runSpacing: 16,
+            children:
+                filteredFacilities.map((f) => _buildHealthCard(f)).toList(),
+          ),
       ],
     );
   }

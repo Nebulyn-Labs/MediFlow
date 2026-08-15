@@ -95,6 +95,14 @@ beforeEach(async () => {
       quantity: 10,
       type: 'indent',
     });
+
+    // Inventory & Medicines
+    await db.doc(`inventory/${FACILITY_ID}`).set({ name: 'Alpha Inventory' });
+    await db.doc(`inventory/${FACILITY_ID}/medicines/med-001`).set({ name: 'Paracetamol' });
+
+    // Daily Usage Logs
+    await db.doc(`daily_usage_logs/${FACILITY_ID}`).set({ created: true });
+    await db.doc(`daily_usage_logs/${FACILITY_ID}/logs/log-001`).set({ quantity: 5 });
   });
 });
 
@@ -216,5 +224,44 @@ describe('Issue #196 – users facilityId ownership on create', () => {
         facilityId: FACILITY_ID,
       }),
     );
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Issue #274 – Database wipe and delete rules enforcement
+// ═══════════════════════════════════════════════════════════════════════════════
+
+describe('Issue #274 – database wipe and delete rules enforcement', () => {
+  test('admin CAN delete inventory and medicines documents', async () => {
+    const db = authedDb(ADMIN_UID, 'admin@mediflow.internal');
+    await assertSucceeds(db.doc(`inventory/${FACILITY_ID}/medicines/med-001`).delete());
+    await assertSucceeds(db.doc(`inventory/${FACILITY_ID}`).delete());
+  });
+
+  test('facility head CANNOT delete inventory or medicines documents', async () => {
+    const db = authedDb(FACILITY_HEAD_UID, FACILITY_EMAIL);
+    await assertFails(db.doc(`inventory/${FACILITY_ID}/medicines/med-001`).delete());
+    await assertFails(db.doc(`inventory/${FACILITY_ID}`).delete());
+  });
+
+  test('admin CAN delete daily_usage_logs and logs documents', async () => {
+    const db = authedDb(ADMIN_UID, 'admin@mediflow.internal');
+    await assertSucceeds(db.doc(`daily_usage_logs/${FACILITY_ID}/logs/log-001`).delete());
+    await assertSucceeds(db.doc(`daily_usage_logs/${FACILITY_ID}`).delete());
+  });
+
+  test('facility head CANNOT delete daily_usage_logs or logs documents', async () => {
+    const db = authedDb(FACILITY_HEAD_UID, FACILITY_EMAIL);
+    await assertFails(db.doc(`daily_usage_logs/${FACILITY_ID}/logs/log-001`).delete());
+    await assertFails(db.doc(`daily_usage_logs/${FACILITY_ID}`).delete());
+  });
+
+  test('unauthenticated user CANNOT delete inventory, medicines, daily_usage_logs, or requests documents', async () => {
+    const db = testEnv.unauthenticatedContext().firestore();
+    await assertFails(db.doc(`inventory/${FACILITY_ID}`).delete());
+    await assertFails(db.doc(`inventory/${FACILITY_ID}/medicines/med-001`).delete());
+    await assertFails(db.doc(`daily_usage_logs/${FACILITY_ID}`).delete());
+    await assertFails(db.doc(`daily_usage_logs/${FACILITY_ID}/logs/log-001`).delete());
+    await assertFails(db.doc('requests/req-001').delete());
   });
 });
