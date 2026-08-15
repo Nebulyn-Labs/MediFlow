@@ -64,8 +64,8 @@ class SimulationService {
     final double latOffset = (_random.nextDouble() - 0.5) * 0.4;
     final double lngOffset = (_random.nextDouble() - 0.5) * 0.4;
 
-    final FacilityType assignedType = type ??
-        (_random.nextBool() ? FacilityType.urban : FacilityType.rural);
+    final FacilityType assignedType =
+        type ?? (_random.nextBool() ? FacilityType.urban : FacilityType.rural);
 
     final List<String> regions = [
       'North District',

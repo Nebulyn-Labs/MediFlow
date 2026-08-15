@@ -239,10 +239,12 @@ class OptimizationService {
           return -1;
         }
 
-        if (facA.type == FacilityType.rural && facB.type != FacilityType.rural) {
+        if (facA.type == FacilityType.rural &&
+            facB.type != FacilityType.rural) {
           return -1;
         }
-        if (facB.type == FacilityType.rural && facA.type != FacilityType.rural) {
+        if (facB.type == FacilityType.rural &&
+            facA.type != FacilityType.rural) {
           return 1;
         }
         return b.quantity.compareTo(a.quantity);

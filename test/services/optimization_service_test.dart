@@ -14,7 +14,8 @@ void main() {
     });
 
     // Helpers to create entities easily
-    Facility createFacility(String id, FacilityType type, double lat, double lng) {
+    Facility createFacility(
+        String id, FacilityType type, double lat, double lng) {
       return Facility(
         id: id,
         name: 'Facility $id',
@@ -156,8 +157,10 @@ void main() {
     test('rural requests are prioritized over urban requests', () {
       // Setup one donor with limited surplus, and two requests (rural and urban).
       final donor = createFacility('d1', FacilityType.urban, 28.6, 77.2);
-      final recipientUrban = createFacility('r_urban', FacilityType.urban, 28.7, 77.3);
-      final recipientRural = createFacility('r_rural', FacilityType.rural, 28.7, 77.3);
+      final recipientUrban =
+          createFacility('r_urban', FacilityType.urban, 28.7, 77.3);
+      final recipientRural =
+          createFacility('r_rural', FacilityType.rural, 28.7, 77.3);
 
       // Donor has 50 surplus
       final inventory = createInventory(donor.id, 'ORS', 100, 80);
@@ -182,8 +185,8 @@ void main() {
     test('distance prioritization chooses closer donor', () {
       final donorClose = createFacility(
           'd_close', FacilityType.urban, 28.61, 77.21); // Close to recipient
-      final donorFar =
-          createFacility('d_far', FacilityType.urban, 29.0, 78.0); // Far from recipient
+      final donorFar = createFacility(
+          'd_far', FacilityType.urban, 29.0, 78.0); // Far from recipient
       final recipient = createFacility('r1', FacilityType.urban, 28.6, 77.2);
 
       final invClose =
@@ -209,9 +212,10 @@ void main() {
 
     test('quantity matching chooses full fulfillment over partial fulfillment',
         () {
-      final donorPartial = createFacility('d_partial', FacilityType.urban, 28.61, 77.21);
-      final donorFull = createFacility(
-          'd_full', FacilityType.urban, 28.62, 77.22); // Slightly further but full qty
+      final donorPartial =
+          createFacility('d_partial', FacilityType.urban, 28.61, 77.21);
+      final donorFull = createFacility('d_full', FacilityType.urban, 28.62,
+          77.22); // Slightly further but full qty
       final recipient = createFacility('r1', FacilityType.urban, 28.6, 77.2);
 
       final invPartial =
@@ -592,7 +596,8 @@ void main() {
       const double lat = 28.6;
       const double lng = 77.2;
 
-      final donorFresh = createFacility('d_fresh', FacilityType.urban, lat, lng + 0.1);
+      final donorFresh =
+          createFacility('d_fresh', FacilityType.urban, lat, lng + 0.1);
       final donorExpiring =
           createFacility('d_expiring', FacilityType.urban, lat, lng + 0.1);
       final recipient = createFacility('r1', FacilityType.urban, lat, lng);

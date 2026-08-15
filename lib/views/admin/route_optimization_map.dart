@@ -445,7 +445,8 @@ class _RouteOptimizationMapState extends ConsumerState<RouteOptimizationMap> {
                                               LatLng(s.latitude, s.longitude))
                                           .toList();
                                   bool hasRural = mr.stops.any((s) =>
-                                      s.type == FacilityType.rural && s.id != donorId);
+                                      s.type == FacilityType.rural &&
+                                      s.id != donorId);
                                   return Polyline(
                                     points: points,
                                     color: (hasRural
