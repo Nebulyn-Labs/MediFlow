@@ -1,5 +1,7 @@
 const assert = require("node:assert/strict");
 const { describe, it, beforeEach } = require("node:test");
+const fs = require("node:fs");
+const path = require("node:path");
 const {
   handleCspReport,
   isValidCspReportPayload,
@@ -330,3 +332,34 @@ describe("isValidCspReportPayload helper", () => {
     );
   });
 });
+
+describe("firebase.json Security Headers Configuration", () => {
+  it("includes an enforcing Content-Security-Policy header alongside report-only", () => {
+    const firebaseJsonPath = path.resolve(__dirname, "../../firebase.json");
+    const rawData = fs.readFileSync(firebaseJsonPath, "utf8");
+    const firebaseConfig = JSON.parse(rawData);
+
+    const headersList = firebaseConfig.hosting?.headers?.[0]?.headers || [];
+
+    const cspHeader = headersList.find(
+      (h) => h.key === "Content-Security-Policy"
+    );
+    const cspReportOnlyHeader = headersList.find(
+      (h) => h.key === "Content-Security-Policy-Report-Only"
+    );
+
+    assert.ok(cspHeader, "Content-Security-Policy header should be present");
+    assert.ok(
+      cspReportOnlyHeader,
+      "Content-Security-Policy-Report-Only header should be present"
+    );
+
+    const value = cspHeader.value;
+    assert.ok(value.includes("default-src 'self'"), "Must specify default-src 'self'");
+    assert.ok(value.includes("script-src"), "Must specify script-src");
+    assert.ok(value.includes("style-src"), "Must specify style-src");
+    assert.ok(value.includes("connect-src"), "Must specify connect-src");
+    assert.ok(value.includes("report-uri /csp-report"), "Must wire report-uri /csp-report");
+  });
+});
+
