@@ -2,6 +2,7 @@ import 'dart:math';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_auth/firebase_auth.dart' as auth;
+import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter/foundation.dart';
 import '../models/facility.dart';
@@ -126,6 +127,23 @@ class FirebaseService {
       'facilityId': facilityId,
       'createdAt': FieldValue.serverTimestamp(),
     });
+
+    // Best-effort FCM token capture at signup time. Login-time registration
+    // (NotificationService.registerForPushNotifications) is the primary
+    // path and also handles permission requests and token refresh; this
+    // just avoids a gap for a user who signs up but doesn't immediately
+    // go through the login screen flow. Never let a token failure block
+    // account creation.
+    try {
+      final fcmToken = await FirebaseMessaging.instance.getToken();
+      if (fcmToken != null) {
+        await _firestore.collection('users').doc(uid).update({
+          'fcmToken': fcmToken,
+        });
+      }
+    } catch (e) {
+      debugPrint('signUpFacility: failed to capture FCM token for $email: $e');
+    }
 
     // 5. Run Initial Simulation (30 days)
     await _simulation.runFullSimulation(facilityId, facility.type);
