@@ -236,6 +236,10 @@ class _FacilityOverviewState extends ConsumerState<FacilityOverview> {
                       onPressed: _isSimulating
                           ? null
                           : () async {
+                              final confirmed =
+                                  await confirmSimulateAnalytics(context);
+                              if (!confirmed || !mounted) return;
+
                               setState(() => _isSimulating = true);
 
                               if (context.mounted) {

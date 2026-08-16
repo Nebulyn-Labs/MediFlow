@@ -254,7 +254,7 @@ void main() {
       id: 'fac1',
       name: 'Rampur PHC',
       email: 'rampur@phc.com',
-      type: 'rural',
+      type: FacilityType.rural,
       region: 'North',
       latitude: 28.5,
       longitude: 77.1,
