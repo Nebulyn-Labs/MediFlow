@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../../theme/medi_theme.dart';
+import 'package:med_supply_prototype/theme/medi_flow_theme.dart';
 
 class KpiCard extends StatelessWidget {
   final String title;
