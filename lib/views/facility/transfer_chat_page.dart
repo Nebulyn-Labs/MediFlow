@@ -36,20 +36,17 @@ class _TransferChatPageState extends ConsumerState<TransferChatPage> {
   Future<void> _sendMessage() async {
     final text = _messageController.text.trim();
     if (text.isEmpty) return;
-    
+
     _messageController.clear();
-    
+
     try {
-      await ref.read(firebaseServiceProvider).sendTransferMessage(
-        widget.threadId, 
-        text, 
-        widget.facilityId
-      );
+      await ref
+          .read(firebaseServiceProvider)
+          .sendTransferMessage(widget.threadId, text, widget.facilityId);
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to send message: $e'))
-        );
+            SnackBar(content: Text('Failed to send message: $e')));
       }
     }
   }
@@ -59,37 +56,39 @@ class _TransferChatPageState extends ConsumerState<TransferChatPage> {
     return Scaffold(
       appBar: AppBar(
         title: StreamBuilder<TransferThread?>(
-          stream: ref.read(firebaseServiceProvider).streamTransferThread(widget.threadId),
+          stream: ref
+              .read(firebaseServiceProvider)
+              .streamTransferThread(widget.threadId),
           builder: (context, snapshot) {
             if (!snapshot.hasData || snapshot.data == null) {
               return const Text('Transfer Chat');
             }
             final thread = snapshot.data!;
-            
+
             // Try fetching the other facility's name if we haven't already
             if (_otherFacility == null) {
-              final otherId = thread.donorFacilityId == widget.facilityId 
-                  ? thread.recipientFacilityId 
+              final otherId = thread.donorFacilityId == widget.facilityId
+                  ? thread.recipientFacilityId
                   : thread.donorFacilityId;
-              
-              ref.read(firebaseServiceProvider).getFacility(otherId).then((fac) {
+
+              ref
+                  .read(firebaseServiceProvider)
+                  .getFacility(otherId)
+                  .then((fac) {
                 if (mounted && fac != null) {
                   setState(() => _otherFacility = fac);
                 }
               });
             }
-            
+
             return Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  _otherFacility?.name ?? 'Loading facility...', 
-                  style: const TextStyle(fontSize: 16)
-                ),
-                Text(
-                  '${thread.quantity}x ${thread.medicineName}', 
-                  style: const TextStyle(fontSize: 12, color: Colors.white70)
-                ),
+                Text(_otherFacility?.name ?? 'Loading facility...',
+                    style: const TextStyle(fontSize: 16)),
+                Text('${thread.quantity}x ${thread.medicineName}',
+                    style:
+                        const TextStyle(fontSize: 12, color: Colors.white70)),
               ],
             );
           },
@@ -101,25 +100,27 @@ class _TransferChatPageState extends ConsumerState<TransferChatPage> {
         children: [
           Expanded(
             child: StreamBuilder<List<TransferMessage>>(
-              stream: ref.read(firebaseServiceProvider).streamTransferMessages(widget.threadId),
+              stream: ref
+                  .read(firebaseServiceProvider)
+                  .streamTransferMessages(widget.threadId),
               builder: (context, snapshot) {
                 if (snapshot.connectionState == ConnectionState.waiting) {
                   return const Center(child: CircularProgressIndicator());
                 }
-                
+
                 if (snapshot.hasError) {
                   return Center(child: Text('Error: ${snapshot.error}'));
                 }
-                
+
                 final messages = snapshot.data ?? [];
-                
+
                 if (messages.isEmpty) {
                   return const Center(
-                    child: Text('No messages yet. Send a message to start coordinating.',
-                      style: TextStyle(color: MediColors.textMuted))
-                  );
+                      child: Text(
+                          'No messages yet. Send a message to start coordinating.',
+                          style: TextStyle(color: MediColors.textMuted)));
                 }
-                
+
                 // Auto-scroll to bottom on new messages
                 WidgetsBinding.instance.addPostFrameCallback((_) {
                   if (_scrollController.hasClients) {
@@ -138,28 +139,41 @@ class _TransferChatPageState extends ConsumerState<TransferChatPage> {
                   itemBuilder: (context, index) {
                     final message = messages[index];
                     final isMe = message.senderId == widget.facilityId;
-                    
+
                     return Align(
-                      alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
+                      alignment:
+                          isMe ? Alignment.centerRight : Alignment.centerLeft,
                       child: Container(
                         margin: const EdgeInsets.only(bottom: 12),
-                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 16, vertical: 10),
                         decoration: BoxDecoration(
-                          color: isMe ? MediColors.primary : MediColors.surfaceLight,
+                          color: isMe
+                              ? MediColors.primary
+                              : MediColors.surfaceLight,
                           borderRadius: BorderRadius.circular(16).copyWith(
-                            bottomRight: isMe ? const Radius.circular(0) : const Radius.circular(16),
-                            bottomLeft: !isMe ? const Radius.circular(0) : const Radius.circular(16),
+                            bottomRight: isMe
+                                ? const Radius.circular(0)
+                                : const Radius.circular(16),
+                            bottomLeft: !isMe
+                                ? const Radius.circular(0)
+                                : const Radius.circular(16),
                           ),
-                          border: isMe ? null : Border.all(color: MediColors.border),
+                          border: isMe
+                              ? null
+                              : Border.all(color: MediColors.border),
                         ),
-                        constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.75),
+                        constraints: BoxConstraints(
+                            maxWidth: MediaQuery.of(context).size.width * 0.75),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
                               message.text,
                               style: TextStyle(
-                                color: isMe ? Colors.white : MediColors.textPrimary,
+                                color: isMe
+                                    ? Colors.white
+                                    : MediColors.textPrimary,
                               ),
                             ),
                             const SizedBox(height: 4),
@@ -167,7 +181,9 @@ class _TransferChatPageState extends ConsumerState<TransferChatPage> {
                               DateFormatter.formatTime(message.sentAt),
                               style: TextStyle(
                                 fontSize: 10,
-                                color: isMe ? Colors.white70 : MediColors.textMuted,
+                                color: isMe
+                                    ? Colors.white70
+                                    : MediColors.textMuted,
                               ),
                             ),
                           ],
@@ -198,7 +214,8 @@ class _TransferChatPageState extends ConsumerState<TransferChatPage> {
                       ),
                       filled: true,
                       fillColor: MediColors.surfaceLight,
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                      contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 20, vertical: 10),
                     ),
                     maxLines: null,
                     textInputAction: TextInputAction.send,

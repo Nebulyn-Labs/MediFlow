@@ -958,18 +958,18 @@ class FirebaseService {
         .orderBy('sentAt', descending: false)
         .snapshots()
         .map((snapshot) => snapshot.docs
-            .map((doc) =>
-                TransferMessage.fromMap(doc.data(), doc.id))
+            .map((doc) => TransferMessage.fromMap(doc.data(), doc.id))
             .toList());
   }
 
-  Future<void> sendTransferMessage(String threadId, String text, String senderId) async {
+  Future<void> sendTransferMessage(
+      String threadId, String text, String senderId) async {
     final messageRef = _firestore
         .collection('transfer_threads')
         .doc(threadId)
         .collection('messages')
         .doc();
-        
+
     final threadRef = _firestore.collection('transfer_threads').doc(threadId);
 
     await _firestore.runTransaction((transaction) async {
@@ -979,7 +979,7 @@ class FirebaseService {
         text: text,
         sentAt: DateTime.now(),
       );
-      
+
       transaction.set(messageRef, message.toMap());
       transaction.update(threadRef, {
         'lastMessageAt': FieldValue.serverTimestamp(),

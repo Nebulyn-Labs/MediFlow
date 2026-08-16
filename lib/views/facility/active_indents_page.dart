@@ -1224,16 +1224,23 @@ class _ActiveIndentsPageState extends ConsumerState<ActiveIndentsPage> {
                                     mainAxisSize: MainAxisSize.min,
                                     children: [
                                       statusBadge,
-                                      if (req.status == RequestStatus.approved || req.status == RequestStatus.fulfilled) ...[
+                                      if (req.status ==
+                                              RequestStatus.approved ||
+                                          req.status ==
+                                              RequestStatus.fulfilled) ...[
                                         const SizedBox(width: 8),
                                         IconButton(
-                                          icon: const Icon(Icons.chat, color: MediColors.primary),
-                                          onPressed: () => Navigator.push(context, MaterialPageRoute(
-                                            builder: (_) => TransferChatPage(
-                                              threadId: req.id,
-                                              facilityId: widget.facilityId,
-                                            ),
-                                          )),
+                                          icon: const Icon(Icons.chat,
+                                              color: MediColors.primary),
+                                          onPressed: () => Navigator.push(
+                                              context,
+                                              MaterialPageRoute(
+                                                builder: (_) =>
+                                                    TransferChatPage(
+                                                  threadId: req.id,
+                                                  facilityId: widget.facilityId,
+                                                ),
+                                              )),
                                         ),
                                       ],
                                     ],
@@ -1260,16 +1267,20 @@ class _ActiveIndentsPageState extends ConsumerState<ActiveIndentsPage> {
                               mainAxisSize: MainAxisSize.min,
                               children: [
                                 statusBadge,
-                                if (req.status == RequestStatus.approved || req.status == RequestStatus.fulfilled) ...[
+                                if (req.status == RequestStatus.approved ||
+                                    req.status == RequestStatus.fulfilled) ...[
                                   const SizedBox(width: 8),
                                   IconButton(
-                                    icon: const Icon(Icons.chat, color: MediColors.primary),
-                                    onPressed: () => Navigator.push(context, MaterialPageRoute(
-                                      builder: (_) => TransferChatPage(
-                                        threadId: req.id,
-                                        facilityId: widget.facilityId,
-                                      ),
-                                    )),
+                                    icon: const Icon(Icons.chat,
+                                        color: MediColors.primary),
+                                    onPressed: () => Navigator.push(
+                                        context,
+                                        MaterialPageRoute(
+                                          builder: (_) => TransferChatPage(
+                                            threadId: req.id,
+                                            facilityId: widget.facilityId,
+                                          ),
+                                        )),
                                   ),
                                 ],
                               ],

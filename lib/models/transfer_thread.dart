@@ -33,7 +33,8 @@ class TransferThread {
       recipientFacilityId: map['recipientFacilityId']?.toString() ?? '',
       status: map['status']?.toString() ?? 'active',
       createdAt: (map['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
-      lastMessageAt: (map['lastMessageAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
+      lastMessageAt:
+          (map['lastMessageAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
     );
   }
 
