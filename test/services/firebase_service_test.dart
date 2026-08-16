@@ -12,6 +12,22 @@ class MockUserCredential extends Mock implements UserCredential {}
 
 class MockUser extends Mock implements User {}
 
+/// A FakeFirebaseFirestore that reports [errorCode] from runTransaction,
+/// simulating a transaction failure (offline, timeout, etc).
+class _FailingTransactionFirestore extends FakeFirebaseFirestore {
+  _FailingTransactionFirestore(this.errorCode);
+  final String errorCode;
+
+  @override
+  Future<T> runTransaction<T>(
+    TransactionHandler<T> transactionHandler, {
+    Duration timeout = const Duration(seconds: 30),
+    int maxAttempts = 5,
+  }) {
+    throw FirebaseException(plugin: 'cloud_firestore', code: errorCode);
+  }
+}
+
 // Helper: write a medicine document into inventory/{facilityId}/medicines/{medId}
 Future<void> _addMedicine(
   FakeFirebaseFirestore fakeFirestore, {
@@ -244,12 +260,104 @@ void main() {
       expect(result, isFalse);
     });
 
-    test('forceSyncPendingWrites completes without hanging', () async {
-      // fake_cloud_firestore doesn't implement waitForPendingWrites, so we
-      // can't assert the return value here — only that the timeout/catch
-      // path means this always resolves instead of hanging forever.
-      final synced = await firebaseService.forceSyncPendingWrites();
-      expect(synced, isA<bool>());
+    group('logUsage offline fallback', () {
+      test(
+          'queues offline write via batch and applies actualDeduction when transaction reports unavailable',
+          () async {
+        final failingFirestore = _FailingTransactionFirestore('unavailable');
+        final offlineService = FirebaseService(failingFirestore, mockAuth);
+
+        const facilityId = 'fac_offline';
+        const medicineId = 'paracetamol';
+        const medicineName = 'Paracetamol';
+        final date = DateTime(2026, 8, 16);
+
+        await failingFirestore
+            .collection('inventory')
+            .doc(facilityId)
+            .collection('medicines')
+            .doc(medicineId)
+            .set({
+          'medicineName': medicineName,
+          'remainingQuantity': 80,
+          'lastUpdated': Timestamp.now(),
+        });
+
+        await offlineService.logUsage(
+          facilityId: facilityId,
+          date: date,
+          medicineName: medicineName,
+          quantity: 10,
+          patients: 1,
+        );
+
+        // batch.commit() isn't awaited inside _logUsageOffline (by design,
+        // so it doesn't hang offline), so give the microtask queue a turn.
+        await Future.delayed(Duration.zero);
+
+        final invDoc = await failingFirestore
+            .collection('inventory')
+            .doc(facilityId)
+            .collection('medicines')
+            .doc(medicineId)
+            .get();
+        expect(invDoc.data()?['remainingQuantity'], 70);
+
+        final dateStr = '2026-08-16';
+        final logDoc = await failingFirestore
+            .collection('daily_usage_logs')
+            .doc(facilityId)
+            .collection('logs')
+            .doc(dateStr)
+            .get();
+        final medicines = logDoc.data()?['medicines'] as List;
+        expect(medicines.first['unitsDistributed'], 10);
+      });
+
+      test(
+          'does not double-deduct when transaction reports deadline-exceeded (regression)',
+          () async {
+        final failingFirestore =
+            _FailingTransactionFirestore('deadline-exceeded');
+        final offlineService = FirebaseService(failingFirestore, mockAuth);
+
+        const facilityId = 'fac_deadline';
+        const medicineId = 'paracetamol';
+        const medicineName = 'Paracetamol';
+
+        await failingFirestore
+            .collection('inventory')
+            .doc(facilityId)
+            .collection('medicines')
+            .doc(medicineId)
+            .set({
+          'medicineName': medicineName,
+          'remainingQuantity': 80,
+          'lastUpdated': Timestamp.now(),
+        });
+
+        // deadline-exceeded must rethrow, NOT fall back to the offline
+        // batch path — the transaction may already have committed
+        // server-side, so re-applying here would double-deduct.
+        expect(
+          () => offlineService.logUsage(
+            facilityId: facilityId,
+            date: DateTime(2026, 8, 16),
+            medicineName: medicineName,
+            quantity: 10,
+            patients: 1,
+          ),
+          throwsA(isA<FirebaseException>()),
+        );
+      });
+    });
+
+    test('forceSyncPendingWrites resolves within its 5s timeout budget',
+        () async {
+      final stopwatch = Stopwatch()..start();
+      await firebaseService.forceSyncPendingWrites();
+      stopwatch.stop();
+      expect(stopwatch.elapsed, lessThan(const Duration(seconds: 6)));
     });
   });
 

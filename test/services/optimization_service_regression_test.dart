@@ -8,7 +8,7 @@ const _testDate = '2026-07-22T00:00:00.000Z';
 
 Facility facility(
   String id, {
-  String type = 'urban',
+  FacilityType type = FacilityType.urban,
   double latitude = 0,
   double longitude = 0,
 }) {
@@ -221,7 +221,7 @@ void main() {
       'produces the documented score and reasoning for a rural recipient',
       () {
         final donor = facility('donor');
-        final recipient = facility('recipient', type: 'rural');
+        final recipient = facility('recipient', type: FacilityType.rural);
 
         final result = service.calculateOptimalTransfers(
           facilities: [donor, recipient],
