@@ -839,7 +839,7 @@ async function executeTool(name, args, authInfo) {
  * Explicit audit hook for password reset requests.
  */
 exports.logPasswordResetRequest = onCall(async (request) => {
-  let { email, status } = request.data;
+  let { email } = request.data;
   
   if (!email || typeof email !== "string") {
     throw new HttpsError("invalid-argument", "Email is required and must be a string");
