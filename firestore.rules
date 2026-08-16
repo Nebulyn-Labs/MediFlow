@@ -115,7 +115,14 @@ service cloud.firestore {
          && exists(/databases/$(database)/documents/facilities/$(request.resource.data.facilityId))
          && get(/databases/$(database)/documents/facilities/$(request.resource.data.facilityId)).data.email.lower()
             == request.auth.token.email.lower());
-      allow update: if isAdmin();
+      // Admins may update any field. A facility head may update only their own
+      // fcmToken (for push notification registration) — field-scoped so they
+      // cannot smuggle a role or facilityId change alongside the token write
+      // to self-promote or reassign facilities.
+      allow update: if isAdmin() ||
+        (isAuthenticated()
+         && request.auth.uid == userId
+         && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['fcmToken']));
       allow delete: if isAdmin();
     }
 
