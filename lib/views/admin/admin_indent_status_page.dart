@@ -337,39 +337,60 @@ class _AdminIndentStatusPageState extends ConsumerState<AdminIndentStatusPage> {
           ),
           Expanded(
             flex: 3,
-            child: (req.status == RequestStatus.dispatched || req.status == RequestStatus.inTransit || req.status == RequestStatus.received || req.status == RequestStatus.verified) 
+            child: (req.status == RequestStatus.dispatched ||
+                    req.status == RequestStatus.inTransit ||
+                    req.status == RequestStatus.received ||
+                    req.status == RequestStatus.verified)
                 ? Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Icon(Icons.local_shipping, size: 16, color: req.status.index >= RequestStatus.dispatched.index ? MediColors.primary : MediColors.textMuted),
-                      const Text(' â†’ ', style: TextStyle(color: MediColors.textMuted)),
-                      Icon(Icons.inventory_2, size: 16, color: req.status.index >= RequestStatus.received.index ? MediColors.primary : MediColors.textMuted),
-                      const Text(' â†’ ', style: TextStyle(color: MediColors.textMuted)),
-                      Icon(Icons.check_circle, size: 16, color: req.status.index >= RequestStatus.verified.index ? MediColors.success : MediColors.textMuted),
+                      Icon(Icons.local_shipping,
+                          size: 16,
+                          color:
+                              req.status.index >= RequestStatus.dispatched.index
+                                  ? MediColors.primary
+                                  : MediColors.textMuted),
+                      const Text(' â†’ ',
+                          style: TextStyle(color: MediColors.textMuted)),
+                      Icon(Icons.inventory_2,
+                          size: 16,
+                          color:
+                              req.status.index >= RequestStatus.received.index
+                                  ? MediColors.primary
+                                  : MediColors.textMuted),
+                      const Text(' â†’ ',
+                          style: TextStyle(color: MediColors.textMuted)),
+                      Icon(Icons.check_circle,
+                          size: 16,
+                          color:
+                              req.status.index >= RequestStatus.verified.index
+                                  ? MediColors.success
+                                  : MediColors.textMuted),
                     ],
                   )
                 : isApproved
-                  ? Center(
-                      child: TextButton.icon(
-                        onPressed: () => context.go('/admin/routing'),
-                        icon: const Icon(Icons.auto_fix_high_rounded, size: 14),
-                        label: const Text('Optimize Routes',
-                            style: TextStyle(
-                                fontSize: 11, fontWeight: FontWeight.bold)),
-                        style: TextButton.styleFrom(
-                          foregroundColor: MediColors.primary,
-                          backgroundColor:
-                              MediColors.primary.withValues(alpha: 0.08),
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 12, vertical: 8),
-                          shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(8)),
+                    ? Center(
+                        child: TextButton.icon(
+                          onPressed: () => context.go('/admin/routing'),
+                          icon:
+                              const Icon(Icons.auto_fix_high_rounded, size: 14),
+                          label: const Text('Optimize Routes',
+                              style: TextStyle(
+                                  fontSize: 11, fontWeight: FontWeight.bold)),
+                          style: TextButton.styleFrom(
+                            foregroundColor: MediColors.primary,
+                            backgroundColor:
+                                MediColors.primary.withValues(alpha: 0.08),
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 12, vertical: 8),
+                            shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(8)),
+                          ),
                         ),
-                      ),
-                    )
-                  : const Center(
-                      child: Text('â€”',
-                          style: TextStyle(color: MediColors.textMuted))),
+                      )
+                    : const Center(
+                        child: Text('â€”',
+                            style: TextStyle(color: MediColors.textMuted))),
           ),
           Expanded(
             flex: 1,

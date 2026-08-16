@@ -1195,10 +1195,13 @@ class _ActiveIndentsPageState extends ConsumerState<ActiveIndentsPage> {
                   ),
                 );
 
-                final bool isDeliveryPending = req.status == RequestStatus.dispatched ||
-                    req.status == RequestStatus.inTransit ||
-                    req.status == RequestStatus.received;
-                final bool isRecipient = req.type == RequestType.regularIndent || req.type == RequestType.shortage;
+                final bool isDeliveryPending =
+                    req.status == RequestStatus.dispatched ||
+                        req.status == RequestStatus.inTransit ||
+                        req.status == RequestStatus.received;
+                final bool isRecipient =
+                    req.type == RequestType.regularIndent ||
+                        req.type == RequestType.shortage;
 
                 Widget? confirmDeliveryButton;
                 if (isDeliveryPending && isRecipient) {
@@ -1209,16 +1212,21 @@ class _ActiveIndentsPageState extends ConsumerState<ActiveIndentsPage> {
                         try {
                           await ref
                               .read(firebaseServiceProvider)
-                              .updateRequestStatus(req.id, RequestStatus.verified);
+                              .updateRequestStatus(
+                                  req.id, RequestStatus.verified);
                           if (context.mounted) {
                             ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(content: Text('Delivery confirmed successfully!')),
+                              const SnackBar(
+                                  content:
+                                      Text('Delivery confirmed successfully!')),
                             );
                           }
                         } catch (e) {
                           if (context.mounted) {
                             ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(content: Text('Failed to confirm delivery: $e')),
+                              SnackBar(
+                                  content:
+                                      Text('Failed to confirm delivery: $e')),
                             );
                           }
                         }
@@ -1227,7 +1235,8 @@ class _ActiveIndentsPageState extends ConsumerState<ActiveIndentsPage> {
                       label: const Text('Confirm Delivery'),
                       style: FilledButton.styleFrom(
                         backgroundColor: MediColors.success,
-                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 16, vertical: 8),
                       ),
                     ),
                   );
@@ -1260,7 +1269,8 @@ class _ActiveIndentsPageState extends ConsumerState<ActiveIndentsPage> {
                                   Row(
                                     children: [
                                       statusBadge,
-                                      if (confirmDeliveryButton != null) confirmDeliveryButton,
+                                      if (confirmDeliveryButton != null)
+                                        confirmDeliveryButton,
                                     ],
                                   ),
                                 ],
@@ -1284,7 +1294,8 @@ class _ActiveIndentsPageState extends ConsumerState<ActiveIndentsPage> {
                             Row(
                               children: [
                                 statusBadge,
-                                if (confirmDeliveryButton != null) confirmDeliveryButton,
+                                if (confirmDeliveryButton != null)
+                                  confirmDeliveryButton,
                               ],
                             ),
                           ],

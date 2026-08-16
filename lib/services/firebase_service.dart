@@ -512,7 +512,7 @@ class FirebaseService {
       String requestId, RequestStatus status) async {
     final batch = _firestore.batch();
     final reqRef = _firestore.collection('requests').doc(requestId);
-    
+
     batch.update(reqRef, {'status': status.name});
 
     // Add transfer event
