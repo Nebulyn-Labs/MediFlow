@@ -541,7 +541,8 @@ class _AdminOverviewState extends ConsumerState<AdminOverview> {
                                   fillColor: colors.surface,
                                   border: OutlineInputBorder(
                                     borderRadius: BorderRadius.circular(8),
-                                    borderSide: BorderSide(color: colors.border),
+                                    borderSide:
+                                        BorderSide(color: colors.border),
                                   ),
                                 ),
                               ),
@@ -692,8 +693,7 @@ class _AdminOverviewState extends ConsumerState<AdminOverview> {
                     value: region,
                     child: Text(
                       region,
-                      style: TextStyle(
-                          fontSize: 13, color: colors.textPrimary),
+                      style: TextStyle(fontSize: 13, color: colors.textPrimary),
                     ),
                   ))
               .toList(),
@@ -711,8 +711,8 @@ class _AdminOverviewState extends ConsumerState<AdminOverview> {
   Widget _buildFacilityHealthGrid() {
     final colors = context.mediTheme;
     final filteredFacilities = _facilities.where((f) {
-      final matchesRegion = _selectedRegion == _allRegionsOption ||
-          f.region == _selectedRegion;
+      final matchesRegion =
+          _selectedRegion == _allRegionsOption || f.region == _selectedRegion;
       if (!matchesRegion) return false;
 
       if (_searchQuery.isEmpty) return true;
@@ -735,8 +735,7 @@ class _AdminOverviewState extends ConsumerState<AdminOverview> {
                     fontSize: 16,
                     fontWeight: FontWeight.w700,
                     color: colors.textPrimary)),
-            if (_searchQuery.isNotEmpty ||
-                _selectedRegion != _allRegionsOption)
+            if (_searchQuery.isNotEmpty || _selectedRegion != _allRegionsOption)
               Text(
                 '${filteredFacilities.length} of ${_facilities.length} facilities shown',
                 style: TextStyle(fontSize: 12, color: colors.textSecondary),
