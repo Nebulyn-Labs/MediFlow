@@ -58,7 +58,7 @@ class FirebaseService {
     required String name,
     required String email,
     required String password,
-    String? type,
+    FacilityType? type,
     double? fixedLat,
     double? fixedLng,
     String? fixedRegion,
@@ -104,7 +104,7 @@ class FirebaseService {
       id: facilityId,
       name: name,
       email: email,
-      type: type ?? profile['type']?.toString() ?? 'urban',
+      type: type ?? FacilityType.fromFirestore(profile['type']?.toString()),
       region: fixedRegion ?? profile['region']?.toString() ?? '',
       latitude: fixedLat ?? (profile['latitude'] as num?)?.toDouble() ?? 0.0,
       longitude: fixedLng ?? (profile['longitude'] as num?)?.toDouble() ?? 0.0,
@@ -781,13 +781,17 @@ class FirebaseService {
               .toLowerCase()
               .replaceAll('@', '_')
               .replaceAll('.', '_');
-          final profile =
-              _simulation.generateRealisticProfile(type: f['type']?.toString());
+          final profile = _simulation.generateRealisticProfile(
+              type: f['type'] != null
+                  ? FacilityType.fromFirestore(f['type']?.toString())
+                  : null);
           final facility = Facility(
             id: facilityId,
             name: f['name']?.toString() ?? '',
             email: f['email']?.toString() ?? '',
-            type: f['type']?.toString() ?? (profile['type'] as String),
+            type: f['type'] != null
+                ? FacilityType.fromFirestore(f['type']?.toString())
+                : FacilityType.fromFirestore(profile['type'] as String?),
             region: f['region']?.toString() ?? (profile['region'] as String),
             latitude: (f['lat'] as num?)?.toDouble() ??
                 (profile['latitude'] as num).toDouble(),
@@ -886,7 +890,9 @@ class FirebaseService {
             name: f['name']?.toString() ?? '',
             email: f['email']?.toString() ?? '',
             password: f['password']?.toString() ?? '',
-            type: f['type']?.toString(),
+            type: f['type'] != null
+                ? FacilityType.fromFirestore(f['type']?.toString())
+                : null,
             fixedLat: (f['lat'] as num?)?.toDouble(),
             fixedLng: (f['lng'] as num?)?.toDouble(),
             fixedRegion: f['region']?.toString(),

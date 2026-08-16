@@ -52,7 +52,7 @@ void main() {
       id: 'fac-1',
       name: 'Test PHC',
       email: 't@test.com',
-      type: 'urban',
+      type: FacilityType.urban,
       region: 'North',
       latitude: 28.6,
       longitude: 77.2,
