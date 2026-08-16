@@ -9,6 +9,7 @@ import '../../models/daily_usage_log.dart';
 import 'package:med_supply_prototype/constants/colors.dart';
 import '../shared/skeleton_loaders.dart';
 import '../../utils/date_formatter.dart';
+import 'transfer_chat_page.dart';
 
 enum _IndentSortOption { newestFirst, oldestFirst }
 
@@ -1219,7 +1220,24 @@ class _ActiveIndentsPageState extends ConsumerState<ActiveIndentsPage> {
                                         fontWeight: FontWeight.bold,
                                         color: MediColors.textPrimary),
                                   ),
-                                  statusBadge,
+                                  Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      statusBadge,
+                                      if (req.status == RequestStatus.approved || req.status == RequestStatus.fulfilled) ...[
+                                        const SizedBox(width: 8),
+                                        IconButton(
+                                          icon: const Icon(Icons.chat, color: MediColors.primary),
+                                          onPressed: () => Navigator.push(context, MaterialPageRoute(
+                                            builder: (_) => TransferChatPage(
+                                              threadId: req.id,
+                                              facilityId: widget.facilityId,
+                                            ),
+                                          )),
+                                        ),
+                                      ],
+                                    ],
+                                  ),
                                 ],
                               ),
                             ],
@@ -1238,7 +1256,24 @@ class _ActiveIndentsPageState extends ConsumerState<ActiveIndentsPage> {
                                     color: MediColors.textPrimary),
                               ),
                             ),
-                            statusBadge,
+                            Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                statusBadge,
+                                if (req.status == RequestStatus.approved || req.status == RequestStatus.fulfilled) ...[
+                                  const SizedBox(width: 8),
+                                  IconButton(
+                                    icon: const Icon(Icons.chat, color: MediColors.primary),
+                                    onPressed: () => Navigator.push(context, MaterialPageRoute(
+                                      builder: (_) => TransferChatPage(
+                                        threadId: req.id,
+                                        facilityId: widget.facilityId,
+                                      ),
+                                    )),
+                                  ),
+                                ],
+                              ],
+                            ),
                           ],
                         );
                       },
