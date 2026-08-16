@@ -49,3 +49,32 @@ Future<void> signOutWithConfirmation(BuildContext context,
     }
   }
 }
+
+/// Shows a confirmation dialog before running the analytics simulation.
+/// Warns that it writes synthetic demo data on top of the facility's
+/// real usage history. Returns true if the user confirms, false otherwise.
+Future<bool> confirmSimulateAnalytics(BuildContext context) async {
+  final result = await showDialog<bool>(
+    context: context,
+    builder: (context) => AlertDialog(
+      title: const Text('Simulate analytics?'),
+      content: const Text(
+        'This writes 30 days of synthetic demo usage data and resets '
+        'inventory levels for this facility. It will mix with any real '
+        'data already logged and cannot be undone. Continue?',
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(false),
+          child: const Text('Cancel'),
+        ),
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(true),
+          style: TextButton.styleFrom(foregroundColor: MediColors.error),
+          child: const Text('Simulate'),
+        ),
+      ],
+    ),
+  );
+  return result ?? false;
+}
