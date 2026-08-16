@@ -5,7 +5,6 @@ import '../../services/ai_service.dart';
 import '../../services/csv_export_service.dart';
 import '../../models/request.dart';
 import '../../models/inventory_item.dart';
-import '../../models/daily_usage_log.dart';
 import 'package:med_supply_prototype/constants/colors.dart';
 import '../shared/skeleton_loaders.dart';
 import '../../utils/date_formatter.dart';
