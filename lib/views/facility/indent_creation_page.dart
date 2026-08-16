@@ -51,7 +51,7 @@ class _IndentCreationPageState extends ConsumerState<IndentCreationPage> {
       setState(() {
         _inventory = inv;
         for (var item in _inventory) {
-          _controllers[item.id] = TextEditingController(text: '0');
+          _controllers[item.id] = TextEditingController(text: '');
         }
       });
     } catch (e) {
@@ -140,7 +140,8 @@ class _IndentCreationPageState extends ConsumerState<IndentCreationPage> {
               suggestedQty = 0;
             }
 
-            _controllers[item.id]?.text = suggestedQty.toString();
+            _controllers[item.id]?.text =
+                suggestedQty > 0 ? suggestedQty.toString() : '';
             _forecastLoading[item.id] = false;
           });
         } catch (e) {
@@ -164,10 +165,10 @@ class _IndentCreationPageState extends ConsumerState<IndentCreationPage> {
   Future<void> _submitIndent() async {
     bool hasInvalidQuantity = false;
     for (var item in _inventory) {
-      final text = _controllers[item.id]?.text.trim() ?? '0';
+      final text = _controllers[item.id]?.text.trim() ?? '';
       if (text.isEmpty) continue;
       final val = int.tryParse(text);
-      if (val == null || val < 0) {
+      if (val == null || val <= 0) {
         hasInvalidQuantity = true;
         break;
       }
@@ -175,13 +176,14 @@ class _IndentCreationPageState extends ConsumerState<IndentCreationPage> {
 
     if (hasInvalidQuantity) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-          content: Text('Please enter valid, non-negative quantities.'),
+          content: Text('Please enter valid quantities greater than 0.'),
           backgroundColor: MediColors.error));
       return;
     }
 
     final itemsToSubmit = _inventory.where((item) {
-      final qty = int.tryParse(_controllers[item.id]?.text ?? '0') ?? 0;
+      final text = _controllers[item.id]?.text.trim() ?? '';
+      final qty = int.tryParse(text) ?? 0;
       return qty > 0;
     }).toList();
 
@@ -576,7 +578,7 @@ class _IndentCreationPageState extends ConsumerState<IndentCreationPage> {
               final textVal = _controllers[item.id]?.text.trim() ?? '';
               final parsedVal = int.tryParse(textVal);
               final bool isNegativeOrInvalid =
-                  textVal.isNotEmpty && (parsedVal == null || parsedVal < 0);
+                  textVal.isNotEmpty && (parsedVal == null || parsedVal <= 0);
               return Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisSize: MainAxisSize.min,
