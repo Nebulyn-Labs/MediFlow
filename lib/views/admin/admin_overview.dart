@@ -509,8 +509,7 @@ class _AdminOverviewState extends ConsumerState<AdminOverview> {
                                 value: '$_needsManualReview',
                                 icon: Icons.report_problem_rounded,
                                 isAlert: true,
-                                onTap: () =>
-                                    context.go('/admin/supply-status'),
+                                onTap: () => context.go('/admin/supply-status'),
                               ),
                           ],
                         ),
