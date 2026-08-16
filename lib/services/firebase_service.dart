@@ -510,9 +510,20 @@ class FirebaseService {
 
   Future<void> updateRequestStatus(
       String requestId, RequestStatus status) async {
-    await _firestore.collection('requests').doc(requestId).update({
+    final batch = _firestore.batch();
+    final reqRef = _firestore.collection('requests').doc(requestId);
+    
+    batch.update(reqRef, {'status': status.name});
+
+    // Add transfer event
+    final eventRef = reqRef.collection('transfer_events').doc();
+    batch.set(eventRef, {
       'status': status.name,
+      'timestamp': FieldValue.serverTimestamp(),
+      'actorId': _auth.currentUser?.uid,
     });
+
+    await batch.commit();
   }
 
   Future<void> updateRequestQuantity(String requestId, int quantity) async {

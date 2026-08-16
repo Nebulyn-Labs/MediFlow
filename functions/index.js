@@ -479,9 +479,9 @@ exports.checkLowStock = onSchedule("every 24 hours", async () => {
 
 /**
  * 3. autoRedistribute(requestId)
- * Atomic stock transfer when a request is approved.
+ * Atomic stock transfer when a request is verified (recipient confirms delivery).
  */
-exports.onIndentApproved = onDocumentUpdated(
+exports.onTransferVerified = onDocumentUpdated(
   {
     document: "requests/{requestId}",
     retry: true,
@@ -500,8 +500,8 @@ exports.onIndentApproved = onDocumentUpdated(
   const beforeStatus = beforeData ? beforeData.status : null;
   const afterStatus = afterData.status;
 
-  // Execute only when request transitions to 'approved' status
-  if (beforeStatus !== "approved" && afterStatus === "approved") {
+  // Execute only when request transitions to 'verified' status
+  if (beforeStatus !== "verified" && afterStatus === "verified") {
     const db = admin.firestore();
     const requestId = event.params.requestId;
 
