@@ -653,7 +653,7 @@ class _AdminOverviewState extends ConsumerState<AdminOverview> {
       final q = _searchQuery;
       return f.name.toLowerCase().contains(q) ||
           f.region.toLowerCase().contains(q) ||
-          f.type.toLowerCase().contains(q) ||
+          f.type.toFirestore().contains(q) ||
           f.id.toLowerCase().contains(q) ||
           f.email.toLowerCase().contains(q);
     }).toList();
@@ -740,7 +740,7 @@ class _AdminOverviewState extends ConsumerState<AdminOverview> {
                 decoration: BoxDecoration(
                     color: colors.surfaceLight,
                     borderRadius: BorderRadius.circular(20)),
-                child: Text(facility.type,
+                child: Text(facility.type.toFirestore(),
                     style: TextStyle(
                         fontSize: 10,
                         color: colors.textSecondary,
