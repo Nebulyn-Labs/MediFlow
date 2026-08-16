@@ -233,8 +233,8 @@ class _FacilityProfilePageState extends ConsumerState<FacilityProfilePage> {
                           const SizedBox(height: 16),
                           _buildReadOnlyField('Email', _facility!.email),
                           const SizedBox(height: 12),
-                          _buildReadOnlyField(
-                              'Facility Type', _facility!.type.toUpperCase()),
+                          _buildReadOnlyField('Facility Type',
+                              _facility!.type.toFirestore().toUpperCase()),
                           const SizedBox(height: 12),
                           _buildReadOnlyField('Coordinates',
                               '${_facility!.latitude.toStringAsFixed(4)}, ${_facility!.longitude.toStringAsFixed(4)}'),
