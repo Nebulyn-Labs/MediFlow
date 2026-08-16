@@ -478,41 +478,42 @@ class _AdminOverviewState extends ConsumerState<AdminOverview> {
                           spacing: 20,
                           runSpacing: 20,
                           children: [
+                            KpiCard(
+                              title: 'TOTAL FACILITIES',
+                              value: '${_facilities.length}',
+                              icon: Icons.business_rounded,
+                            ),
+                            KpiCard(
+                              title: 'OPEN SHORTAGE REQUESTS',
+                              value: '$_openShortageRequests',
+                              icon: Icons.warning_amber_rounded,
+                              isAlert: true,
+                            ),
+                            KpiCard(
+                              title: 'SURPLUS / EXPIRY OFFERS',
+                              value: '$_surplusOffers',
+                              icon: Icons.swap_horiz_rounded,
+                              isAlert: false,
+                              iconColor: colors.warning,
+                            ),
+                            KpiCard(
+                              title: 'PENDING APPROVALS',
+                              value: '$_pendingApprovals',
+                              icon: Icons.assignment_turned_in_rounded,
+                              iconColor: colors.info,
+                              onTap: () => context.go('/admin/approvals'),
+                            ),
+                            if (_needsManualReview > 0)
                               KpiCard(
-                                title: 'TOTAL FACILITIES',
-                                value: '${_facilities.length}',
-                                icon: Icons.business_rounded,
-                              ),
-                              KpiCard(
-                                title: 'OPEN SHORTAGE REQUESTS',
-                                value: '$_openShortageRequests',
-                                icon: Icons.warning_amber_rounded,
+                                title: 'NEEDS REVIEW',
+                                value: '$_needsManualReview',
+                                icon: Icons.report_problem_rounded,
                                 isAlert: true,
+                                onTap: () =>
+                                    context.go('/admin/supply-status'),
                               ),
-                              KpiCard(
-                                title: 'SURPLUS / EXPIRY OFFERS',
-                                value: '$_surplusOffers',
-                                icon: Icons.swap_horiz_rounded,
-                                isAlert: false,
-                                iconColor: colors.warning,
-                              ),
-                              KpiCard(
-                                title: 'PENDING APPROVALS',
-                                value: '$_pendingApprovals',
-                                icon: Icons.assignment_turned_in_rounded,
-                                iconColor: colors.info,
-                                onTap: () => context.go('/admin/approvals'),
-                              ),
-                              if (_needsManualReview > 0)
-                                KpiCard(
-                                  title: 'NEEDS REVIEW',
-                                  value: '$_needsManualReview',
-                                  icon: Icons.report_problem_rounded,
-                                  isAlert: true,
-                                  onTap: () => context.go('/admin/supply-status'),
-                                ),
-                            ],
-                          ),
+                          ],
+                        ),
                         const SizedBox(height: 36),
                         TextField(
                           controller: _searchController,
