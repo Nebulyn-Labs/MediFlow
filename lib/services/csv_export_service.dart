@@ -261,18 +261,22 @@ class CsvExportService {
     final rows = <List<dynamic>>[
       [
         'Medicine Name',
+        'Unit',
         'Expired Units',
         'Near Expiry Units (<= 30 days)',
-        'Estimated Cost (\$) (Assumed \$1.50/unit)',
+        'Est. Lost (\$) (Assumed \$1.50/unit)',
+        'Est. At Risk (\$) (Assumed \$1.50/unit)',
       ],
     ];
 
     for (final data in wastageData) {
       rows.add([
         data['medicineName'],
+        data['unit'] ?? '',
         data['expiredUnits'],
         data['nearExpiryUnits'],
-        data['estimatedCost'],
+        data['lostCost'],
+        data['atRiskCost'],
       ]);
     }
 
