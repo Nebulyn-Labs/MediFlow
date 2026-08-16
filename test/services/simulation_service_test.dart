@@ -3,6 +3,7 @@ import 'package:fake_cloud_firestore/fake_cloud_firestore.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:med_supply_prototype/models/daily_usage_log.dart';
+import 'package:med_supply_prototype/models/facility.dart';
 import 'package:med_supply_prototype/services/simulation_service.dart';
 
 void main() {
@@ -43,11 +44,11 @@ void main() {
     test('generateRealisticProfile respects explicit facility type parameter',
         () {
       final urbanProfile =
-          simulationService.generateRealisticProfile(type: 'urban');
+          simulationService.generateRealisticProfile(type: FacilityType.urban);
       expect(urbanProfile['type'], equals('urban'));
 
       final ruralProfile =
-          simulationService.generateRealisticProfile(type: 'rural');
+          simulationService.generateRealisticProfile(type: FacilityType.rural);
       expect(ruralProfile['type'], equals('rural'));
     });
   });
@@ -57,7 +58,7 @@ void main() {
         'runFullSimulation creates inventory and 31 days of logs for urban facility',
         () async {
       const facilityId = 'facility_urban_test';
-      await simulationService.runFullSimulation(facilityId, 'urban');
+      await simulationService.runFullSimulation(facilityId, FacilityType.urban);
 
       // 1. Verify Inventory creation
       final inventorySnapshot = await fakeFirestore
@@ -131,7 +132,7 @@ void main() {
     test('runFullSimulation generates patient counts scaled for rural facility',
         () async {
       const facilityId = 'facility_rural_test';
-      await simulationService.runFullSimulation(facilityId, 'rural');
+      await simulationService.runFullSimulation(facilityId, FacilityType.rural);
 
       final logsSnapshot = await fakeFirestore
           .collection('daily_usage_logs')
@@ -153,7 +154,7 @@ void main() {
         'runFullSimulation applies hardcoded health persona for rampur_mediflow_com',
         () async {
       const facilityId = 'rampur_mediflow_com';
-      await simulationService.runFullSimulation(facilityId, 'rural');
+      await simulationService.runFullSimulation(facilityId, FacilityType.rural);
 
       final inventorySnapshot = await fakeFirestore
           .collection('inventory')
@@ -193,7 +194,7 @@ void main() {
         're-running simulation updates inventory without creating duplicate docs',
         () async {
       const facilityId = 'repeat_sim_facility';
-      await simulationService.runFullSimulation(facilityId, 'urban');
+      await simulationService.runFullSimulation(facilityId, FacilityType.urban);
 
       final firstInventoryCount = (await fakeFirestore
               .collection('inventory')
@@ -204,7 +205,7 @@ void main() {
           .length;
 
       // Run simulation a second time
-      await simulationService.runFullSimulation(facilityId, 'urban');
+      await simulationService.runFullSimulation(facilityId, FacilityType.urban);
 
       final secondInventoryCount = (await fakeFirestore
               .collection('inventory')

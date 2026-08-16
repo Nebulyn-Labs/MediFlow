@@ -30,7 +30,7 @@ void main() {
     id: 'fac-101',
     name: 'Central Hospital',
     email: 'central@hospital.org',
-    type: 'urban',
+    type: FacilityType.urban,
     region: 'North District',
     latitude: 12.3456,
     longitude: 78.9101,
