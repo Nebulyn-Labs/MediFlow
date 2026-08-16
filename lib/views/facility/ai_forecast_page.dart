@@ -366,7 +366,13 @@ class _AIForecastPageState extends ConsumerState<AIForecastPage> {
     if (_forecastResult != null && _historicalData.isNotEmpty) {
       final lastX = _historicalData.length - 1.0;
       final lastY = _historicalData.last;
-      final predTotal = (_forecastResult!['prediction'] as num).toDouble();
+      final predRaw = _forecastResult!['prediction'];
+      double predTotal = 0.0;
+      if (predRaw is num) {
+        predTotal = predRaw.toDouble();
+      } else if (predRaw is String) {
+        predTotal = double.tryParse(predRaw) ?? 0.0;
+      }
       final projectedEndY = predTotal / _forecastDays;
       forecastSpots = [
         FlSpot(lastX, lastY),

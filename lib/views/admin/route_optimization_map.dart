@@ -74,12 +74,31 @@ class _RouteOptimizationMapState extends ConsumerState<RouteOptimizationMap> {
       List<MedRequest> requests, List<InventoryItem> allMeds) async {
     setState(() => _isGenerating = true);
     try {
+      final firebaseService = ref.read(firebaseServiceProvider);
+      if (_facilities.isEmpty) {
+        final freshFacs = await firebaseService
+            .getFacilities()
+            .catchError((_) => <Facility>[]);
+        if (freshFacs.isNotEmpty) {
+          _facilities = freshFacs;
+        }
+      }
+      final freshRequests = await firebaseService
+          .getRequestsOnce()
+          .catchError((_) => <MedRequest>[]);
+      final freshMeds = await firebaseService
+          .getAllMedicinesOnce()
+          .catchError((_) => <InventoryItem>[]);
+      final activeRequests =
+          freshRequests.isNotEmpty ? freshRequests : requests;
+      final activeMeds = freshMeds.isNotEmpty ? freshMeds : allMeds;
+
       final optimizer = ref.read(optimizationServiceProvider);
       final router = ref.read(routingServiceProvider);
       final ai = ref.read(aiServiceProvider);
 
       Map<String, List<InventoryItem>> inventories = {};
-      for (var med in allMeds) {
+      for (var med in activeMeds) {
         if (med.facilityId != null) {
           inventories.putIfAbsent(med.facilityId!, () => []).add(med);
         }
@@ -89,7 +108,7 @@ class _RouteOptimizationMapState extends ConsumerState<RouteOptimizationMap> {
       final multiRoutes = optimizer.calculateMultiStopRoutes(
         facilities: _facilities,
         inventories: inventories,
-        requests: requests,
+        requests: activeRequests,
       );
 
       // 2. Fetch road-accurate routes for each multi-stop route and leg
@@ -112,7 +131,7 @@ class _RouteOptimizationMapState extends ConsumerState<RouteOptimizationMap> {
 
       // 3. Generate AI Summary
       final summary =
-          await ai.generateRedistributionPlan(requests, _facilities);
+          await ai.generateRedistributionPlan(activeRequests, _facilities);
 
       debugPrint(
           'RouteOptimizationMap: Generated ${multiRoutes.length} multi-stop routes.');
@@ -295,13 +314,49 @@ class _RouteOptimizationMapState extends ConsumerState<RouteOptimizationMap> {
                                   label: const Text('Simulate Demo Scenario',
                                       style: TextStyle(fontSize: 12)),
                                   onPressed: () async {
+                                    final messenger =
+                                        ScaffoldMessenger.of(context);
+                                    final confirmed = await showDialog<bool>(
+                                      context: context,
+                                      builder: (ctx) => AlertDialog(
+                                        title: const Text(
+                                            'Confirm Demo Simulation'),
+                                        content: const Text(
+                                          'Warning: Simulating demo scenario will wipe existing data and reseed demo data. Are you sure you want to proceed?',
+                                        ),
+                                        actions: [
+                                          TextButton(
+                                            onPressed: () =>
+                                                Navigator.of(ctx).pop(false),
+                                            child: const Text('Cancel'),
+                                          ),
+                                          FilledButton(
+                                            style: FilledButton.styleFrom(
+                                              backgroundColor: Colors.red,
+                                            ),
+                                            onPressed: () =>
+                                                Navigator.of(ctx).pop(true),
+                                            child: const Text('Wipe & Reseed'),
+                                          ),
+                                        ],
+                                      ),
+                                    );
+
+                                    if (confirmed != true) return;
+
                                     setState(() => _isGenerating = true);
                                     try {
-                                      await ref
+                                      final error = await ref
                                           .read(firebaseServiceProvider)
                                           .seedDemoData();
-                                      // RE-LOAD FACILITIES AFTER SEEDING
+                                      if (error != null) {
+                                        messenger.showSnackBar(
+                                            SnackBar(content: Text(error)));
+                                        return;
+                                      }
+                                      // RE-LOAD FACILITIES & AUTO GENERATE ROUTES AFTER SEEDING
                                       await _loadData();
+                                      await _generateOptimalRoutes([], []);
                                     } catch (e) {
                                       debugPrint(
                                           'RouteOptimizationMap: Demo seed failed: $e');
@@ -310,12 +365,9 @@ class _RouteOptimizationMapState extends ConsumerState<RouteOptimizationMap> {
                                         setState(() => _isGenerating = false);
                                       }
                                     }
-                                    if (context.mounted) {
-                                      ScaffoldMessenger.of(context)
-                                          .showSnackBar(const SnackBar(
-                                              content: Text(
-                                                  'Demo scenario seeded! Click Generate to see routes.')));
-                                    }
+                                    messenger.showSnackBar(const SnackBar(
+                                        content: Text(
+                                            'Demo scenario seeded! Click Generate to see routes.')));
                                   },
                                 ),
                               ),

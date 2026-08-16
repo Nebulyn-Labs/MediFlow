@@ -138,6 +138,64 @@ class CsvExportService {
     return rows;
   }
 
+  /// Exports indent requests as a CSV file and prompts the user to
+  /// save/download it. Rows are sorted newest-first to match the admin
+  /// indent management tables.
+  static Future<String?> exportIndentRequests(
+    List<MedRequest> requests,
+  ) async {
+    final rows = buildIndentRequestRows(requests);
+    final fileName = 'indent_requests_${_stampFmt.format(DateTime.now())}.csv';
+    return _saveCsv(rows, fileName);
+  }
+
+  static List<List<dynamic>> buildIndentRequestRows(List<MedRequest> requests) {
+    final rows = <List<dynamic>>[
+      [
+        'Date',
+        'Facility',
+        'Medicine',
+        'Request Type',
+        'Quantity',
+        'Status',
+        'Facility Notes',
+        'Rejection Reason',
+        'Resolved At',
+      ],
+    ];
+
+    final sorted = [...requests]
+      ..sort((a, b) => b.requestDate.compareTo(a.requestDate));
+    for (final request in sorted) {
+      rows.add([
+        _dateFmt.format(request.requestDate),
+        request.facilityId.replaceAll('_', ' ').toUpperCase(),
+        request.medicineName,
+        _requestTypeLabel(request.type),
+        request.quantity,
+        request.status.label.toUpperCase(),
+        request.notes ?? '',
+        request.rejectionReason ?? '',
+        request.resolvedAt == null
+            ? ''
+            : _dateTimeFmt.format(request.resolvedAt!),
+      ]);
+    }
+
+    return rows;
+  }
+
+  static String _requestTypeLabel(RequestType type) {
+    switch (type) {
+      case RequestType.surplus:
+        return 'Redistribution';
+      case RequestType.shortage:
+        return 'Shortage';
+      case RequestType.regularIndent:
+        return 'Restock';
+    }
+  }
+
   /// Exports transfer request history as CSV with columns aligned to the
   /// admin transfer request status table.
   static Future<String?> exportTransferRequests(

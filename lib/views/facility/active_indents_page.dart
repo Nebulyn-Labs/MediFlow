@@ -383,7 +383,7 @@ class _ActiveIndentsPageState extends ConsumerState<ActiveIndentsPage> {
 
   String _statusLabel(RequestStatus? status) {
     if (status == null) return 'All statuses';
-    return status.name[0].toUpperCase() + status.name.substring(1);
+    return status.label;
   }
 
   String _sortLabel(_IndentSortOption sort) {
@@ -1040,6 +1040,8 @@ class _ActiveIndentsPageState extends ConsumerState<ActiveIndentsPage> {
               itemBuilder: (context, idx) {
                 final req = history[idx];
                 final isRejected = req.status == RequestStatus.rejected;
+                final needsReview =
+                    req.status == RequestStatus.needsManualReview;
                 final hasResolution = req.resolvedAt != null;
 
                 final Color statusColor;
@@ -1055,6 +1057,9 @@ class _ActiveIndentsPageState extends ConsumerState<ActiveIndentsPage> {
                     break;
                   case RequestStatus.fulfilled:
                     statusColor = MediColors.info;
+                    break;
+                  case RequestStatus.needsManualReview:
+                    statusColor = MediColors.violet;
                     break;
                   default:
                     statusColor = MediColors.textMuted;
@@ -1110,6 +1115,28 @@ class _ActiveIndentsPageState extends ConsumerState<ActiveIndentsPage> {
                         ),
                       ),
                     ],
+                    if (needsReview) ...[
+                      const SizedBox(height: 8),
+                      Container(
+                        padding: const EdgeInsets.all(10),
+                        width: double.infinity,
+                        decoration: BoxDecoration(
+                          color: MediColors.violet.withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(
+                              color: MediColors.violet.withValues(alpha: 0.3)),
+                        ),
+                        child: const Text(
+                          'This request hit a system error while being processed. '
+                          'An administrator has been notified and will review it shortly — '
+                          'no action is needed from you.',
+                          style: TextStyle(
+                              fontSize: 12,
+                              color: MediColors.violet,
+                              fontWeight: FontWeight.w600),
+                        ),
+                      ),
+                    ],
                     const SizedBox(height: 6),
                     Container(
                       padding: const EdgeInsets.symmetric(
@@ -1160,7 +1187,7 @@ class _ActiveIndentsPageState extends ConsumerState<ActiveIndentsPage> {
                         Border.all(color: statusColor.withValues(alpha: 0.25)),
                   ),
                   child: Text(
-                    req.status.name.toUpperCase(),
+                    req.status.label.toUpperCase(),
                     style: TextStyle(
                         color: statusColor,
                         fontSize: 12,

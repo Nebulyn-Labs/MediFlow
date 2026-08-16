@@ -40,10 +40,12 @@ service cloud.firestore {
 
     // Inventory collection
     match /inventory/{facilityId} {
-      allow read, write: if isAdmin() || isFacilityUser(facilityId);
+      allow read, create, update: if isAdmin() || isFacilityUser(facilityId);
+      allow delete: if isAdmin();
 
       match /medicines/{medicineId} {
-        allow read, write: if isAdmin() || isFacilityUser(facilityId);
+        allow read, create, update: if isAdmin() || isFacilityUser(facilityId);
+        allow delete: if isAdmin();
       }
     }
 
@@ -54,10 +56,12 @@ service cloud.firestore {
 
     // Daily Usage Logs collection
     match /daily_usage_logs/{facilityId} {
-      allow read, write: if isAdmin() || isFacilityUser(facilityId);
+      allow read, create, update: if isAdmin() || isFacilityUser(facilityId);
+      allow delete: if isAdmin();
 
       match /logs/{logId} {
-        allow read, write: if isAdmin() || isFacilityUser(facilityId);
+        allow read, create, update: if isAdmin() || isFacilityUser(facilityId);
+        allow delete: if isAdmin();
       }
     }
 
@@ -113,6 +117,12 @@ service cloud.firestore {
             == request.auth.token.email.lower());
       allow update: if isAdmin();
       allow delete: if isAdmin();
+    }
+
+    // Rate limits collection
+    match /rate_limits/{rateLimitId} {
+      allow read: if isAdmin();
+      allow write: if false;
     }
   }
 }
