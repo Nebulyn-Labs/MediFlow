@@ -57,8 +57,8 @@ class _AdminIndentStatusPageState extends ConsumerState<AdminIndentStatusPage> {
       case RequestStatus.approved:
         return [RequestStatus.dispatched, RequestStatus.rejected];
       case RequestStatus.dispatched:
-        return [RequestStatus.in_transit];
-      case RequestStatus.in_transit:
+        return [RequestStatus.inTransit];
+      case RequestStatus.inTransit:
         return [RequestStatus.received];
       case RequestStatus.received:
         return [RequestStatus.verified];
@@ -143,7 +143,7 @@ class _AdminIndentStatusPageState extends ConsumerState<AdminIndentStatusPage> {
         return MediColors.success;
       case RequestStatus.dispatched:
         return MediColors.primary;
-      case RequestStatus.in_transit:
+      case RequestStatus.inTransit:
         return MediColors.primary;
       case RequestStatus.received:
         return MediColors.success;
@@ -337,7 +337,7 @@ class _AdminIndentStatusPageState extends ConsumerState<AdminIndentStatusPage> {
           ),
           Expanded(
             flex: 3,
-            child: (req.status == RequestStatus.dispatched || req.status == RequestStatus.in_transit || req.status == RequestStatus.received || req.status == RequestStatus.verified) 
+            child: (req.status == RequestStatus.dispatched || req.status == RequestStatus.inTransit || req.status == RequestStatus.received || req.status == RequestStatus.verified) 
                 ? Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [

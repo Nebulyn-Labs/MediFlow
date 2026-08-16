@@ -1196,7 +1196,7 @@ class _ActiveIndentsPageState extends ConsumerState<ActiveIndentsPage> {
                 );
 
                 final bool isDeliveryPending = req.status == RequestStatus.dispatched ||
-                    req.status == RequestStatus.in_transit ||
+                    req.status == RequestStatus.inTransit ||
                     req.status == RequestStatus.received;
                 final bool isRecipient = req.type == RequestType.regularIndent || req.type == RequestType.shortage;
 

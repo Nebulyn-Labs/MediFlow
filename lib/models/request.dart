@@ -14,7 +14,7 @@ enum RequestStatus {
   pending,
   approved,
   dispatched,
-  in_transit,
+  inTransit,
   received,
   verified,
   fulfilled,
@@ -38,7 +38,7 @@ extension RequestStatusLabel on RequestStatus {
         return 'Approved';
       case RequestStatus.dispatched:
         return 'Dispatched';
-      case RequestStatus.in_transit:
+      case RequestStatus.inTransit:
         return 'In Transit';
       case RequestStatus.received:
         return 'Received';
