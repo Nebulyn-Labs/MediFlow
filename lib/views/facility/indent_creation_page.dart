@@ -5,6 +5,7 @@ import '../../services/firebase_service.dart';
 import '../../services/ai_service.dart';
 import '../../models/request.dart';
 import '../../models/inventory_item.dart';
+import '../../models/daily_usage_log.dart';
 import 'package:med_supply_prototype/constants/colors.dart';
 import '../shared/skeleton_loaders.dart';
 import '../../utils/retry_snackbar.dart';
@@ -74,15 +75,33 @@ class _IndentCreationPageState extends ConsumerState<IndentCreationPage> {
     final aiService = ref.read(aiServiceProvider);
     final firebaseService = ref.read(firebaseServiceProvider);
 
-    // Fetch logs once, shared across all concurrent forecast calls.
-    final logs =
-        await firebaseService.getRecentLogs(widget.facilityId, days: 90);
-
     setState(() {
       for (var item in _inventory) {
         _forecastLoading[item.id] = true;
       }
     });
+
+    final List<DailyUsageLog> logs;
+    try {
+      logs = await firebaseService.getRecentLogs(widget.facilityId, days: 90);
+    } catch (e) {
+      debugPrint('Error fetching logs for forecast: $e');
+      if (mounted) {
+        setState(() {
+          for (var item in _inventory) {
+            _forecastLoading[item.id] = false;
+          }
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Failed to fetch recent logs for forecast: $e',
+            ),
+          ),
+        );
+      }
+      return;
+    }
 
     // Run forecasts concurrently in chunks of [_kForecastConcurrency] to
     // avoid both serialising N round-trips and flooding the API (#238).
