@@ -11,6 +11,7 @@ void main() {
   late MedRequest approvedReq;
   late MedRequest rejectedReq;
   late MedRequest fulfilledReq;
+  late MedRequest needsReviewReq;
 
   setUp(() {
     pendingReq = MedRequest(
@@ -48,6 +49,15 @@ void main() {
       quantity: 20,
       requestDate: DateTime(2026, 1, 4),
       status: RequestStatus.fulfilled,
+    );
+    needsReviewReq = MedRequest(
+      id: 'req-needs-review',
+      facilityId: 'fac-1',
+      medicineName: 'Metformin',
+      type: RequestType.regularIndent,
+      quantity: 40,
+      requestDate: DateTime(2026, 1, 5),
+      status: RequestStatus.needsManualReview,
     );
   });
 
@@ -153,6 +163,39 @@ void main() {
     expect(find.text('PENDING'), findsOneWidget);
     expect(find.text('APPROVED'), findsNothing);
     expect(find.text('FULFILLED'), findsNothing);
+  });
+
+  testWidgets(
+      'offers pending/rejected transitions and a "NEEDS REVIEW" badge for '
+      'needsManualReview request (#314)', (WidgetTester tester) async {
+    final firebase = _FakeFirebaseService([needsReviewReq]);
+
+    tester.view.physicalSize = const Size(1400, 1000);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    await tester.pumpWidget(pump(firebase));
+    await tester.pumpAndSettle();
+
+    // A request onIndentApproved couldn't process automatically must be
+    // visibly flagged, not rendered as an ordinary pending row (#314).
+    expect(find.text('NEEDS REVIEW'), findsOneWidget);
+
+    await tester.tap(find.byType(PopupMenuButton<RequestStatus>));
+    await tester.pumpAndSettle();
+
+    expect(find.text('PENDING'), findsOneWidget);
+    expect(find.text('REJECTED'), findsOneWidget);
+    expect(find.text('APPROVED'), findsNothing);
+    expect(find.text('FULFILLED'), findsNothing);
+
+    await tester.tap(find.text('PENDING'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(FilledButton, 'PENDING'));
+    await tester.pumpAndSettle();
+
+    expect(firebase.updatedStatuses['req-needs-review'], RequestStatus.pending);
   });
 
   testWidgets('disables popup menu for fulfilled request (#249)',

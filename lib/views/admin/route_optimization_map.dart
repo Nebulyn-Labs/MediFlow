@@ -314,11 +314,46 @@ class _RouteOptimizationMapState extends ConsumerState<RouteOptimizationMap> {
                                   label: const Text('Simulate Demo Scenario',
                                       style: TextStyle(fontSize: 12)),
                                   onPressed: () async {
+                                    final messenger =
+                                        ScaffoldMessenger.of(context);
+                                    final confirmed = await showDialog<bool>(
+                                      context: context,
+                                      builder: (ctx) => AlertDialog(
+                                        title: const Text(
+                                            'Confirm Demo Simulation'),
+                                        content: const Text(
+                                          'Warning: Simulating demo scenario will wipe existing data and reseed demo data. Are you sure you want to proceed?',
+                                        ),
+                                        actions: [
+                                          TextButton(
+                                            onPressed: () =>
+                                                Navigator.of(ctx).pop(false),
+                                            child: const Text('Cancel'),
+                                          ),
+                                          FilledButton(
+                                            style: FilledButton.styleFrom(
+                                              backgroundColor: Colors.red,
+                                            ),
+                                            onPressed: () =>
+                                                Navigator.of(ctx).pop(true),
+                                            child: const Text('Wipe & Reseed'),
+                                          ),
+                                        ],
+                                      ),
+                                    );
+
+                                    if (confirmed != true) return;
+
                                     setState(() => _isGenerating = true);
                                     try {
-                                      await ref
+                                      final error = await ref
                                           .read(firebaseServiceProvider)
                                           .seedDemoData();
+                                      if (error != null) {
+                                        messenger.showSnackBar(
+                                            SnackBar(content: Text(error)));
+                                        return;
+                                      }
                                       // RE-LOAD FACILITIES & AUTO GENERATE ROUTES AFTER SEEDING
                                       await _loadData();
                                       await _generateOptimalRoutes([], []);
@@ -330,12 +365,9 @@ class _RouteOptimizationMapState extends ConsumerState<RouteOptimizationMap> {
                                         setState(() => _isGenerating = false);
                                       }
                                     }
-                                    if (context.mounted) {
-                                      ScaffoldMessenger.of(context)
-                                          .showSnackBar(const SnackBar(
-                                              content: Text(
-                                                  'Demo scenario seeded! Click Generate to see routes.')));
-                                    }
+                                    messenger.showSnackBar(const SnackBar(
+                                        content: Text(
+                                            'Demo scenario seeded! Click Generate to see routes.')));
                                   },
                                 ),
                               ),
@@ -413,7 +445,8 @@ class _RouteOptimizationMapState extends ConsumerState<RouteOptimizationMap> {
                                               LatLng(s.latitude, s.longitude))
                                           .toList();
                                   bool hasRural = mr.stops.any((s) =>
-                                      s.type == 'rural' && s.id != donorId);
+                                      s.type == FacilityType.rural &&
+                                      s.id != donorId);
                                   return Polyline(
                                     points: points,
                                     color: (hasRural
@@ -702,7 +735,7 @@ class _RouteOptimizationMapState extends ConsumerState<RouteOptimizationMap> {
                         fontWeight: FontWeight.bold,
                         fontSize: 12)),
               ),
-              if (rec.recipient.type == 'rural')
+              if (rec.recipient.type == FacilityType.rural)
                 Container(
                   padding:
                       const EdgeInsets.symmetric(horizontal: 8, vertical: 4),

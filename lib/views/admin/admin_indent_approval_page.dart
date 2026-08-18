@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../services/firebase_service.dart';
 import '../../services/ai_service.dart';
+import '../../services/csv_export_service.dart';
 import '../../models/request.dart';
 import 'package:med_supply_prototype/constants/colors.dart';
 import '../shared/skeleton_loaders.dart';
@@ -19,6 +20,7 @@ class _AdminIndentApprovalPageState
   final Map<String, String?> _aiSuggestions = {};
   final Map<String, bool> _aiLoading = {};
   bool _isActionInProgress = false;
+  bool _isExportingCsv = false;
   final Set<String> _selectedRequestIds = {};
   late final Stream<List<MedRequest>> _requestsStream;
 
@@ -102,7 +104,7 @@ class _AdminIndentApprovalPageState
           .updateRequestStatus(request.id, status);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Request ${status.name} successfully!')));
+            SnackBar(content: Text('Request ${status.label} successfully!')));
       }
     } catch (e) {
       if (mounted) {
@@ -190,6 +192,30 @@ class _AdminIndentApprovalPageState
       }
     } finally {
       if (mounted) setState(() => _isActionInProgress = false);
+    }
+  }
+
+  Future<void> _exportIndentRequestsCsv(List<MedRequest> requests) async {
+    if (requests.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('No indent requests to export yet')));
+      return;
+    }
+
+    setState(() => _isExportingCsv = true);
+    try {
+      await CsvExportService.exportIndentRequests(requests);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Indent requests CSV exported ✓')));
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('Export failed: $e')));
+      }
+    } finally {
+      if (mounted) setState(() => _isExportingCsv = false);
     }
   }
 
@@ -286,6 +312,27 @@ class _AdminIndentApprovalPageState
                       ],
                     ),
                     const Spacer(),
+                    OutlinedButton.icon(
+                      key: const Key('export_indent_csv_button'),
+                      onPressed: _isExportingCsv
+                          ? null
+                          : () => _exportIndentRequestsCsv(pending),
+                      icon: _isExportingCsv
+                          ? const SizedBox(
+                              width: 16,
+                              height: 16,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : const Icon(Icons.file_download_outlined, size: 16),
+                      label: const Text('Export CSV'),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: MediColors.textSecondary,
+                        side: const BorderSide(color: MediColors.border),
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10)),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
                     OutlinedButton.icon(
                       key: const Key('bulk_analyze_button'),
                       onPressed: (_isActionInProgress || validSelected.isEmpty)

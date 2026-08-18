@@ -3,6 +3,7 @@ import 'dart:typed_data';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:med_supply_prototype/models/facility.dart';
+import 'package:med_supply_prototype/models/inventory_item.dart';
 import 'package:med_supply_prototype/models/request.dart';
 import 'package:med_supply_prototype/services/ai_service.dart';
 
@@ -253,7 +254,7 @@ void main() {
       id: 'fac1',
       name: 'Rampur PHC',
       email: 'rampur@phc.com',
-      type: 'rural',
+      type: FacilityType.rural,
       region: 'North',
       latitude: 28.5,
       longitude: 77.1,
@@ -367,6 +368,31 @@ void main() {
         result,
         'Optimizing 2 requests across 1 sites by matching local surpluses.',
       );
+    });
+  });
+
+  group('generateSmartAlerts', () {
+    test(
+        'handles items with initialQuantity == 0 without divide-by-zero crash (#190)',
+        () async {
+      final service = AIService(null);
+      final zeroQtyItem = InventoryItem(
+        id: 'item-zero',
+        medicineName: 'ZeroStockMed',
+        batchId: 'B-ZERO',
+        arrivalDate: DateTime.now().subtract(const Duration(days: 5)),
+        expiryDate: DateTime.now().add(const Duration(days: 60)),
+        initialQuantity: 0,
+        remainingQuantity: 0,
+        unit: 'vials',
+        lastUpdated: DateTime.now(),
+      );
+
+      final alerts = await service.generateSmartAlerts([zeroQtyItem]);
+
+      expect(alerts, isNotEmpty);
+      expect(alerts.first['type'], 'low_stock');
+      expect(alerts.first['remainingPercentage'], 0);
     });
   });
 }

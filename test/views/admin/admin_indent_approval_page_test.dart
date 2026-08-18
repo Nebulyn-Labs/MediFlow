@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -51,7 +52,7 @@ void main() {
       id: 'fac-1',
       name: 'Test PHC',
       email: 't@test.com',
-      type: 'urban',
+      type: FacilityType.urban,
       region: 'North',
       latitude: 28.6,
       longitude: 77.2,
@@ -420,6 +421,34 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(streamFirebase.updatedStatuses['req-1'], RequestStatus.rejected);
+  });
+
+  testWidgets('Export CSV exports pending indent requests (#85)',
+      (WidgetTester tester) async {
+    final streamFirebase = _StreamFirebaseService(requests: [request]);
+
+    const channel = MethodChannel('miguelruivo.flutter.plugins.filepicker');
+    tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+      channel,
+      (call) async => call.method == 'save' ? '/tmp/indent_requests.csv' : null,
+    );
+    addTearDown(() => tester.binding.defaultBinaryMessenger
+        .setMockMethodCallHandler(channel, null));
+
+    tester.view.physicalSize = const Size(1400, 1000);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    await tester.pumpWidget(pump(streamFirebase));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('export_indent_csv_button')), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('export_indent_csv_button')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Indent requests CSV exported ✓'), findsOneWidget);
   });
 }
 

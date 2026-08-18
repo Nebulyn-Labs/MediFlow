@@ -13,6 +13,12 @@ const { createLowStockService } = require("./helpers/lowStock");
 const { handleCspReport, getClientIp } = require("./helpers/cspReport");
 const { wrapUserContent, wrapDataContent } = require("./helpers/promptHardener");
 const { isValidQuantity } = require("./helpers/quantityValidation");
+const { runToolCallLoop } = require("./helpers/toolCallLoop");
+const {
+  ApprovalBusinessRuleError,
+  handleApprovalFailure,
+  isStaleApprovalRetry,
+} = require("./helpers/approvalErrors");
 
 admin.initializeApp();
 
@@ -475,7 +481,12 @@ exports.checkLowStock = onSchedule("every 24 hours", async () => {
  * 3. autoRedistribute(requestId)
  * Atomic stock transfer when a request is approved.
  */
-exports.onIndentApproved = onDocumentUpdated("requests/{requestId}", async (event) => {
+exports.onIndentApproved = onDocumentUpdated(
+  {
+    document: "requests/{requestId}",
+    retry: true,
+  },
+  async (event) => {
   if (!event || !event.data || !event.data.after || !event.data.after.exists) return;
 
   const beforeSnap = event.data.before;
@@ -541,16 +552,30 @@ exports.onIndentApproved = onDocumentUpdated("requests/{requestId}", async (even
 
       try {
         await db.runTransaction(async (transaction) => {
+          // Guard against Cloud Functions redelivering this event after an
+          // earlier attempt's transaction already committed (the ack can be
+          // lost even on success once retry:true is set). Re-read the
+          // request's live status inside the transaction rather than
+          // trusting the "approved" snapshot captured in the event payload.
+          const currentRequestDoc = await transaction.get(event.data.after.ref);
+          if (isStaleApprovalRetry(currentRequestDoc.data()?.status)) {
+            logger.log(
+              `Skipping redistribution for request ${requestId}: already processed (status=${currentRequestDoc.data()?.status})`
+            );
+            return;
+          }
+
           const sourceDoc = await transaction.get(sourceRef);
           if (!sourceDoc.exists) {
-            throw new Error(
-              `Source stock for ${medicineName} at ${sourceFacility} not found`
+            throw new ApprovalBusinessRuleError(
+              "SOURCE_STOCK_NOT_FOUND"
             );
           }
-          const currentSourceQty = Number(sourceDoc.data()?.remainingQuantity || 0);
+          const sourceData = sourceDoc.data() || {};
+          const currentSourceQty = Number(sourceData.remainingQuantity || 0);
           if (currentSourceQty < qty) {
-            throw new Error(
-              `Insufficient stock at donor ${sourceFacility}: available ${currentSourceQty}, requested ${qty}`
+            throw new ApprovalBusinessRuleError(
+              "INSUFFICIENT_DONOR_STOCK"
             );
           }
 
@@ -564,22 +589,37 @@ exports.onIndentApproved = onDocumentUpdated("requests/{requestId}", async (even
 
           // Increment or initialize recipient stock
           if (destDoc.exists) {
-            const currentDestQty = Number(destDoc.data()?.remainingQuantity || 0);
+            const destData = destDoc.data() || {};
+            const currentDestQty = Number(destData.remainingQuantity || 0);
+            const currentDestInit = Number(
+              destData.initialQuantity !== undefined ? destData.initialQuantity : currentDestQty
+            );
             transaction.update(destRef, {
+              initialQuantity: currentDestInit + qty,
               remainingQuantity: currentDestQty + qty,
               lastUpdated: admin.firestore.FieldValue.serverTimestamp(),
             });
           } else {
+            const donorBatchId =
+              sourceData.batchId ||
+              afterData.batchId ||
+              `B-${Math.floor(1000 + Math.random() * 9000)}`;
+            const donorUnit = sourceData.unit || afterData.unit || "units";
+            const donorExpiry =
+              sourceData.expiryDate ||
+              afterData.expiryDate ||
+              admin.firestore.Timestamp.fromDate(
+                new Date(Date.now() + 180 * 86400000)
+              );
+
             transaction.set(destRef, {
               medicineName: medicineName,
-              batchId: `B-${Math.floor(1000 + Math.random() * 9000)}`,
+              batchId: donorBatchId,
               initialQuantity: qty,
               remainingQuantity: qty,
-              unit: "units",
+              unit: donorUnit,
               arrivalDate: admin.firestore.FieldValue.serverTimestamp(),
-              expiryDate: admin.firestore.Timestamp.fromDate(
-                new Date(Date.now() + 180 * 86400000)
-              ),
+              expiryDate: donorExpiry,
               lastUpdated: admin.firestore.FieldValue.serverTimestamp(),
             });
           }
@@ -593,10 +633,12 @@ exports.onIndentApproved = onDocumentUpdated("requests/{requestId}", async (even
           `Redistribution successful: ${qty} units of ${medicineName} from ${sourceFacility} to ${destFacility}`
         );
       } catch (err) {
-        logger.error(`Redistribution failed for request ${requestId}:`, err);
-        await event.data.after.ref.update({
-          status: "rejected",
-          rejectionReason: err.message,
+        await handleApprovalFailure({
+          error: err,
+          requestRef: event.data.after.ref,
+          logger,
+          requestId,
+          operation: "Redistribution",
         });
       }
     } else if (facilityId) {
@@ -610,6 +652,17 @@ exports.onIndentApproved = onDocumentUpdated("requests/{requestId}", async (even
 
       try {
         await db.runTransaction(async (transaction) => {
+          // Same idempotency guard as the redistribution path above: don't
+          // reapply the stock move if a prior (redelivered) attempt already
+          // resolved this request.
+          const currentRequestDoc = await transaction.get(event.data.after.ref);
+          if (isStaleApprovalRetry(currentRequestDoc.data()?.status)) {
+            logger.log(
+              `Skipping stock update for request ${requestId}: already processed (status=${currentRequestDoc.data()?.status})`
+            );
+            return;
+          }
+
           const medDoc = await transaction.get(medRef);
 
           if (type === "surplus") {
@@ -625,22 +678,35 @@ exports.onIndentApproved = onDocumentUpdated("requests/{requestId}", async (even
           } else {
             // Indent / Shortage approved: add stock to facility
             if (medDoc.exists) {
-              const currentQty = Number(medDoc.data()?.remainingQuantity || 0);
+              const medData = medDoc.data() || {};
+              const currentQty = Number(medData.remainingQuantity || 0);
+              const currentInit = Number(
+                medData.initialQuantity !== undefined ? medData.initialQuantity : currentQty
+              );
               transaction.update(medRef, {
+                initialQuantity: currentInit + qty,
                 remainingQuantity: currentQty + qty,
                 lastUpdated: admin.firestore.FieldValue.serverTimestamp(),
               });
             } else {
+              const requestBatchId =
+                afterData.batchId ||
+                `B-${Math.floor(1000 + Math.random() * 9000)}`;
+              const requestUnit = afterData.unit || "units";
+              const requestExpiry =
+                afterData.expiryDate ||
+                admin.firestore.Timestamp.fromDate(
+                  new Date(Date.now() + 180 * 86400000)
+                );
+
               transaction.set(medRef, {
                 medicineName: medicineName,
-                batchId: `B-${Math.floor(1000 + Math.random() * 9000)}`,
+                batchId: requestBatchId,
                 initialQuantity: qty,
                 remainingQuantity: qty,
-                unit: "units",
+                unit: requestUnit,
                 arrivalDate: admin.firestore.FieldValue.serverTimestamp(),
-                expiryDate: admin.firestore.Timestamp.fromDate(
-                  new Date(Date.now() + 180 * 86400000)
-                ),
+                expiryDate: requestExpiry,
                 lastUpdated: admin.firestore.FieldValue.serverTimestamp(),
               });
             }
@@ -655,15 +721,18 @@ exports.onIndentApproved = onDocumentUpdated("requests/{requestId}", async (even
           `Stock updated for request ${requestId} at ${facilityId}: ${type || "indent"} of ${qty} ${medicineName}`
         );
       } catch (err) {
-        logger.error(`Stock update failed for request ${requestId}:`, err);
-        await event.data.after.ref.update({
-          status: "rejected",
-          rejectionReason: err.message,
+        await handleApprovalFailure({
+          error: err,
+          requestRef: event.data.after.ref,
+          logger,
+          requestId,
+          operation: "Stock update",
         });
       }
     }
   }
-});
+  }
+);
 
 async function executeTool(name, args, authInfo) {
   const db = admin.firestore();
@@ -895,28 +964,11 @@ exports.getChatResponseSecure = onCall({ secrets: [GEMINI_API_KEY] }, async (req
       history: formattedHistory
     });
 
-    let result = await chat.sendMessage(prompt);
+    const result = await chat.sendMessage(prompt);
 
-    while (result.response.functionCalls && result.response.functionCalls.length > 0) {
-      const functionResponses = [];
-      for (const call of result.response.functionCalls) {
-        let executionResult;
-        try {
-          executionResult = await executeTool(call.name, call.args, authInfo);
-        } catch (e) {
-          executionResult = { error: e.message };
-        }
-        functionResponses.push({
-          functionResponse: {
-            name: call.name,
-            response: executionResult
-          }
-        });
-      }
-      result = await chat.sendMessage(functionResponses);
-    }
-
-    return result.response.text();
+    return await runToolCallLoop(chat, result, (name, args) =>
+      executeTool(name, args, authInfo)
+    );
   } catch (error) {
     logger.error("Chat Error:", error);
     throw new HttpsError('internal', 'AI chat failed');

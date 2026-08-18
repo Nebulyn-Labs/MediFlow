@@ -1,18 +1,21 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:fake_cloud_firestore/fake_cloud_firestore.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:med_supply_prototype/models/daily_usage_log.dart';
+import 'package:med_supply_prototype/models/facility.dart';
 import 'package:med_supply_prototype/services/simulation_service.dart';
 
 void main() {
-  group('SimulationService', () {
-    late FakeFirebaseFirestore fakeFirestore;
-    late SimulationService simulationService;
+  late FakeFirebaseFirestore fakeFirestore;
+  late SimulationService simulationService;
 
-    setUp(() {
-      fakeFirestore = FakeFirebaseFirestore();
-      simulationService = SimulationService(fakeFirestore);
-    });
+  setUp(() {
+    fakeFirestore = FakeFirebaseFirestore();
+    simulationService = SimulationService(fakeFirestore);
+  });
 
+  group('SimulationService - Single Source of Truth Catalog', () {
     test('demoMedicineCatalog single source of truth is consistent', () {
       expect(SimulationService.demoMedicineCatalog, isNotEmpty);
       expect(
@@ -32,52 +35,179 @@ void main() {
         SimulationService.demoMedicineNames,
         equals(SimulationService.demoMedicineCatalog.keys.toList()),
       );
-      expect(SimulationService.defaultDemoFacilityId,
-          equals('rampur_mediflow_com'));
+      expect(
+        SimulationService.defaultDemoFacilityId,
+        equals('rampur_mediflow_com'),
+      );
     });
+  });
 
-    test('generateRealisticProfile returns valid facility map', () {
-      final profile = simulationService.generateRealisticProfile(type: 'rural');
-      expect(profile['type'], equals('rural'));
+  group('SimulationService - Profile Generation', () {
+    test(
+        'generateRealisticProfile generates valid fields with random type when unassigned',
+        () {
+      final profile = simulationService.generateRealisticProfile();
+
+      expect(profile['type'], anyOf('urban', 'rural'));
       expect(profile['latitude'], isA<double>());
       expect(profile['longitude'], isA<double>());
-      expect(profile['region'], isNotNull);
-      expect(profile['createdAt'], isNotNull);
+      // Delhi NCR center (28.61, 77.20) with max offset ~0.2
+      expect((profile['latitude'] as double), closeTo(28.61, 0.3));
+      expect((profile['longitude'] as double), closeTo(77.20, 0.3));
+      expect(profile['region'], isA<String>());
+      expect(
+        [
+          'North District',
+          'South District',
+          'East State',
+          'West Sector',
+          'Central Zone'
+        ],
+        contains(profile['region']),
+      );
+      expect(profile['createdAt'], isA<Timestamp>());
     });
 
-    test('runFullSimulation seeds inventory and daily logs for demo facility',
+    test('generateRealisticProfile respects explicit facility type parameter',
+        () {
+      final urbanProfile =
+          simulationService.generateRealisticProfile(type: FacilityType.urban);
+      expect(urbanProfile['type'], equals('urban'));
+
+      final ruralProfile =
+          simulationService.generateRealisticProfile(type: FacilityType.rural);
+      expect(ruralProfile['type'], equals('rural'));
+    });
+  });
+
+  group('SimulationService - Full Simulation Workflow', () {
+    test(
+        'runFullSimulation creates inventory and 31 days of logs for urban facility',
         () async {
-      const demoId = SimulationService.defaultDemoFacilityId;
+      const facilityId = 'facility_urban_test';
+      await simulationService.runFullSimulation(facilityId, FacilityType.urban);
 
-      await simulationService.runFullSimulation(demoId, 'rural');
-
-      // Verify inventory documents match demo medicine catalog
-      final invSnapshot = await fakeFirestore
+      // 1. Verify Inventory creation
+      final inventorySnapshot = await fakeFirestore
           .collection('inventory')
-          .doc(demoId)
+          .doc(facilityId)
           .collection('medicines')
           .get();
 
-      expect(invSnapshot.docs.length,
+      expect(inventorySnapshot.docs.length,
           equals(SimulationService.demoMedicineCatalog.length));
 
-      final paracetamolDoc = invSnapshot.docs.firstWhere(
-        (doc) => doc.data()['medicineName'] == 'Paracetamol',
-      );
-      expect(paracetamolDoc.data()['unit'], equals('tablets'));
-      // Demo persona profile for Paracetamol sets expired date (-5 days)
-      final DateTime expiry =
-          (paracetamolDoc.data()['expiryDate'] as Timestamp).toDate();
-      expect(expiry.isBefore(DateTime.now()), isTrue);
+      final expectedMedicines = SimulationService.demoMedicineNames;
 
-      // Verify 31 daily logs were seeded
+      final medicineNames = inventorySnapshot.docs
+          .map((doc) => doc.data()['medicineName'])
+          .toList();
+      for (final med in expectedMedicines) {
+        expect(medicineNames, contains(med));
+      }
+
+      for (final doc in inventorySnapshot.docs) {
+        final data = doc.data();
+        expect(data['batchId'], startsWith('B-'));
+        expect(data['initialQuantity'], greaterThanOrEqualTo(2000));
+        expect(data['remainingQuantity'], isA<int>());
+        expect(data['unit'], isA<String>());
+        expect(data['arrivalDate'], isA<Timestamp>());
+        expect(data['expiryDate'], isA<Timestamp>());
+        expect(data['lastUpdated'], isA<Timestamp>());
+      }
+
+      // 2. Verify 31 days of Daily Usage Logs
       final logsSnapshot = await fakeFirestore
           .collection('daily_usage_logs')
-          .doc(demoId)
+          .doc(facilityId)
           .collection('logs')
           .get();
 
       expect(logsSnapshot.docs.length, equals(31));
+
+      for (final doc in logsSnapshot.docs) {
+        final data = doc.data();
+        expect(data['date'], isA<Timestamp>());
+        expect(data['totalPatients'], isA<int>());
+        // Urban facility base patients is 150 (+/- 20% variation)
+        expect(data['totalPatients'], greaterThan(80));
+        expect(data['totalPatients'], lessThan(250));
+
+        final medicinesList = data['medicines'] as List;
+        expect(medicinesList.length,
+            equals(SimulationService.demoMedicineCatalog.length));
+
+        final usages = medicinesList
+            .map((m) =>
+                MedicineUsage.fromMap(Map<String, dynamic>.from(m as Map)))
+            .toList();
+        for (final usage in usages) {
+          expect(usage.medicineName, isNotEmpty);
+          expect(usage.unitsDistributed, greaterThanOrEqualTo(0));
+        }
+      }
+    });
+
+    test('runFullSimulation generates patient counts scaled for rural facility',
+        () async {
+      const facilityId = 'facility_rural_test';
+      await simulationService.runFullSimulation(facilityId, FacilityType.rural);
+
+      final logsSnapshot = await fakeFirestore
+          .collection('daily_usage_logs')
+          .doc(facilityId)
+          .collection('logs')
+          .get();
+
+      expect(logsSnapshot.docs.length, equals(31));
+
+      for (final doc in logsSnapshot.docs) {
+        final totalPatients = doc.data()['totalPatients'] as int;
+        // Rural facility base patients is 35 (+/- 20% variation)
+        expect(totalPatients, greaterThan(15));
+        expect(totalPatients, lessThan(70));
+      }
+    });
+
+    test(
+        'runFullSimulation applies hardcoded health persona for default demo facility',
+        () async {
+      const facilityId = SimulationService.defaultDemoFacilityId;
+      await simulationService.runFullSimulation(facilityId, FacilityType.rural);
+
+      final inventorySnapshot = await fakeFirestore
+          .collection('inventory')
+          .doc(facilityId)
+          .collection('medicines')
+          .get();
+
+      Map<String, Map<String, dynamic>> itemsByMedName = {
+        for (var doc in inventorySnapshot.docs)
+          doc.data()['medicineName'].toString(): doc.data()
+      };
+
+      // Antibiotic: low stock (15%)
+      final antibiotic = itemsByMedName['Antibiotic']!;
+      final antInitial = antibiotic['initialQuantity'] as int;
+      expect(
+          antibiotic['remainingQuantity'], equals((antInitial * 0.15).round()));
+
+      // Paracetamol: expired (-5 days to expiry)
+      final paracetamol = itemsByMedName['Paracetamol']!;
+      final paraExpiry = (paracetamol['expiryDate'] as Timestamp).toDate();
+      expect(paraExpiry.isBefore(DateTime.now()), isTrue);
+
+      // ORS: surplus stock (95%) and expiring soon
+      final ors = itemsByMedName['ORS']!;
+      final orsInitial = ors['initialQuantity'] as int;
+      expect(ors['remainingQuantity'], equals((orsInitial * 0.95).round()));
+
+      // Cough Syrup: 45% remaining
+      final coughSyrup = itemsByMedName['Cough Syrup']!;
+      final csInitial = coughSyrup['initialQuantity'] as int;
+      expect(
+          coughSyrup['remainingQuantity'], equals((csInitial * 0.45).round()));
     });
 
     test(
@@ -87,7 +217,7 @@ void main() {
 
       await simulationService.runFullSimulation(
         customDemoId,
-        'urban',
+        FacilityType.urban,
         demoFacilityId: customDemoId,
       );
 
@@ -107,6 +237,48 @@ void main() {
       final int initial = orsDoc.data()['initialQuantity'] as int;
       final int remaining = orsDoc.data()['remainingQuantity'] as int;
       expect(remaining, equals((initial * 0.95).round()));
+    });
+
+    test(
+        're-running simulation updates inventory without creating duplicate docs',
+        () async {
+      const facilityId = 'repeat_sim_facility';
+      await simulationService.runFullSimulation(facilityId, FacilityType.urban);
+
+      final firstInventoryCount = (await fakeFirestore
+              .collection('inventory')
+              .doc(facilityId)
+              .collection('medicines')
+              .get())
+          .docs
+          .length;
+
+      // Run simulation a second time
+      await simulationService.runFullSimulation(facilityId, FacilityType.urban);
+
+      final secondInventoryCount = (await fakeFirestore
+              .collection('inventory')
+              .doc(facilityId)
+              .collection('medicines')
+              .get())
+          .docs
+          .length;
+
+      expect(secondInventoryCount, equals(firstInventoryCount));
+    });
+  });
+
+  group('simulationServiceProvider', () {
+    test('provides SimulationService instance via Riverpod container', () {
+      final container = ProviderContainer(
+        overrides: [
+          simulationServiceProvider.overrideWithValue(simulationService),
+        ],
+      );
+      addTearDown(container.dispose);
+
+      final service = container.read(simulationServiceProvider);
+      expect(service, isA<SimulationService>());
     });
   });
 }
