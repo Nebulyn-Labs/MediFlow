@@ -346,7 +346,7 @@ function parseCspHeader(cspString) {
 }
 
 describe("firebase.json Security Headers Configuration", () => {
-  it("includes an enforcing Content-Security-Policy header with complete directive origins", () => {
+  it("includes both enforcing Content-Security-Policy and report-only headers with complete directive origins", () => {
     const firebaseJsonPath = path.resolve(__dirname, "../../firebase.json");
     const rawData = fs.readFileSync(firebaseJsonPath, "utf8");
     const firebaseConfig = JSON.parse(rawData);
@@ -356,60 +356,78 @@ describe("firebase.json Security Headers Configuration", () => {
     const cspHeader = headersList.find(
       (h) => h.key === "Content-Security-Policy"
     );
-    assert.ok(cspHeader, "Content-Security-Policy header should be present");
+    const cspReportOnlyHeader = headersList.find(
+      (h) => h.key === "Content-Security-Policy-Report-Only"
+    );
 
-    const directives = parseCspHeader(cspHeader.value);
+    assert.ok(
+      cspHeader,
+      "Content-Security-Policy enforcing header must be present"
+    );
+    assert.ok(
+      cspReportOnlyHeader,
+      "Content-Security-Policy-Report-Only header must be present alongside enforcing header for monitoring"
+    );
 
-    // Hardening directives
-    assert.deepStrictEqual(directives["object-src"], ["'none'"]);
-    assert.deepStrictEqual(directives["base-uri"], ["'self'"]);
-    assert.deepStrictEqual(directives["frame-ancestors"], ["'none'"]);
+    for (const targetHeader of [cspHeader, cspReportOnlyHeader]) {
+      const directives = parseCspHeader(targetHeader.value);
 
-    // Required origins per directive for Flutter Web, CanvasKit, Firebase & APIs
-    const requiredConnectSrc = [
-      "'self'",
-      "https://*.googleapis.com",
-      "https://*.firebaseio.com",
-      "https://*.firebasestorage.app",
-      "https://securetoken.googleapis.com",
-      "https://identitytoolkit.googleapis.com",
-      "https://firestore.googleapis.com",
-      "https://www.googleapis.com",
-      "wss://*.firebaseio.com",
-      "https://www.gstatic.com",
-      "https://fonts.gstatic.com",
-      "https://*.cloudfunctions.net",
-      "https://*.run.app",
-      "https://*.basemaps.cartocdn.com",
-      "https://router.project-osrm.org",
-    ];
+      // Hardening directives
+      assert.deepStrictEqual(directives["object-src"], ["'none'"]);
+      assert.deepStrictEqual(directives["base-uri"], ["'self'"]);
+      assert.deepStrictEqual(directives["frame-ancestors"], ["'none'"]);
 
-    const connectSrc = directives["connect-src"] || [];
-    for (const origin of requiredConnectSrc) {
+      // Required origins per directive for Flutter Web, CanvasKit, Firebase, Routing & APIs
+      const requiredConnectSrc = [
+        "'self'",
+        "https://*.googleapis.com",
+        "https://*.firebaseio.com",
+        "https://*.firebasestorage.app",
+        "https://securetoken.googleapis.com",
+        "https://identitytoolkit.googleapis.com",
+        "https://firestore.googleapis.com",
+        "https://www.googleapis.com",
+        "wss://*.firebaseio.com",
+        "https://www.gstatic.com",
+        "https://fonts.gstatic.com",
+        "https://*.cloudfunctions.net",
+        "https://*.run.app",
+        "https://*.basemaps.cartocdn.com",
+        "https://router.project-osrm.org",
+        "https://api.openrouteservice.org",
+      ];
+
+      const connectSrc = directives["connect-src"] || [];
+      for (const origin of requiredConnectSrc) {
+        assert.ok(
+          connectSrc.includes(origin),
+          `${targetHeader.key} connect-src missing required origin: ${origin}`
+        );
+      }
+
+      const requiredScriptSrc = [
+        "'self'",
+        "'unsafe-inline'",
+        "'unsafe-eval'",
+        "https://www.gstatic.com",
+        "https://www.googleapis.com",
+      ];
+      const scriptSrc = directives["script-src"] || [];
+      for (const origin of requiredScriptSrc) {
+        assert.ok(
+          scriptSrc.includes(origin),
+          `${targetHeader.key} script-src missing required origin/token: ${origin}`
+        );
+      }
+
       assert.ok(
-        connectSrc.includes(origin),
-        `connect-src missing required origin: ${origin}`
+        directives["report-uri"]?.includes("/csp-report"),
+        `${targetHeader.key} missing report-uri /csp-report`
+      );
+      assert.ok(
+        directives["report-to"]?.includes("csp-endpoint"),
+        `${targetHeader.key} missing report-to csp-endpoint`
       );
     }
-
-    const requiredScriptSrc = [
-      "'self'",
-      "'unsafe-inline'",
-      "'unsafe-eval'",
-      "https://www.gstatic.com",
-      "https://www.googleapis.com",
-    ];
-    const scriptSrc = directives["script-src"] || [];
-    for (const origin of requiredScriptSrc) {
-      assert.ok(
-        scriptSrc.includes(origin),
-        `script-src missing required origin/token: ${origin}`
-      );
-    }
-
-    assert.ok(directives["report-uri"]?.includes("/csp-report"));
-    assert.ok(directives["report-to"]?.includes("csp-endpoint"));
   });
 });
-
-
