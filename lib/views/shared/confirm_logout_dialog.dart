@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:go_router/go_router.dart';
 import 'package:med_supply_prototype/constants/colors.dart';
+import 'package:med_supply_prototype/services/role_guard.dart';
 
 /// Shows a confirmation dialog for logging out.
 /// Returns true if the user confirms, false otherwise.
@@ -36,7 +37,11 @@ Future<void> signOutWithConfirmation(BuildContext context,
   final confirmed = await confirmLogout(context);
   if (!confirmed) return;
   try {
-    await (auth ?? FirebaseAuth.instance).signOut();
+    final firebaseAuth = auth ?? FirebaseAuth.instance;
+    final uid = firebaseAuth.currentUser?.uid;
+    await firebaseAuth.signOut();
+    // Drop the router's cached role so a subsequent login resolves fresh.
+    if (uid != null) clearRoleCache(uid);
     if (context.mounted) context.go('/');
   } catch (e) {
     if (context.mounted) {
