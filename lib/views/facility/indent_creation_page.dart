@@ -6,6 +6,7 @@ import '../../services/ai_service.dart';
 import '../../models/request.dart';
 import '../../models/inventory_item.dart';
 import 'package:med_supply_prototype/constants/colors.dart';
+import 'package:med_supply_prototype/theme/medi_flow_theme.dart';
 import '../shared/skeleton_loaders.dart';
 import '../../utils/retry_snackbar.dart';
 
@@ -220,8 +221,10 @@ class _IndentCreationPageState extends ConsumerState<IndentCreationPage> {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.mediTheme;
+
     return Scaffold(
-      backgroundColor: MediColors.bg,
+      backgroundColor: colors.background,
       appBar: AppBar(
         title: Row(
           children: [
@@ -230,14 +233,14 @@ class _IndentCreationPageState extends ConsumerState<IndentCreationPage> {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
               decoration: BoxDecoration(
-                color: MediColors.primaryOverlay,
+                color: colors.primaryOverlay,
                 borderRadius: BorderRadius.circular(6),
               ),
               child: Text(
                 widget.facilityId.replaceAll('_', ' ').toUpperCase(),
-                style: const TextStyle(
+                style: TextStyle(
                     fontSize: 11,
-                    color: MediColors.primary,
+                    color: colors.primary,
                     fontWeight: FontWeight.bold),
               ),
             ),

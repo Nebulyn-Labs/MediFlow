@@ -4,6 +4,7 @@ import '../../services/firebase_service.dart';
 import '../../services/ai_service.dart';
 import '../../services/csv_export_service.dart';
 import 'package:med_supply_prototype/constants/colors.dart';
+import 'package:med_supply_prototype/theme/medi_flow_theme.dart';
 import '../shared/skeleton_loaders.dart';
 import '../../models/inventory_item.dart';
 
@@ -144,8 +145,10 @@ class _WastageReportPageState extends ConsumerState<WastageReportPage> {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.mediTheme;
+
     return Scaffold(
-      backgroundColor: MediColors.bg,
+      backgroundColor: colors.background,
       appBar: AppBar(
         title: const Text('Wastage Report'),
         actions: [
@@ -170,7 +173,8 @@ class _WastageReportPageState extends ConsumerState<WastageReportPage> {
                           title: 'Expired Units',
                           value: _totalExpired.toString(),
                           icon: Icons.error_outline,
-                          color: MediColors.error,
+                          color: colors.error,
+                          colors: colors,
                         ),
                       ),
                       const SizedBox(width: 16),
@@ -179,8 +183,9 @@ class _WastageReportPageState extends ConsumerState<WastageReportPage> {
                           title: 'Est. Lost',
                           value: '\$${_totalLostCost.toStringAsFixed(2)}',
                           icon: Icons.money_off,
-                          color: MediColors.error,
+                          color: colors.error,
                           subtitle: 'assumes \$1.50/unit',
+                          colors: colors,
                         ),
                       ),
                       const SizedBox(width: 16),
@@ -189,7 +194,8 @@ class _WastageReportPageState extends ConsumerState<WastageReportPage> {
                           title: 'Near Expiry (≤30 Days)',
                           value: _totalNearExpiry.toString(),
                           icon: Icons.warning_amber_rounded,
-                          color: MediColors.warning,
+                          color: colors.warning,
+                          colors: colors,
                         ),
                       ),
                       const SizedBox(width: 16),
@@ -198,8 +204,9 @@ class _WastageReportPageState extends ConsumerState<WastageReportPage> {
                           title: 'Est. At Risk',
                           value: '\$${_totalAtRiskCost.toStringAsFixed(2)}',
                           icon: Icons.attach_money,
-                          color: MediColors.warning,
+                          color: colors.warning,
                           subtitle: 'assumes \$1.50/unit',
+                          colors: colors,
                         ),
                       ),
                     ],
@@ -208,12 +215,12 @@ class _WastageReportPageState extends ConsumerState<WastageReportPage> {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      const Text(
+                      Text(
                         'Wastage Breakdown',
                         style: TextStyle(
                             fontSize: 18,
                             fontWeight: FontWeight.w800,
-                            color: MediColors.textPrimary),
+                            color: colors.textPrimary),
                       ),
                       Row(
                         children: [
@@ -246,12 +253,12 @@ class _WastageReportPageState extends ConsumerState<WastageReportPage> {
                       alignment: Alignment.center,
                       child: Column(
                         children: [
-                          const Icon(Icons.error_outline,
-                              size: 64, color: MediColors.error),
+                          Icon(Icons.error_outline,
+                              size: 64, color: colors.error),
                           const SizedBox(height: 16),
                           Text('Failed to load wastage data: $_error',
-                              style: const TextStyle(
-                                  color: MediColors.error, fontSize: 16)),
+                              style: TextStyle(
+                                  color: colors.error, fontSize: 16)),
                         ],
                       ),
                     )
@@ -259,15 +266,15 @@ class _WastageReportPageState extends ConsumerState<WastageReportPage> {
                     Container(
                       padding: const EdgeInsets.all(40),
                       alignment: Alignment.center,
-                      child: const Column(
+                      child: Column(
                         children: [
                           Icon(Icons.check_circle_outline,
-                              size: 64, color: MediColors.success),
-                          SizedBox(height: 16),
+                              size: 64, color: colors.success),
+                          const SizedBox(height: 16),
                           Text(
                               'No wastage data found. Excellent inventory management!',
                               style: TextStyle(
-                                  color: MediColors.textSecondary,
+                                  color: colors.textSecondary,
                                   fontSize: 16)),
                         ],
                       ),
@@ -276,9 +283,9 @@ class _WastageReportPageState extends ConsumerState<WastageReportPage> {
                     Container(
                       width: double.infinity,
                       decoration: BoxDecoration(
-                        color: MediColors.surface,
+                        color: colors.surface,
                         borderRadius: BorderRadius.circular(16),
-                        border: Border.all(color: MediColors.border),
+                        border: Border.all(color: colors.border),
                       ),
                       child: ClipRRect(
                         borderRadius: BorderRadius.circular(16),
@@ -314,24 +321,24 @@ class _WastageReportPageState extends ConsumerState<WastageReportPage> {
                                 DataCell(Text(expiredUnits.toString(),
                                     style: TextStyle(
                                         color: expiredUnits > 0
-                                            ? MediColors.error
+                                            ? colors.error
                                             : null))),
                                 DataCell(Text(nearExpiryUnits.toString(),
                                     style: TextStyle(
                                         color: nearExpiryUnits > 0
-                                            ? MediColors.warning
+                                            ? colors.warning
                                             : null))),
                                 DataCell(Text(
                                     '\$${lostCost.toStringAsFixed(2)}',
                                     style: TextStyle(
                                         color: lostCost > 0
-                                            ? MediColors.error
+                                            ? colors.error
                                             : null))),
                                 DataCell(Text(
                                     '\$${atRiskCost.toStringAsFixed(2)}',
                                     style: TextStyle(
                                         color: atRiskCost > 0
-                                            ? MediColors.warning
+                                            ? colors.warning
                                             : null))),
                               ],
                             );
@@ -351,11 +358,12 @@ class _WastageReportPageState extends ConsumerState<WastageReportPage> {
     required IconData icon,
     required Color color,
     String? subtitle,
+    required MediFlowTheme colors,
   }) {
     return Container(
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
-        color: MediColors.surfaceLight,
+        color: colors.surface,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: color.withValues(alpha: 0.3)),
         boxShadow: [
@@ -382,10 +390,10 @@ class _WastageReportPageState extends ConsumerState<WastageReportPage> {
               const SizedBox(width: 12),
               Expanded(
                 child: Text(title,
-                    style: const TextStyle(
+                    style: TextStyle(
                         fontSize: 13,
                         fontWeight: FontWeight.w600,
-                        color: MediColors.textSecondary)),
+                        color: colors.textSecondary)),
               ),
             ],
           ),
@@ -396,8 +404,8 @@ class _WastageReportPageState extends ConsumerState<WastageReportPage> {
           if (subtitle != null) ...[
             const SizedBox(height: 4),
             Text(subtitle,
-                style: const TextStyle(
-                    fontSize: 11, color: MediColors.textSecondary)),
+                style: TextStyle(
+                    fontSize: 11, color: colors.textSecondary)),
           ],
         ],
       ),

@@ -3,7 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../services/firebase_service.dart';
-import 'package:med_supply_prototype/constants/colors.dart';
+import 'package:med_supply_prototype/theme/medi_flow_theme.dart';
+import 'package:med_supply_prototype/theme/theme_provider.dart';
 
 class LoginScreen extends ConsumerStatefulWidget {
   final String role;
@@ -112,63 +113,109 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.mediTheme;
     final isFacility = widget.role == 'facility';
-    final accentColor = isFacility ? MediColors.teal : MediColors.primary;
+    final accentColor = isFacility ? colors.teal : colors.primary;
     final gradient =
-        isFacility ? MediColors.cyanGradient : MediColors.primaryGradient;
+        isFacility ? colors.cyanGradient : colors.primaryGradient;
+
+    final themeMode = ref.watch(themeModeProvider);
+    final isDark = themeMode == ThemeMode.dark ||
+        (themeMode == ThemeMode.system &&
+            MediaQuery.of(context).platformBrightness == Brightness.dark);
+
+    final themeToggleButton = Tooltip(
+      message: isDark ? 'Switch to Light Mode' : 'Switch to Dark Mode',
+      child: InkWell(
+        key: const Key('login_theme_toggle_button'),
+        borderRadius: BorderRadius.circular(12),
+        onTap: () => ref.read(themeModeProvider.notifier).toggleTheme(),
+        child: Container(
+          padding: const EdgeInsets.all(10),
+          decoration: BoxDecoration(
+            color: colors.surface,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: colors.border),
+          ),
+          child: Icon(
+            isDark ? Icons.light_mode_rounded : Icons.dark_mode_rounded,
+            size: 22,
+            color: isDark ? const Color(0xFFFBBF24) : colors.primary,
+          ),
+        ),
+      ),
+    );
 
     return Scaffold(
-      backgroundColor: MediColors.bg,
-      body: LayoutBuilder(
-        builder: (context, constraints) {
-          final isNarrow = constraints.maxWidth < 700;
+      backgroundColor: colors.background,
+      body: Stack(
+        children: [
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final isNarrow = constraints.maxWidth < 700;
 
-          if (isNarrow) {
-            return SafeArea(
-              child: SingleChildScrollView(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 20, vertical: 32),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    _buildBrandHeader(isFacility, accentColor, gradient,
-                        compact: true),
-                    const SizedBox(height: 32),
-                    _buildLoginForm(gradient, accentColor, compact: true),
-                  ],
-                ),
-              ),
-            );
-          }
-
-          return Row(
-            children: [
-              // Left: Brand illustration
-              Expanded(
-                child: Container(
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      colors: [MediColors.bg, MediColors.surface],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
+              if (isNarrow) {
+                return SafeArea(
+                  child: SingleChildScrollView(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 20, vertical: 32),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Align(
+                          alignment: Alignment.topRight,
+                          child: themeToggleButton,
+                        ),
+                        const SizedBox(height: 16),
+                        _buildBrandHeader(isFacility, accentColor, gradient,
+                            compact: true),
+                        const SizedBox(height: 32),
+                        _buildLoginForm(gradient, accentColor, compact: true),
+                      ],
                     ),
                   ),
-                  child: Center(
-                    child: _buildBrandHeader(isFacility, accentColor, gradient,
-                        compact: false),
-                  ),
-                ),
-              ),
+                );
+              }
 
-              // Right: Login form
-              Expanded(
-                child: Center(
-                  child: _buildLoginForm(gradient, accentColor, compact: false),
-                ),
-              ),
-            ],
-          );
-        },
+              return Row(
+                children: [
+                  // Left: Brand illustration
+                  Expanded(
+                    child: Container(
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: [colors.heroStart, colors.heroEnd],
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                        ),
+                      ),
+                      child: Center(
+                        child: _buildBrandHeader(isFacility, accentColor, gradient,
+                            compact: false),
+                      ),
+                    ),
+                  ),
+
+                  // Right: Login form
+                  Expanded(
+                    child: Stack(
+                      children: [
+                        Positioned(
+                          top: 24,
+                          right: 24,
+                          child: themeToggleButton,
+                        ),
+                        Center(
+                          child: _buildLoginForm(gradient, accentColor, compact: false),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              );
+            },
+          ),
+        ],
       ),
     );
   }
@@ -176,6 +223,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   Widget _buildBrandHeader(
       bool isFacility, Color accentColor, Gradient gradient,
       {required bool compact}) {
+    final colors = context.mediTheme;
     final iconBoxSize = compact ? 88.0 : 120.0;
     final iconSize = compact ? 40.0 : 56.0;
     final titleSize = compact ? 22.0 : 28.0;
@@ -221,8 +269,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   ? 'Manage daily logs, track inventory, and forecast indents using AI.'
                   : 'Monitor global stock levels and optimize redistribution routes.',
               textAlign: TextAlign.center,
-              style: const TextStyle(
-                  color: MediColors.textSecondary, fontSize: 14, height: 1.6),
+              style: TextStyle(
+                  color: colors.textSecondary, fontSize: 14, height: 1.6),
             ),
           ),
         ],
@@ -232,58 +280,59 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
   Widget _buildLoginForm(Gradient gradient, Color accentColor,
       {required bool compact}) {
+    final colors = context.mediTheme;
     return ConstrainedBox(
       constraints: const BoxConstraints(maxWidth: 400),
       child: Container(
         width: double.infinity,
         padding: EdgeInsets.all(compact ? 24 : 40),
         decoration: BoxDecoration(
-          color: MediColors.surface,
+          color: colors.surface,
           borderRadius: BorderRadius.circular(24),
-          border: Border.all(color: MediColors.border),
+          border: Border.all(color: colors.border),
         ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            const Text(
+            Text(
               'Sign In',
               style: TextStyle(
                   fontSize: 28,
                   fontWeight: FontWeight.w800,
-                  color: MediColors.textPrimary),
+                  color: colors.textPrimary),
             ),
             const SizedBox(height: 8),
-            const Text(
+            Text(
               'Enter your credentials to continue',
-              style: TextStyle(color: MediColors.textSecondary, fontSize: 14),
+              style: TextStyle(color: colors.textSecondary, fontSize: 14),
             ),
             const SizedBox(height: 36),
             TextField(
               controller: _emailController,
               keyboardType: TextInputType.emailAddress,
-              style: const TextStyle(color: MediColors.textPrimary),
+              style: TextStyle(color: colors.textPrimary),
               decoration: InputDecoration(
                 labelText: 'Email Address',
                 prefixIcon: Icon(Icons.email_outlined,
-                    color: MediColors.textMuted, size: 20),
+                    color: colors.textMuted, size: 20),
               ),
             ),
             const SizedBox(height: 20),
             TextField(
               controller: _passwordController,
               obscureText: _obscurePassword,
-              style: const TextStyle(color: MediColors.textPrimary),
+              style: TextStyle(color: colors.textPrimary),
               decoration: InputDecoration(
                 labelText: 'Password',
                 prefixIcon: Icon(Icons.lock_outline_rounded,
-                    color: MediColors.textMuted, size: 20),
+                    color: colors.textMuted, size: 20),
                 suffixIcon: IconButton(
                   icon: Icon(
                     _obscurePassword
                         ? Icons.visibility_off_rounded
                         : Icons.visibility_rounded,
-                    color: MediColors.textMuted,
+                    color: colors.textMuted,
                     size: 20,
                   ),
                   onPressed: () =>
@@ -298,7 +347,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
               child: TextButton(
                 onPressed: () => context.push('/forgot-password'),
                 style: TextButton.styleFrom(
-                  foregroundColor: MediColors.primary,
+                  foregroundColor: colors.primary,
                   padding: EdgeInsets.zero,
                   minimumSize: const Size(0, 0),
                   tapTargetSize: MaterialTapTargetSize.shrinkWrap,
@@ -335,7 +384,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   ),
                   onPressed: _isLoading ? null : _login,
                   child: _isLoading
-                      ? const SizedBox(
+                       ? const SizedBox(
                           width: 22,
                           height: 22,
                           child: CircularProgressIndicator(
@@ -358,7 +407,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     icon: const Icon(Icons.dataset_rounded, size: 16),
                     label: const Text('Seed DB'),
                     style: TextButton.styleFrom(
-                        foregroundColor: MediColors.textMuted),
+                        foregroundColor: colors.textMuted),
                   ),
                   const SizedBox(width: 8),
                 ],
@@ -367,7 +416,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   icon: const Icon(Icons.arrow_back_rounded, size: 16),
                   label: const Text('Back'),
                   style: TextButton.styleFrom(
-                      foregroundColor: MediColors.textMuted),
+                      foregroundColor: colors.textMuted),
                 ),
               ],
             ),

@@ -6,6 +6,7 @@ import '../../services/firebase_service.dart';
 import '../../services/simulation_service.dart';
 import '../../services/csv_export_service.dart';
 import 'package:med_supply_prototype/constants/colors.dart';
+import 'package:med_supply_prototype/theme/medi_flow_theme.dart';
 import '../shared/confirm_logout_dialog.dart';
 import '../shared/skeleton_loaders.dart';
 import '../../utils/date_formatter.dart';
@@ -24,6 +25,7 @@ class _FacilityOverviewState extends ConsumerState<FacilityOverview> {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.mediTheme;
     final inventoryStream =
         ref.watch(firebaseServiceProvider).streamInventory(widget.facilityId);
 
@@ -31,16 +33,16 @@ class _FacilityOverviewState extends ConsumerState<FacilityOverview> {
       stream: inventoryStream,
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Scaffold(
-            backgroundColor: MediColors.bg,
-            body: FacilityOverviewSkeleton(),
+          return Scaffold(
+            backgroundColor: colors.background,
+            body: const FacilityOverviewSkeleton(),
           );
         }
         final inventory = snapshot.data ?? [];
         final alertCount = inventory.where((i) => i.hasAlert).length;
 
         return Scaffold(
-          backgroundColor: MediColors.bg,
+          backgroundColor: colors.background,
           appBar: AppBar(
             title: const Text('Dashboard'),
             actions: [
@@ -49,8 +51,8 @@ class _FacilityOverviewState extends ConsumerState<FacilityOverview> {
                 icon: Stack(
                   clipBehavior: Clip.none,
                   children: [
-                    const Icon(Icons.notifications_outlined,
-                        color: MediColors.textSecondary),
+                    Icon(Icons.notifications_outlined,
+                        color: colors.textSecondary),
                     if (alertCount > 0)
                       Positioned(
                         top: -2,
@@ -58,8 +60,8 @@ class _FacilityOverviewState extends ConsumerState<FacilityOverview> {
                         child: Container(
                           width: 16,
                           height: 16,
-                          decoration: const BoxDecoration(
-                              color: MediColors.error, shape: BoxShape.circle),
+                          decoration: BoxDecoration(
+                              color: colors.error, shape: BoxShape.circle),
                           child: Center(
                               child: Text('$alertCount',
                                   style: const TextStyle(
@@ -73,13 +75,13 @@ class _FacilityOverviewState extends ConsumerState<FacilityOverview> {
                 tooltip: 'Alerts',
                 itemBuilder: (context) {
                   final alerts = <PopupMenuEntry<String>>[
-                    const PopupMenuItem<String>(
+                    PopupMenuItem<String>(
                         value: 'h',
                         enabled: false,
                         child: Text('Live Alerts',
                             style: TextStyle(
                                 fontWeight: FontWeight.w700,
-                                color: MediColors.textPrimary))),
+                                color: colors.textPrimary))),
                     const PopupMenuDivider(),
                   ];
                   final lowItems = inventory
@@ -97,14 +99,14 @@ class _FacilityOverviewState extends ConsumerState<FacilityOverview> {
                     alerts.add(PopupMenuItem<String>(
                         value: 'l_${item.medicineName}',
                         child: ListTile(
-                          leading: const Icon(Icons.warning_rounded,
-                              color: MediColors.error, size: 20),
+                          leading: Icon(Icons.warning_rounded,
+                              color: colors.error, size: 20),
                           title: Text('${item.medicineName} critically low',
-                              style: const TextStyle(
-                                  fontSize: 13, color: MediColors.textPrimary)),
+                              style: TextStyle(
+                                  fontSize: 13, color: colors.textPrimary)),
                           subtitle: Text('${item.remainingQuantity} units left',
-                              style: const TextStyle(
-                                  fontSize: 11, color: MediColors.textMuted)),
+                              style: TextStyle(
+                                  fontSize: 11, color: colors.textMuted)),
                           trailing: TextButton(
                             onPressed: () async {
                               try {
@@ -146,31 +148,14 @@ class _FacilityOverviewState extends ConsumerState<FacilityOverview> {
                               isExpired
                                   ? Icons.error_outline_rounded
                                   : Icons.schedule_rounded,
-                              color: isExpired
-                                  ? MediColors.error
-                                  : MediColors.warning,
+                              color: isExpired ? colors.error : colors.warning,
                               size: 20),
                           title: Text(
                               isExpired
                                   ? '${item.medicineName} has EXPIRED'
                                   : '${item.medicineName} expires in $d d',
-                              style: const TextStyle(
-                                  fontSize: 13, color: MediColors.textPrimary)),
-                          dense: true,
-                          contentPadding: EdgeInsets.zero,
-                        )));
-                  }
-                  if (lowItems.isEmpty && expiringItems.isEmpty) {
-                    alerts.add(const PopupMenuItem<String>(
-                        value: 'ok',
-                        enabled: false,
-                        child: ListTile(
-                          leading: Icon(Icons.check_circle_rounded,
-                              color: MediColors.success, size: 20),
-                          title: Text('All systems healthy',
                               style: TextStyle(
-                                  fontSize: 13,
-                                  color: MediColors.textSecondary)),
+                                  fontSize: 13, color: colors.textPrimary)),
                           dense: true,
                           contentPadding: EdgeInsets.zero,
                         )));
@@ -222,14 +207,14 @@ class _FacilityOverviewState extends ConsumerState<FacilityOverview> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text('Facility Dashboard',
-                            style: const TextStyle(
+                            style: TextStyle(
                                 fontSize: 26,
                                 fontWeight: FontWeight.w800,
-                                color: MediColors.textPrimary)),
+                                color: colors.textPrimary)),
                         const SizedBox(height: 4),
                         Text('Real-time inventory monitoring and insights',
-                            style: const TextStyle(
-                                color: MediColors.textSecondary, fontSize: 14)),
+                            style: TextStyle(
+                                color: colors.textSecondary, fontSize: 14)),
                       ],
                     ),
                     OutlinedButton.icon(
@@ -256,10 +241,10 @@ class _FacilityOverviewState extends ConsumerState<FacilityOverview> {
                                 if (fac == null) {
                                   if (context.mounted) {
                                     ScaffoldMessenger.of(context)
-                                        .showSnackBar(const SnackBar(
-                                      content: Text(
+                                        .showSnackBar(SnackBar(
+                                      content: const Text(
                                           'Simulation failed. Please try again.'),
-                                      backgroundColor: MediColors.error,
+                                      backgroundColor: colors.error,
                                     ));
                                   }
                                   if (mounted) {
@@ -281,10 +266,10 @@ class _FacilityOverviewState extends ConsumerState<FacilityOverview> {
                               } catch (_) {
                                 if (context.mounted) {
                                   ScaffoldMessenger.of(context)
-                                      .showSnackBar(const SnackBar(
-                                    content: Text(
+                                      .showSnackBar(SnackBar(
+                                    content: const Text(
                                         'Simulation failed. Please try again.'),
-                                    backgroundColor: MediColors.error,
+                                    backgroundColor: colors.error,
                                   ));
                                 }
                               }
@@ -293,17 +278,17 @@ class _FacilityOverviewState extends ConsumerState<FacilityOverview> {
                               }
                             },
                       icon: _isSimulating
-                          ? const SizedBox(
+                          ? SizedBox(
                               width: 18,
                               height: 18,
                               child: CircularProgressIndicator(
-                                  strokeWidth: 2, color: MediColors.primary))
+                                  strokeWidth: 2, color: colors.primary))
                           : const Icon(Icons.analytics_outlined),
                       label: Text(
                           _isSimulating ? 'Running...' : 'Simulate Analytics'),
                       style: OutlinedButton.styleFrom(
-                        foregroundColor: MediColors.primary,
-                        side: const BorderSide(color: MediColors.primary),
+                        foregroundColor: colors.primary,
+                        side: BorderSide(color: colors.primary),
                         shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(10)),
                       ),
@@ -333,13 +318,11 @@ class _FacilityOverviewState extends ConsumerState<FacilityOverview> {
                         ? 'No stock'
                         : '$healthy / ${inventory.length} healthy';
                     final stockHealthColor = unhealthy == 0
-                        ? MediColors.success
-                        : MediColors.warning;
+                        ? colors.success
+                        : colors.warning;
                     final stockHealthGradient = unhealthy == 0
-                        ? const LinearGradient(
-                            colors: [Color(0xFF0A3D2E), Color(0xFF1E293B)])
-                        : const LinearGradient(
-                            colors: [Color(0xFF3D2E0A), Color(0xFF1E293B)]);
+                        ? colors.healthyKpiGradient
+                        : colors.warningKpiGradient;
 
                     return Wrap(
                       spacing: 20,
@@ -349,10 +332,10 @@ class _FacilityOverviewState extends ConsumerState<FacilityOverview> {
                             'Total Meds in Inv',
                             '${inventory.length}',
                             Icons.medication_rounded,
-                            MediColors.info,
-                            const LinearGradient(
-                                colors: [Color(0xFF1E3A5F), Color(0xFF1E293B)]),
-                            null),
+                            colors.info,
+                            colors.infoKpiGradient,
+                            null,
+                            colors),
                         _buildKpiCard(
                             'Stock Health',
                             stockHealthText,
@@ -360,43 +343,40 @@ class _FacilityOverviewState extends ConsumerState<FacilityOverview> {
                             stockHealthColor,
                             stockHealthGradient, () {
                           context.go('/facility/${widget.facilityId}/alerts');
-                        }),
+                        }, colors),
                         _buildKpiCard(
                             'Expired',
                             '$expired',
                             Icons.error_outline_rounded,
-                            MediColors.error,
-                            const LinearGradient(
-                                colors: [Color(0xFF3D1519), Color(0xFF1E293B)]),
+                            colors.error,
+                            colors.errorKpiGradient,
                             () {
                           context.go('/facility/${widget.facilityId}/alerts');
-                        }),
+                        }, colors),
                         _buildKpiCard(
                             'Wastage Risk',
                             '$wastageRisk',
                             Icons.warning_amber_rounded,
                             const Color(0xFFF59E0B),
-                            const LinearGradient(
-                                colors: [Color(0xFF3D2E0A), Color(0xFF1E293B)]),
+                            colors.warningKpiGradient,
                             () {
                           context.go('/facility/${widget.facilityId}/alerts');
-                        }),
+                        }, colors),
                         _buildKpiCard(
                             'Low Stock',
                             '$lowStock',
                             Icons.trending_down_rounded,
-                            MediColors.error,
-                            const LinearGradient(
-                                colors: [Color(0xFF3D1519), Color(0xFF1E293B)]),
+                            colors.error,
+                            colors.errorKpiGradient,
                             () {
                           context.go('/facility/${widget.facilityId}/alerts');
-                        }),
+                        }, colors),
                       ],
                     );
                   },
                 ),
                 const SizedBox(height: 36),
-                _buildInventoryTable(context, ref, inventory),
+                _buildInventoryTable(context, ref, inventory, colors),
               ],
             ),
           ),
@@ -426,7 +406,7 @@ class _FacilityOverviewState extends ConsumerState<FacilityOverview> {
   }
 
   Widget _buildKpiCard(String title, String value, IconData icon, Color accent,
-      LinearGradient bg, VoidCallback? onTap) {
+      LinearGradient bg, VoidCallback? onTap, MediFlowTheme colors) {
     return MouseRegion(
       cursor:
           onTap != null ? SystemMouseCursors.click : SystemMouseCursors.basic,
@@ -459,8 +439,8 @@ class _FacilityOverviewState extends ConsumerState<FacilityOverview> {
                       color: accent)),
               const SizedBox(height: 4),
               Text(title,
-                  style: const TextStyle(
-                      fontSize: 13, color: MediColors.textSecondary)),
+                  style: TextStyle(
+                      fontSize: 13, color: colors.textSecondary)),
             ],
           ),
         ),
@@ -469,7 +449,7 @@ class _FacilityOverviewState extends ConsumerState<FacilityOverview> {
   }
 
   Widget _buildInventoryTable(
-      BuildContext context, WidgetRef ref, List<InventoryItem> inventory) {
+      BuildContext context, WidgetRef ref, List<InventoryItem> inventory, MediFlowTheme colors) {
     return Column(
       key: _inventoryTableKey,
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -477,11 +457,11 @@ class _FacilityOverviewState extends ConsumerState<FacilityOverview> {
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            const Text('Inventory Status',
+            Text('Inventory Status',
                 style: TextStyle(
                     fontSize: 20,
                     fontWeight: FontWeight.w700,
-                    color: MediColors.textPrimary)),
+                    color: colors.textPrimary)),
             OutlinedButton.icon(
               onPressed: inventory.isEmpty
                   ? null
@@ -489,8 +469,8 @@ class _FacilityOverviewState extends ConsumerState<FacilityOverview> {
               icon: const Icon(Icons.file_download_outlined, size: 18),
               label: const Text('Export CSV'),
               style: OutlinedButton.styleFrom(
-                foregroundColor: MediColors.textSecondary,
-                side: const BorderSide(color: MediColors.border),
+                foregroundColor: colors.textSecondary,
+                side: BorderSide(color: colors.border),
                 shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(10)),
               ),
@@ -501,9 +481,9 @@ class _FacilityOverviewState extends ConsumerState<FacilityOverview> {
         Container(
           width: double.infinity,
           decoration: BoxDecoration(
-            color: MediColors.surface,
+            color: colors.surface,
             borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: MediColors.border),
+            border: Border.all(color: colors.border),
           ),
           child: inventory.isEmpty
               ? Padding(
@@ -511,10 +491,10 @@ class _FacilityOverviewState extends ConsumerState<FacilityOverview> {
                   child: Center(
                     child: Column(children: [
                       Icon(Icons.inventory_2_outlined,
-                          size: 48, color: MediColors.textMuted),
+                          size: 48, color: colors.textMuted),
                       const SizedBox(height: 12),
                       Text('No inventory items yet',
-                          style: TextStyle(color: MediColors.textMuted)),
+                          style: TextStyle(color: colors.textMuted)),
                     ]),
                   ),
                 )
@@ -534,11 +514,11 @@ class _FacilityOverviewState extends ConsumerState<FacilityOverview> {
                       final daysToExpiry = item.daysToExpiry;
                       // Use centralized status — single source of truth.
                       final statusColor = switch (item.status) {
-                        ItemStatus.expired => MediColors.error,
+                        ItemStatus.expired => colors.error,
                         ItemStatus.wastageRisk => const Color(0xFFF59E0B),
-                        ItemStatus.lowStock => MediColors.error,
-                        ItemStatus.expiringSoon => MediColors.warning,
-                        ItemStatus.healthy => MediColors.success,
+                        ItemStatus.lowStock => colors.error,
+                        ItemStatus.expiringSoon => colors.warning,
+                        ItemStatus.healthy => colors.success,
                       };
                       final statusText = item.statusText;
 
@@ -556,13 +536,13 @@ class _FacilityOverviewState extends ConsumerState<FacilityOverview> {
                               mainAxisAlignment: MainAxisAlignment.center,
                               children: [
                                 Text(item.medicineName,
-                                    style: const TextStyle(
+                                    style: TextStyle(
                                         fontWeight: FontWeight.w600,
-                                        color: MediColors.textPrimary)),
+                                        color: colors.textPrimary)),
                                 Text(item.batchId,
-                                    style: const TextStyle(
+                                    style: TextStyle(
                                         fontSize: 11,
-                                        color: MediColors.textMuted)),
+                                        color: colors.textMuted)),
                               ]),
                         ])),
                         DataCell(Column(
@@ -571,15 +551,15 @@ class _FacilityOverviewState extends ConsumerState<FacilityOverview> {
                           children: [
                             Text(
                                 '${item.remainingQuantity} / ${item.initialQuantity}',
-                                style: const TextStyle(
-                                    color: MediColors.textPrimary,
+                                style: TextStyle(
+                                    color: colors.textPrimary,
                                     fontWeight: FontWeight.w500)),
                             const SizedBox(height: 4),
                             SizedBox(
                               width: 100,
                               child: LinearProgressIndicator(
                                 value: pct,
-                                backgroundColor: MediColors.surfaceLight,
+                                backgroundColor: colors.surfaceLight,
                                 color: statusColor,
                                 minHeight: 4,
                                 borderRadius: BorderRadius.circular(4),
@@ -602,7 +582,7 @@ class _FacilityOverviewState extends ConsumerState<FacilityOverview> {
                         DataCell(Text(
                           DateFormatter.formatDate(item.expiryDate),
                           style:
-                              const TextStyle(color: MediColors.textSecondary),
+                              TextStyle(color: colors.textSecondary),
                         )),
                         DataCell(Text(
                           daysToExpiry < 0
@@ -612,10 +592,10 @@ class _FacilityOverviewState extends ConsumerState<FacilityOverview> {
                                   : '$daysToExpiry days',
                           style: TextStyle(
                             color: daysToExpiry < 0
-                                ? MediColors.error
+                                ? colors.error
                                 : daysToExpiry < 90
-                                    ? MediColors.warning
-                                    : MediColors.textSecondary,
+                                    ? colors.warning
+                                    : colors.textSecondary,
                             fontWeight: daysToExpiry < 0
                                 ? FontWeight.bold
                                 : FontWeight.normal,

@@ -4,7 +4,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
 import '../../services/firebase_service.dart';
 import '../../models/audit_log.dart';
-import 'package:med_supply_prototype/constants/colors.dart';
+import 'package:med_supply_prototype/theme/medi_flow_theme.dart';
 
 class AuditTrailPage extends ConsumerStatefulWidget {
   const AuditTrailPage({super.key});
@@ -138,7 +138,7 @@ class _AuditTrailPageState extends ConsumerState<AuditTrailPage> {
     _loadInitialData();
   }
 
-  Widget _buildFilterChips() {
+  Widget _buildFilterChips(MediFlowTheme colors) {
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
       padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
@@ -153,19 +153,19 @@ class _AuditTrailPageState extends ConsumerState<AuditTrailPage> {
                     ? 'All Actions'
                     : filter.replaceAll('_', ' ').toUpperCase(),
                 style: TextStyle(
-                  color: isSelected ? Colors.white : MediColors.textSecondary,
+                  color: isSelected ? Colors.white : colors.textSecondary,
                   fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
                 ),
               ),
               selected: isSelected,
               onSelected: (_) => _onFilterChanged(filter),
-              backgroundColor: MediColors.surface,
-              selectedColor: MediColors.primary,
+              backgroundColor: colors.surface,
+              selectedColor: colors.primary,
               checkmarkColor: Colors.white,
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(20),
                 side: BorderSide(
-                  color: isSelected ? MediColors.primary : MediColors.border,
+                  color: isSelected ? colors.primary : colors.border,
                 ),
               ),
             ),
@@ -177,25 +177,23 @@ class _AuditTrailPageState extends ConsumerState<AuditTrailPage> {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.mediTheme;
+
     return Scaffold(
-      backgroundColor: MediColors.bg,
+      backgroundColor: colors.background,
       appBar: AppBar(
-        backgroundColor: MediColors.surface,
-        title: const Text(
+        title: Text(
           'Audit Trail',
           style: TextStyle(
-            color: MediColors.textPrimary,
+            color: colors.textPrimary,
             fontWeight: FontWeight.bold,
           ),
         ),
-        elevation: 1,
-        shadowColor: Colors.black12,
-        iconTheme: const IconThemeData(color: MediColors.textPrimary),
       ),
       body: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          _buildFilterChips(),
+          _buildFilterChips(colors),
           Expanded(
             child: _errorMessage != null
                 // Replaced raw exception text with a friendly message and Retry button
@@ -205,16 +203,16 @@ class _AuditTrailPageState extends ConsumerState<AuditTrailPage> {
                       child: Column(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          const Icon(
+                          Icon(
                             Icons.error_outline,
-                            color: MediColors.error,
+                            color: colors.error,
                             size: 48,
                           ),
                           const SizedBox(height: 16),
-                          const Text(
+                          Text(
                             'Failed to load audit logs.\nPlease check your connection and try again.',
                             style: TextStyle(
-                              color: MediColors.textSecondary,
+                              color: colors.textSecondary,
                               fontSize: 16,
                             ),
                             textAlign: TextAlign.center,
@@ -225,7 +223,7 @@ class _AuditTrailPageState extends ConsumerState<AuditTrailPage> {
                             icon: const Icon(Icons.refresh),
                             label: const Text('Retry'),
                             style: ElevatedButton.styleFrom(
-                              backgroundColor: MediColors.primary,
+                              backgroundColor: colors.primary,
                               foregroundColor: Colors.white,
                             ),
                           ),
@@ -234,11 +232,11 @@ class _AuditTrailPageState extends ConsumerState<AuditTrailPage> {
                     ),
                   )
                 : _logs.isEmpty && !_isLoading
-                    ? const Center(
+                    ? Center(
                         child: Text(
                           'No audit logs found.',
                           style: TextStyle(
-                            color: MediColors.textSecondary,
+                            color: colors.textSecondary,
                             fontSize: 16,
                           ),
                         ),
@@ -261,8 +259,8 @@ class _AuditTrailPageState extends ConsumerState<AuditTrailPage> {
                                     children: [
                                       Text(
                                         _loadMoreError!,
-                                        style: const TextStyle(
-                                          color: MediColors.error,
+                                        style: TextStyle(
+                                          color: colors.error,
                                           fontSize: 14,
                                         ),
                                         textAlign: TextAlign.center,
@@ -280,7 +278,7 @@ class _AuditTrailPageState extends ConsumerState<AuditTrailPage> {
                                             const Icon(Icons.refresh, size: 18),
                                         label: const Text('Retry'),
                                         style: ElevatedButton.styleFrom(
-                                          backgroundColor: MediColors.primary,
+                                          backgroundColor: colors.primary,
                                           foregroundColor: Colors.white,
                                           padding: const EdgeInsets.symmetric(
                                             horizontal: 24,
@@ -294,11 +292,11 @@ class _AuditTrailPageState extends ConsumerState<AuditTrailPage> {
                               );
                             }
                             if (_isLoading) {
-                              return const Center(
+                              return Center(
                                 child: Padding(
-                                  padding: EdgeInsets.all(16.0),
+                                  padding: const EdgeInsets.all(16.0),
                                   child: CircularProgressIndicator(
-                                    color: MediColors.primary,
+                                    color: colors.primary,
                                   ),
                                 ),
                               );
@@ -306,7 +304,7 @@ class _AuditTrailPageState extends ConsumerState<AuditTrailPage> {
                             return const SizedBox.shrink();
                           }
                           final log = _logs[index];
-                          return _buildLogCard(log);
+                          return _buildLogCard(log, colors);
                         },
                       ),
           ),
@@ -315,13 +313,13 @@ class _AuditTrailPageState extends ConsumerState<AuditTrailPage> {
     );
   }
 
-  Widget _buildLogCard(AuditLog log) {
+  Widget _buildLogCard(AuditLog log, MediFlowTheme colors) {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: MediColors.surface,
+        color: colors.surface,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: MediColors.border),
+        border: Border.all(color: colors.border),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -332,10 +330,10 @@ class _AuditTrailPageState extends ConsumerState<AuditTrailPage> {
               Expanded(
                 child: Text(
                   log.action.replaceAll('_', ' ').toUpperCase(),
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontWeight: FontWeight.bold,
                     fontSize: 14,
-                    color: MediColors.primary,
+                    color: colors.primary,
                   ),
                   overflow: TextOverflow.ellipsis,
                 ),
@@ -343,9 +341,9 @@ class _AuditTrailPageState extends ConsumerState<AuditTrailPage> {
               const SizedBox(width: 8),
               Text(
                 DateFormat('MMM dd, yyyy - HH:mm').format(log.timestamp),
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 12,
-                  color: MediColors.textSecondary,
+                  color: colors.textSecondary,
                 ),
               ),
             ],
@@ -353,9 +351,9 @@ class _AuditTrailPageState extends ConsumerState<AuditTrailPage> {
           const SizedBox(height: 8),
           RichText(
             text: TextSpan(
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 14,
-                color: MediColors.textPrimary,
+                color: colors.textPrimary,
               ),
               children: [
                 const TextSpan(
@@ -378,26 +376,26 @@ class _AuditTrailPageState extends ConsumerState<AuditTrailPage> {
           ),
           if (log.metadata != null && log.metadata!.isNotEmpty) ...[
             const SizedBox(height: 8),
-            const Text(
+            Text(
               'Details:',
               style: TextStyle(
                 fontWeight: FontWeight.w600,
                 fontSize: 14,
-                color: MediColors.textPrimary,
+                color: colors.textPrimary,
               ),
             ),
             const SizedBox(height: 4),
             Container(
               padding: const EdgeInsets.all(8),
               decoration: BoxDecoration(
-                color: MediColors.bg,
+                color: colors.surfaceLight,
                 borderRadius: BorderRadius.circular(8),
               ),
               child: Text(
                 log.metadata.toString(),
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 12,
-                  color: MediColors.textSecondary,
+                  color: colors.textSecondary,
                   fontFamily: 'monospace',
                 ),
               ),

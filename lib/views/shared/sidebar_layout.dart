@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 import '../../services/firebase_service.dart';
 import '../../models/inventory_item.dart';
 import 'package:med_supply_prototype/theme/medi_flow_theme.dart';
+import 'package:med_supply_prototype/theme/theme_provider.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'confirm_logout_dialog.dart';
 import 'scroll_to_top_button.dart';
@@ -236,6 +237,9 @@ class _SidebarLayoutState extends ConsumerState<SidebarLayout> {
                     ),
                   ),
 
+                  // Theme Toggle
+                  _buildThemeToggleItem(),
+
                   // Logout
                   _buildNavItem(
                     _NavItem(Icons.logout_rounded, 'Logout'),
@@ -379,6 +383,83 @@ class _SidebarLayoutState extends ConsumerState<SidebarLayout> {
                       ),
                     ),
                 ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildThemeToggleItem() {
+    final colors = context.mediTheme;
+    final themeMode = ref.watch(themeModeProvider);
+    final isDark = themeMode == ThemeMode.dark ||
+        (themeMode == ThemeMode.system &&
+            MediaQuery.of(context).platformBrightness == Brightness.dark);
+
+    final icon = isDark ? Icons.light_mode_rounded : Icons.dark_mode_rounded;
+    final label = isDark ? 'Light Mode' : 'Dark Mode';
+    final tooltip = isDark ? 'Switch to Light Mode' : 'Switch to Dark Mode';
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+      child: Material(
+        color: Colors.transparent,
+        child: Tooltip(
+          message: _isExpanded ? '' : tooltip,
+          child: InkWell(
+            key: const Key('theme_toggle_button'),
+            onTap: () => ref.read(themeModeProvider.notifier).toggleTheme(),
+            borderRadius: BorderRadius.circular(12),
+            hoverColor: colors.surfaceHover,
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 200),
+              padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 12),
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(12),
+                color: Colors.transparent,
+              ),
+              child: ClipRect(
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    SizedBox(
+                      width: 24,
+                      child: Center(
+                        child: AnimatedSwitcher(
+                          duration: const Duration(milliseconds: 200),
+                          transitionBuilder: (child, anim) =>
+                              RotationTransition(turns: anim, child: FadeTransition(opacity: anim, child: child)),
+                          child: Icon(
+                            icon,
+                            key: ValueKey(isDark),
+                            size: 22,
+                            color: isDark ? const Color(0xFFFBBF24) : colors.primary,
+                          ),
+                        ),
+                      ),
+                    ),
+                    AnimatedContainer(
+                      duration: const Duration(milliseconds: 200),
+                      curve: Curves.easeOutCubic,
+                      width: _isExpanded ? 14 : 0,
+                    ),
+                    if (_isExpanded)
+                      Expanded(
+                        child: Text(
+                          label,
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w500,
+                            color: colors.textSecondary,
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                          maxLines: 1,
+                        ),
+                      ),
+                  ],
+                ),
               ),
             ),
           ),

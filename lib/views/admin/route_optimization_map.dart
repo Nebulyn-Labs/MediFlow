@@ -10,7 +10,7 @@ import '../../services/firebase_service.dart';
 import '../../services/ai_service.dart';
 import '../../services/routing_service.dart';
 import '../../services/optimization_service.dart';
-import 'package:med_supply_prototype/constants/colors.dart';
+import 'package:med_supply_prototype/theme/medi_flow_theme.dart';
 import '../shared/skeleton_loaders.dart';
 
 class RouteOptimizationMap extends ConsumerStatefulWidget {
@@ -165,16 +165,18 @@ class _RouteOptimizationMapState extends ConsumerState<RouteOptimizationMap> {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.mediTheme;
+
     if (_isLoading) {
-      return const Scaffold(
-        backgroundColor: MediColors.bg,
-        body: RouteOptimizationMapSkeleton(),
+      return Scaffold(
+        backgroundColor: colors.background,
+        body: const RouteOptimizationMapSkeleton(),
       );
     }
 
     if (_errorMessage != null) {
       return Scaffold(
-        backgroundColor: MediColors.bg,
+        backgroundColor: colors.background,
         appBar: AppBar(title: const Text('Advanced Route Optimization')),
         body: Center(
           child: Padding(
@@ -182,21 +184,21 @@ class _RouteOptimizationMapState extends ConsumerState<RouteOptimizationMap> {
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                const Icon(Icons.error_outline_rounded,
-                    size: 64, color: MediColors.textMuted),
+                Icon(Icons.error_outline_rounded,
+                    size: 64, color: colors.textMuted),
                 const SizedBox(height: 20),
                 Text(
                   _errorMessage!,
                   textAlign: TextAlign.center,
-                  style: const TextStyle(
-                      fontSize: 16, color: MediColors.textSecondary),
+                  style: TextStyle(
+                      fontSize: 16, color: colors.textSecondary),
                 ),
                 const SizedBox(height: 24),
                 SizedBox(
                   height: 44,
                   child: Container(
                     decoration: BoxDecoration(
-                        gradient: MediColors.primaryGradient,
+                        gradient: colors.primaryGradient,
                         borderRadius: BorderRadius.circular(12)),
                     child: FilledButton.icon(
                       style: FilledButton.styleFrom(
@@ -220,7 +222,7 @@ class _RouteOptimizationMapState extends ConsumerState<RouteOptimizationMap> {
         : const LatLng(28.6139, 77.2090);
 
     return Scaffold(
-      backgroundColor: MediColors.bg,
+      backgroundColor: colors.background,
       appBar: AppBar(title: const Text('Advanced Route Optimization')),
       body: StreamBuilder<List<InventoryItem>>(
         stream: ref.watch(firebaseServiceProvider).streamAllMedicines(),
@@ -237,7 +239,7 @@ class _RouteOptimizationMapState extends ConsumerState<RouteOptimizationMap> {
                   // Left Panel: Logistics Details
                   Container(
                     width: 400,
-                    color: MediColors.surface,
+                    color: colors.surface,
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
@@ -246,31 +248,31 @@ class _RouteOptimizationMapState extends ConsumerState<RouteOptimizationMap> {
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              const Text('Transfer Manifest',
+                              Text('Transfer Manifest',
                                   style: TextStyle(
                                       fontSize: 20,
                                       fontWeight: FontWeight.w700,
-                                      color: MediColors.textPrimary)),
+                                      color: colors.textPrimary)),
                               const SizedBox(height: 8),
-                              const Text(
+                              Text(
                                   'Smart-scored redistribution paths factoring in rural priority and expiry risks.',
                                   style: TextStyle(
-                                      color: MediColors.textSecondary,
+                                      color: colors.textSecondary,
                                       fontSize: 13)),
                               const SizedBox(height: 16),
                               if (_aiSummary.isNotEmpty && _showRoutes)
                                 Container(
                                   padding: const EdgeInsets.all(12),
                                   decoration: BoxDecoration(
-                                      color: MediColors.primary
+                                      color: colors.primary
                                           .withValues(alpha: 0.08),
                                       borderRadius: BorderRadius.circular(10),
                                       border: Border.all(
-                                          color: MediColors.primary
+                                          color: colors.primary
                                               .withValues(alpha: 0.2))),
                                   child: Text(_aiSummary,
-                                      style: const TextStyle(
-                                          color: MediColors.primaryLight,
+                                      style: TextStyle(
+                                          color: colors.primaryLight,
                                           fontStyle: FontStyle.italic,
                                           fontSize: 13)),
                                 ),
@@ -280,7 +282,7 @@ class _RouteOptimizationMapState extends ConsumerState<RouteOptimizationMap> {
                                 height: 50,
                                 child: Container(
                                   decoration: BoxDecoration(
-                                      gradient: MediColors.primaryGradient,
+                                      gradient: colors.primaryGradient,
                                       borderRadius: BorderRadius.circular(12)),
                                   child: FilledButton.icon(
                                     style: FilledButton.styleFrom(
@@ -377,28 +379,28 @@ class _RouteOptimizationMapState extends ConsumerState<RouteOptimizationMap> {
                                   child: TextButton(
                                     onPressed: () =>
                                         setState(() => _showRoutes = false),
-                                    child: const Center(
+                                    child: Center(
                                         child: Text('Clear Map',
                                             style: TextStyle(
-                                                color: MediColors.textMuted))),
+                                                color: colors.textMuted))),
                                   ),
                                 ),
                             ],
                           ),
                         ),
-                        const Divider(height: 1),
+                        Divider(height: 1, color: colors.border),
                         Expanded(
                           child: !_showRoutes
-                              ? const Center(
+                              ? Center(
                                   child: Column(
                                   mainAxisAlignment: MainAxisAlignment.center,
                                   children: [
                                     Icon(Icons.map_outlined,
-                                        size: 48, color: MediColors.textMuted),
-                                    SizedBox(height: 12),
+                                        size: 48, color: colors.textMuted),
+                                    const SizedBox(height: 12),
                                     Text('Click Generate to start analysis',
                                         style: TextStyle(
-                                            color: MediColors.textMuted)),
+                                            color: colors.textMuted)),
                                   ],
                                 ))
                               : ListView.builder(
@@ -406,7 +408,7 @@ class _RouteOptimizationMapState extends ConsumerState<RouteOptimizationMap> {
                                   itemCount: _multiStopRoutes.length,
                                   itemBuilder: (context, index) {
                                     final mr = _multiStopRoutes[index];
-                                    return _buildMultiStopRouteCard(mr);
+                                    return _buildMultiStopRouteCard(mr, colors);
                                   },
                                 ),
                         ),
@@ -451,7 +453,7 @@ class _RouteOptimizationMapState extends ConsumerState<RouteOptimizationMap> {
                                     points: points,
                                     color: (hasRural
                                             ? Colors.blueAccent
-                                            : MediColors.primary)
+                                            : colors.primary)
                                         .withValues(alpha: 0.8),
                                     strokeWidth: 6.0,
                                   );
@@ -464,7 +466,7 @@ class _RouteOptimizationMapState extends ConsumerState<RouteOptimizationMap> {
                                 bool isRecipient = _multiStopRoutes.any((mr) =>
                                     mr.stops.skip(1).any((s) => s.id == f.id));
 
-                                Color markerColor = MediColors.textMuted;
+                                Color markerColor = colors.textMuted;
                                 if (_showRoutes) {
                                   if (isDonor) {
                                     markerColor = Colors.green;
@@ -509,20 +511,20 @@ class _RouteOptimizationMapState extends ConsumerState<RouteOptimizationMap> {
                                           padding: const EdgeInsets.symmetric(
                                               horizontal: 6, vertical: 2),
                                           decoration: BoxDecoration(
-                                            color: MediColors.surface
+                                            color: colors.surface
                                                 .withValues(alpha: 0.9),
                                             borderRadius:
                                                 BorderRadius.circular(4),
                                             border: Border.all(
-                                                color: MediColors.border,
+                                                color: colors.border,
                                                 width: 0.5),
                                           ),
                                           child: Text(
                                             f.name,
-                                            style: const TextStyle(
+                                            style: TextStyle(
                                                 fontSize: 9,
                                                 fontWeight: FontWeight.bold,
-                                                color: MediColors.textPrimary),
+                                                color: colors.textPrimary),
                                             textAlign: TextAlign.center,
                                             maxLines: 1,
                                             overflow: TextOverflow.ellipsis,
@@ -546,13 +548,13 @@ class _RouteOptimizationMapState extends ConsumerState<RouteOptimizationMap> {
                                 _mapController.move(
                                     _mapController.camera.center,
                                     _mapController.camera.zoom + 1);
-                              }),
+                              }, colors),
                               const SizedBox(height: 8),
                               _buildMapControl(Icons.remove, () {
                                 _mapController.move(
                                     _mapController.camera.center,
                                     _mapController.camera.zoom - 1);
-                              }),
+                              }, colors),
                             ],
                           ),
                         ),
@@ -563,25 +565,25 @@ class _RouteOptimizationMapState extends ConsumerState<RouteOptimizationMap> {
                           child: Container(
                             padding: const EdgeInsets.all(16),
                             decoration: BoxDecoration(
-                                color: MediColors.surface,
+                                color: colors.surface,
                                 borderRadius: BorderRadius.circular(12),
-                                border: Border.all(color: MediColors.border)),
+                                border: Border.all(color: colors.border)),
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                const Text('Optimization Legend',
+                                Text('Optimization Legend',
                                     style: TextStyle(
                                         fontWeight: FontWeight.bold,
-                                        color: MediColors.textPrimary)),
+                                        color: colors.textPrimary)),
                                 const SizedBox(height: 12),
                                 _buildLegendItem(
-                                    Colors.green, 'Donor Site (Surplus)'),
+                                    Colors.green, 'Donor Site (Surplus)', colors),
                                 _buildLegendItem(
-                                    Colors.orange, 'Recipient Site (Deficit)'),
+                                    Colors.orange, 'Recipient Site (Deficit)', colors),
                                 _buildLegendItem(
-                                    Colors.blueAccent, 'Rural Priority Route'),
+                                    Colors.blueAccent, 'Rural Priority Route', colors),
                                 _buildLegendItem(
-                                    MediColors.primary, 'Standard Route'),
+                                    colors.primary, 'Standard Route', colors),
                               ],
                             ),
                           ),
@@ -598,12 +600,12 @@ class _RouteOptimizationMapState extends ConsumerState<RouteOptimizationMap> {
     );
   }
 
-  Widget _buildMapControl(IconData icon, VoidCallback onPressed) {
+  Widget _buildMapControl(IconData icon, VoidCallback onPressed, MediFlowTheme colors) {
     return Container(
       decoration: BoxDecoration(
-        color: MediColors.surface,
+        color: colors.surface,
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: MediColors.border),
+        border: Border.all(color: colors.border),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withValues(alpha: 0.3),
@@ -613,13 +615,13 @@ class _RouteOptimizationMapState extends ConsumerState<RouteOptimizationMap> {
         ],
       ),
       child: IconButton(
-        icon: Icon(icon, color: MediColors.textPrimary),
+        icon: Icon(icon, color: colors.textPrimary),
         onPressed: onPressed,
       ),
     );
   }
 
-  Widget _buildLegendItem(Color color, String label) {
+  Widget _buildLegendItem(Color color, String label, MediFlowTheme colors) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),
       child: Row(
@@ -630,49 +632,49 @@ class _RouteOptimizationMapState extends ConsumerState<RouteOptimizationMap> {
               decoration: BoxDecoration(color: color, shape: BoxShape.circle)),
           const SizedBox(width: 8),
           Text(label,
-              style: const TextStyle(
-                  color: MediColors.textSecondary, fontSize: 11)),
+              style: TextStyle(
+                  color: colors.textSecondary, fontSize: 11)),
         ],
       ),
     );
   }
 
-  Widget _buildMultiStopRouteCard(MultiStopRoute mr) {
+  Widget _buildMultiStopRouteCard(MultiStopRoute mr, MediFlowTheme colors) {
     if (mr.transfers.isEmpty) return const SizedBox.shrink();
 
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-          color: MediColors.surface,
+          color: colors.surface,
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: MediColors.border, width: 2)),
+          border: Border.all(color: colors.border, width: 2)),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              const Icon(Icons.local_shipping_outlined,
-                  color: MediColors.primary),
+              Icon(Icons.local_shipping_outlined,
+                  color: colors.primary),
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
                     'Multi-Stop Route: ${mr.transfers.first.donor.name}',
-                    style: const TextStyle(
+                    style: TextStyle(
                         fontWeight: FontWeight.w800,
-                        color: MediColors.textPrimary,
+                        color: colors.textPrimary,
                         fontSize: 16)),
               ),
             ],
           ),
           const SizedBox(height: 12),
-          ...mr.transfers.map((rec) => _buildSingleTransferInfo(rec)),
+          ...mr.transfers.map((rec) => _buildSingleTransferInfo(rec, colors)),
         ],
       ),
     );
   }
 
-  Widget _buildSingleTransferInfo(TransferRecommendation rec) {
+  Widget _buildSingleTransferInfo(TransferRecommendation rec, MediFlowTheme colors) {
     /// Fallback assumed average speed when no road-routing data is available.
     /// Named here as a constant so it is easy to find and change (#252).
     const double kFallbackSpeedKmh = 40.0;
@@ -713,9 +715,9 @@ class _RouteOptimizationMapState extends ConsumerState<RouteOptimizationMap> {
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-          color: MediColors.surfaceLight,
+          color: colors.surfaceLight,
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: MediColors.border)),
+          border: Border.all(color: colors.border)),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -727,11 +729,11 @@ class _RouteOptimizationMapState extends ConsumerState<RouteOptimizationMap> {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                 decoration: BoxDecoration(
-                    color: MediColors.primaryOverlay,
+                    color: colors.primaryOverlay,
                     borderRadius: BorderRadius.circular(6)),
                 child: Text('Score: ${rec.score.toInt()}',
-                    style: const TextStyle(
-                        color: MediColors.primaryLight,
+                    style: TextStyle(
+                        color: colors.primaryLight,
                         fontWeight: FontWeight.bold,
                         fontSize: 12)),
               ),
@@ -756,36 +758,36 @@ class _RouteOptimizationMapState extends ConsumerState<RouteOptimizationMap> {
             const SizedBox(width: 8),
             Expanded(
                 child: Text(rec.donor.name,
-                    style: const TextStyle(
+                    style: TextStyle(
                         fontWeight: FontWeight.w600,
-                        color: MediColors.textPrimary))),
+                        color: colors.textPrimary))),
           ]),
-          const Padding(
-              padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+          Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
               child: Icon(Icons.arrow_downward_rounded,
-                  color: MediColors.textMuted, size: 16)),
+                  color: colors.textMuted, size: 16)),
           Row(children: [
             const Icon(Icons.input_rounded, color: Colors.orange, size: 20),
             const SizedBox(width: 8),
             Expanded(
                 child: Text(rec.recipient.name,
-                    style: const TextStyle(
+                    style: TextStyle(
                         fontWeight: FontWeight.w600,
-                        color: MediColors.textPrimary))),
+                        color: colors.textPrimary))),
           ]),
-          const Divider(height: 32),
+          Divider(height: 32, color: colors.border),
           Text(rec.medicine,
-              style: const TextStyle(
+              style: TextStyle(
                   fontWeight: FontWeight.w800,
-                  color: MediColors.textPrimary,
+                  color: colors.textPrimary,
                   fontSize: 15)),
           Text('${rec.quantity} Units requested',
               style:
-                  const TextStyle(color: MediColors.textMuted, fontSize: 13)),
+                  TextStyle(color: colors.textMuted, fontSize: 13)),
           const SizedBox(height: 12),
           Text(rec.reasoning,
-              style: const TextStyle(
-                  color: MediColors.primaryLight,
+              style: TextStyle(
+                  color: colors.primaryLight,
                   fontSize: 11,
                   fontStyle: FontStyle.italic)),
           const SizedBox(height: 16),
@@ -797,24 +799,24 @@ class _RouteOptimizationMapState extends ConsumerState<RouteOptimizationMap> {
               Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  const Icon(Icons.route_rounded,
-                      size: 14, color: MediColors.textMuted),
+                  Icon(Icons.route_rounded,
+                      size: 14, color: colors.textMuted),
                   const SizedBox(width: 4),
                   Text('${displayDistKm.toStringAsFixed(1)} km',
-                      style: const TextStyle(
-                          color: MediColors.textMuted, fontSize: 12)),
+                      style: TextStyle(
+                          color: colors.textMuted, fontSize: 12)),
                 ],
               ),
               Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  const Icon(Icons.schedule_rounded,
-                      size: 14, color: MediColors.textMuted),
+                  Icon(Icons.schedule_rounded,
+                      size: 14, color: colors.textMuted),
                   const SizedBox(width: 4),
                   Flexible(
                     child: Text('${displayTimeMinutes}m $etaLabel',
-                        style: const TextStyle(
-                            color: MediColors.textMuted, fontSize: 12)),
+                        style: TextStyle(
+                            color: colors.textMuted, fontSize: 12)),
                   ),
                 ],
               ),

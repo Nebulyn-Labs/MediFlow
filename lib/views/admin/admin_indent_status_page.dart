@@ -4,7 +4,7 @@ import 'package:go_router/go_router.dart';
 import '../../services/firebase_service.dart';
 import '../../services/csv_export_service.dart';
 import '../../models/request.dart';
-import 'package:med_supply_prototype/constants/colors.dart';
+import 'package:med_supply_prototype/theme/medi_flow_theme.dart';
 import '../shared/skeleton_loaders.dart';
 import '../../utils/date_formatter.dart';
 
@@ -59,10 +59,6 @@ class _AdminIndentStatusPageState extends ConsumerState<AdminIndentStatusPage> {
       case RequestStatus.rejected:
         return [RequestStatus.pending];
       case RequestStatus.needsManualReview:
-        // Flagged by onIndentApproved when approval processing hit a
-        // non-retryable, non-business-rule failure (#314). Give the admin
-        // an explicit way to unstick it: retry it as a fresh pending
-        // request, or reject it outright if it shouldn't be retried.
         return [RequestStatus.pending, RequestStatus.rejected];
       case RequestStatus.fulfilled:
       case RequestStatus.draft:
@@ -76,19 +72,20 @@ class _AdminIndentStatusPageState extends ConsumerState<AdminIndentStatusPage> {
     required String confirmLabel,
     required Color confirmColor,
   }) {
+    final colors = context.mediTheme;
     return showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        backgroundColor: MediColors.surface,
+        backgroundColor: colors.surface,
         title:
-            Text(title, style: const TextStyle(color: MediColors.textPrimary)),
+            Text(title, style: TextStyle(color: colors.textPrimary)),
         content: Text(message,
-            style: const TextStyle(color: MediColors.textSecondary)),
+            style: TextStyle(color: colors.textSecondary)),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('Cancel',
-                style: TextStyle(color: MediColors.textMuted)),
+            child: Text('Cancel',
+                style: TextStyle(color: colors.textMuted)),
           ),
           FilledButton(
             onPressed: () => Navigator.of(context).pop(true),
@@ -101,13 +98,14 @@ class _AdminIndentStatusPageState extends ConsumerState<AdminIndentStatusPage> {
   }
 
   Future<void> _updateStatus(MedRequest request, RequestStatus status) async {
+    final colors = context.mediTheme;
     final statusLabel = status.label.toUpperCase();
     final confirmed = await _showConfirmationDialog(
       title: 'Confirm Status Change',
       message:
           'Are you sure you want to change the status of ${request.medicineName} request to $statusLabel?',
       confirmLabel: statusLabel,
-      confirmColor: _getStatusColor(status),
+      confirmColor: _getStatusColor(status, colors),
     );
 
     if (confirmed != true || !mounted) return;
@@ -130,27 +128,29 @@ class _AdminIndentStatusPageState extends ConsumerState<AdminIndentStatusPage> {
     }
   }
 
-  Color _getStatusColor(RequestStatus status) {
+  Color _getStatusColor(RequestStatus status, MediFlowTheme colors) {
     switch (status) {
       case RequestStatus.approved:
-        return MediColors.success;
+        return colors.success;
       case RequestStatus.rejected:
-        return MediColors.error;
+        return colors.error;
       case RequestStatus.pending:
-        return MediColors.warning;
+        return colors.warning;
       case RequestStatus.fulfilled:
-        return MediColors.info;
+        return colors.info;
       case RequestStatus.needsManualReview:
-        return MediColors.violet;
+        return colors.violet;
       case RequestStatus.draft:
-        return MediColors.textMuted;
+        return colors.textMuted;
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.mediTheme;
+
     return Scaffold(
-      backgroundColor: MediColors.bg,
+      backgroundColor: colors.background,
       appBar: AppBar(title: const Text('Supply Status')),
       body: StreamBuilder<List<MedRequest>>(
         stream: ref.read(firebaseServiceProvider).streamRequests(null),
@@ -162,9 +162,9 @@ class _AdminIndentStatusPageState extends ConsumerState<AdminIndentStatusPage> {
           final requests = _buildVisibleRequests(snapshot.data);
 
           if (requests.isEmpty) {
-            return const Center(
+            return Center(
                 child: Text('No supply requests found.',
-                    style: TextStyle(color: MediColors.textMuted)));
+                    style: TextStyle(color: colors.textMuted)));
           }
 
           return SingleChildScrollView(
@@ -187,8 +187,8 @@ class _AdminIndentStatusPageState extends ConsumerState<AdminIndentStatusPage> {
                         : const Icon(Icons.file_download_outlined, size: 18),
                     label: const Text('Export CSV'),
                     style: OutlinedButton.styleFrom(
-                      foregroundColor: MediColors.textSecondary,
-                      side: const BorderSide(color: MediColors.border),
+                      foregroundColor: colors.textSecondary,
+                      side: BorderSide(color: colors.border),
                       shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(10)),
                     ),
@@ -196,18 +196,23 @@ class _AdminIndentStatusPageState extends ConsumerState<AdminIndentStatusPage> {
                 ),
                 const SizedBox(height: 12),
                 Card(
+                  color: colors.surface,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16),
+                    side: BorderSide(color: colors.border),
+                  ),
                   child: Column(
                     children: [
-                      _buildTableHeader(),
+                      _buildTableHeader(colors),
                       ListView.separated(
                         shrinkWrap: true,
                         physics: const NeverScrollableScrollPhysics(),
                         itemCount: requests.length,
                         separatorBuilder: (context, index) =>
-                            const Divider(height: 1),
+                            Divider(height: 1, color: colors.border),
                         itemBuilder: (context, index) {
                           final req = requests[index];
-                          return _buildTableRow(req);
+                          return _buildTableRow(req, colors);
                         },
                       ),
                     ],
@@ -221,63 +226,60 @@ class _AdminIndentStatusPageState extends ConsumerState<AdminIndentStatusPage> {
     );
   }
 
-  Widget _buildTableHeader() {
+  Widget _buildTableHeader(MediFlowTheme colors) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-      decoration: const BoxDecoration(
-        color: MediColors.surfaceLight,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      decoration: BoxDecoration(
+        color: colors.surfaceLight,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
       ),
-      child: const Row(
+      child: Row(
         children: [
           Expanded(
               flex: 2,
               child: Text('Date',
                   style: TextStyle(
-                      color: MediColors.textSecondary,
+                      color: colors.textSecondary,
                       fontWeight: FontWeight.bold))),
           Expanded(
               flex: 3,
               child: Text('Facility',
                   style: TextStyle(
-                      color: MediColors.textSecondary,
+                      color: colors.textSecondary,
                       fontWeight: FontWeight.bold))),
           Expanded(
               flex: 3,
               child: Text('Medicine',
                   style: TextStyle(
-                      color: MediColors.textSecondary,
+                      color: colors.textSecondary,
                       fontWeight: FontWeight.bold))),
           Expanded(
               flex: 2,
               child: Text('Quantity',
                   style: TextStyle(
-                      color: MediColors.textSecondary,
+                      color: colors.textSecondary,
                       fontWeight: FontWeight.bold))),
           Expanded(
               flex: 2,
               child: Text('Status',
                   style: TextStyle(
-                      color: MediColors.textSecondary,
+                      color: colors.textSecondary,
                       fontWeight: FontWeight.bold))),
           Expanded(
               flex: 3,
               child: Text('Global Optimization',
                   style: TextStyle(
-                      color: MediColors.textSecondary,
+                      color: colors.textSecondary,
                       fontWeight: FontWeight.bold))),
-          Expanded(
+          const Expanded(
               flex: 1,
-              child: Text('',
-                  style: TextStyle(
-                      color: MediColors.textSecondary,
-                      fontWeight: FontWeight.bold))),
+              child: SizedBox()),
         ],
       ),
     );
   }
 
-  Widget _buildTableRow(MedRequest req) {
+  Widget _buildTableRow(MedRequest req, MediFlowTheme colors) {
     final isApproved = req.status == RequestStatus.approved;
     final validTransitions = _getValidTransitions(req.status);
 
@@ -288,33 +290,35 @@ class _AdminIndentStatusPageState extends ConsumerState<AdminIndentStatusPage> {
           Expanded(
               flex: 2,
               child: Text(DateFormatter.formatDate(req.requestDate),
-                  style: const TextStyle(color: MediColors.textSecondary))),
+                  style: TextStyle(color: colors.textSecondary))),
           Expanded(
               flex: 3,
               child: Text(req.facilityId.replaceAll('_', ' ').toUpperCase(),
-                  style: const TextStyle(
+                  style: TextStyle(
                       fontWeight: FontWeight.w600,
-                      color: MediColors.textPrimary,
+                      color: colors.textPrimary,
                       fontSize: 13))),
           Expanded(
               flex: 3,
               child: Text(req.medicineName,
-                  style: const TextStyle(color: MediColors.textPrimary))),
+                  style: TextStyle(color: colors.textPrimary))),
           Expanded(
               flex: 2,
               child: Text(req.quantity.toString(),
-                  style: const TextStyle(fontWeight: FontWeight.bold))),
+                  style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      color: colors.textPrimary))),
           Expanded(
             flex: 2,
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
               decoration: BoxDecoration(
-                color: _getStatusColor(req.status).withValues(alpha: 0.1),
+                color: _getStatusColor(req.status, colors).withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(6),
               ),
               child: Text(req.status.label.toUpperCase(),
                   style: TextStyle(
-                      color: _getStatusColor(req.status),
+                      color: _getStatusColor(req.status, colors),
                       fontSize: 10,
                       fontWeight: FontWeight.bold),
                   textAlign: TextAlign.center),
@@ -331,9 +335,9 @@ class _AdminIndentStatusPageState extends ConsumerState<AdminIndentStatusPage> {
                           style: TextStyle(
                               fontSize: 11, fontWeight: FontWeight.bold)),
                       style: TextButton.styleFrom(
-                        foregroundColor: MediColors.primary,
+                        foregroundColor: colors.primary,
                         backgroundColor:
-                            MediColors.primary.withValues(alpha: 0.08),
+                            colors.primary.withValues(alpha: 0.08),
                         padding: const EdgeInsets.symmetric(
                             horizontal: 12, vertical: 8),
                         shape: RoundedRectangleBorder(
@@ -341,9 +345,9 @@ class _AdminIndentStatusPageState extends ConsumerState<AdminIndentStatusPage> {
                       ),
                     ),
                   )
-                : const Center(
+                : Center(
                     child: Text('—',
-                        style: TextStyle(color: MediColors.textMuted))),
+                        style: TextStyle(color: colors.textMuted))),
           ),
           Expanded(
             flex: 1,
@@ -352,8 +356,8 @@ class _AdminIndentStatusPageState extends ConsumerState<AdminIndentStatusPage> {
               icon: Icon(
                 Icons.more_vert_rounded,
                 color: validTransitions.isNotEmpty
-                    ? MediColors.textMuted
-                    : MediColors.textMuted.withValues(alpha: 0.3),
+                    ? colors.textMuted
+                    : colors.textMuted.withValues(alpha: 0.3),
                 size: 20,
               ),
               onSelected: (status) => _updateStatus(req, status),

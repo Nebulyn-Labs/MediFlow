@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:med_supply_prototype/constants/colors.dart';
+import 'package:med_supply_prototype/theme/medi_flow_theme.dart';
 
 /// Animated skeleton container that pulses opacity between 0.35 and 0.8
 class SkeletonBox extends StatefulWidget {
@@ -45,6 +45,7 @@ class _SkeletonBoxState extends State<SkeletonBox>
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.mediTheme;
     return AnimatedBuilder(
       animation: _opacityAnimation,
       builder: (context, child) {
@@ -53,11 +54,11 @@ class _SkeletonBoxState extends State<SkeletonBox>
           height: widget.height,
           margin: widget.margin,
           decoration: BoxDecoration(
-            color: MediColors.surfaceLight
+            color: colors.surfaceLight
                 .withValues(alpha: _opacityAnimation.value),
             borderRadius: BorderRadius.circular(widget.borderRadius),
             border: Border.all(
-              color: MediColors.border
+              color: colors.border
                   .withValues(alpha: _opacityAnimation.value * 0.5),
             ),
           ),
@@ -91,13 +92,14 @@ class SkeletonKpiCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.mediTheme;
     return Container(
       width: width,
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: MediColors.surface,
+        color: colors.surface,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: MediColors.border),
+        border: Border.all(color: colors.border),
       ),
       child: const Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -126,13 +128,14 @@ class SkeletonTableRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.mediTheme;
     return Container(
       margin: const EdgeInsets.only(bottom: 8),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: MediColors.surface,
+        color: colors.surface,
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: MediColors.border),
+        border: Border.all(color: colors.border),
       ),
       child: const Row(
         children: [
@@ -156,14 +159,15 @@ class SkeletonCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.mediTheme;
     return Container(
       width: double.infinity,
       height: height,
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: MediColors.surface,
+        color: colors.surface,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: MediColors.border),
+        border: Border.all(color: colors.border),
       ),
       child: const Column(
         crossAxisAlignment: CrossAxisAlignment.start,

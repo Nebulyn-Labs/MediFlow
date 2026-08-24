@@ -44,8 +44,7 @@ class MediFlowTheme extends ThemeExtension<MediFlowTheme> {
     required this.errorKpiSurface,
   });
 
-  /// Current application palette. Values intentionally match the pre-refactor
-  /// `MediColors` values so this migration causes no visual change.
+  /// Current application dark palette.
   static const dark = MediFlowTheme(
     background: MediColors.bg,
     surface: MediColors.surface,
@@ -80,6 +79,43 @@ class MediFlowTheme extends ThemeExtension<MediFlowTheme> {
     warningKpiSurface: Color(0xFF3D2E0A),
     infoKpiSurface: Color(0xFF1E3A5F),
     errorKpiSurface: Color(0xFF3D1519),
+  );
+
+  /// Application light palette designed for high readability and contrast.
+  static const light = MediFlowTheme(
+    background: Color(0xFFF8FAFC),
+    surface: Color(0xFFFFFFFF),
+    surfaceLight: Color(0xFFF1F5F9),
+    surfaceHover: Color(0xFFE2E8F0),
+    border: Color(0xFFE2E8F0),
+    borderLight: Color(0xFFCBD5E1),
+    textPrimary: Color(0xFF0F172A),
+    textSecondary: Color(0xFF475569),
+    textMuted: Color(0xFF94A3B8),
+    primary: Color(0xFF4F46E5),
+    primaryLight: Color(0xFF6366F1),
+    violet: Color(0xFF7C3AED),
+    cyan: Color(0xFF0891B2),
+    teal: Color(0xFF0D9488),
+    success: Color(0xFF059669),
+    warning: Color(0xFFD97706),
+    error: Color(0xFFE11D48),
+    info: Color(0xFF2563EB),
+    onAccent: Colors.white,
+    shadow: Color(0x1F000000),
+    donor: Color(0xFF16A34A),
+    recipient: Color(0xFFEA580C),
+    priorityRoute: Color(0xFF2563EB),
+    heroStart: Color(0xFFEEF2FF),
+    heroEnd: Color(0xFFE0E7FF),
+    heroTextEnd: Color(0xFF4338CA),
+    facilityGradientStart: Color(0xFF059669),
+    smartAnalysisSurface: Color(0xFFEFF6FF),
+    kpiSurfaceEnd: Color(0xFFF1F5F9),
+    healthyKpiSurface: Color(0xFFECFDF5),
+    warningKpiSurface: Color(0xFFFFFBEB),
+    infoKpiSurface: Color(0xFFEFF6FF),
+    errorKpiSurface: Color(0xFFFEF2F2),
   );
 
   final Color background;
