@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:go_router/go_router.dart';
 import 'package:med_supply_prototype/constants/colors.dart';
+import 'package:med_supply_prototype/main.dart' show profileCache;
 
 /// Shows a confirmation dialog for logging out.
 /// Returns true if the user confirms, false otherwise.
@@ -37,6 +38,7 @@ Future<void> signOutWithConfirmation(BuildContext context,
   if (!confirmed) return;
   try {
     await (auth ?? FirebaseAuth.instance).signOut();
+    profileCache.clear();
     if (context.mounted) context.go('/');
   } catch (e) {
     if (context.mounted) {

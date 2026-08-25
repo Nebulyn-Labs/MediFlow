@@ -11,6 +11,7 @@ import 'package:med_supply_prototype/theme/medi_flow_theme.dart';
 import 'package:med_supply_prototype/views/shared/not_found_page.dart';
 
 import 'services/firebase_setup.dart';
+import 'services/user_profile_cache.dart';
 import 'views/admin/admin_indent_approval_page.dart';
 import 'views/admin/admin_indent_status_page.dart';
 // Admin Pages
@@ -109,14 +110,56 @@ void main() async {
 }
 
 /// Returns `'/'` when an unauthenticated user tries to reach a protected route,
-/// `null` otherwise. Extracted so tests can reuse it without duplicating it.
-String? authRedirect(BuildContext context, GoRouterState state) {
-  final isLoggedIn = FirebaseAuth.instance.currentUser != null;
+/// redirects based on role/facility for authenticated users, or `null` to allow
+/// navigation. Extracted so tests can reuse it without duplicating it.
+///
+/// For authenticated users, enforces role-based access:
+/// - Facility users cannot access `/admin/*` routes
+/// - Facility users cannot access `/facility/<other-id>/*` routes
+/// - Users with no resolvable role are bounced to `/`
+///
+/// Role and facility lookups are cached in [profileCache] so Firestore is not
+/// queried on every navigation.
+final profileCache = UserProfileCache();
+
+Future<String?> authRedirect(BuildContext context, GoRouterState state) async {
+  final user = FirebaseAuth.instance.currentUser;
   final uri = state.uri.toString();
   final isAuthRoute = uri == '/' ||
       uri.startsWith('/login') ||
       uri.startsWith('/forgot-password');
-  if (!isLoggedIn && !isAuthRoute) return '/';
+
+  if (user == null) {
+    return isAuthRoute ? null : '/';
+  }
+
+  if (isAuthRoute) return null;
+
+  final profile = await profileCache.getUserProfile(user.uid);
+
+  if (profile == null) return '/';
+
+  final isAdminRoute = uri.startsWith('/admin');
+  final isFacilityRoute = uri.startsWith('/facility/');
+
+  if (isAdminRoute && !profile.isAdmin) {
+    if (profile.isFacilityHead && profile.facilityId != null) {
+      return '/facility/${profile.facilityId}/overview';
+    }
+    return '/';
+  }
+
+  if (isFacilityRoute && !profile.isFacilityHead) {
+    return profile.isAdmin ? '/admin/overview' : '/';
+  }
+
+  if (isFacilityRoute && profile.isFacilityHead) {
+    final facilityId = state.pathParameters['id'];
+    if (facilityId != null && facilityId != profile.facilityId) {
+      return '/facility/${profile.facilityId}/overview';
+    }
+  }
+
   return null;
 }
 
