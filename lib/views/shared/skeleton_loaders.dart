@@ -54,8 +54,8 @@ class _SkeletonBoxState extends State<SkeletonBox>
           height: widget.height,
           margin: widget.margin,
           decoration: BoxDecoration(
-            color: colors.surfaceLight
-                .withValues(alpha: _opacityAnimation.value),
+            color:
+                colors.surfaceLight.withValues(alpha: _opacityAnimation.value),
             borderRadius: BorderRadius.circular(widget.borderRadius),
             border: Border.all(
               color: colors.border

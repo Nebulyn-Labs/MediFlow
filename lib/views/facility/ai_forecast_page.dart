@@ -139,8 +139,7 @@ class _AIForecastPageState extends ConsumerState<AIForecastPage> {
                           color: colors.textPrimary)),
                   const SizedBox(height: 8),
                   Text('Configure your forecast model',
-                      style:
-                          TextStyle(fontSize: 13, color: colors.textMuted)),
+                      style: TextStyle(fontSize: 13, color: colors.textMuted)),
                   const SizedBox(height: 28),
                   DropdownButtonFormField<String>(
                     decoration: const InputDecoration(labelText: 'Medicine'),
@@ -213,8 +212,8 @@ class _AIForecastPageState extends ConsumerState<AIForecastPage> {
                             color: colors.success, size: 16),
                         const SizedBox(width: 8),
                         Text('${_historicalData.length} days loaded',
-                            style: TextStyle(
-                                color: colors.success, fontSize: 12)),
+                            style:
+                                TextStyle(color: colors.success, fontSize: 12)),
                       ]),
                     ),
                   ],
@@ -262,8 +261,7 @@ class _AIForecastPageState extends ConsumerState<AIForecastPage> {
                                         child: Text(
                                           'Failed to load historical data.\n$_historyError',
                                           textAlign: TextAlign.center,
-                                          style: TextStyle(
-                                              color: colors.error),
+                                          style: TextStyle(color: colors.error),
                                         ),
                                       ),
                                     )
@@ -347,9 +345,7 @@ class _AIForecastPageState extends ConsumerState<AIForecastPage> {
               decoration: BoxDecoration(
                   color: color, borderRadius: BorderRadius.circular(3))),
           const SizedBox(width: 6),
-          Text(label,
-              style:
-                  TextStyle(fontSize: 12, color: colors.textMuted)),
+          Text(label, style: TextStyle(fontSize: 12, color: colors.textMuted)),
         ]),
       ),
     );
@@ -410,8 +406,7 @@ class _AIForecastPageState extends ConsumerState<AIForecastPage> {
           showTitles: true,
           reservedSize: 40,
           getTitlesWidget: (v, _) => Text(v.toStringAsFixed(0),
-              style:
-                  TextStyle(fontSize: 10, color: colors.textMuted)),
+              style: TextStyle(fontSize: 10, color: colors.textMuted)),
         )),
         bottomTitles: AxisTitles(
             sideTitles: SideTitles(

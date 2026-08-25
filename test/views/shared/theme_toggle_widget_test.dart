@@ -14,7 +14,8 @@ void main() {
     SharedPreferences.setMockInitialValues({});
   });
 
-  Widget createTestApp({required Widget child, required ProviderContainer container}) {
+  Widget createTestApp(
+      {required Widget child, required ProviderContainer container}) {
     final router = GoRouter(
       initialLocation: '/admin/overview',
       routes: [
@@ -50,11 +51,13 @@ void main() {
     );
   }
 
-  testWidgets('Theme toggle button is present in sidebar and switches theme mode on tap',
+  testWidgets(
+      'Theme toggle button is present in sidebar and switches theme mode on tap',
       (tester) async {
     final container = ProviderContainer(
       overrides: [
-        themeModeProvider.overrideWith(() => ThemeModeNotifier(initialMode: ThemeMode.dark)),
+        themeModeProvider
+            .overrideWith(() => ThemeModeNotifier(initialMode: ThemeMode.dark)),
       ],
     );
     addTearDown(container.dispose);

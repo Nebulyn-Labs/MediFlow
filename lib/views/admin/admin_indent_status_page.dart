@@ -77,15 +77,12 @@ class _AdminIndentStatusPageState extends ConsumerState<AdminIndentStatusPage> {
       context: context,
       builder: (context) => AlertDialog(
         backgroundColor: colors.surface,
-        title:
-            Text(title, style: TextStyle(color: colors.textPrimary)),
-        content: Text(message,
-            style: TextStyle(color: colors.textSecondary)),
+        title: Text(title, style: TextStyle(color: colors.textPrimary)),
+        content: Text(message, style: TextStyle(color: colors.textSecondary)),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(false),
-            child: Text('Cancel',
-                style: TextStyle(color: colors.textMuted)),
+            child: Text('Cancel', style: TextStyle(color: colors.textMuted)),
           ),
           FilledButton(
             onPressed: () => Navigator.of(context).pop(true),
@@ -271,9 +268,7 @@ class _AdminIndentStatusPageState extends ConsumerState<AdminIndentStatusPage> {
                   style: TextStyle(
                       color: colors.textSecondary,
                       fontWeight: FontWeight.bold))),
-          const Expanded(
-              flex: 1,
-              child: SizedBox()),
+          const Expanded(flex: 1, child: SizedBox()),
         ],
       ),
     );
@@ -306,14 +301,14 @@ class _AdminIndentStatusPageState extends ConsumerState<AdminIndentStatusPage> {
               flex: 2,
               child: Text(req.quantity.toString(),
                   style: TextStyle(
-                      fontWeight: FontWeight.bold,
-                      color: colors.textPrimary))),
+                      fontWeight: FontWeight.bold, color: colors.textPrimary))),
           Expanded(
             flex: 2,
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
               decoration: BoxDecoration(
-                color: _getStatusColor(req.status, colors).withValues(alpha: 0.1),
+                color:
+                    _getStatusColor(req.status, colors).withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(6),
               ),
               child: Text(req.status.label.toUpperCase(),
@@ -336,8 +331,7 @@ class _AdminIndentStatusPageState extends ConsumerState<AdminIndentStatusPage> {
                               fontSize: 11, fontWeight: FontWeight.bold)),
                       style: TextButton.styleFrom(
                         foregroundColor: colors.primary,
-                        backgroundColor:
-                            colors.primary.withValues(alpha: 0.08),
+                        backgroundColor: colors.primary.withValues(alpha: 0.08),
                         padding: const EdgeInsets.symmetric(
                             horizontal: 12, vertical: 8),
                         shape: RoundedRectangleBorder(
@@ -346,8 +340,8 @@ class _AdminIndentStatusPageState extends ConsumerState<AdminIndentStatusPage> {
                     ),
                   )
                 : Center(
-                    child: Text('—',
-                        style: TextStyle(color: colors.textMuted))),
+                    child:
+                        Text('—', style: TextStyle(color: colors.textMuted))),
           ),
           Expanded(
             flex: 1,

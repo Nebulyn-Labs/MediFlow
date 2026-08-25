@@ -257,8 +257,8 @@ class _WastageReportPageState extends ConsumerState<WastageReportPage> {
                               size: 64, color: colors.error),
                           const SizedBox(height: 16),
                           Text('Failed to load wastage data: $_error',
-                              style: TextStyle(
-                                  color: colors.error, fontSize: 16)),
+                              style:
+                                  TextStyle(color: colors.error, fontSize: 16)),
                         ],
                       ),
                     )
@@ -274,8 +274,7 @@ class _WastageReportPageState extends ConsumerState<WastageReportPage> {
                           Text(
                               'No wastage data found. Excellent inventory management!',
                               style: TextStyle(
-                                  color: colors.textSecondary,
-                                  fontSize: 16)),
+                                  color: colors.textSecondary, fontSize: 16)),
                         ],
                       ),
                     )
@@ -404,8 +403,7 @@ class _WastageReportPageState extends ConsumerState<WastageReportPage> {
           if (subtitle != null) ...[
             const SizedBox(height: 4),
             Text(subtitle,
-                style: TextStyle(
-                    fontSize: 11, color: colors.textSecondary)),
+                style: TextStyle(fontSize: 11, color: colors.textSecondary)),
           ],
         ],
       ),

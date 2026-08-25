@@ -24,8 +24,7 @@ class AlertsHubPage extends ConsumerWidget {
             children: [
               Text('Alerts & Notifications',
                   style: TextStyle(
-                      fontWeight: FontWeight.w800,
-                      color: colors.textPrimary)),
+                      fontWeight: FontWeight.w800, color: colors.textPrimary)),
               const SizedBox(width: 12),
               Container(
                 padding:

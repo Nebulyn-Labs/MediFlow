@@ -317,9 +317,8 @@ class _FacilityOverviewState extends ConsumerState<FacilityOverview> {
                     final stockHealthText = inventory.isEmpty
                         ? 'No stock'
                         : '$healthy / ${inventory.length} healthy';
-                    final stockHealthColor = unhealthy == 0
-                        ? colors.success
-                        : colors.warning;
+                    final stockHealthColor =
+                        unhealthy == 0 ? colors.success : colors.warning;
                     final stockHealthGradient = unhealthy == 0
                         ? colors.healthyKpiGradient
                         : colors.warningKpiGradient;
@@ -349,8 +348,7 @@ class _FacilityOverviewState extends ConsumerState<FacilityOverview> {
                             '$expired',
                             Icons.error_outline_rounded,
                             colors.error,
-                            colors.errorKpiGradient,
-                            () {
+                            colors.errorKpiGradient, () {
                           context.go('/facility/${widget.facilityId}/alerts');
                         }, colors),
                         _buildKpiCard(
@@ -358,8 +356,7 @@ class _FacilityOverviewState extends ConsumerState<FacilityOverview> {
                             '$wastageRisk',
                             Icons.warning_amber_rounded,
                             const Color(0xFFF59E0B),
-                            colors.warningKpiGradient,
-                            () {
+                            colors.warningKpiGradient, () {
                           context.go('/facility/${widget.facilityId}/alerts');
                         }, colors),
                         _buildKpiCard(
@@ -367,8 +364,7 @@ class _FacilityOverviewState extends ConsumerState<FacilityOverview> {
                             '$lowStock',
                             Icons.trending_down_rounded,
                             colors.error,
-                            colors.errorKpiGradient,
-                            () {
+                            colors.errorKpiGradient, () {
                           context.go('/facility/${widget.facilityId}/alerts');
                         }, colors),
                       ],
@@ -439,8 +435,7 @@ class _FacilityOverviewState extends ConsumerState<FacilityOverview> {
                       color: accent)),
               const SizedBox(height: 4),
               Text(title,
-                  style: TextStyle(
-                      fontSize: 13, color: colors.textSecondary)),
+                  style: TextStyle(fontSize: 13, color: colors.textSecondary)),
             ],
           ),
         ),
@@ -448,8 +443,8 @@ class _FacilityOverviewState extends ConsumerState<FacilityOverview> {
     );
   }
 
-  Widget _buildInventoryTable(
-      BuildContext context, WidgetRef ref, List<InventoryItem> inventory, MediFlowTheme colors) {
+  Widget _buildInventoryTable(BuildContext context, WidgetRef ref,
+      List<InventoryItem> inventory, MediFlowTheme colors) {
     return Column(
       key: _inventoryTableKey,
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -541,8 +536,7 @@ class _FacilityOverviewState extends ConsumerState<FacilityOverview> {
                                         color: colors.textPrimary)),
                                 Text(item.batchId,
                                     style: TextStyle(
-                                        fontSize: 11,
-                                        color: colors.textMuted)),
+                                        fontSize: 11, color: colors.textMuted)),
                               ]),
                         ])),
                         DataCell(Column(
@@ -581,8 +575,7 @@ class _FacilityOverviewState extends ConsumerState<FacilityOverview> {
                         )),
                         DataCell(Text(
                           DateFormatter.formatDate(item.expiryDate),
-                          style:
-                              TextStyle(color: colors.textSecondary),
+                          style: TextStyle(color: colors.textSecondary),
                         )),
                         DataCell(Text(
                           daysToExpiry < 0

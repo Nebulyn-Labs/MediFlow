@@ -430,12 +430,17 @@ class _SidebarLayoutState extends ConsumerState<SidebarLayout> {
                         child: AnimatedSwitcher(
                           duration: const Duration(milliseconds: 200),
                           transitionBuilder: (child, anim) =>
-                              RotationTransition(turns: anim, child: FadeTransition(opacity: anim, child: child)),
+                              RotationTransition(
+                                  turns: anim,
+                                  child: FadeTransition(
+                                      opacity: anim, child: child)),
                           child: Icon(
                             icon,
                             key: ValueKey(isDark),
                             size: 22,
-                            color: isDark ? const Color(0xFFFBBF24) : colors.primary,
+                            color: isDark
+                                ? const Color(0xFFFBBF24)
+                                : colors.primary,
                           ),
                         ),
                       ),

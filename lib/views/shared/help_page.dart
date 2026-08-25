@@ -95,8 +95,8 @@ class HelpPage extends StatelessWidget {
               decoration: BoxDecoration(
                 color: colors.warning.withValues(alpha: 0.06),
                 borderRadius: BorderRadius.circular(16),
-                border: Border.all(
-                    color: colors.warning.withValues(alpha: 0.2)),
+                border:
+                    Border.all(color: colors.warning.withValues(alpha: 0.2)),
               ),
               child: Row(
                 children: [
@@ -122,8 +122,7 @@ class HelpPage extends StatelessWidget {
                           Text(
                               'Check dashboard daily for alerts. AI works best with consistent logging.',
                               style: TextStyle(
-                                  color: colors.textSecondary,
-                                  fontSize: 13)),
+                                  color: colors.textSecondary, fontSize: 13)),
                         ]),
                   ),
                 ],

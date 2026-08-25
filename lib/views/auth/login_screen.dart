@@ -116,8 +116,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     final colors = context.mediTheme;
     final isFacility = widget.role == 'facility';
     final accentColor = isFacility ? colors.teal : colors.primary;
-    final gradient =
-        isFacility ? colors.cyanGradient : colors.primaryGradient;
+    final gradient = isFacility ? colors.cyanGradient : colors.primaryGradient;
 
     final themeMode = ref.watch(themeModeProvider);
     final isDark = themeMode == ThemeMode.dark ||
@@ -157,8 +156,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
               if (isNarrow) {
                 return SafeArea(
                   child: SingleChildScrollView(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 20, vertical: 32),
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 20, vertical: 32),
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
@@ -190,7 +189,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                         ),
                       ),
                       child: Center(
-                        child: _buildBrandHeader(isFacility, accentColor, gradient,
+                        child: _buildBrandHeader(
+                            isFacility, accentColor, gradient,
                             compact: false),
                       ),
                     ),
@@ -206,7 +206,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                           child: themeToggleButton,
                         ),
                         Center(
-                          child: _buildLoginForm(gradient, accentColor, compact: false),
+                          child: _buildLoginForm(gradient, accentColor,
+                              compact: false),
                         ),
                       ],
                     ),
@@ -384,7 +385,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   ),
                   onPressed: _isLoading ? null : _login,
                   child: _isLoading
-                       ? const SizedBox(
+                      ? const SizedBox(
                           width: 22,
                           height: 22,
                           child: CircularProgressIndicator(
@@ -406,8 +407,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     onPressed: _isLoading ? null : _seedDatabase,
                     icon: const Icon(Icons.dataset_rounded, size: 16),
                     label: const Text('Seed DB'),
-                    style: TextButton.styleFrom(
-                        foregroundColor: colors.textMuted),
+                    style:
+                        TextButton.styleFrom(foregroundColor: colors.textMuted),
                   ),
                   const SizedBox(width: 8),
                 ],
@@ -415,8 +416,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   onPressed: () => context.go('/'),
                   icon: const Icon(Icons.arrow_back_rounded, size: 16),
                   label: const Text('Back'),
-                  style: TextButton.styleFrom(
-                      foregroundColor: colors.textMuted),
+                  style:
+                      TextButton.styleFrom(foregroundColor: colors.textMuted),
                 ),
               ],
             ),

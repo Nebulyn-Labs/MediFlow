@@ -56,13 +56,17 @@ void main() {
       final container = ProviderContainer();
       addTearDown(container.dispose);
 
-      await container.read(themeModeProvider.notifier).setThemeMode(ThemeMode.light);
+      await container
+          .read(themeModeProvider.notifier)
+          .setThemeMode(ThemeMode.light);
       expect(container.read(themeModeProvider), ThemeMode.light);
 
       var prefs = await SharedPreferences.getInstance();
       expect(prefs.getString(themePreferenceKey), 'light');
 
-      await container.read(themeModeProvider.notifier).setThemeMode(ThemeMode.system);
+      await container
+          .read(themeModeProvider.notifier)
+          .setThemeMode(ThemeMode.system);
       expect(container.read(themeModeProvider), ThemeMode.system);
       expect(prefs.getString(themePreferenceKey), 'system');
     });
@@ -72,7 +76,8 @@ void main() {
     test('reflects active theme mode', () {
       final container = ProviderContainer(
         overrides: [
-          themeModeProvider.overrideWith(() => ThemeModeNotifier(initialMode: ThemeMode.dark)),
+          themeModeProvider.overrideWith(
+              () => ThemeModeNotifier(initialMode: ThemeMode.dark)),
         ],
       );
       addTearDown(container.dispose);

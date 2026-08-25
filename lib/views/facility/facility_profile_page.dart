@@ -234,16 +234,23 @@ class _FacilityProfilePageState extends ConsumerState<FacilityProfilePage> {
                             ),
                           ),
                           const SizedBox(height: 16),
-                          _buildReadOnlyField('Email', _facility!.email, colors),
+                          _buildReadOnlyField(
+                              'Email', _facility!.email, colors),
                           const SizedBox(height: 12),
-                          _buildReadOnlyField('Facility Type',
-                              _facility!.type.toFirestore().toUpperCase(), colors),
+                          _buildReadOnlyField(
+                              'Facility Type',
+                              _facility!.type.toFirestore().toUpperCase(),
+                              colors),
                           const SizedBox(height: 12),
-                          _buildReadOnlyField('Coordinates',
-                              '${_facility!.latitude.toStringAsFixed(4)}, ${_facility!.longitude.toStringAsFixed(4)}', colors),
+                          _buildReadOnlyField(
+                              'Coordinates',
+                              '${_facility!.latitude.toStringAsFixed(4)}, ${_facility!.longitude.toStringAsFixed(4)}',
+                              colors),
                           const SizedBox(height: 12),
-                          _buildReadOnlyField('Created At',
-                              DateFormat('yMMMd').format(_facility!.createdAt), colors),
+                          _buildReadOnlyField(
+                              'Created At',
+                              DateFormat('yMMMd').format(_facility!.createdAt),
+                              colors),
                           const SizedBox(height: 32),
                           SizedBox(
                             width: double.infinity,

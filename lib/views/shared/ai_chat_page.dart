@@ -165,8 +165,7 @@ class _AIChatPageState extends ConsumerState<AIChatPage> {
                         color: colors.textPrimary)),
                 Text(
                   _isLocalMode ? 'Local Assistant Mode' : 'Powered by Gemini',
-                  style: TextStyle(
-                      fontSize: 11, color: colors.textMuted),
+                  style: TextStyle(fontSize: 11, color: colors.textMuted),
                 ),
               ],
             ),
@@ -187,7 +186,8 @@ class _AIChatPageState extends ConsumerState<AIChatPage> {
                         return _buildTypingIndicator(colors);
                       }
                       final msg = _messages[index];
-                      return _buildBubble(msg['role']!, msg['content']!, colors);
+                      return _buildBubble(
+                          msg['role']!, msg['content']!, colors);
                     },
                   ),
           ),
@@ -286,10 +286,12 @@ class _AIChatPageState extends ConsumerState<AIChatPage> {
                 runSpacing: 12,
                 alignment: WrapAlignment.center,
                 children: [
-                  _buildSuggestion('Which medicines are expiring soon?', colors),
+                  _buildSuggestion(
+                      'Which medicines are expiring soon?', colors),
                   _buildSuggestion('Show low stock medicines.', colors),
                   _buildSuggestion('Explain inventory trends.', colors),
-                  _buildSuggestion('How can I improve stock distribution?', colors),
+                  _buildSuggestion(
+                      'How can I improve stock distribution?', colors),
                 ],
               ),
             ],
@@ -415,7 +417,8 @@ class _AIChatPageState extends ConsumerState<AIChatPage> {
                   3,
                   (i) => Padding(
                         padding: EdgeInsets.only(right: i < 2 ? 6 : 0),
-                        child: _BouncingDot(delay: i * 150, color: colors.primary),
+                        child:
+                            _BouncingDot(delay: i * 150, color: colors.primary),
                       )),
             ),
           ),
@@ -466,8 +469,8 @@ class _BouncingDotState extends State<_BouncingDot>
         child: Container(
             width: 8,
             height: 8,
-            decoration: BoxDecoration(
-                color: widget.color, shape: BoxShape.circle)),
+            decoration:
+                BoxDecoration(color: widget.color, shape: BoxShape.circle)),
       ),
     );
   }

@@ -190,8 +190,7 @@ class _RouteOptimizationMapState extends ConsumerState<RouteOptimizationMap> {
                 Text(
                   _errorMessage!,
                   textAlign: TextAlign.center,
-                  style: TextStyle(
-                      fontSize: 16, color: colors.textSecondary),
+                  style: TextStyle(fontSize: 16, color: colors.textSecondary),
                 ),
                 const SizedBox(height: 24),
                 SizedBox(
@@ -399,8 +398,8 @@ class _RouteOptimizationMapState extends ConsumerState<RouteOptimizationMap> {
                                         size: 48, color: colors.textMuted),
                                     const SizedBox(height: 12),
                                     Text('Click Generate to start analysis',
-                                        style: TextStyle(
-                                            color: colors.textMuted)),
+                                        style:
+                                            TextStyle(color: colors.textMuted)),
                                   ],
                                 ))
                               : ListView.builder(
@@ -576,12 +575,12 @@ class _RouteOptimizationMapState extends ConsumerState<RouteOptimizationMap> {
                                         fontWeight: FontWeight.bold,
                                         color: colors.textPrimary)),
                                 const SizedBox(height: 12),
-                                _buildLegendItem(
-                                    Colors.green, 'Donor Site (Surplus)', colors),
-                                _buildLegendItem(
-                                    Colors.orange, 'Recipient Site (Deficit)', colors),
-                                _buildLegendItem(
-                                    Colors.blueAccent, 'Rural Priority Route', colors),
+                                _buildLegendItem(Colors.green,
+                                    'Donor Site (Surplus)', colors),
+                                _buildLegendItem(Colors.orange,
+                                    'Recipient Site (Deficit)', colors),
+                                _buildLegendItem(Colors.blueAccent,
+                                    'Rural Priority Route', colors),
                                 _buildLegendItem(
                                     colors.primary, 'Standard Route', colors),
                               ],
@@ -600,7 +599,8 @@ class _RouteOptimizationMapState extends ConsumerState<RouteOptimizationMap> {
     );
   }
 
-  Widget _buildMapControl(IconData icon, VoidCallback onPressed, MediFlowTheme colors) {
+  Widget _buildMapControl(
+      IconData icon, VoidCallback onPressed, MediFlowTheme colors) {
     return Container(
       decoration: BoxDecoration(
         color: colors.surface,
@@ -632,8 +632,7 @@ class _RouteOptimizationMapState extends ConsumerState<RouteOptimizationMap> {
               decoration: BoxDecoration(color: color, shape: BoxShape.circle)),
           const SizedBox(width: 8),
           Text(label,
-              style: TextStyle(
-                  color: colors.textSecondary, fontSize: 11)),
+              style: TextStyle(color: colors.textSecondary, fontSize: 11)),
         ],
       ),
     );
@@ -654,8 +653,7 @@ class _RouteOptimizationMapState extends ConsumerState<RouteOptimizationMap> {
         children: [
           Row(
             children: [
-              Icon(Icons.local_shipping_outlined,
-                  color: colors.primary),
+              Icon(Icons.local_shipping_outlined, color: colors.primary),
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
@@ -674,7 +672,8 @@ class _RouteOptimizationMapState extends ConsumerState<RouteOptimizationMap> {
     );
   }
 
-  Widget _buildSingleTransferInfo(TransferRecommendation rec, MediFlowTheme colors) {
+  Widget _buildSingleTransferInfo(
+      TransferRecommendation rec, MediFlowTheme colors) {
     /// Fallback assumed average speed when no road-routing data is available.
     /// Named here as a constant so it is easy to find and change (#252).
     const double kFallbackSpeedKmh = 40.0;
@@ -782,8 +781,7 @@ class _RouteOptimizationMapState extends ConsumerState<RouteOptimizationMap> {
                   color: colors.textPrimary,
                   fontSize: 15)),
           Text('${rec.quantity} Units requested',
-              style:
-                  TextStyle(color: colors.textMuted, fontSize: 13)),
+              style: TextStyle(color: colors.textMuted, fontSize: 13)),
           const SizedBox(height: 12),
           Text(rec.reasoning,
               style: TextStyle(
@@ -799,12 +797,10 @@ class _RouteOptimizationMapState extends ConsumerState<RouteOptimizationMap> {
               Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Icon(Icons.route_rounded,
-                      size: 14, color: colors.textMuted),
+                  Icon(Icons.route_rounded, size: 14, color: colors.textMuted),
                   const SizedBox(width: 4),
                   Text('${displayDistKm.toStringAsFixed(1)} km',
-                      style: TextStyle(
-                          color: colors.textMuted, fontSize: 12)),
+                      style: TextStyle(color: colors.textMuted, fontSize: 12)),
                 ],
               ),
               Row(
@@ -815,8 +811,8 @@ class _RouteOptimizationMapState extends ConsumerState<RouteOptimizationMap> {
                   const SizedBox(width: 4),
                   Flexible(
                     child: Text('${displayTimeMinutes}m $etaLabel',
-                        style: TextStyle(
-                            color: colors.textMuted, fontSize: 12)),
+                        style:
+                            TextStyle(color: colors.textMuted, fontSize: 12)),
                   ),
                 ],
               ),

@@ -394,9 +394,7 @@ class _AdminIndentApprovalPageState
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(12),
                         side: BorderSide(
-                          color: isSelected
-                              ? colors.primary
-                              : colors.border,
+                          color: isSelected ? colors.primary : colors.border,
                           width: isSelected ? 2 : 1,
                         ),
                       ),

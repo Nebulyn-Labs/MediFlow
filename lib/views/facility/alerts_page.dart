@@ -354,8 +354,7 @@ class _AlertsPageState extends ConsumerState<AlertsPage> {
       ),
       actions: [
         IconButton(
-          icon: Icon(Icons.refresh_rounded,
-              color: colors.textSecondary),
+          icon: Icon(Icons.refresh_rounded, color: colors.textSecondary),
           onPressed: _manualRefresh,
           tooltip: 'Refresh',
         ),

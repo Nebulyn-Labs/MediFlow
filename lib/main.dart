@@ -91,7 +91,8 @@ void main() async {
                           ? details.exceptionAsString()
                           : 'An unexpected error occurred. Our team has been notified.',
                       textAlign: TextAlign.center,
-                      style: TextStyle(color: mediTheme.textMuted, fontSize: 13),
+                      style:
+                          TextStyle(color: mediTheme.textMuted, fontSize: 13),
                     ),
                     const SizedBox(height: 24),
                     ElevatedButton(
@@ -316,10 +317,8 @@ ThemeData _buildTheme(Brightness brightness, MediFlowTheme mediTheme) {
         backgroundColor: mediTheme.primary,
         foregroundColor: mediTheme.onAccent,
         padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-        shape:
-            RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        textStyle:
-            const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        textStyle: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
       ),
     ),
     outlinedButtonTheme: OutlinedButtonThemeData(
@@ -327,16 +326,14 @@ ThemeData _buildTheme(Brightness brightness, MediFlowTheme mediTheme) {
         foregroundColor: mediTheme.primary,
         side: BorderSide(color: mediTheme.border),
         padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-        shape:
-            RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       ),
     ),
     dividerTheme: DividerThemeData(color: mediTheme.border, thickness: 1),
     snackBarTheme: SnackBarThemeData(
       backgroundColor: mediTheme.surfaceLight,
       contentTextStyle: TextStyle(color: mediTheme.textPrimary),
-      shape:
-          RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       behavior: SnackBarBehavior.floating,
     ),
     popupMenuTheme: PopupMenuThemeData(
@@ -348,8 +345,7 @@ ThemeData _buildTheme(Brightness brightness, MediFlowTheme mediTheme) {
     ),
     dialogTheme: DialogThemeData(
       backgroundColor: mediTheme.surface,
-      shape:
-          RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
       titleTextStyle: TextStyle(
           fontSize: 18,
           fontWeight: FontWeight.w700,
@@ -376,8 +372,8 @@ ThemeData _buildTheme(Brightness brightness, MediFlowTheme mediTheme) {
       }),
       dividerThickness: 1,
       decoration: BoxDecoration(
-          border: Border(
-              bottom: BorderSide(color: mediTheme.border, width: 0.5))),
+          border:
+              Border(bottom: BorderSide(color: mediTheme.border, width: 0.5))),
     ),
   );
 }
