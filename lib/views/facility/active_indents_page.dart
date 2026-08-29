@@ -1248,6 +1248,53 @@ class _ActiveIndentsPageState extends ConsumerState<ActiveIndentsPage> {
                   ),
                 );
 
+                final bool isDeliveryPending =
+                    req.status == RequestStatus.dispatched ||
+                        req.status == RequestStatus.inTransit ||
+                        req.status == RequestStatus.received;
+                final bool isRecipient =
+                    req.type == RequestType.regularIndent ||
+                        req.type == RequestType.shortage;
+
+                Widget? confirmDeliveryButton;
+                if (isDeliveryPending && isRecipient) {
+                  confirmDeliveryButton = Padding(
+                    padding: const EdgeInsets.only(left: 12.0),
+                    child: FilledButton.icon(
+                      onPressed: () async {
+                        try {
+                          await ref
+                              .read(firebaseServiceProvider)
+                              .updateRequestStatus(
+                                  req.id, RequestStatus.verified);
+                          if (context.mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                  content:
+                                      Text('Delivery confirmed successfully!')),
+                            );
+                          }
+                        } catch (e) {
+                          if (context.mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                  content:
+                                      Text('Failed to confirm delivery: $e')),
+                            );
+                          }
+                        }
+                      },
+                      icon: const Icon(Icons.check_circle_outline, size: 16),
+                      label: const Text('Confirm Delivery'),
+                      style: FilledButton.styleFrom(
+                        backgroundColor: MediColors.success,
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 16, vertical: 8),
+                      ),
+                    ),
+                  );
+                }
+
                 return Card(
                   margin: const EdgeInsets.only(bottom: 16),
                   child: Padding(
@@ -1295,6 +1342,10 @@ class _ActiveIndentsPageState extends ConsumerState<ActiveIndentsPage> {
                                               )),
                                         ),
                                       ],
+                                      if (confirmDeliveryButton != null) ...[
+                                        const SizedBox(width: 8),
+                                        confirmDeliveryButton,
+                                      ],
                                     ],
                                   ),
                                 ],
@@ -1334,6 +1385,10 @@ class _ActiveIndentsPageState extends ConsumerState<ActiveIndentsPage> {
                                           ),
                                         )),
                                   ),
+                                ],
+                                if (confirmDeliveryButton != null) ...[
+                                  const SizedBox(width: 8),
+                                  confirmDeliveryButton,
                                 ],
                               ],
                             ),
