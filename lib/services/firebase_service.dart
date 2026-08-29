@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:math';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:cloud_functions/cloud_functions.dart';
@@ -24,6 +25,35 @@ class FirebaseService {
   final auth.FirebaseAuth _auth;
   final bool isDebugMode;
   late final SimulationService _simulation;
+
+  int _pendingWriteCount = 0;
+  final _pendingWriteCountController = StreamController<int>.broadcast();
+
+  /// Emits true while there are locally-queued writes waiting to sync.
+  /// Counts writes issued through [_logUsageOffline] specifically, rather
+  /// than watching a Firestore query, since our writes fan out across two
+  /// docs (inventory + log) and a query-based approach can't reliably tell
+  /// "queued by us" apart from "just slow to resolve".
+  Stream<bool> get hasPendingWritesStream async* {
+    yield _pendingWriteCount > 0;
+    yield* _pendingWriteCountController.stream.map((c) => c > 0).distinct();
+  }
+
+  /// Attempts to flush any queued offline writes, with a timeout so the
+  /// caller (e.g. a "Force Sync" button) gets honest feedback instead of
+  /// hanging forever while offline.
+  Future<bool> forceSyncPendingWrites() async {
+    try {
+      await _firestore
+          .waitForPendingWrites()
+          .timeout(const Duration(seconds: 5));
+      return true;
+    } on TimeoutException {
+      return false;
+    } catch (_) {
+      return false;
+    }
+  }
 
   FirebaseService(this._firestore, this._auth,
       {this.isDebugMode = kDebugMode}) {
@@ -418,6 +448,42 @@ class FirebaseService {
         .collection('medicines')
         .doc(medicineId);
 
+    try {
+      await _runLogUsageTransaction(
+        logRef: logRef,
+        invRef: invRef,
+        date: date,
+        medicineName: medicineName,
+        quantity: quantity,
+        patients: patients,
+      );
+    } on FirebaseException catch (e) {
+      // Transactions require a server round trip, so this is the real signal
+      // for "device is offline" — not a connectivity_plus guess, which can
+      // lag or misreport captive portals.
+      if (e.code == 'unavailable') {
+        await _logUsageOffline(
+          logRef: logRef,
+          invRef: invRef,
+          date: date,
+          medicineName: medicineName,
+          quantity: quantity,
+          patients: patients,
+        );
+      } else {
+        rethrow;
+      }
+    }
+  }
+
+  Future<void> _runLogUsageTransaction({
+    required DocumentReference logRef,
+    required DocumentReference invRef,
+    required DateTime date,
+    required String medicineName,
+    required int quantity,
+    required int patients,
+  }) async {
     await _firestore.runTransaction((transaction) async {
       // ── Phase 1: ALL READS FIRST ──────────────────────────────────────────
       final invDoc = await transaction.get(invRef);
@@ -429,17 +495,23 @@ class FirebaseService {
             'Inventory document not found for medicine: $medicineName');
       }
 
-      final int remaining =
-          (invDoc.data()?['remainingQuantity'] as num?)?.toInt() ?? 0;
+      final int remaining = ((invDoc.data()
+                  as Map<String, dynamic>?)?['remainingQuantity'] as num?)
+              ?.toInt() ??
+          0;
       final int actualDeduction = min(quantity, remaining);
 
       // Firestore returns unmodifiable maps; rebuild as mutable copies.
-      final rawList = (logDoc.data()?['medicines'] as List?) ?? [];
+      final rawList =
+          ((logDoc.data() as Map<String, dynamic>?)?['medicines'] as List?) ??
+              [];
       final List<Map<String, dynamic>> medicines = rawList
           .map<Map<String, dynamic>>((m) => Map<String, dynamic>.from(m as Map))
           .toList();
       final int totalPatients =
-          (logDoc.data()?['totalPatients'] as num?)?.toInt() ?? 0;
+          ((logDoc.data() as Map<String, dynamic>?)?['totalPatients'] as num?)
+                  ?.toInt() ??
+              0;
 
       final int index =
           medicines.indexWhere((m) => m['medicineName'] == medicineName);
@@ -480,6 +552,96 @@ class FirebaseService {
         });
       }
     });
+  }
+
+  /// Offline fallback for [logUsage]. Transactions can't run offline (they
+  /// need a server round trip), so this reads from Firestore's local cache
+  /// instead — which still works offline — and writes through a [WriteBatch],
+  /// which Firestore queues locally and commits automatically on reconnect.
+  ///
+  /// This intentionally duplicates the read-modify-write logic from the
+  /// transaction above rather than sharing it, since transaction.get() and
+  /// a plain DocumentReference.get() return different snapshot types.
+  Future<void> _logUsageOffline({
+    required DocumentReference logRef,
+    required DocumentReference invRef,
+    required DateTime date,
+    required String medicineName,
+    required int quantity,
+    required int patients,
+  }) async {
+    _pendingWriteCountController.add(++_pendingWriteCount);
+    try {
+      final invDoc = await invRef.get();
+      final logDoc = await logRef.get();
+
+      if (!invDoc.exists) {
+        throw Exception(
+            'Inventory document not found for medicine: $medicineName');
+      }
+
+      final int remaining = ((invDoc.data()
+                  as Map<String, dynamic>?)?['remainingQuantity'] as num?)
+              ?.toInt() ??
+          0;
+      final int actualDeduction = min(quantity, remaining);
+
+      final rawList =
+          ((logDoc.data() as Map<String, dynamic>?)?['medicines'] as List?) ??
+              [];
+      final List<Map<String, dynamic>> medicines = rawList
+          .map<Map<String, dynamic>>((m) => Map<String, dynamic>.from(m as Map))
+          .toList();
+      final int totalPatients =
+          ((logDoc.data() as Map<String, dynamic>?)?['totalPatients'] as num?)
+                  ?.toInt() ??
+              0;
+
+      final int index =
+          medicines.indexWhere((m) => m['medicineName'] == medicineName);
+      if (index >= 0) {
+        medicines[index] = {
+          ...medicines[index],
+          'unitsDistributed':
+              (medicines[index]['unitsDistributed'] as int) + actualDeduction,
+        };
+      } else {
+        medicines.add({
+          'medicineName': medicineName,
+          'unitsDistributed': actualDeduction,
+        });
+      }
+
+      final batch = _firestore.batch();
+      batch.update(invRef, {
+        'remainingQuantity': remaining - actualDeduction,
+        'lastUpdated': Timestamp.now(),
+      });
+      if (logDoc.exists) {
+        batch.update(logRef, {
+          'medicines': medicines,
+          'totalPatients': totalPatients + patients,
+        });
+      } else {
+        batch.set(logRef, {
+          'date': Timestamp.fromDate(date),
+          'medicines': [
+            {'medicineName': medicineName, 'unitsDistributed': actualDeduction}
+          ],
+          'totalPatients': patients,
+        });
+      }
+
+      // Don't await commit() to completion — while offline it won't resolve
+      // until reconnect, and blocking here would hang the caller the same
+      // way the previous PR's Force Sync button hung.
+      unawaited(batch.commit().whenComplete(() {
+        _pendingWriteCountController.add(--_pendingWriteCount);
+      }));
+    } catch (e) {
+      _pendingWriteCountController.add(--_pendingWriteCount);
+      rethrow;
+    }
   }
 
   Stream<List<MedRequest>> streamRequests(String? facilityId) {

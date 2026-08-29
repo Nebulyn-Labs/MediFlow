@@ -58,6 +58,12 @@ class FakeFirebaseService implements FirebaseService {
   }
 
   @override
+  Stream<bool> get hasPendingWritesStream => Stream.value(false);
+
+  @override
+  Future<bool> forceSyncPendingWrites() async => true;
+
+  @override
   dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 }
 
@@ -173,18 +179,24 @@ void main() {
       expect(exportButton.onPressed, isNotNull);
     });
 
-    testWidgets('disables saving and exporting while offline', (tester) async {
+    testWidgets('saving still works while offline, but exporting is disabled',
+        (tester) async {
       await _pumpPage(tester, status: Stream.value(false));
 
-      expect(find.text('Save Log (offline)'), findsOneWidget);
-      expect(_isButtonEnabled(tester, 'Save Log (offline)'), isFalse);
+      // Submitting a log no longer needs a live connection — logUsage
+      // itself falls back to a queued local write, so the button stays
+      // enabled and keeps its normal label.
+      expect(find.text('Save Log'), findsOneWidget);
+      expect(_isButtonEnabled(tester, 'Save Log'), isTrue);
 
+      // Exporting genuinely needs the network (reads + CSV generation), so
+      // that one is still correctly gated on connectivity.
       final exportButton = tester.widget<IconButton>(
           find.widgetWithIcon(IconButton, Icons.file_download_outlined));
       expect(exportButton.onPressed, isNull);
     });
 
-    testWidgets('a filled-in form is not written while offline',
+    testWidgets('a filled-in form is submitted (and queued) while offline',
         (tester) async {
       final controller = StreamController<bool>.broadcast();
       // Not awaited: closing inside tearDown would wait on a microtask that
@@ -204,20 +216,15 @@ void main() {
       // Connectivity drops after the form was filled but before submitting.
       await _emit(tester, controller, false);
 
-      await tester.tap(find.text('Save Log (offline)'));
-      await tester.pump();
-
-      expect(firebase.logUsageCallCount, 0);
-
-      // The input survives the outage, so the user can submit on reconnect.
-      await _emit(tester, controller, true);
+      // logUsage handles the offline fallback internally (batched write),
+      // so the UI submits normally instead of blocking the tap.
       await tester.tap(find.text('Save Log'));
       await tester.pump();
 
       expect(firebase.logUsageCallCount, 1);
     });
 
-    testWidgets('restores normal behaviour once reconnected', (tester) async {
+    testWidgets('restores export access once reconnected', (tester) async {
       final controller = StreamController<bool>.broadcast();
       // Not awaited: closing inside tearDown would wait on a microtask that
       // the (already finished) fake async zone will never pump.
@@ -228,10 +235,15 @@ void main() {
       await _pumpPage(tester, status: controller.stream);
 
       await _emit(tester, controller, false);
-      expect(_isButtonEnabled(tester, 'Save Log (offline)'), isFalse);
+      final exportButtonOffline = tester.widget<IconButton>(
+          find.widgetWithIcon(IconButton, Icons.file_download_outlined));
+      expect(exportButtonOffline.onPressed, isNull);
 
       await _emit(tester, controller, true);
 
+      final exportButtonOnline = tester.widget<IconButton>(
+          find.widgetWithIcon(IconButton, Icons.file_download_outlined));
+      expect(exportButtonOnline.onPressed, isNotNull);
       expect(find.text('Save Log'), findsOneWidget);
       expect(_isButtonEnabled(tester, 'Save Log'), isTrue);
     });

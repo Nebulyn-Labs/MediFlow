@@ -15,6 +15,10 @@ import '../shared/connectivity_indicator.dart';
 import '../shared/skeleton_loaders.dart';
 import '../../utils/retry_snackbar.dart';
 
+final _pendingWritesProvider = StreamProvider<bool>((ref) {
+  return ref.watch(firebaseServiceProvider).hasPendingWritesStream;
+});
+
 int _parseNumber(dynamic val) {
   if (val == null) return 0;
   final str = val.toString().trim();
@@ -318,7 +322,6 @@ class _DailyLoggingPageState extends ConsumerState<DailyLoggingPage>
 
   Future<void> _submitLog() async {
     if (!_formKey.currentState!.validate() || _medName == null) return;
-    if (!_ensureOnline()) return;
     _formKey.currentState!.save();
     setState(() => _isSubmitting = true);
     try {
@@ -419,7 +422,6 @@ class _DailyLoggingPageState extends ConsumerState<DailyLoggingPage>
 
   Future<void> _submitCSVLogs() async {
     if (_csvItems.isEmpty) return;
-    if (!_ensureOnline()) return;
     setState(() => _isSubmittingCsv = true);
     try {
       final List<Map<String, dynamic>> successful = [];
@@ -488,7 +490,6 @@ class _DailyLoggingPageState extends ConsumerState<DailyLoggingPage>
 
   Future<void> _submitScannedLogs() async {
     if (_scannedItems.isEmpty) return;
-    if (!_ensureOnline()) return;
     setState(() => _isSubmittingQr = true);
     try {
       for (var item in _scannedItems) {
@@ -579,7 +580,6 @@ class _DailyLoggingPageState extends ConsumerState<DailyLoggingPage>
 
   Future<void> _submitImageLogs() async {
     if (_imageItems.isEmpty) return;
-    if (!_ensureOnline()) return;
 
     final invalidItems = _imageItems.where((item) {
       final med = item['medicine']?.toString() ?? '';
@@ -642,6 +642,7 @@ class _DailyLoggingPageState extends ConsumerState<DailyLoggingPage>
       }
     });
     final isOnline = ref.watch(isOnlineProvider);
+    final hasPendingWrites = ref.watch(_pendingWritesProvider).value ?? false;
 
     return Scaffold(
       backgroundColor: MediColors.bg,
@@ -649,6 +650,23 @@ class _DailyLoggingPageState extends ConsumerState<DailyLoggingPage>
         title: const Text('Daily Logging'),
         actions: [
           const ConnectivityIndicator(),
+          if (hasPendingWrites) ...[
+            IconButton(
+              tooltip: 'Force sync pending changes',
+              icon: const Icon(Icons.sync_rounded),
+              onPressed: () async {
+                final synced = await ref
+                    .read(firebaseServiceProvider)
+                    .forceSyncPendingWrites();
+                if (!context.mounted) return;
+                ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                  content: Text(synced
+                      ? 'Synced ✓'
+                      : 'Still offline — will retry automatically'),
+                ));
+              },
+            ),
+          ],
           const SizedBox(width: 8),
           IconButton(
             tooltip: isOnline
@@ -680,6 +698,25 @@ class _DailyLoggingPageState extends ConsumerState<DailyLoggingPage>
       body: Column(
         children: [
           const OfflineBanner(),
+          if (hasPendingWrites)
+            Container(
+              width: double.infinity,
+              color: MediColors.warning.withValues(alpha: 0.12),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              child: Row(
+                children: const [
+                  Icon(Icons.cloud_upload_outlined,
+                      size: 16, color: MediColors.warning),
+                  SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'Saving locally. Changes will sync automatically when online.',
+                      style: TextStyle(color: MediColors.warning, fontSize: 12),
+                    ),
+                  ),
+                ],
+              ),
+            ),
           Expanded(
             child: TabBarView(
               controller: _tabController,
@@ -848,20 +885,17 @@ class _DailyLoggingPageState extends ConsumerState<DailyLoggingPage>
                       width: double.infinity,
                       height: 50,
                       child: FilledButton(
-                          onPressed: (_isSubmitting ||
-                                  _availableMedicines.isEmpty ||
-                                  !isOnline)
-                              ? null
-                              : _submitLog,
+                          onPressed:
+                              (_isSubmitting || _availableMedicines.isEmpty)
+                                  ? null
+                                  : _submitLog,
                           child: _isSubmitting
                               ? const SizedBox(
                                   width: 20,
                                   height: 20,
                                   child: CircularProgressIndicator(
                                       color: Colors.white, strokeWidth: 2))
-                              : Text(isOnline
-                                  ? 'Save Log'
-                                  : 'Save Log (offline)'))),
+                              : const Text('Save Log'))),
                 ],
               ),
             ),
@@ -1025,8 +1059,7 @@ class _DailyLoggingPageState extends ConsumerState<DailyLoggingPage>
                       : Text(isOnline
                           ? 'Submit ${_csvItems.length} Logs'
                           : 'Submit ${_csvItems.length} Logs (offline)'),
-                  onPressed:
-                      (_isSubmittingCsv || !isOnline) ? null : _submitCSVLogs)),
+                  onPressed: _isSubmittingCsv ? null : _submitCSVLogs)),
         ],
       ]),
     );
@@ -1137,9 +1170,7 @@ class _DailyLoggingPageState extends ConsumerState<DailyLoggingPage>
                         : Text(isOnline
                             ? 'Submit ${_scannedItems.length}'
                             : 'Submit ${_scannedItems.length} (offline)'),
-                    onPressed: (_isSubmittingQr || !isOnline)
-                        ? null
-                        : _submitScannedLogs)),
+                    onPressed: _isSubmittingQr ? null : _submitScannedLogs)),
           ]),
         ],
       ]),
@@ -1421,8 +1452,7 @@ class _DailyLoggingPageState extends ConsumerState<DailyLoggingPage>
                     : Text(isOnline
                         ? 'Submit ${_imageItems.length} Logs'
                         : 'Submit ${_imageItems.length} Logs (offline)'),
-                onPressed:
-                    (_isSubmittingImage || !isOnline) ? null : _submitImageLogs,
+                onPressed: _isSubmittingImage ? null : _submitImageLogs,
               ),
             ),
           ]),
