@@ -629,6 +629,19 @@ exports.onTransferVerified = onDocumentUpdated(
             resolvedAt: admin.firestore.FieldValue.serverTimestamp(),
           });
         });
+        
+        // Auto-create transfer thread for horizontal communication
+        await db.collection("transfer_threads").doc(requestId).set({
+          requestId: requestId,
+          medicineName: medicineName,
+          quantity: qty,
+          donorFacilityId: sourceFacility,
+          recipientFacilityId: destFacility,
+          status: "active",
+          createdAt: admin.firestore.FieldValue.serverTimestamp(),
+          lastMessageAt: admin.firestore.FieldValue.serverTimestamp(),
+        }, { merge: true });
+
         logger.log(
           `Redistribution successful: ${qty} units of ${medicineName} from ${sourceFacility} to ${destFacility}`
         );
