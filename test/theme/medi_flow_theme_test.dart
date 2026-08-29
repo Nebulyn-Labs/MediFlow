@@ -38,6 +38,30 @@ void main() {
       expect(theme.surfaceGradient, MediColors.surfaceGradient);
     });
 
+    test('light theme provides expected light palette tokens', () {
+      const theme = MediFlowTheme.light;
+
+      expect(theme.background, const Color(0xFFF8FAFC));
+      expect(theme.surface, const Color(0xFFFFFFFF));
+      expect(theme.surfaceLight, const Color(0xFFF1F5F9));
+      expect(theme.surfaceHover, const Color(0xFFE2E8F0));
+      expect(theme.border, const Color(0xFFE2E8F0));
+      expect(theme.borderLight, const Color(0xFFCBD5E1));
+      expect(theme.textPrimary, const Color(0xFF0F172A));
+      expect(theme.textSecondary, const Color(0xFF475569));
+      expect(theme.textMuted, const Color(0xFF94A3B8));
+      expect(theme.primary, const Color(0xFF4F46E5));
+      expect(theme.primaryLight, const Color(0xFF6366F1));
+      expect(theme.violet, const Color(0xFF7C3AED));
+      expect(theme.cyan, const Color(0xFF0891B2));
+      expect(theme.teal, const Color(0xFF0D9488));
+      expect(theme.success, const Color(0xFF059669));
+      expect(theme.warning, const Color(0xFFD97706));
+      expect(theme.error, const Color(0xFFE11D48));
+      expect(theme.info, const Color(0xFF2563EB));
+      expect(theme.onAccent, Colors.white);
+    });
+
     testWidgets('context reads the extension from ThemeData', (tester) async {
       const customPrimary = Color(0xFF123456);
       final customTheme = MediFlowTheme.dark.copyWith(primary: customPrimary);

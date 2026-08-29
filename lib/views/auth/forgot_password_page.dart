@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../services/firebase_service.dart';
-import 'package:med_supply_prototype/constants/colors.dart';
+import 'package:med_supply_prototype/theme/medi_flow_theme.dart';
 
 class ForgotPasswordPage extends ConsumerStatefulWidget {
   const ForgotPasswordPage({super.key});
@@ -50,11 +50,13 @@ class _ForgotPasswordPageState extends ConsumerState<ForgotPasswordPage> {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.mediTheme;
+
     return Scaffold(
-      backgroundColor: MediColors.bg,
+      backgroundColor: colors.background,
       appBar: AppBar(
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_rounded),
+          icon: Icon(Icons.arrow_back_rounded, color: colors.textPrimary),
           onPressed: () => context.pop(),
         ),
       ),
@@ -64,35 +66,35 @@ class _ForgotPasswordPageState extends ConsumerState<ForgotPasswordPage> {
             width: 400,
             padding: const EdgeInsets.all(40),
             decoration: BoxDecoration(
-              color: MediColors.surface,
+              color: colors.surface,
               borderRadius: BorderRadius.circular(24),
-              border: Border.all(color: MediColors.border),
+              border: Border.all(color: colors.border),
             ),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                const Icon(
+                Icon(
                   Icons.lock_reset_rounded,
                   size: 56,
-                  color: MediColors.primary,
+                  color: colors.primary,
                 ),
                 const SizedBox(height: 24),
-                const Text(
+                Text(
                   'Reset Password',
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     fontSize: 28,
                     fontWeight: FontWeight.w800,
-                    color: MediColors.textPrimary,
+                    color: colors.textPrimary,
                   ),
                 ),
                 const SizedBox(height: 8),
-                const Text(
+                Text(
                   'Enter your email address and we\'ll send you a link to reset your password.',
                   textAlign: TextAlign.center,
                   style: TextStyle(
-                    color: MediColors.textSecondary,
+                    color: colors.textSecondary,
                     fontSize: 14,
                   ),
                 ),
@@ -100,11 +102,11 @@ class _ForgotPasswordPageState extends ConsumerState<ForgotPasswordPage> {
                 TextField(
                   controller: _emailController,
                   keyboardType: TextInputType.emailAddress,
-                  style: const TextStyle(color: MediColors.textPrimary),
+                  style: TextStyle(color: colors.textPrimary),
                   decoration: InputDecoration(
                     labelText: 'Email Address',
                     prefixIcon: Icon(Icons.email_outlined,
-                        color: MediColors.textMuted, size: 20),
+                        color: colors.textMuted, size: 20),
                   ),
                   onSubmitted: (_) => _resetPassword(),
                 ),
@@ -113,11 +115,11 @@ class _ForgotPasswordPageState extends ConsumerState<ForgotPasswordPage> {
                   height: 52,
                   child: Container(
                     decoration: BoxDecoration(
-                      gradient: MediColors.primaryGradient,
+                      gradient: colors.primaryGradient,
                       borderRadius: BorderRadius.circular(12),
                       boxShadow: [
                         BoxShadow(
-                          color: MediColors.primary.withValues(alpha: 0.3),
+                          color: colors.primary.withValues(alpha: 0.3),
                           blurRadius: 16,
                           offset: const Offset(0, 6),
                         ),

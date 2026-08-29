@@ -7,6 +7,7 @@ import '../../models/request.dart';
 import '../../models/inventory_item.dart';
 import '../../models/daily_usage_log.dart';
 import 'package:med_supply_prototype/constants/colors.dart';
+import 'package:med_supply_prototype/theme/medi_flow_theme.dart';
 import '../shared/skeleton_loaders.dart';
 import '../../utils/date_formatter.dart';
 import 'transfer_chat_page.dart';
@@ -1408,8 +1409,10 @@ class _ActiveIndentsPageState extends ConsumerState<ActiveIndentsPage> {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.mediTheme;
+
     return Scaffold(
-      backgroundColor: MediColors.bg,
+      backgroundColor: colors.background,
       appBar: AppBar(title: const Text('Requests')),
       body: _isLoading
           ? const ActiveIndentsSkeleton()

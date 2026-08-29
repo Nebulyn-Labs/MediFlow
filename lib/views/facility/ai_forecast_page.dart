@@ -6,6 +6,7 @@ import '../../models/daily_usage_log.dart';
 import '../../services/firebase_service.dart';
 import '../../services/ai_service.dart';
 import 'package:med_supply_prototype/constants/colors.dart';
+import 'package:med_supply_prototype/theme/medi_flow_theme.dart';
 import '../shared/skeleton_loaders.dart';
 
 class AIForecastPage extends ConsumerStatefulWidget {
@@ -91,11 +92,12 @@ class _AIForecastPageState extends ConsumerState<AIForecastPage> {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.mediTheme;
     final inventoryStream =
         ref.watch(firebaseServiceProvider).streamInventory(widget.facilityId);
 
     return Scaffold(
-      backgroundColor: MediColors.bg,
+      backgroundColor: colors.background,
       appBar: AppBar(title: const Text('AI Demand Forecast')),
       body: StreamBuilder<List<InventoryItem>>(
         stream: inventoryStream,
@@ -120,31 +122,30 @@ class _AIForecastPageState extends ConsumerState<AIForecastPage> {
               width: isWide ? 320 : double.infinity,
               padding: const EdgeInsets.all(28),
               decoration: BoxDecoration(
-                color: MediColors.surface,
+                color: colors.surface,
                 border: Border(
                     right: isWide
-                        ? BorderSide(color: MediColors.border)
+                        ? BorderSide(color: colors.border)
                         : BorderSide.none),
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  const Text('Parameters',
+                  Text('Parameters',
                       style: TextStyle(
                           fontSize: 18,
                           fontWeight: FontWeight.w700,
-                          color: MediColors.textPrimary)),
+                          color: colors.textPrimary)),
                   const SizedBox(height: 8),
-                  const Text('Configure your forecast model',
-                      style:
-                          TextStyle(fontSize: 13, color: MediColors.textMuted)),
+                  Text('Configure your forecast model',
+                      style: TextStyle(fontSize: 13, color: colors.textMuted)),
                   const SizedBox(height: 28),
                   DropdownButtonFormField<String>(
                     decoration: const InputDecoration(labelText: 'Medicine'),
-                    dropdownColor: MediColors.surfaceLight,
+                    dropdownColor: colors.surfaceLight,
                     initialValue: _selectedMed,
-                    style: const TextStyle(color: MediColors.textPrimary),
+                    style: TextStyle(color: colors.textPrimary),
                     items: medNames
                         .map((m) => DropdownMenuItem(value: m, child: Text(m)))
                         .toList(),
@@ -159,9 +160,9 @@ class _AIForecastPageState extends ConsumerState<AIForecastPage> {
                   const SizedBox(height: 20),
                   DropdownButtonFormField<int>(
                     decoration: const InputDecoration(labelText: 'Duration'),
-                    dropdownColor: MediColors.surfaceLight,
+                    dropdownColor: colors.surfaceLight,
                     initialValue: _forecastDays,
-                    style: const TextStyle(color: MediColors.textPrimary),
+                    style: TextStyle(color: colors.textPrimary),
                     items: const [
                       DropdownMenuItem(
                           value: 30, child: Text('1 Month (30 Days)')),
@@ -179,7 +180,7 @@ class _AIForecastPageState extends ConsumerState<AIForecastPage> {
                     height: 50,
                     child: Container(
                       decoration: BoxDecoration(
-                          gradient: MediColors.primaryGradient,
+                          gradient: colors.primaryGradient,
                           borderRadius: BorderRadius.circular(12)),
                       child: FilledButton.icon(
                         style: FilledButton.styleFrom(
@@ -202,17 +203,17 @@ class _AIForecastPageState extends ConsumerState<AIForecastPage> {
                     Container(
                       padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(
-                        color: MediColors.successSubtle,
+                        color: colors.successSubtle,
                         borderRadius: BorderRadius.circular(10),
-                        border: Border.all(color: MediColors.successBorder),
+                        border: Border.all(color: colors.successBorder),
                       ),
                       child: Row(children: [
-                        const Icon(Icons.check_circle_rounded,
-                            color: MediColors.success, size: 16),
+                        Icon(Icons.check_circle_rounded,
+                            color: colors.success, size: 16),
                         const SizedBox(width: 8),
                         Text('${_historicalData.length} days loaded',
-                            style: const TextStyle(
-                                color: MediColors.success, fontSize: 12)),
+                            style:
+                                TextStyle(color: colors.success, fontSize: 12)),
                       ]),
                     ),
                   ],
@@ -228,24 +229,24 @@ class _AIForecastPageState extends ConsumerState<AIForecastPage> {
                   height: 380,
                   padding: const EdgeInsets.all(24),
                   decoration: BoxDecoration(
-                    color: MediColors.surface,
+                    color: colors.surface,
                     borderRadius: BorderRadius.circular(18),
-                    border: Border.all(color: MediColors.border),
+                    border: Border.all(color: colors.border),
                   ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Row(children: [
-                        const Text('Usage Trend',
+                        Text('Usage Trend',
                             style: TextStyle(
                                 fontSize: 17,
                                 fontWeight: FontWeight.w700,
-                                color: MediColors.textPrimary)),
+                                color: colors.textPrimary)),
                         const Spacer(),
-                        _buildLegendDot(MediColors.info, 'Historical'),
+                        _buildLegendDot(colors.info, 'Historical', colors),
                         if (_forecastResult != null) ...[
                           const SizedBox(width: 16),
-                          _buildLegendDot(MediColors.violet, 'Forecast')
+                          _buildLegendDot(colors.violet, 'Forecast', colors)
                         ],
                       ]),
                       const SizedBox(height: 20),
@@ -260,12 +261,11 @@ class _AIForecastPageState extends ConsumerState<AIForecastPage> {
                                         child: Text(
                                           'Failed to load historical data.\n$_historyError',
                                           textAlign: TextAlign.center,
-                                          style: const TextStyle(
-                                              color: MediColors.error),
+                                          style: TextStyle(color: colors.error),
                                         ),
                                       ),
                                     )
-                                  : _buildChart()),
+                                  : _buildChart(colors)),
                     ],
                   ),
                 ),
@@ -275,10 +275,10 @@ class _AIForecastPageState extends ConsumerState<AIForecastPage> {
                   width: double.infinity,
                   padding: const EdgeInsets.all(24),
                   decoration: BoxDecoration(
-                    color: MediColors.primary.withValues(alpha: 0.06),
+                    color: colors.primary.withValues(alpha: 0.06),
                     borderRadius: BorderRadius.circular(18),
                     border: Border.all(
-                        color: MediColors.primary.withValues(alpha: 0.15)),
+                        color: colors.primary.withValues(alpha: 0.15)),
                   ),
                   child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -287,34 +287,34 @@ class _AIForecastPageState extends ConsumerState<AIForecastPage> {
                           Container(
                             padding: const EdgeInsets.all(8),
                             decoration: BoxDecoration(
-                                gradient: MediColors.primaryGradient,
+                                gradient: colors.primaryGradient,
                                 borderRadius: BorderRadius.circular(10)),
                             child: const Icon(Icons.psychology_rounded,
                                 color: Colors.white, size: 20),
                           ),
                           const SizedBox(width: 12),
-                          const Text('AI Insight',
+                          Text('AI Insight',
                               style: TextStyle(
                                   fontSize: 17,
                                   fontWeight: FontWeight.w700,
-                                  color: MediColors.primary)),
+                                  color: colors.primary)),
                         ]),
                         const SizedBox(height: 16),
                         if (_forecastResult == null)
-                          const Text(
+                          Text(
                               'Run the forecaster to see AI-powered demand predictions.',
-                              style: TextStyle(color: MediColors.textPrimary))
+                              style: TextStyle(color: colors.textPrimary))
                         else ...[
                           Text(
                               'Predicted: ${_forecastResult!['prediction']} units over $_forecastDays days',
-                              style: const TextStyle(
+                              style: TextStyle(
                                   fontSize: 20,
                                   fontWeight: FontWeight.w800,
-                                  color: MediColors.primary)),
+                                  color: colors.primary)),
                           const SizedBox(height: 8),
                           Text('${_forecastResult!['reasoning']}',
-                              style: const TextStyle(
-                                  color: MediColors.textPrimary, height: 1.6)),
+                              style: TextStyle(
+                                  color: colors.textPrimary, height: 1.6)),
                         ],
                       ]),
                 ),
@@ -334,7 +334,7 @@ class _AIForecastPageState extends ConsumerState<AIForecastPage> {
     );
   }
 
-  Widget _buildLegendDot(Color color, String label) {
+  Widget _buildLegendDot(Color color, String label, MediFlowTheme colors) {
     return Semantics(
       label: '$label series',
       child: ExcludeSemantics(
@@ -345,15 +345,13 @@ class _AIForecastPageState extends ConsumerState<AIForecastPage> {
               decoration: BoxDecoration(
                   color: color, borderRadius: BorderRadius.circular(3))),
           const SizedBox(width: 6),
-          Text(label,
-              style:
-                  const TextStyle(fontSize: 12, color: MediColors.textMuted)),
+          Text(label, style: TextStyle(fontSize: 12, color: colors.textMuted)),
         ]),
       ),
     );
   }
 
-  Widget _buildChart() {
+  Widget _buildChart(MediFlowTheme colors) {
     final historicalSpots = _historicalData.isNotEmpty
         ? _historicalData
             .asMap()
@@ -397,7 +395,7 @@ class _AIForecastPageState extends ConsumerState<AIForecastPage> {
         show: true,
         drawVerticalLine: false,
         getDrawingHorizontalLine: (value) =>
-            FlLine(color: MediColors.border, strokeWidth: 0.5),
+            FlLine(color: colors.border, strokeWidth: 0.5),
       ),
       titlesData: FlTitlesData(
         rightTitles:
@@ -408,8 +406,7 @@ class _AIForecastPageState extends ConsumerState<AIForecastPage> {
           showTitles: true,
           reservedSize: 40,
           getTitlesWidget: (v, _) => Text(v.toStringAsFixed(0),
-              style:
-                  const TextStyle(fontSize: 10, color: MediColors.textMuted)),
+              style: TextStyle(fontSize: 10, color: colors.textMuted)),
         )),
         bottomTitles: AxisTitles(
             sideTitles: SideTitles(
@@ -419,12 +416,12 @@ class _AIForecastPageState extends ConsumerState<AIForecastPage> {
             final idx = v.toInt();
             if (_historicalData.isEmpty) return const Text('');
             if (idx == 0) {
-              return const Text('D-30',
-                  style: TextStyle(fontSize: 10, color: MediColors.textMuted));
+              return Text('D-30',
+                  style: TextStyle(fontSize: 10, color: colors.textMuted));
             }
             if (idx == _historicalData.length - 1) {
-              return const Text('Today',
-                  style: TextStyle(fontSize: 10, color: MediColors.textMuted));
+              return Text('Today',
+                  style: TextStyle(fontSize: 10, color: colors.textMuted));
             }
             return const Text('');
           },
@@ -435,18 +432,18 @@ class _AIForecastPageState extends ConsumerState<AIForecastPage> {
         LineChartBarData(
           spots: historicalSpots,
           isCurved: true,
-          color: MediColors.info,
+          color: colors.info,
           barWidth: 2.5,
           isStrokeCapRound: true,
           dotData: const FlDotData(show: false),
           belowBarData: BarAreaData(
-              show: true, color: MediColors.info.withValues(alpha: 0.08)),
+              show: true, color: colors.info.withValues(alpha: 0.08)),
         ),
         if (forecastSpots.isNotEmpty)
           LineChartBarData(
             spots: forecastSpots,
             isCurved: true,
-            color: MediColors.violet,
+            color: colors.violet,
             barWidth: 2.5,
             isStrokeCapRound: true,
             dashArray: [6, 4],

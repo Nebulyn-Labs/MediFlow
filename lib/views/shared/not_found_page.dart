@@ -1,14 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-import 'package:med_supply_prototype/constants/colors.dart';
+import 'package:med_supply_prototype/theme/medi_flow_theme.dart';
 
 class NotFoundPage extends StatelessWidget {
   const NotFoundPage({super.key});
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.mediTheme;
+
     return Scaffold(
-      backgroundColor: MediColors.bg,
+      backgroundColor: colors.background,
       body: Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -16,7 +18,7 @@ class NotFoundPage extends StatelessWidget {
             Icon(
               Icons.error_outline,
               size: 80,
-              color: MediColors.error,
+              color: colors.error,
             ),
             const SizedBox(height: 24),
             Text(
@@ -24,7 +26,7 @@ class NotFoundPage extends StatelessWidget {
               style: TextStyle(
                 fontSize: 24,
                 fontWeight: FontWeight.w700,
-                color: MediColors.textPrimary,
+                color: colors.textPrimary,
               ),
             ),
             const SizedBox(height: 8),
@@ -32,7 +34,7 @@ class NotFoundPage extends StatelessWidget {
               'The page you are looking for does not exist.',
               style: TextStyle(
                 fontSize: 16,
-                color: MediColors.textMuted,
+                color: colors.textMuted,
               ),
             ),
             const SizedBox(height: 16),

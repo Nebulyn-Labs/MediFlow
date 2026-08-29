@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:med_supply_prototype/constants/colors.dart';
+import 'package:med_supply_prototype/theme/medi_flow_theme.dart';
 
 import 'alerts_page.dart';
 import '../shared/notification_feed_widget.dart';
@@ -13,41 +13,42 @@ class AlertsHubPage extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final colors = context.mediTheme;
+
     return DefaultTabController(
       length: 2,
       child: Scaffold(
-        backgroundColor: MediColors.bg,
+        backgroundColor: colors.background,
         appBar: AppBar(
           title: Row(
             children: [
-              const Text('Alerts & Notifications',
+              Text('Alerts & Notifications',
                   style: TextStyle(
-                      fontWeight: FontWeight.w800,
-                      color: MediColors.textPrimary)),
+                      fontWeight: FontWeight.w800, color: colors.textPrimary)),
               const SizedBox(width: 12),
               Container(
                 padding:
                     const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                 decoration: BoxDecoration(
-                  color: MediColors.info.withValues(alpha: 0.12),
+                  color: colors.info.withValues(alpha: 0.12),
                   borderRadius: BorderRadius.circular(6),
                 ),
                 child: Text(
                   facilityId.replaceAll('_', ' ').toUpperCase(),
-                  style: const TextStyle(
+                  style: TextStyle(
                       fontSize: 12,
-                      color: MediColors.info,
+                      color: colors.info,
                       fontWeight: FontWeight.w600),
                 ),
               ),
             ],
           ),
-          bottom: const TabBar(
-            indicatorColor: MediColors.primary,
-            labelColor: MediColors.primary,
-            unselectedLabelColor: MediColors.textSecondary,
-            dividerColor: MediColors.border,
-            tabs: [
+          bottom: TabBar(
+            indicatorColor: colors.primary,
+            labelColor: colors.primary,
+            unselectedLabelColor: colors.textSecondary,
+            dividerColor: colors.border,
+            tabs: const [
               Tab(
                   text: 'Live Feed',
                   icon: Icon(Icons.notifications_active_rounded)),

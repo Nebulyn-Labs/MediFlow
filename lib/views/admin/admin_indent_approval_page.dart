@@ -5,6 +5,7 @@ import '../../services/ai_service.dart';
 import '../../services/csv_export_service.dart';
 import '../../models/request.dart';
 import 'package:med_supply_prototype/constants/colors.dart';
+import 'package:med_supply_prototype/theme/medi_flow_theme.dart';
 import '../shared/skeleton_loaders.dart';
 
 class AdminIndentApprovalPage extends ConsumerStatefulWidget {
@@ -298,8 +299,10 @@ class _AdminIndentApprovalPageState
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.mediTheme;
+
     return Scaffold(
-      backgroundColor: MediColors.bg,
+      backgroundColor: colors.background,
       appBar: AppBar(title: const Text('Pending Requests Approval')),
       body: StreamBuilder<List<MedRequest>>(
         stream: _requestsStream,
@@ -311,9 +314,9 @@ class _AdminIndentApprovalPageState
           final pending = MedRequest.filterPending(snapshot.data ?? const []);
 
           if (pending.isEmpty) {
-            return const Center(
+            return Center(
                 child: Text('No pending requests.',
-                    style: TextStyle(color: MediColors.textMuted)));
+                    style: TextStyle(color: colors.textMuted)));
           }
 
           final pendingIds = pending.map((e) => e.id).toSet();
@@ -329,7 +332,7 @@ class _AdminIndentApprovalPageState
               Container(
                 padding:
                     const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                color: MediColors.surface,
+                color: colors.surface,
                 child: Row(
                   children: [
                     Row(
@@ -351,8 +354,8 @@ class _AdminIndentApprovalPageState
                         ),
                         Text(
                           'Select All (${validSelected.length}/${pending.length})',
-                          style: const TextStyle(
-                            color: MediColors.textPrimary,
+                          style: TextStyle(
+                            color: colors.textPrimary,
                             fontWeight: FontWeight.w600,
                           ),
                         ),
@@ -373,8 +376,8 @@ class _AdminIndentApprovalPageState
                           : const Icon(Icons.file_download_outlined, size: 16),
                       label: const Text('Export CSV'),
                       style: OutlinedButton.styleFrom(
-                        foregroundColor: MediColors.textSecondary,
-                        side: const BorderSide(color: MediColors.border),
+                        foregroundColor: colors.textSecondary,
+                        side: BorderSide(color: colors.border),
                         shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(10)),
                       ),
@@ -388,7 +391,7 @@ class _AdminIndentApprovalPageState
                       icon: const Icon(Icons.auto_awesome, size: 16),
                       label: const Text('Bulk Analyze'),
                       style: OutlinedButton.styleFrom(
-                        foregroundColor: MediColors.primaryLight,
+                        foregroundColor: colors.primaryLight,
                       ),
                     ),
                     const SizedBox(width: 8),
@@ -401,7 +404,7 @@ class _AdminIndentApprovalPageState
                       icon: const Icon(Icons.close, size: 16),
                       label: const Text('Bulk Decline'),
                       style: TextButton.styleFrom(
-                        foregroundColor: MediColors.error,
+                        foregroundColor: colors.error,
                       ),
                     ),
                     const SizedBox(width: 8),
@@ -414,13 +417,13 @@ class _AdminIndentApprovalPageState
                       icon: const Icon(Icons.check, size: 16),
                       label: const Text('Bulk Approve'),
                       style: FilledButton.styleFrom(
-                        backgroundColor: MediColors.success,
+                        backgroundColor: colors.success,
                       ),
                     ),
                   ],
                 ),
               ),
-              const Divider(height: 1, thickness: 1, color: MediColors.border),
+              Divider(height: 1, thickness: 1, color: colors.border),
               Expanded(
                 child: ListView.builder(
                   padding: const EdgeInsets.all(24),
@@ -434,12 +437,11 @@ class _AdminIndentApprovalPageState
 
                     return Card(
                       margin: const EdgeInsets.only(bottom: 20),
+                      color: colors.surface,
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(12),
                         side: BorderSide(
-                          color: isSelected
-                              ? MediColors.primary
-                              : MediColors.border,
+                          color: isSelected ? colors.primary : colors.border,
                           width: isSelected ? 2 : 1,
                         ),
                       ),
@@ -475,18 +477,18 @@ class _AdminIndentApprovalPageState
                                         ),
                                         const SizedBox(width: 8),
                                         Text(req.medicineName,
-                                            style: const TextStyle(
+                                            style: TextStyle(
                                                 fontSize: 18,
                                                 fontWeight: FontWeight.bold,
-                                                color: MediColors.textPrimary)),
+                                                color: colors.textPrimary)),
                                         const SizedBox(width: 12),
                                         Container(
                                           padding: const EdgeInsets.symmetric(
                                               horizontal: 8, vertical: 4),
                                           decoration: BoxDecoration(
                                             color: isRedistribution
-                                                ? MediColors.successOverlay
-                                                : MediColors.errorOverlay,
+                                                ? colors.successOverlay
+                                                : colors.errorOverlay,
                                             borderRadius:
                                                 BorderRadius.circular(6),
                                           ),
@@ -496,8 +498,8 @@ class _AdminIndentApprovalPageState
                                                 : 'RESTOCK REQUEST',
                                             style: TextStyle(
                                               color: isRedistribution
-                                                  ? MediColors.success
-                                                  : MediColors.error,
+                                                  ? colors.success
+                                                  : colors.error,
                                               fontSize: 10,
                                               fontWeight: FontWeight.bold,
                                             ),
@@ -508,8 +510,8 @@ class _AdminIndentApprovalPageState
                                     const SizedBox(height: 4),
                                     Text(
                                         'Facility: ${req.facilityId.replaceAll('_', ' ').toUpperCase()}',
-                                        style: const TextStyle(
-                                            color: MediColors.primaryLight,
+                                        style: TextStyle(
+                                            color: colors.primaryLight,
                                             fontWeight: FontWeight.w600,
                                             fontSize: 12)),
                                   ],
@@ -518,26 +520,26 @@ class _AdminIndentApprovalPageState
                                   padding: const EdgeInsets.symmetric(
                                       horizontal: 16, vertical: 8),
                                   decoration: BoxDecoration(
-                                      color: MediColors.surfaceLight,
+                                      color: colors.surfaceLight,
                                       borderRadius: BorderRadius.circular(8)),
                                   child: Text('${req.quantity} Units',
-                                      style: const TextStyle(
+                                      style: TextStyle(
                                           fontSize: 16,
                                           fontWeight: FontWeight.w800,
-                                          color: MediColors.textPrimary)),
+                                          color: colors.textPrimary)),
                                 ),
                               ],
                             ),
                             const SizedBox(height: 16),
                             if (req.notes != null)
                               Text('Facility Notes: ${req.notes}',
-                                  style: const TextStyle(
-                                      color: MediColors.textSecondary,
+                                  style: TextStyle(
+                                      color: colors.textSecondary,
                                       fontSize: 13,
                                       fontStyle: FontStyle.italic)),
 
                             const SizedBox(height: 24),
-                            const Divider(),
+                            Divider(color: colors.border),
                             const SizedBox(height: 16),
 
                             // AI Suggestion Box
@@ -548,19 +550,19 @@ class _AdminIndentApprovalPageState
                                 margin: const EdgeInsets.only(bottom: 20),
                                 decoration: BoxDecoration(
                                   color: suggestion.contains('✅')
-                                      ? MediColors.successOverlay
-                                      : MediColors.warningOverlay,
+                                      ? colors.successOverlay
+                                      : colors.warningOverlay,
                                   borderRadius: BorderRadius.circular(12),
                                   border: Border.all(
                                       color: suggestion.contains('✅')
-                                          ? MediColors.success
+                                          ? colors.success
                                               .withValues(alpha: 0.3)
-                                          : MediColors.warning
+                                          : colors.warning
                                               .withValues(alpha: 0.3)),
                                 ),
                                 child: Text(suggestion,
-                                    style: const TextStyle(
-                                        color: MediColors.textPrimary,
+                                    style: TextStyle(
+                                        color: colors.textPrimary,
                                         fontWeight: FontWeight.w500)),
                               ),
 
@@ -581,7 +583,7 @@ class _AdminIndentApprovalPageState
                                           size: 16),
                                   label: const Text('Analyze with AI'),
                                   style: OutlinedButton.styleFrom(
-                                      foregroundColor: MediColors.primaryLight),
+                                      foregroundColor: colors.primaryLight),
                                 ),
                                 const Spacer(),
                                 TextButton(
@@ -590,7 +592,7 @@ class _AdminIndentApprovalPageState
                                       : () => _updateStatus(
                                           req, RequestStatus.rejected),
                                   style: TextButton.styleFrom(
-                                      foregroundColor: MediColors.error),
+                                      foregroundColor: colors.error),
                                   child: const Text('Decline'),
                                 ),
                                 const SizedBox(width: 12),
@@ -600,7 +602,7 @@ class _AdminIndentApprovalPageState
                                       : () => _updateStatus(
                                           req, RequestStatus.approved),
                                   style: FilledButton.styleFrom(
-                                      backgroundColor: MediColors.success),
+                                      backgroundColor: colors.success),
                                   child: const Text('Approve'),
                                 ),
                               ],

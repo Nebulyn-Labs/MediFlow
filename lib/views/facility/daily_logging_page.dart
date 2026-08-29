@@ -11,6 +11,7 @@ import '../../services/csv_export_service.dart';
 import '../../services/ai_service.dart';
 import '../../services/connectivity_service.dart';
 import 'package:med_supply_prototype/constants/colors.dart';
+import 'package:med_supply_prototype/theme/medi_flow_theme.dart';
 import '../shared/connectivity_indicator.dart';
 import '../shared/skeleton_loaders.dart';
 import '../../utils/retry_snackbar.dart';
@@ -642,9 +643,10 @@ class _DailyLoggingPageState extends ConsumerState<DailyLoggingPage>
       }
     });
     final isOnline = ref.watch(isOnlineProvider);
+    final colors = context.mediTheme;
 
     return Scaffold(
-      backgroundColor: MediColors.bg,
+      backgroundColor: colors.background,
       appBar: AppBar(
         title: const Text('Daily Logging'),
         actions: [

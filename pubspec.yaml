@@ -40,6 +40,7 @@ dependencies:
   vector_math: ^2.2.0
   connectivity_plus: ^7.3.1
   flutter_markdown_plus: ^1.0.6
+  shared_preferences: ^2.3.5
 
 dev_dependencies:
   flutter_test:

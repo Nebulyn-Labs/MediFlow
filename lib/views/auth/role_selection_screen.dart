@@ -5,6 +5,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:vector_math/vector_math_64.dart' show Vector3;
 import '../../services/firebase_service.dart';
 import 'package:med_supply_prototype/constants/colors.dart';
+import 'package:med_supply_prototype/theme/medi_flow_theme.dart';
+import 'package:med_supply_prototype/theme/theme_provider.dart';
 import 'dart:math' as math;
 
 class RoleSelectionScreen extends StatefulWidget {
@@ -39,8 +41,9 @@ class _RoleSelectionScreenState extends State<RoleSelectionScreen>
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.mediTheme;
     return Scaffold(
-      backgroundColor: MediColors.bg,
+      backgroundColor: colors.background,
       body: Row(
         children: [
           // Left: Animated brand side
@@ -166,110 +169,160 @@ class _RoleSelectionScreenState extends State<RoleSelectionScreen>
           // Right: Role selection
           Expanded(
             child: Container(
-              color: MediColors.bg,
-              child: Center(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    const Text(
-                      'Welcome Back',
-                      style: TextStyle(
-                          fontSize: 32,
-                          fontWeight: FontWeight.w800,
-                          color: MediColors.textPrimary),
+              color: colors.background,
+              child: Stack(
+                children: [
+                  Positioned(
+                    top: 24,
+                    right: 24,
+                    child: Consumer(
+                      builder: (context, ref, _) {
+                        final themeMode = ref.watch(themeModeProvider);
+                        final isDark = themeMode == ThemeMode.dark ||
+                            (themeMode == ThemeMode.system &&
+                                MediaQuery.of(context).platformBrightness ==
+                                    Brightness.dark);
+                        return Tooltip(
+                          message: isDark
+                              ? 'Switch to Light Mode'
+                              : 'Switch to Dark Mode',
+                          child: InkWell(
+                            key: const Key('home_theme_toggle_button'),
+                            borderRadius: BorderRadius.circular(12),
+                            onTap: () => ref
+                                .read(themeModeProvider.notifier)
+                                .toggleTheme(),
+                            child: Container(
+                              padding: const EdgeInsets.all(10),
+                              decoration: BoxDecoration(
+                                color: colors.surface,
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(color: colors.border),
+                              ),
+                              child: Icon(
+                                isDark
+                                    ? Icons.light_mode_rounded
+                                    : Icons.dark_mode_rounded,
+                                size: 22,
+                                color: isDark
+                                    ? const Color(0xFFFBBF24)
+                                    : colors.primary,
+                              ),
+                            ),
+                          ),
+                        );
+                      },
                     ),
-                    const SizedBox(height: 8),
-                    const Text(
-                      'Choose your portal to continue',
-                      style: TextStyle(
-                          fontSize: 15, color: MediColors.textSecondary),
-                    ),
-                    const SizedBox(height: 48),
-                    _buildRoleCard(
-                      title: 'Facility Head',
-                      subtitle: 'Manage inventory, daily logs & AI indents',
-                      icon: Icons.local_hospital_rounded,
-                      gradient: const LinearGradient(
-                          colors: [Color(0xFF059669), Color(0xFF14B8A6)]),
-                      isHovering: _isHoveringFacility,
-                      isFocused: _isFocusedFacility,
-                      onHover: (val) =>
-                          setState(() => _isHoveringFacility = val),
-                      onFocusChange: (val) =>
-                          setState(() => _isFocusedFacility = val),
-                      onTap: () => context.go('/login/facility'),
-                    ),
-                    const SizedBox(height: 20),
-                    _buildRoleCard(
-                      title: 'CMS Admin',
-                      subtitle: 'Global logistics & redistribution planning',
-                      icon: Icons.admin_panel_settings_rounded,
-                      gradient: MediColors.primaryGradient,
-                      isHovering: _isHoveringAdmin,
-                      isFocused: _isFocusedAdmin,
-                      onHover: (val) => setState(() => _isHoveringAdmin = val),
-                      onFocusChange: (val) =>
-                          setState(() => _isFocusedAdmin = val),
-                      onTap: () => context.go('/login/admin'),
-                    ),
-                    if (kDebugMode) ...[
-                      const SizedBox(height: 48),
-                      Consumer(
-                        builder: (context, ref, child) {
-                          return TextButton.icon(
-                            onPressed: () async {
-                              final messenger = ScaffoldMessenger.of(context);
-                              final confirmed = await showDialog<bool>(
-                                context: context,
-                                builder: (ctx) => AlertDialog(
-                                  title: const Text('Confirm Database Reseed'),
-                                  content: const Text(
-                                    'Warning: This deletes all live data (facilities, inventory, usage logs, and requests) and repopulates demo data. This action cannot be undone.\n\nAre you sure you want to proceed?',
-                                  ),
-                                  actions: [
-                                    TextButton(
-                                      onPressed: () =>
-                                          Navigator.of(ctx).pop(false),
-                                      child: const Text('Cancel'),
-                                    ),
-                                    FilledButton(
-                                      style: FilledButton.styleFrom(
-                                        backgroundColor: Colors.red,
+                  ),
+                  Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Text(
+                          'Welcome Back',
+                          style: TextStyle(
+                              fontSize: 32,
+                              fontWeight: FontWeight.w800,
+                              color: colors.textPrimary),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          'Choose your portal to continue',
+                          style: TextStyle(
+                              fontSize: 15, color: colors.textSecondary),
+                        ),
+                        const SizedBox(height: 48),
+                        _buildRoleCard(
+                          title: 'Facility Head',
+                          subtitle: 'Manage inventory, daily logs & AI indents',
+                          icon: Icons.local_hospital_rounded,
+                          gradient: const LinearGradient(
+                              colors: [Color(0xFF059669), Color(0xFF14B8A6)]),
+                          isHovering: _isHoveringFacility,
+                          isFocused: _isFocusedFacility,
+                          onHover: (val) =>
+                              setState(() => _isHoveringFacility = val),
+                          onFocusChange: (val) =>
+                              setState(() => _isFocusedFacility = val),
+                          onTap: () => context.go('/login/facility'),
+                        ),
+                        const SizedBox(height: 20),
+                        _buildRoleCard(
+                          title: 'CMS Admin',
+                          subtitle:
+                              'Global logistics & redistribution planning',
+                          icon: Icons.admin_panel_settings_rounded,
+                          gradient: colors.primaryGradient,
+                          isHovering: _isHoveringAdmin,
+                          isFocused: _isFocusedAdmin,
+                          onHover: (val) =>
+                              setState(() => _isHoveringAdmin = val),
+                          onFocusChange: (val) =>
+                              setState(() => _isFocusedAdmin = val),
+                          onTap: () => context.go('/login/admin'),
+                        ),
+                        if (kDebugMode) ...[
+                          const SizedBox(height: 48),
+                          Consumer(
+                            builder: (context, ref, child) {
+                              return TextButton.icon(
+                                onPressed: () async {
+                                  final messenger =
+                                      ScaffoldMessenger.of(context);
+                                  final confirmed = await showDialog<bool>(
+                                    context: context,
+                                    builder: (ctx) => AlertDialog(
+                                      title:
+                                          const Text('Confirm Database Reseed'),
+                                      content: const Text(
+                                        'Warning: This deletes all live data (facilities, inventory, usage logs, and requests) and repopulates demo data. This action cannot be undone.\n\nAre you sure you want to proceed?',
                                       ),
-                                      onPressed: () =>
-                                          Navigator.of(ctx).pop(true),
-                                      child: const Text('Wipe & Reseed'),
+                                      actions: [
+                                        TextButton(
+                                          onPressed: () =>
+                                              Navigator.of(ctx).pop(false),
+                                          child: const Text('Cancel'),
+                                        ),
+                                        FilledButton(
+                                          style: FilledButton.styleFrom(
+                                            backgroundColor: Colors.red,
+                                          ),
+                                          onPressed: () =>
+                                              Navigator.of(ctx).pop(true),
+                                          child: const Text('Wipe & Reseed'),
+                                        ),
+                                      ],
                                     ),
-                                  ],
-                                ),
+                                  );
+
+                                  if (confirmed != true) return;
+
+                                  messenger.showSnackBar(const SnackBar(
+                                      content: Text('Seeding demo data...')));
+                                  final error = await ref
+                                      .read(firebaseServiceProvider)
+                                      .seedDemoData();
+                                  if (error != null) {
+                                    messenger.showSnackBar(
+                                        SnackBar(content: Text(error)));
+                                  } else {
+                                    messenger.showSnackBar(const SnackBar(
+                                        content: Text('Demo data seeded ✓')));
+                                  }
+                                },
+                                icon: const Icon(Icons.data_saver_on_rounded,
+                                    size: 16),
+                                label: const Text('Seed Demo Data'),
+                                style: TextButton.styleFrom(
+                                    foregroundColor: MediColors.textMuted),
                               );
-
-                              if (confirmed != true) return;
-
-                              messenger.showSnackBar(const SnackBar(
-                                  content: Text('Seeding demo data...')));
-                              final error = await ref
-                                  .read(firebaseServiceProvider)
-                                  .seedDemoData();
-                              if (error != null) {
-                                messenger.showSnackBar(
-                                    SnackBar(content: Text(error)));
-                              } else {
-                                messenger.showSnackBar(const SnackBar(
-                                    content: Text('Demo data seeded ✓')));
-                              }
                             },
-                            icon: const Icon(Icons.data_saver_on_rounded,
-                                size: 16),
-                            label: const Text('Seed Demo Data'),
-                            style: TextButton.styleFrom(
-                                foregroundColor: MediColors.textMuted),
-                          );
-                        },
-                      ),
-                    ],
-                  ],
-                ),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                ],
               ),
             ),
           ),
@@ -312,10 +365,10 @@ class _RoleSelectionScreenState extends State<RoleSelectionScreen>
     // gives a clean single label that reads "Facility Head, Manage
     // inventory, daily logs & AI indents, button" instead of the bare text
     // labels the previous GestureDetector surfaced.
+    final colors = context.mediTheme;
     final isActive = isHovering || isFocused;
-    final borderColor = isActive
-        ? gradient.colors.first.withValues(alpha: 0.5)
-        : MediColors.border;
+    final borderColor =
+        isActive ? gradient.colors.first.withValues(alpha: 0.5) : colors.border;
     final shadow = isActive
         ? [
             BoxShadow(
@@ -345,7 +398,7 @@ class _RoleSelectionScreenState extends State<RoleSelectionScreen>
               transform:
                   Matrix4.translation(Vector3(0.0, isActive ? -4.0 : 0.0, 0.0)),
               decoration: BoxDecoration(
-                color: MediColors.surface,
+                color: colors.surface,
                 borderRadius: BorderRadius.circular(20),
                 border: Border.all(color: borderColor, width: 1.5),
                 boxShadow: shadow,
@@ -366,22 +419,21 @@ class _RoleSelectionScreenState extends State<RoleSelectionScreen>
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(title,
-                            style: const TextStyle(
+                            style: TextStyle(
                                 fontSize: 18,
                                 fontWeight: FontWeight.w700,
-                                color: MediColors.textPrimary)),
+                                color: colors.textPrimary)),
                         const SizedBox(height: 4),
                         Text(subtitle,
-                            style: const TextStyle(
-                                fontSize: 13, color: MediColors.textSecondary)),
+                            style: TextStyle(
+                                fontSize: 13, color: colors.textSecondary)),
                       ],
                     ),
                   ),
                   Icon(
                     Icons.arrow_forward_ios_rounded,
                     size: 16,
-                    color:
-                        isActive ? gradient.colors.first : MediColors.textMuted,
+                    color: isActive ? gradient.colors.first : colors.textMuted,
                   ),
                 ],
               ),

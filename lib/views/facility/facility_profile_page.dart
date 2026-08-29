@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:med_supply_prototype/constants/colors.dart';
+import 'package:med_supply_prototype/theme/medi_flow_theme.dart';
 import 'package:med_supply_prototype/services/firebase_service.dart';
 import 'package:med_supply_prototype/models/facility.dart';
 import 'package:intl/intl.dart';
@@ -111,6 +112,8 @@ class _FacilityProfilePageState extends ConsumerState<FacilityProfilePage> {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.mediTheme;
+
     if (_isLoading) {
       return const Center(child: CircularProgressIndicator());
     }
@@ -122,26 +125,26 @@ class _FacilityProfilePageState extends ConsumerState<FacilityProfilePage> {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              const Icon(
+              Icon(
                 Icons.error_outline_rounded,
-                color: MediColors.error,
+                color: colors.error,
                 size: 48,
               ),
               const SizedBox(height: 16),
-              const Text(
+              Text(
                 'Failed to load facility',
                 style: TextStyle(
                   fontSize: 20,
                   fontWeight: FontWeight.bold,
-                  color: MediColors.textPrimary,
+                  color: colors.textPrimary,
                 ),
               ),
               const SizedBox(height: 8),
               Text(
                 _error.toString(),
                 textAlign: TextAlign.center,
-                style: const TextStyle(
-                  color: MediColors.textSecondary,
+                style: TextStyle(
+                  color: colors.textSecondary,
                   fontSize: 14,
                 ),
               ),
@@ -151,7 +154,7 @@ class _FacilityProfilePageState extends ConsumerState<FacilityProfilePage> {
                 icon: const Icon(Icons.refresh_rounded),
                 label: const Text('Retry'),
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: MediColors.primary,
+                  backgroundColor: colors.primary,
                   foregroundColor: Colors.white,
                 ),
               ),
@@ -171,12 +174,12 @@ class _FacilityProfilePageState extends ConsumerState<FacilityProfilePage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text(
+            Text(
               'Profile & Settings',
               style: TextStyle(
                 fontSize: 28,
                 fontWeight: FontWeight.bold,
-                color: MediColors.textPrimary,
+                color: colors.textPrimary,
               ),
             ),
             const SizedBox(height: 32),
@@ -231,16 +234,23 @@ class _FacilityProfilePageState extends ConsumerState<FacilityProfilePage> {
                             ),
                           ),
                           const SizedBox(height: 16),
-                          _buildReadOnlyField('Email', _facility!.email),
+                          _buildReadOnlyField(
+                              'Email', _facility!.email, colors),
                           const SizedBox(height: 12),
-                          _buildReadOnlyField('Facility Type',
-                              _facility!.type.toFirestore().toUpperCase()),
+                          _buildReadOnlyField(
+                              'Facility Type',
+                              _facility!.type.toFirestore().toUpperCase(),
+                              colors),
                           const SizedBox(height: 12),
-                          _buildReadOnlyField('Coordinates',
-                              '${_facility!.latitude.toStringAsFixed(4)}, ${_facility!.longitude.toStringAsFixed(4)}'),
+                          _buildReadOnlyField(
+                              'Coordinates',
+                              '${_facility!.latitude.toStringAsFixed(4)}, ${_facility!.longitude.toStringAsFixed(4)}',
+                              colors),
                           const SizedBox(height: 12),
-                          _buildReadOnlyField('Created At',
-                              DateFormat('yMMMd').format(_facility!.createdAt)),
+                          _buildReadOnlyField(
+                              'Created At',
+                              DateFormat('yMMMd').format(_facility!.createdAt),
+                              colors),
                           const SizedBox(height: 32),
                           SizedBox(
                             width: double.infinity,
@@ -271,7 +281,7 @@ class _FacilityProfilePageState extends ConsumerState<FacilityProfilePage> {
     );
   }
 
-  Widget _buildReadOnlyField(String label, String value) {
+  Widget _buildReadOnlyField(String label, String value, MediFlowTheme colors) {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -279,8 +289,8 @@ class _FacilityProfilePageState extends ConsumerState<FacilityProfilePage> {
           width: 140,
           child: Text(
             label,
-            style: const TextStyle(
-              color: MediColors.textSecondary,
+            style: TextStyle(
+              color: colors.textSecondary,
               fontWeight: FontWeight.w500,
             ),
           ),
@@ -288,8 +298,8 @@ class _FacilityProfilePageState extends ConsumerState<FacilityProfilePage> {
         Expanded(
           child: Text(
             value,
-            style: const TextStyle(
-              color: MediColors.textPrimary,
+            style: TextStyle(
+              color: colors.textPrimary,
               fontWeight: FontWeight.w500,
             ),
           ),
