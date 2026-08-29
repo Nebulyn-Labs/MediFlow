@@ -13,6 +13,10 @@ enum RequestStatus {
   draft,
   pending,
   approved,
+  dispatched,
+  inTransit,
+  received,
+  verified,
   fulfilled,
   rejected,
   needsManualReview
@@ -32,6 +36,14 @@ extension RequestStatusLabel on RequestStatus {
         return 'Pending';
       case RequestStatus.approved:
         return 'Approved';
+      case RequestStatus.dispatched:
+        return 'Dispatched';
+      case RequestStatus.inTransit:
+        return 'In Transit';
+      case RequestStatus.received:
+        return 'Received';
+      case RequestStatus.verified:
+        return 'Verified';
       case RequestStatus.fulfilled:
         return 'Fulfilled';
       case RequestStatus.rejected:
@@ -51,6 +63,7 @@ class MedRequest {
   final DateTime requestDate;
   final RequestStatus status;
   final String? notes;
+  final String? batchId;
   final String? rejectionReason;
   final DateTime? resolvedAt;
 
@@ -63,6 +76,7 @@ class MedRequest {
     required this.requestDate,
     required this.status,
     this.notes,
+    this.batchId,
     this.rejectionReason,
     this.resolvedAt,
   });
@@ -121,6 +135,7 @@ class MedRequest {
       status: RequestStatus.values.firstWhere((e) => e.name == map['status'],
           orElse: () => RequestStatus.pending),
       notes: map['notes']?.toString(),
+      batchId: map['batchId']?.toString(),
       rejectionReason: map['rejectionReason']?.toString(),
       resolvedAt: map['resolvedAt'] is Timestamp
           ? (map['resolvedAt'] as Timestamp).toDate()
@@ -142,6 +157,7 @@ class MedRequest {
       'requestDate': Timestamp.fromDate(requestDate),
       'status': status.name,
       'notes': notes,
+      if (batchId != null) 'batchId': batchId,
       if (rejectionReason != null) 'rejectionReason': rejectionReason,
       if (resolvedAt != null) 'resolvedAt': Timestamp.fromDate(resolvedAt!),
     };

@@ -15,6 +15,33 @@ void main() {
     simulationService = SimulationService(fakeFirestore);
   });
 
+  group('SimulationService - Single Source of Truth Catalog', () {
+    test('demoMedicineCatalog single source of truth is consistent', () {
+      expect(SimulationService.demoMedicineCatalog, isNotEmpty);
+      expect(
+        SimulationService.demoMedicineCatalog.keys,
+        containsAll([
+          'Paracetamol',
+          'Cough Syrup',
+          'ORS',
+          'Antibiotic',
+          'Vitamin Tablets',
+          'Metformin 500mg',
+          'Iron Folic Acid',
+          'Amoxicillin 250mg',
+        ]),
+      );
+      expect(
+        SimulationService.demoMedicineNames,
+        equals(SimulationService.demoMedicineCatalog.keys.toList()),
+      );
+      expect(
+        SimulationService.defaultDemoFacilityId,
+        equals('rampur_mediflow_com'),
+      );
+    });
+  });
+
   group('SimulationService - Profile Generation', () {
     test(
         'generateRealisticProfile generates valid fields with random type when unassigned',
@@ -67,18 +94,10 @@ void main() {
           .collection('medicines')
           .get();
 
-      expect(inventorySnapshot.docs.length, equals(8));
+      expect(inventorySnapshot.docs.length,
+          equals(SimulationService.demoMedicineCatalog.length));
 
-      final expectedMedicines = [
-        'Paracetamol',
-        'Cough Syrup',
-        'ORS',
-        'Antibiotic',
-        'Vitamin Tablets',
-        'Metformin 500mg',
-        'Iron Folic Acid',
-        'Amoxicillin 250mg'
-      ];
+      final expectedMedicines = SimulationService.demoMedicineNames;
 
       final medicineNames = inventorySnapshot.docs
           .map((doc) => doc.data()['medicineName'])
@@ -116,7 +135,8 @@ void main() {
         expect(data['totalPatients'], lessThan(250));
 
         final medicinesList = data['medicines'] as List;
-        expect(medicinesList.length, equals(8));
+        expect(medicinesList.length,
+            equals(SimulationService.demoMedicineCatalog.length));
 
         final usages = medicinesList
             .map((m) =>
@@ -151,9 +171,9 @@ void main() {
     });
 
     test(
-        'runFullSimulation applies hardcoded health persona for rampur_mediflow_com',
+        'runFullSimulation applies hardcoded health persona for default demo facility',
         () async {
-      const facilityId = 'rampur_mediflow_com';
+      const facilityId = SimulationService.defaultDemoFacilityId;
       await simulationService.runFullSimulation(facilityId, FacilityType.rural);
 
       final inventorySnapshot = await fakeFirestore
@@ -191,6 +211,35 @@ void main() {
     });
 
     test(
+        'runFullSimulation with custom demoFacilityId parameter applies demo persona',
+        () async {
+      const customDemoId = 'custom_demo_facility';
+
+      await simulationService.runFullSimulation(
+        customDemoId,
+        FacilityType.urban,
+        demoFacilityId: customDemoId,
+      );
+
+      final invSnapshot = await fakeFirestore
+          .collection('inventory')
+          .doc(customDemoId)
+          .collection('medicines')
+          .get();
+
+      expect(invSnapshot.docs.length,
+          equals(SimulationService.demoMedicineCatalog.length));
+
+      // ORS demo persona sets remaining to 95% of initial
+      final orsDoc = invSnapshot.docs.firstWhere(
+        (doc) => doc.data()['medicineName'] == 'ORS',
+      );
+      final int initial = orsDoc.data()['initialQuantity'] as int;
+      final int remaining = orsDoc.data()['remainingQuantity'] as int;
+      expect(remaining, equals((initial * 0.95).round()));
+    });
+
+    test(
         're-running simulation updates inventory without creating duplicate docs',
         () async {
       const facilityId = 'repeat_sim_facility';
@@ -221,9 +270,6 @@ void main() {
 
   group('simulationServiceProvider', () {
     test('provides SimulationService instance via Riverpod container', () {
-      // Override with the fake-backed instance so the provider does not
-      // construct a real Firestore connection (which would throw
-      // "No Firebase App '[DEFAULT]' has been created").
       final container = ProviderContainer(
         overrides: [
           simulationServiceProvider.overrideWithValue(simulationService),

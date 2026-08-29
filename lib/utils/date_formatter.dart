@@ -6,6 +6,11 @@ class DateFormatter {
     return DateFormat('dd/MM/yyyy').format(date);
   }
 
+  /// Formats a [DateTime] into a time string format (e.g., "14:30").
+  static String formatTime(DateTime date) {
+    return DateFormat('HH:mm').format(date);
+  }
+
   /// Formats a nullable [DateTime], returning a fallback string if null.
   static String formatNullableDate(DateTime? date, {String fallback = '—'}) {
     if (date == null) return fallback;

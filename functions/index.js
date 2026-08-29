@@ -479,9 +479,9 @@ exports.checkLowStock = onSchedule("every 24 hours", async () => {
 
 /**
  * 3. autoRedistribute(requestId)
- * Atomic stock transfer when a request is approved.
+ * Atomic stock transfer when a request is verified (recipient confirms delivery).
  */
-exports.onIndentApproved = onDocumentUpdated(
+exports.onTransferVerified = onDocumentUpdated(
   {
     document: "requests/{requestId}",
     retry: true,
@@ -500,8 +500,8 @@ exports.onIndentApproved = onDocumentUpdated(
   const beforeStatus = beforeData ? beforeData.status : null;
   const afterStatus = afterData.status;
 
-  // Execute only when request transitions to 'approved' status
-  if (beforeStatus !== "approved" && afterStatus === "approved") {
+  // Execute only when request transitions to 'verified' status
+  if (beforeStatus !== "verified" && afterStatus === "verified") {
     const db = admin.firestore();
     const requestId = event.params.requestId;
 
@@ -629,6 +629,19 @@ exports.onIndentApproved = onDocumentUpdated(
             resolvedAt: admin.firestore.FieldValue.serverTimestamp(),
           });
         });
+        
+        // Auto-create transfer thread for horizontal communication
+        await db.collection("transfer_threads").doc(requestId).set({
+          requestId: requestId,
+          medicineName: medicineName,
+          quantity: qty,
+          donorFacilityId: sourceFacility,
+          recipientFacilityId: destFacility,
+          status: "active",
+          createdAt: admin.firestore.FieldValue.serverTimestamp(),
+          lastMessageAt: admin.firestore.FieldValue.serverTimestamp(),
+        }, { merge: true });
+
         logger.log(
           `Redistribution successful: ${qty} units of ${medicineName} from ${sourceFacility} to ${destFacility}`
         );
@@ -826,7 +839,7 @@ async function executeTool(name, args, authInfo) {
  * Explicit audit hook for password reset requests.
  */
 exports.logPasswordResetRequest = onCall(async (request) => {
-  let { email, status } = request.data;
+  let { email } = request.data;
   
   if (!email || typeof email !== "string") {
     throw new HttpsError("invalid-argument", "Email is required and must be a string");
