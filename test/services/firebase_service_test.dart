@@ -3,6 +3,7 @@ import 'package:fake_cloud_firestore/fake_cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:med_supply_prototype/models/inventory_item.dart';
+import 'package:med_supply_prototype/models/request.dart';
 import 'package:med_supply_prototype/services/firebase_service.dart';
 import 'package:mocktail/mocktail.dart';
 
@@ -593,6 +594,110 @@ void main() {
       final fac =
           await firebaseService.getFacilityByEmail('nonexistent@mediflow.org');
       expect(fac, isNull);
+    });
+  });
+
+  group('FirebaseService - streamRequests (#253)', () {
+    late FakeFirebaseFirestore fakeFirestore;
+    late MockFirebaseAuth mockAuth;
+    late FirebaseService firebaseService;
+
+    setUp(() {
+      fakeFirestore = FakeFirebaseFirestore();
+      mockAuth = MockFirebaseAuth();
+      firebaseService = FirebaseService(fakeFirestore, mockAuth);
+    });
+
+    Future<void> addRequest({
+      required String id,
+      required String facilityId,
+      required RequestStatus status,
+      required DateTime requestDate,
+    }) {
+      return fakeFirestore.collection('requests').doc(id).set({
+        'facilityId': facilityId,
+        'medicineName': 'Paracetamol',
+        'type': RequestType.regularIndent.name,
+        'quantity': 10,
+        'requestDate': Timestamp.fromDate(requestDate),
+        'status': status.name,
+      });
+    }
+
+    test('without statuses returns every request', () async {
+      await addRequest(
+        id: 'pending',
+        facilityId: 'fac_a',
+        status: RequestStatus.pending,
+        requestDate: DateTime(2026, 1, 2),
+      );
+      await addRequest(
+        id: 'draft',
+        facilityId: 'fac_b',
+        status: RequestStatus.draft,
+        requestDate: DateTime(2026, 1, 1),
+      );
+
+      final result = await firebaseService.streamRequests(null).first;
+      expect(result.map((r) => r.id), containsAll(['pending', 'draft']));
+    });
+
+    test('filters to a single status in the query', () async {
+      await addRequest(
+        id: 'pending',
+        facilityId: 'fac_a',
+        status: RequestStatus.pending,
+        requestDate: DateTime(2026, 1, 2),
+      );
+      await addRequest(
+        id: 'approved',
+        facilityId: 'fac_a',
+        status: RequestStatus.approved,
+        requestDate: DateTime(2026, 1, 3),
+      );
+      await addRequest(
+        id: 'draft',
+        facilityId: 'fac_b',
+        status: RequestStatus.draft,
+        requestDate: DateTime(2026, 1, 1),
+      );
+
+      final result = await firebaseService
+          .streamRequests(null, statuses: const [RequestStatus.pending]).first;
+
+      expect(result.map((r) => r.id), ['pending']);
+    });
+
+    test('excludes draft when the remaining statuses are queried', () async {
+      await addRequest(
+        id: 'approved',
+        facilityId: 'fac_a',
+        status: RequestStatus.approved,
+        requestDate: DateTime(2026, 1, 1),
+      );
+      await addRequest(
+        id: 'pending',
+        facilityId: 'fac_b',
+        status: RequestStatus.pending,
+        requestDate: DateTime(2026, 1, 3),
+      );
+      await addRequest(
+        id: 'draft',
+        facilityId: 'fac_c',
+        status: RequestStatus.draft,
+        requestDate: DateTime(2026, 1, 4),
+      );
+
+      final result = await firebaseService
+          .streamRequests(
+            null,
+            statuses: RequestStatus.values
+                .where((s) => s != RequestStatus.draft)
+                .toList(),
+          )
+          .first;
+
+      expect(result.map((r) => r.id).toSet(), {'pending', 'approved'});
     });
   });
 }

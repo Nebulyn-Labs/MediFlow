@@ -168,7 +168,12 @@ class _AdminIndentStatusPageState extends ConsumerState<AdminIndentStatusPage> {
       backgroundColor: MediColors.bg,
       appBar: AppBar(title: const Text('Supply Status')),
       body: StreamBuilder<List<MedRequest>>(
-        stream: ref.read(firebaseServiceProvider).streamRequests(null),
+        stream: ref.read(firebaseServiceProvider).streamRequests(
+              null,
+              statuses: RequestStatus.values
+                  .where((s) => s != RequestStatus.draft)
+                  .toList(),
+            ),
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
             return const AdminIndentStatusSkeleton();

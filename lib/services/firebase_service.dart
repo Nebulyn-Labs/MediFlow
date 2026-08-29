@@ -482,15 +482,31 @@ class FirebaseService {
     });
   }
 
-  Stream<List<MedRequest>> streamRequests(String? facilityId) {
-    var query = _firestore.collection('requests');
+  /// Streams medicine requests. When [statuses] is set, Firestore applies the
+  /// status filter in the query so the client is not given the full collection
+  /// (#253).
+  Stream<List<MedRequest>> streamRequests(
+    String? facilityId, {
+    List<RequestStatus>? statuses,
+  }) {
+    Query<Map<String, dynamic>> query = _firestore.collection('requests');
+
+    // Note: Requests are still top-level as they involve cross-facility matching
     if (facilityId != null) {
-      // Note: Requests are still top-level as they involve cross-facility matching
-      return query.where('facilityId', isEqualTo: facilityId).snapshots().map(
-          (snapshot) => snapshot.docs
-              .map((doc) => MedRequest.fromMap(doc.data(), doc.id))
-              .toList());
+      query = query.where('facilityId', isEqualTo: facilityId);
     }
+
+    if (statuses != null && statuses.isNotEmpty) {
+      if (statuses.length == 1) {
+        query = query.where('status', isEqualTo: statuses.first.name);
+      } else {
+        query = query.where(
+          'status',
+          whereIn: statuses.map((s) => s.name).toList(),
+        );
+      }
+    }
+
     return query.snapshots().map((snapshot) => snapshot.docs
         .map((doc) => MedRequest.fromMap(doc.data(), doc.id))
         .toList());

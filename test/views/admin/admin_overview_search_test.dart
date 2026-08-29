@@ -39,7 +39,10 @@ class _FakeFirebaseService implements FirebaseService {
   Future<List<InventoryItem>> getInventoryOnce(String facilityId) async => [];
 
   @override
-  Stream<List<MedRequest>> streamRequests(String? facilityId) =>
+  Stream<List<MedRequest>> streamRequests(
+    String? facilityId, {
+    List<RequestStatus>? statuses,
+  }) =>
       Stream.value([]);
 
   @override
