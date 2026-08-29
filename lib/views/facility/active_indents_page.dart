@@ -71,7 +71,7 @@ class _ActiveIndentsPageState extends ConsumerState<ActiveIndentsPage> {
       setState(() {
         _inventory = inv;
         for (var i in _inventory) {
-          _analysisControllers[i.id] = TextEditingController(text: '0');
+          _analysisControllers[i.id] = TextEditingController(text: '');
         }
       });
     } catch (e) {
@@ -95,9 +95,8 @@ class _ActiveIndentsPageState extends ConsumerState<ActiveIndentsPage> {
     final aiService = ref.read(aiServiceProvider);
     final firebaseService = ref.read(firebaseServiceProvider);
 
-    // Mark every item as loading before starting any futures.
     setState(() {
-      for (final item in _inventory) {
+      for (var item in _inventory) {
         _forecastLoading[item.id] = true;
       }
     });
@@ -109,7 +108,7 @@ class _ActiveIndentsPageState extends ConsumerState<ActiveIndentsPage> {
       debugPrint('Error fetching logs for forecast: $e');
       if (mounted) {
         setState(() {
-          for (final item in _inventory) {
+          for (var item in _inventory) {
             _forecastLoading[item.id] = false;
           }
         });
@@ -124,8 +123,6 @@ class _ActiveIndentsPageState extends ConsumerState<ActiveIndentsPage> {
       return;
     }
 
-    // Run forecasts concurrently in chunks of [_kForecastConcurrency] to
-    // avoid both serialising N round-trips and flooding the API (#238).
     for (int i = 0; i < _inventory.length; i += _kForecastConcurrency) {
       final chunk = _inventory.sublist(
         i,
@@ -135,11 +132,9 @@ class _ActiveIndentsPageState extends ConsumerState<ActiveIndentsPage> {
       await Future.wait(chunk.map((item) async {
         try {
           final dynamic result = await aiService.forecastDemand(
-            item.medicineName,
-            logs,
-            _selectedPeriod,
-            facilityId: widget.facilityId,
-          );
+              item.medicineName, logs, _selectedPeriod,
+              facilityId: widget.facilityId);
+
           if (!mounted) return;
           setState(() {
             dynamic predRaw;
@@ -148,6 +143,7 @@ class _ActiveIndentsPageState extends ConsumerState<ActiveIndentsPage> {
               predRaw = result['prediction'];
               reasonRaw = result['reasoning'];
             }
+
             int predicted = 0;
             if (predRaw is num) {
               predicted = predRaw.toInt();
@@ -158,8 +154,9 @@ class _ActiveIndentsPageState extends ConsumerState<ActiveIndentsPage> {
             _reasoning[item.id] =
                 reasonRaw?.toString() ?? "Calculated based on demand.";
 
+            final suggestedQty = _suggestedQuantity(item, predicted);
             _analysisControllers[item.id]?.text =
-                _suggestedQuantity(item, predicted).toString();
+                suggestedQty > 0 ? suggestedQty.toString() : '';
             _forecastLoading[item.id] = false;
           });
         } catch (e) {
@@ -169,7 +166,7 @@ class _ActiveIndentsPageState extends ConsumerState<ActiveIndentsPage> {
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
                 content: Text(
-                  'Failed to generate forecast for ${item.medicineName}: $e',
+                  'AI forecast unavailable for ${item.medicineName}. Check connection or API key.',
                 ),
               ),
             );
@@ -224,8 +221,27 @@ class _ActiveIndentsPageState extends ConsumerState<ActiveIndentsPage> {
   }
 
   Future<void> _saveAnalysisAsDrafts() async {
+    bool hasInvalidQuantity = false;
+    for (final item in _inventory) {
+      final text = _analysisControllers[item.id]?.text.trim() ?? '';
+      if (text.isEmpty) continue;
+      final val = int.tryParse(text);
+      if (val == null || val <= 0) {
+        hasInvalidQuantity = true;
+        break;
+      }
+    }
+
+    if (hasInvalidQuantity) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text('Please enter valid quantities greater than 0.'),
+          backgroundColor: MediColors.error));
+      return;
+    }
+
     final itemsToSubmit = _inventory.where((item) {
-      final qty = int.tryParse(_analysisControllers[item.id]?.text ?? '0') ?? 0;
+      final qty =
+          int.tryParse(_analysisControllers[item.id]?.text.trim() ?? '') ?? 0;
       return qty > 0;
     }).toList();
 
@@ -277,6 +293,14 @@ class _ActiveIndentsPageState extends ConsumerState<ActiveIndentsPage> {
 
   // ---------- Draft actions ----------
   Future<void> _updateQuantity(String requestId, int quantity) async {
+    if (quantity <= 0) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+            content: Text('Quantity must be greater than 0.'),
+            backgroundColor: MediColors.error));
+      }
+      return;
+    }
     setState(() => _isDraftActionInProgress = true);
     try {
       await ref
@@ -694,34 +718,62 @@ class _ActiveIndentsPageState extends ConsumerState<ActiveIndentsPage> {
           ),
           Expanded(
             flex: 2,
-            child: Container(
-              height: 40,
-              decoration: BoxDecoration(
-                  color: MediColors.surfaceLight,
-                  borderRadius: BorderRadius.circular(20),
-                  border: Border.all(color: MediColors.border)),
-              child: Row(
+            child: Builder(builder: (context) {
+              final textVal = _analysisControllers[item.id]?.text.trim() ?? '';
+              final parsedVal = int.tryParse(textVal);
+              final bool isNegativeOrInvalid =
+                  textVal.isNotEmpty && (parsedVal == null || parsedVal <= 0);
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
                 children: [
-                  Expanded(
-                    child: TextField(
-                      controller: _analysisControllers[item.id],
-                      keyboardType: TextInputType.number,
-                      textAlign: TextAlign.center,
-                      style: const TextStyle(
-                          fontSize: 14, color: MediColors.textPrimary),
-                      decoration: const InputDecoration(
-                          border: InputBorder.none,
-                          contentPadding: EdgeInsets.zero),
+                  Container(
+                    height: 40,
+                    decoration: BoxDecoration(
+                        color: MediColors.surfaceLight,
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(
+                            color: isNegativeOrInvalid
+                                ? MediColors.error
+                                : MediColors.border)),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: TextField(
+                            controller: _analysisControllers[item.id],
+                            keyboardType: TextInputType.number,
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                                fontSize: 14,
+                                color: isNegativeOrInvalid
+                                    ? MediColors.error
+                                    : MediColors.textPrimary),
+                            decoration: const InputDecoration(
+                                border: InputBorder.none,
+                                contentPadding: EdgeInsets.zero),
+                            onChanged: (_) => setState(() {}),
+                          ),
+                        ),
+                        Padding(
+                            padding: const EdgeInsets.only(right: 12.0),
+                            child: Text(item.unit,
+                                style: const TextStyle(
+                                    color: MediColors.textMuted,
+                                    fontSize: 11))),
+                      ],
                     ),
                   ),
-                  Padding(
-                      padding: const EdgeInsets.only(right: 12.0),
-                      child: Text(item.unit,
-                          style: const TextStyle(
-                              color: MediColors.textMuted, fontSize: 11))),
+                  if (isNegativeOrInvalid)
+                    const Padding(
+                      padding: EdgeInsets.only(top: 2, left: 8),
+                      child: Text(
+                        'Enter a number > 0',
+                        style: TextStyle(color: MediColors.error, fontSize: 10),
+                      ),
+                    ),
                 ],
-              ),
-            ),
+              );
+            }),
           ),
         ],
       ),
@@ -1196,6 +1248,53 @@ class _ActiveIndentsPageState extends ConsumerState<ActiveIndentsPage> {
                   ),
                 );
 
+                final bool isDeliveryPending =
+                    req.status == RequestStatus.dispatched ||
+                        req.status == RequestStatus.inTransit ||
+                        req.status == RequestStatus.received;
+                final bool isRecipient =
+                    req.type == RequestType.regularIndent ||
+                        req.type == RequestType.shortage;
+
+                Widget? confirmDeliveryButton;
+                if (isDeliveryPending && isRecipient) {
+                  confirmDeliveryButton = Padding(
+                    padding: const EdgeInsets.only(left: 12.0),
+                    child: FilledButton.icon(
+                      onPressed: () async {
+                        try {
+                          await ref
+                              .read(firebaseServiceProvider)
+                              .updateRequestStatus(
+                                  req.id, RequestStatus.verified);
+                          if (context.mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                  content:
+                                      Text('Delivery confirmed successfully!')),
+                            );
+                          }
+                        } catch (e) {
+                          if (context.mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                  content:
+                                      Text('Failed to confirm delivery: $e')),
+                            );
+                          }
+                        }
+                      },
+                      icon: const Icon(Icons.check_circle_outline, size: 16),
+                      label: const Text('Confirm Delivery'),
+                      style: FilledButton.styleFrom(
+                        backgroundColor: MediColors.success,
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 16, vertical: 8),
+                      ),
+                    ),
+                  );
+                }
+
                 return Card(
                   margin: const EdgeInsets.only(bottom: 16),
                   child: Padding(
@@ -1243,6 +1342,10 @@ class _ActiveIndentsPageState extends ConsumerState<ActiveIndentsPage> {
                                               )),
                                         ),
                                       ],
+                                      if (confirmDeliveryButton != null) ...[
+                                        const SizedBox(width: 8),
+                                        confirmDeliveryButton,
+                                      ],
                                     ],
                                   ),
                                 ],
@@ -1282,6 +1385,10 @@ class _ActiveIndentsPageState extends ConsumerState<ActiveIndentsPage> {
                                           ),
                                         )),
                                   ),
+                                ],
+                                if (confirmDeliveryButton != null) ...[
+                                  const SizedBox(width: 8),
+                                  confirmDeliveryButton,
                                 ],
                               ],
                             ),
