@@ -27,7 +27,10 @@ class _AdminIndentApprovalPageState
   @override
   void initState() {
     super.initState();
-    _requestsStream = ref.read(firebaseServiceProvider).streamRequests(null);
+    _requestsStream = ref.read(firebaseServiceProvider).streamRequests(
+      null,
+      statuses: const [RequestStatus.pending],
+    );
   }
 
   /// Facility-scoped cache for the expensive reads that back AI analysis

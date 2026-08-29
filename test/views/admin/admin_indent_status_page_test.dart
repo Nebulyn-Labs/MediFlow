@@ -215,6 +215,25 @@ void main() {
     );
     expect(popupMenu.enabled, false);
   });
+
+  testWidgets('queries every non-draft status at the Firestore level (#253)',
+      (WidgetTester tester) async {
+    final firebase = _FakeFirebaseService([pendingReq]);
+
+    tester.view.physicalSize = const Size(1400, 1000);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    await tester.pumpWidget(pump(firebase));
+    await tester.pump();
+
+    expect(
+      firebase.lastStatuses?.toSet(),
+      RequestStatus.values.where((s) => s != RequestStatus.draft).toSet(),
+    );
+    expect(firebase.lastStatuses, isNot(contains(RequestStatus.draft)));
+  });
 }
 
 class _FakeFirebaseService implements FirebaseService {
@@ -222,9 +241,14 @@ class _FakeFirebaseService implements FirebaseService {
 
   final List<MedRequest> requests;
   final Map<String, RequestStatus> updatedStatuses = {};
+  List<RequestStatus>? lastStatuses;
 
   @override
-  Stream<List<MedRequest>> streamRequests(String? facilityId) {
+  Stream<List<MedRequest>> streamRequests(
+    String? facilityId, {
+    List<RequestStatus>? statuses,
+  }) {
+    lastStatuses = statuses;
     return Stream.value(requests);
   }
 

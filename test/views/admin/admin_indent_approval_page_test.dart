@@ -450,6 +450,21 @@ void main() {
 
     expect(find.text('Indent requests CSV exported ✓'), findsOneWidget);
   });
+
+  testWidgets('queries pending requests only at the Firestore level (#253)',
+      (WidgetTester tester) async {
+    final streamFirebase = _StreamFirebaseService(requests: [request]);
+
+    tester.view.physicalSize = const Size(1400, 1000);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    await tester.pumpWidget(pump(streamFirebase));
+    await tester.pump();
+
+    expect(streamFirebase.lastStatuses, const [RequestStatus.pending]);
+  });
 }
 
 /// Fake firebase service that drives a streamed list of pending requests
@@ -461,6 +476,7 @@ class _StreamFirebaseService implements FirebaseService {
   final List<MedRequest> requests;
   final List<InventoryItem> inventoryItems;
   final Map<String, RequestStatus> updatedStatuses = {};
+  List<RequestStatus>? lastStatuses;
 
   @override
   Future<List<InventoryItem>> getInventoryOnce(String facilityId) async =>
@@ -477,7 +493,11 @@ class _StreamFirebaseService implements FirebaseService {
   }
 
   @override
-  Stream<List<MedRequest>> streamRequests(String? facilityId) {
+  Stream<List<MedRequest>> streamRequests(
+    String? facilityId, {
+    List<RequestStatus>? statuses,
+  }) {
+    lastStatuses = statuses;
     // `Stream.value` emits the list asynchronously on first listen, which is
     // what StreamBuilder needs to settle out of `ConnectionState.waiting`.
     return Stream.value(requests);
