@@ -604,8 +604,11 @@ class _DailyLoggingPageState extends ConsumerState<DailyLoggingPage>
     }
 
     setState(() => _isSubmittingImage = true);
+    // Iterate a copy so a mid-submit list mutation cannot throw
+    // ConcurrentModificationError (#288).
+    final items = List<Map<String, dynamic>>.of(_imageItems);
     try {
-      for (var item in _imageItems) {
+      for (var item in items) {
         await ref.read(firebaseServiceProvider).logUsage(
             facilityId: widget.facilityId,
             date: _selectedDate,
@@ -615,7 +618,7 @@ class _DailyLoggingPageState extends ConsumerState<DailyLoggingPage>
       }
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('${_imageItems.length} logs saved ✓')));
+            SnackBar(content: Text('${items.length} logs saved ✓')));
         setState(() {
           _imageItems.clear();
           _imageParseResult = null;
@@ -1394,8 +1397,10 @@ class _DailyLoggingPageState extends ConsumerState<DailyLoggingPage>
                           DataCell(IconButton(
                             icon: const Icon(Icons.close_rounded,
                                 color: MediColors.error, size: 18),
-                            onPressed: () =>
-                                setState(() => _imageItems.remove(item)),
+                            onPressed: _isSubmittingImage
+                                ? null
+                                : () =>
+                                    setState(() => _imageItems.remove(item)),
                           )),
                         ]);
                       }).toList()))),
@@ -1405,7 +1410,9 @@ class _DailyLoggingPageState extends ConsumerState<DailyLoggingPage>
               child: OutlinedButton.icon(
                 icon: const Icon(Icons.photo_camera_rounded),
                 label: const Text('Parse Another Image'),
-                onPressed: (_isParsingImage || !isOnline) ? null : _parseImage,
+                onPressed: (_isParsingImage || _isSubmittingImage || !isOnline)
+                    ? null
+                    : _parseImage,
               ),
             ),
             const SizedBox(width: 16),
