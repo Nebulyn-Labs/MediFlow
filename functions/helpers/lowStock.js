@@ -62,6 +62,34 @@ function createLowStockService({ serverTimestamp }) {
     const alertDoc = await alertRef.get();
     const existed = alertDoc.exists;
 
+    // Proactive Auto-Offers: when batch crosses 90-day-to-expiry threshold
+    const expiry = toIsoTimestamp(data.expiryDate);
+    const daysLeft = expiry
+      ? Math.ceil((new Date(expiry).getTime() - Date.now()) / 86400000)
+      : null;
+
+    if (daysLeft !== null && daysLeft <= 90 && daysLeft > 0) {
+      const existingSurplus = await db.collection("requests")
+        .where("facilityId", "==", facilityId)
+        .where("medicineName", "==", data.medicineName)
+        .where("type", "==", "surplus")
+        .where("status", "in", ["pending", "approved"])
+        .get();
+
+      if (existingSurplus.empty) {
+        await db.collection("requests").add({
+          facilityId,
+          medicineName: data.medicineName || "",
+          batchId: data.batchId || "",
+          type: "surplus",
+          quantity: Number(data.remainingQuantity || 0),
+          requestDate: serverTimestamp(),
+          status: "pending",
+          notes: "Auto-generated proactive surplus offer (approaching expiry)",
+        });
+      }
+    }
+
     if (status === "healthy") {
       if (existed) {
         await alertRef.delete();

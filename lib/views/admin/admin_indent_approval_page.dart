@@ -31,17 +31,62 @@ class _AdminIndentApprovalPageState
     _requestsStream = ref.read(firebaseServiceProvider).streamRequests(null);
   }
 
+  /// Facility-scoped cache for the expensive reads that back AI analysis
+  /// (full inventory + 90 days of usage logs). Several pending requests
+  /// usually belong to the same facility, so without this every "Analyze
+  /// with AI" click re-issued identical Firestore queries.
+  ///
+  /// Keyed by `<kind>:<facilityId>`. Futures are cached rather than values,
+  /// so two analyses started back-to-back share a single in-flight read.
+  final Map<String, Future<Object?>> _facilityDataCache = {};
+
+  Future<T> _cachedFacilityRead<T>(String key, Future<T> Function() read) {
+    final cached = _facilityDataCache[key];
+    if (cached != null) return cached as Future<T>;
+
+    final future = read();
+    _facilityDataCache[key] = future;
+
+    // A failed read must not poison the cache — drop it so the next attempt
+    // refetches. This side-listener also marks the future's error as observed,
+    // so it is never reported as an unhandled async error.
+    future.then<void>((_) {}, onError: (Object _) {
+      _facilityDataCache.remove(key);
+    });
+
+    return future;
+  }
+
+  /// Approving/declining changes what the facility holds, so the cached
+  /// snapshot is stale afterwards. Drop it and let the next analysis refetch.
+  void _invalidateFacilityCache(String facilityId) {
+    _facilityDataCache.remove('inventory:$facilityId');
+    _facilityDataCache.remove('logs:$facilityId');
+  }
+
   Future<void> _analyzeRequest(MedRequest request) async {
+    debugPrint('🟢 [ANALYZE] ${request.medicineName} '
+        'cache=${_facilityDataCache.keys.toList()} '
+        'state=${identityHashCode(this)}');
     setState(() => _aiLoading[request.id] = true);
     try {
       final firebaseService = ref.read(firebaseServiceProvider);
       final aiService = ref.read(aiServiceProvider);
 
-      // Fetch facility inventory for context
-      final inventory =
-          await firebaseService.getInventoryOnce(request.facilityId);
-      final logs =
-          await firebaseService.getRecentLogs(request.facilityId, days: 90);
+      // Fetch facility inventory + usage logs for context. Both go through the
+      // per-facility cache, and both are started before the first await so the
+      // initial (uncached) analysis issues them in parallel instead of serially.
+      final inventoryFuture = _cachedFacilityRead(
+        'inventory:${request.facilityId}',
+        () => firebaseService.getInventoryOnce(request.facilityId),
+      );
+      final logsFuture = _cachedFacilityRead(
+        'logs:${request.facilityId}',
+        () => firebaseService.getRecentLogs(request.facilityId, days: 90),
+      );
+
+      final inventory = await inventoryFuture;
+      final logs = await logsFuture;
 
       final currentItem = inventory.firstWhere(
         (i) => i.medicineName == request.medicineName,
@@ -103,6 +148,7 @@ class _AdminIndentApprovalPageState
       await ref
           .read(firebaseServiceProvider)
           .updateRequestStatus(request.id, status);
+      _invalidateFacilityCache(request.facilityId);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(content: Text('Request ${status.label} successfully!')));
@@ -143,6 +189,7 @@ class _AdminIndentApprovalPageState
       final firebaseService = ref.read(firebaseServiceProvider);
       for (final req in selectedRequests) {
         await firebaseService.updateRequestStatus(req.id, status);
+        _invalidateFacilityCache(req.facilityId);
       }
       if (mounted) {
         setState(() {

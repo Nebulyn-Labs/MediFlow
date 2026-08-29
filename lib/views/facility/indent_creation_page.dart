@@ -5,6 +5,7 @@ import '../../services/firebase_service.dart';
 import '../../services/ai_service.dart';
 import '../../models/request.dart';
 import '../../models/inventory_item.dart';
+import '../../models/daily_usage_log.dart';
 import 'package:med_supply_prototype/constants/colors.dart';
 import 'package:med_supply_prototype/theme/medi_flow_theme.dart';
 import '../shared/skeleton_loaders.dart';
@@ -52,7 +53,7 @@ class _IndentCreationPageState extends ConsumerState<IndentCreationPage> {
       setState(() {
         _inventory = inv;
         for (var item in _inventory) {
-          _controllers[item.id] = TextEditingController(text: '0');
+          _controllers[item.id] = TextEditingController(text: '');
         }
       });
     } catch (e) {
@@ -75,15 +76,33 @@ class _IndentCreationPageState extends ConsumerState<IndentCreationPage> {
     final aiService = ref.read(aiServiceProvider);
     final firebaseService = ref.read(firebaseServiceProvider);
 
-    // Fetch logs once, shared across all concurrent forecast calls.
-    final logs =
-        await firebaseService.getRecentLogs(widget.facilityId, days: 90);
-
     setState(() {
       for (var item in _inventory) {
         _forecastLoading[item.id] = true;
       }
     });
+
+    final List<DailyUsageLog> logs;
+    try {
+      logs = await firebaseService.getRecentLogs(widget.facilityId, days: 90);
+    } catch (e) {
+      debugPrint('Error fetching logs for forecast: $e');
+      if (mounted) {
+        setState(() {
+          for (var item in _inventory) {
+            _forecastLoading[item.id] = false;
+          }
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Failed to fetch recent logs for forecast: $e',
+            ),
+          ),
+        );
+      }
+      return;
+    }
 
     // Run forecasts concurrently in chunks of [_kForecastConcurrency] to
     // avoid both serialising N round-trips and flooding the API (#238).
@@ -141,7 +160,8 @@ class _IndentCreationPageState extends ConsumerState<IndentCreationPage> {
               suggestedQty = 0;
             }
 
-            _controllers[item.id]?.text = suggestedQty.toString();
+            _controllers[item.id]?.text =
+                suggestedQty > 0 ? suggestedQty.toString() : '';
             _forecastLoading[item.id] = false;
           });
         } catch (e) {
@@ -163,14 +183,34 @@ class _IndentCreationPageState extends ConsumerState<IndentCreationPage> {
   }
 
   Future<void> _submitIndent() async {
+    bool hasInvalidQuantity = false;
+    for (var item in _inventory) {
+      final text = _controllers[item.id]?.text.trim() ?? '';
+      if (text.isEmpty) continue;
+      final val = int.tryParse(text);
+      if (val == null || val <= 0) {
+        hasInvalidQuantity = true;
+        break;
+      }
+    }
+
+    if (hasInvalidQuantity) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text('Please enter valid quantities greater than 0.'),
+          backgroundColor: MediColors.error));
+      return;
+    }
+
     final itemsToSubmit = _inventory.where((item) {
-      final qty = int.tryParse(_controllers[item.id]?.text ?? '0') ?? 0;
+      final text = _controllers[item.id]?.text.trim() ?? '';
+      final qty = int.tryParse(text) ?? 0;
       return qty > 0;
     }).toList();
 
     if (itemsToSubmit.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-          content: Text('Please enter quantities for at least one medicine.')));
+          content: Text(
+              'Please enter quantities greater than 0 for at least one medicine.')));
       return;
     }
 
@@ -556,33 +596,60 @@ class _IndentCreationPageState extends ConsumerState<IndentCreationPage> {
           ),
           Expanded(
             flex: 2,
-            child: Container(
-                height: 40,
-                decoration: BoxDecoration(
-                    color: MediColors.surfaceLight,
-                    borderRadius: BorderRadius.circular(20),
-                    border: Border.all(color: MediColors.border)),
-                child: Row(children: [
-                  Expanded(
-                    child: TextField(
-                      controller: _controllers[item.id],
-                      keyboardType: TextInputType.number,
-                      textAlign: TextAlign.center,
-                      style: const TextStyle(
-                          fontSize: 14, color: MediColors.textPrimary),
-                      decoration: const InputDecoration(
-                        border: InputBorder.none,
-                        contentPadding: EdgeInsets.zero,
+            child: Builder(builder: (context) {
+              final textVal = _controllers[item.id]?.text.trim() ?? '';
+              final parsedVal = int.tryParse(textVal);
+              final bool isNegativeOrInvalid =
+                  textVal.isNotEmpty && (parsedVal == null || parsedVal <= 0);
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                      height: 40,
+                      decoration: BoxDecoration(
+                          color: MediColors.surfaceLight,
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(
+                              color: isNegativeOrInvalid
+                                  ? MediColors.error
+                                  : MediColors.border)),
+                      child: Row(children: [
+                        Expanded(
+                          child: TextField(
+                            controller: _controllers[item.id],
+                            keyboardType: TextInputType.number,
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                                fontSize: 14,
+                                color: isNegativeOrInvalid
+                                    ? MediColors.error
+                                    : MediColors.textPrimary),
+                            decoration: const InputDecoration(
+                              border: InputBorder.none,
+                              contentPadding: EdgeInsets.zero,
+                            ),
+                            onChanged: (_) => setState(() {}),
+                          ),
+                        ),
+                        Padding(
+                          padding: const EdgeInsets.only(right: 12.0),
+                          child: Text(item.unit,
+                              style: const TextStyle(
+                                  color: MediColors.textMuted, fontSize: 11)),
+                        ),
+                      ])),
+                  if (isNegativeOrInvalid)
+                    const Padding(
+                      padding: EdgeInsets.only(top: 2, left: 8),
+                      child: Text(
+                        'Enter a number > 0',
+                        style: TextStyle(color: MediColors.error, fontSize: 10),
                       ),
                     ),
-                  ),
-                  Padding(
-                    padding: const EdgeInsets.only(right: 12.0),
-                    child: Text(item.unit,
-                        style: const TextStyle(
-                            color: MediColors.textMuted, fontSize: 11)),
-                  ),
-                ])),
+                ],
+              );
+            }),
           ),
         ],
       ),

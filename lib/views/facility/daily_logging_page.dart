@@ -825,9 +825,12 @@ class _DailyLoggingPageState extends ConsumerState<DailyLoggingPage>
                           const InputDecoration(labelText: 'Units Distributed'),
                       keyboardType: TextInputType.number,
                       style: const TextStyle(color: MediColors.textPrimary),
-                      validator: (v) => (int.tryParse(v ?? '') == null)
-                          ? 'Enter valid number'
-                          : null,
+                      validator: (v) {
+                        final val = int.tryParse(v ?? '');
+                        if (val == null) return 'Enter valid number';
+                        if (val <= 0) return 'Enter a number greater than 0';
+                        return null;
+                      },
                       onSaved: (v) => _quantity = int.parse(v!)),
                   const SizedBox(height: 16),
                   TextFormField(
@@ -835,9 +838,12 @@ class _DailyLoggingPageState extends ConsumerState<DailyLoggingPage>
                           const InputDecoration(labelText: 'Patients Served'),
                       keyboardType: TextInputType.number,
                       style: const TextStyle(color: MediColors.textPrimary),
-                      validator: (v) => (int.tryParse(v ?? '') == null)
-                          ? 'Enter valid number'
-                          : null,
+                      validator: (v) {
+                        final val = int.tryParse(v ?? '');
+                        if (val == null) return 'Enter valid number';
+                        if (val < 0) return 'Enter a number 0 or greater';
+                        return null;
+                      },
                       onSaved: (v) => _patients = int.parse(v!)),
                   const SizedBox(height: 28),
                   SizedBox(

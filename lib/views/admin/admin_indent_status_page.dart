@@ -55,11 +55,18 @@ class _AdminIndentStatusPageState extends ConsumerState<AdminIndentStatusPage> {
       case RequestStatus.pending:
         return [RequestStatus.approved, RequestStatus.rejected];
       case RequestStatus.approved:
-        return [RequestStatus.fulfilled, RequestStatus.rejected];
+        return [RequestStatus.dispatched, RequestStatus.rejected];
+      case RequestStatus.dispatched:
+        return [RequestStatus.inTransit];
+      case RequestStatus.inTransit:
+        return [RequestStatus.received];
+      case RequestStatus.received:
+        return [RequestStatus.verified];
       case RequestStatus.rejected:
         return [RequestStatus.pending];
       case RequestStatus.needsManualReview:
         return [RequestStatus.pending, RequestStatus.rejected];
+      case RequestStatus.verified:
       case RequestStatus.fulfilled:
       case RequestStatus.draft:
         return [];
@@ -128,6 +135,14 @@ class _AdminIndentStatusPageState extends ConsumerState<AdminIndentStatusPage> {
   Color _getStatusColor(RequestStatus status, MediFlowTheme colors) {
     switch (status) {
       case RequestStatus.approved:
+        return colors.success;
+      case RequestStatus.dispatched:
+        return colors.primary;
+      case RequestStatus.inTransit:
+        return colors.primary;
+      case RequestStatus.received:
+        return colors.success;
+      case RequestStatus.verified:
         return colors.success;
       case RequestStatus.rejected:
         return colors.error;
@@ -321,27 +336,60 @@ class _AdminIndentStatusPageState extends ConsumerState<AdminIndentStatusPage> {
           ),
           Expanded(
             flex: 3,
-            child: isApproved
-                ? Center(
-                    child: TextButton.icon(
-                      onPressed: () => context.go('/admin/routing'),
-                      icon: const Icon(Icons.auto_fix_high_rounded, size: 14),
-                      label: const Text('Optimize Routes',
-                          style: TextStyle(
-                              fontSize: 11, fontWeight: FontWeight.bold)),
-                      style: TextButton.styleFrom(
-                        foregroundColor: colors.primary,
-                        backgroundColor: colors.primary.withValues(alpha: 0.08),
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 12, vertical: 8),
-                        shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(8)),
-                      ),
-                    ),
+            child: (req.status == RequestStatus.dispatched ||
+                    req.status == RequestStatus.inTransit ||
+                    req.status == RequestStatus.received ||
+                    req.status == RequestStatus.verified)
+                ? Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.local_shipping,
+                          size: 16,
+                          color:
+                              req.status.index >= RequestStatus.dispatched.index
+                                  ? colors.primary
+                                  : colors.textMuted),
+                      Text(' → ',
+                          style: TextStyle(color: colors.textMuted)),
+                      Icon(Icons.inventory_2,
+                          size: 16,
+                          color:
+                              req.status.index >= RequestStatus.received.index
+                                  ? colors.primary
+                                  : colors.textMuted),
+                      Text(' → ',
+                          style: TextStyle(color: colors.textMuted)),
+                      Icon(Icons.check_circle,
+                          size: 16,
+                          color:
+                              req.status.index >= RequestStatus.verified.index
+                                  ? colors.success
+                                  : colors.textMuted),
+                    ],
                   )
-                : Center(
-                    child:
-                        Text('—', style: TextStyle(color: colors.textMuted))),
+                : isApproved
+                    ? Center(
+                        child: TextButton.icon(
+                          onPressed: () => context.go('/admin/routing'),
+                          icon:
+                              const Icon(Icons.auto_fix_high_rounded, size: 14),
+                          label: const Text('Optimize Routes',
+                              style: TextStyle(
+                                  fontSize: 11, fontWeight: FontWeight.bold)),
+                          style: TextButton.styleFrom(
+                            foregroundColor: colors.primary,
+                            backgroundColor:
+                                colors.primary.withValues(alpha: 0.08),
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 12, vertical: 8),
+                            shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(8)),
+                          ),
+                        ),
+                      )
+                    : Center(
+                        child: Text('—',
+                            style: TextStyle(color: colors.textMuted))),
           ),
           Expanded(
             flex: 1,

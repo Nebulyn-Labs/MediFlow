@@ -53,10 +53,19 @@ function canonicalJson(value) {
   return JSON.stringify(value);
 }
 
-function insertionId(tableName, row, index) {
+function insertionId(tableName, row, index, dedupeKey) {
+  // When a caller supplies a stable dedupeKey (e.g. a Firestore CloudEvent's
+  // event.id), base the insertId on that instead of the row's own content.
+  // Content-based hashing breaks deduplication whenever a row embeds a
+  // wall-clock value (captured_at, etc.), since retries/redeliveries of the
+  // same logical event then produce a different hash - and therefore a
+  // different insertId - defeating BigQuery's insertId-based dedup.
+  const basis = dedupeKey != null
+    ? `dedupe:${dedupeKey}`
+    : `content:${index}:${canonicalJson(row)}`;
   return crypto
     .createHash("sha256")
-    .update(`${tableName}:${index}:${canonicalJson(row)}`)
+    .update(`${tableName}:${basis}`)
     .digest("hex");
 }
 
@@ -117,7 +126,7 @@ function createBigQueryRecovery({
     }
   }
 
-  async function tryInsert(tableName, rows) {
+  async function tryInsert(tableName, rows, dedupeKeys) {
     let lastError;
     let attempts = 0;
     for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
@@ -125,7 +134,7 @@ function createBigQueryRecovery({
       try {
         const table = await ensureTable(tableName);
         const rawRows = rows.map((row, index) => ({
-          insertId: insertionId(tableName, row, index),
+          insertId: insertionId(tableName, row, index, dedupeKeys?.[index]),
           json: row,
         }));
         await table.insert(rawRows, {
@@ -153,13 +162,17 @@ function createBigQueryRecovery({
     return { ok: false, attempts, error: lastError };
   }
 
-  async function queueFailure(tableName, rows, source, result) {
+  async function queueFailure(tableName, rows, source, result, dedupeKeys) {
     const failureRef = firestore.collection(FAILURE_COLLECTION).doc();
     const failedAt = now();
     const failure = {
       tableName,
       rows,
       source,
+      // Persisted so a later recoverPending() replay reuses the same
+      // insertId basis as the original attempt, instead of falling back to
+      // content hashing.
+      dedupeKeys: dedupeKeys || null,
       status: "pending",
       insertionAttempts: result.attempts,
       recoveryAttempts: 0,
@@ -191,17 +204,20 @@ function createBigQueryRecovery({
     return failureRef.id;
   }
 
-  async function insert(tableName, rows, { source = "unspecified" } = {}) {
+  async function insert(tableName, rows, { source = "unspecified", dedupeKeys } = {}) {
     if (!tables[tableName]) {
       throw new Error(`Unknown BigQuery table: ${tableName}`);
     }
     const rowList = Array.isArray(rows) ? rows : [rows];
+    const keyList = dedupeKeys == null
+      ? undefined
+      : (Array.isArray(dedupeKeys) ? dedupeKeys : [dedupeKeys]);
     if (rowList.length === 0) return { ok: true, attempts: 0 };
 
-    const result = await tryInsert(tableName, rowList);
+    const result = await tryInsert(tableName, rowList, keyList);
     if (result.ok) return result;
 
-    const failureId = await queueFailure(tableName, rowList, source, result);
+    const failureId = await queueFailure(tableName, rowList, source, result, keyList);
     return { ...result, queued: true, failureId };
   }
 
@@ -255,7 +271,11 @@ function createBigQueryRecovery({
       if (!failure) continue;
 
       const recoveryAttempts = Number(failure.recoveryAttempts || 0) + 1;
-      const result = await tryInsert(failure.tableName, failure.rows);
+      const result = await tryInsert(
+        failure.tableName,
+        failure.rows,
+        failure.dedupeKeys || undefined
+      );
       if (result.ok) {
         await document.ref.update({
           status: "recovered",
