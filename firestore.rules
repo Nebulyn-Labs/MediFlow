@@ -79,6 +79,24 @@ service cloud.firestore {
       allow delete: if (isAuthenticated() && isFacilityUser(resource.data.facilityId)); // Admin deletions must go through backend audit Callable Function
     }
 
+    // Transfer Threads collection
+    match /transfer_threads/{threadId} {
+      allow read, update: if isAdmin() || (isAuthenticated() && resource != null && 
+        (isFacilityUser(resource.data.donorFacilityId) || isFacilityUser(resource.data.recipientFacilityId)));
+      allow create: if false; // Only Cloud Functions create threads
+      
+      match /messages/{messageId} {
+        allow read: if isAdmin() || (isAuthenticated() && 
+          (isFacilityUser(get(/databases/$(database)/documents/transfer_threads/$(threadId)).data.donorFacilityId) || 
+           isFacilityUser(get(/databases/$(database)/documents/transfer_threads/$(threadId)).data.recipientFacilityId)));
+        allow create: if isAuthenticated() && request.resource.data.senderId != null &&
+          isFacilityUser(request.resource.data.senderId) &&
+          (isFacilityUser(get(/databases/$(database)/documents/transfer_threads/$(threadId)).data.donorFacilityId) || 
+           isFacilityUser(get(/databases/$(database)/documents/transfer_threads/$(threadId)).data.recipientFacilityId));
+        allow update, delete: if false;
+      }
+    }
+
     // Audit Logs collection
     match /audit_logs/{logId} {
       allow read: if isAdmin();

@@ -44,12 +44,41 @@ final simulationServiceProvider =
 /// - **Stock "personas":** after generating history, `_resetInventoryLevels`
 ///   assigns each facility a random health persona (critical/low stock,
 ///   surplus, or normal) so demo dashboards show varied, realistic stock
-///   states rather than uniform inventory. The facility `rampur_mediflow_com`
-///   is hardcoded with a fixed, deliberately varied set of stock levels
-///   (including an expired batch) for demo-script consistency.
+///   states rather than uniform inventory. The demo facility (defined by
+///   [defaultDemoFacilityId]) is initialized with a fixed, deliberately
+///   varied set of stock levels (including an expired batch) for demo-script consistency.
 class SimulationService {
   final FirebaseFirestore _firestore;
   final Random _random = Random();
+
+  /// Default facility ID used for demo inventory persona profiling.
+  static const String defaultDemoFacilityId = 'rampur_mediflow_com';
+
+  /// Single source of truth for the demo medicine catalog and unit types.
+  static const Map<String, String> demoMedicineCatalog = {
+    'Paracetamol': 'tablets',
+    'Cough Syrup': 'vials',
+    'ORS': 'sachets',
+    'Antibiotic': 'capsules',
+    'Vitamin Tablets': 'tablets',
+    'Metformin 500mg': 'tablets',
+    'Iron Folic Acid': 'tablets',
+    'Amoxicillin 250mg': 'capsules',
+  };
+
+  /// List of canonical medicine names derived from [demoMedicineCatalog].
+  static List<String> get demoMedicineNames =>
+      demoMedicineCatalog.keys.toList();
+
+  /// Demo stock profiles specifying inventory remaining factors and expiry overrides.
+  static const Map<String, DemoStockProfile> demoStockProfiles = {
+    'Antibiotic': DemoStockProfile(0.15),
+    'Paracetamol': DemoStockProfile(0.35, -5),
+    'ORS': DemoStockProfile(0.95, 7),
+    'Cough Syrup': DemoStockProfile(0.45, 10),
+    'Vitamin Tablets': DemoStockProfile(0.30),
+    'Metformin 500mg': DemoStockProfile(0.28),
+  };
 
   SimulationService(this._firestore);
 
@@ -88,9 +117,14 @@ class SimulationService {
   // --- DAILY USAGE SIMULATION ---
 
   Future<void> runFullSimulation(
-      String facilityId, FacilityType facilityType) async {
+    String facilityId,
+    FacilityType facilityType, {
+    String demoFacilityId = defaultDemoFacilityId,
+  }) async {
+    final bool isDemoFacility = (facilityId == demoFacilityId);
+
     // 1. Initialize Inventory if not exists
-    await _seedInventory(facilityId);
+    await _seedInventory(facilityId, isDemoFacility: isDemoFacility);
 
     // 2. Simulate last 30 days using a single WriteBatch
     final now = DateTime.now();
@@ -115,10 +149,14 @@ class SimulationService {
     }
 
     // 3. Reset inventory to realistic remaining levels after simulation
-    await _resetInventoryLevels(facilityId);
+    await _resetInventoryLevels(facilityId, isDemoFacility: isDemoFacility);
   }
 
-  Future<void> _resetInventoryLevels(String facilityId) async {
+  Future<void> _resetInventoryLevels(
+    String facilityId, {
+    bool? isDemoFacility,
+  }) async {
+    final bool isDemo = isDemoFacility ?? (facilityId == defaultDemoFacilityId);
     final medsSnapshot = await _firestore
         .collection('inventory')
         .doc(facilityId)
@@ -136,24 +174,13 @@ class SimulationService {
 
       int remaining;
       int? daysToExpiryOverride;
-      if (facilityId == 'rampur_mediflow_com') {
-        if (medName == 'Antibiotic') {
-          remaining = (initial * 0.15).round(); // Low stock (15%)
-        } else if (medName == 'Paracetamol') {
-          remaining = (initial * 0.35).round(); // Expired (35% stock)
-          daysToExpiryOverride = -5;
-        } else if (medName == 'ORS') {
-          remaining = (initial * 0.95).round(); // Surplus (Wastage risk)
-          daysToExpiryOverride = 7;
-        } else if (medName == 'Cough Syrup') {
-          remaining = (initial * 0.45).round(); // Expiring soon (45% stock)
-          daysToExpiryOverride = 10;
-        } else if (medName == 'Vitamin Tablets') {
-          remaining = (initial * 0.30).round(); // Healthy but 30% stock
-        } else if (medName == 'Metformin 500mg') {
-          remaining = (initial * 0.28).round(); // Healthy but 28% stock
+      if (isDemo) {
+        final profile = demoStockProfiles[medName];
+        if (profile != null) {
+          remaining = (initial * profile.remainingFactor).round();
+          daysToExpiryOverride = profile.daysToExpiry;
         } else {
-          remaining = (initial * 0.32).round(); // Healthy but 32% stock
+          remaining = (initial * 0.32).round();
         }
       } else {
         double factor;
@@ -180,19 +207,13 @@ class SimulationService {
     }
   }
 
-  Future<void> _seedInventory(String facilityId) async {
-    final Map<String, String> medicines = {
-      'Paracetamol': 'tablets',
-      'Cough Syrup': 'vials',
-      'ORS': 'sachets',
-      'Antibiotic': 'capsules',
-      'Vitamin Tablets': 'tablets',
-      'Metformin 500mg': 'tablets',
-      'Iron Folic Acid': 'tablets',
-      'Amoxicillin 250mg': 'capsules'
-    };
+  Future<void> _seedInventory(
+    String facilityId, {
+    bool? isDemoFacility,
+  }) async {
+    final bool isDemo = isDemoFacility ?? (facilityId == defaultDemoFacilityId);
 
-    for (var entry in medicines.entries) {
+    for (var entry in demoMedicineCatalog.entries) {
       final med = entry.key;
       final unit = entry.value;
       final medicineId = med.toLowerCase().replaceAll(' ', '_');
@@ -207,15 +228,12 @@ class SimulationService {
         final int initialQty = 2000 + _random.nextInt(3000);
 
         int daysToExpiry;
-        if (facilityId == 'rampur_mediflow_com') {
-          if (med == 'Paracetamol') {
-            daysToExpiry = -5; // Expired
-          } else if (med == 'Cough Syrup') {
-            daysToExpiry = 10; // Expiring soon
-          } else if (med == 'ORS') {
-            daysToExpiry = 7; // Expiring soon (wastage risk)
+        if (isDemo) {
+          final profile = demoStockProfiles[med];
+          if (profile?.daysToExpiry != null) {
+            daysToExpiry = profile!.daysToExpiry!;
           } else {
-            daysToExpiry = 180 + _random.nextInt(200); // Normal
+            daysToExpiry = 180 + _random.nextInt(200);
           }
         } else {
           daysToExpiry = _random.nextInt(10) < 2
@@ -247,20 +265,10 @@ class SimulationService {
     int totalPatients = (basePatients * variation).round();
 
     // 2. Generate medicine usage for ALL medicines
-    final List<String> medicines = [
-      'Paracetamol',
-      'Cough Syrup',
-      'ORS',
-      'Antibiotic',
-      'Vitamin Tablets',
-      'Metformin 500mg',
-      'Iron Folic Acid',
-      'Amoxicillin 250mg'
-    ];
     List<MedicineUsage> usages = [];
     final month = date.month;
 
-    for (var med in medicines) {
+    for (var med in demoMedicineCatalog.keys) {
       double usagePerPatient =
           0.4 + (_random.nextDouble() * 0.3); // more realistic base
 
@@ -293,4 +301,13 @@ class SimulationService {
       'totalPatients': totalPatients,
     });
   }
+}
+
+/// Represents initial remaining quantity factor and optional expiry override
+/// for demo inventory stock persona assignment.
+class DemoStockProfile {
+  final double remainingFactor;
+  final int? daysToExpiry;
+
+  const DemoStockProfile(this.remainingFactor, [this.daysToExpiry]);
 }
