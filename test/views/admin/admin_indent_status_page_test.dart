@@ -140,7 +140,7 @@ void main() {
     await tester.tap(find.byType(PopupMenuButton<RequestStatus>));
     await tester.pumpAndSettle();
 
-    expect(find.text('FULFILLED'), findsOneWidget);
+    expect(find.text('DISPATCHED'), findsOneWidget);
     expect(find.text('REJECTED'), findsOneWidget);
     expect(find.text('PENDING'), findsNothing);
   });

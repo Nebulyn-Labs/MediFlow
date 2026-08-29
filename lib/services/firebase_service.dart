@@ -9,6 +9,8 @@ import '../models/inventory_item.dart';
 import '../models/daily_usage_log.dart';
 import '../models/request.dart';
 import '../models/audit_log.dart';
+import '../models/transfer_thread.dart';
+import '../models/transfer_message.dart';
 import '../models/notification.dart' as import_notification;
 import 'simulation_service.dart';
 
@@ -510,9 +512,20 @@ class FirebaseService {
 
   Future<void> updateRequestStatus(
       String requestId, RequestStatus status) async {
-    await _firestore.collection('requests').doc(requestId).update({
+    final batch = _firestore.batch();
+    final reqRef = _firestore.collection('requests').doc(requestId);
+
+    batch.update(reqRef, {'status': status.name});
+
+    // Add transfer event
+    final eventRef = reqRef.collection('transfer_events').doc();
+    batch.set(eventRef, {
       'status': status.name,
+      'timestamp': FieldValue.serverTimestamp(),
+      'actorId': _auth.currentUser?.uid,
     });
+
+    await batch.commit();
   }
 
   Future<void> updateRequestQuantity(String requestId, int quantity) async {
@@ -937,5 +950,57 @@ class FirebaseService {
     } catch (e) {
       throw Exception('Error fetching audit logs: $e');
     }
+  }
+  // --- Transfer Threads ---
+
+  Stream<TransferThread?> streamTransferThread(String threadId) {
+    return _firestore
+        .collection('transfer_threads')
+        .doc(threadId)
+        .snapshots()
+        .map((snapshot) {
+      if (snapshot.exists && snapshot.data() != null) {
+        return TransferThread.fromMap(
+            snapshot.data() as Map<String, dynamic>, snapshot.id);
+      }
+      return null;
+    });
+  }
+
+  Stream<List<TransferMessage>> streamTransferMessages(String threadId) {
+    return _firestore
+        .collection('transfer_threads')
+        .doc(threadId)
+        .collection('messages')
+        .orderBy('sentAt', descending: false)
+        .snapshots()
+        .map((snapshot) => snapshot.docs
+            .map((doc) => TransferMessage.fromMap(doc.data(), doc.id))
+            .toList());
+  }
+
+  Future<void> sendTransferMessage(
+      String threadId, String text, String senderId) async {
+    final messageRef = _firestore
+        .collection('transfer_threads')
+        .doc(threadId)
+        .collection('messages')
+        .doc();
+
+    final threadRef = _firestore.collection('transfer_threads').doc(threadId);
+
+    await _firestore.runTransaction((transaction) async {
+      final message = TransferMessage(
+        id: messageRef.id,
+        senderId: senderId,
+        text: text,
+        sentAt: DateTime.now(),
+      );
+
+      transaction.set(messageRef, message.toMap());
+      transaction.update(threadRef, {
+        'lastMessageAt': FieldValue.serverTimestamp(),
+      });
+    });
   }
 }
