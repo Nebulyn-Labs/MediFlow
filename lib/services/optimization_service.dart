@@ -14,6 +14,7 @@ class TransferRecommendation {
   final int quantity;
   final double score;
   final String reasoning;
+  final String? batchId;
 
   TransferRecommendation({
     required this.donor,
@@ -22,6 +23,7 @@ class TransferRecommendation {
     required this.quantity,
     required this.score,
     required this.reasoning,
+    this.batchId,
   });
 }
 
@@ -303,26 +305,28 @@ class OptimizationService {
             reasons.add('Partial Fulfillment');
           }
 
-          // D. Near-Expiry Priority (+100 when soonest valid batch expires ≤90 days)
+          // D. Near-Expiry Priority and FEFO (First-Expire-First-Out)
           // Prefer donors whose surplus expires soonest so stock is redistributed
-          // before wastage, matching the documented heuristic in the AI prompt.
-          // Only non-expired batches are considered: a batch that already expired
-          // gives a negative daysUntilExpiry which would satisfy <= 90 and
-          // incorrectly rank expired stock above fresh stock.
+          // before wastage. Score scales inversely with days to expiry.
+          // We also select the specific batch closest to expiry.
+          String? selectedBatchId;
           final donorBatches = inventories[donorFac.id] ?? [];
           final validMedicineBatches = donorBatches
               .where((item) =>
                   item.medicineName == medicine &&
                   item.expiryDate.isAfter(DateTime.now()))
               .toList();
+
           if (validMedicineBatches.isNotEmpty) {
-            final soonestExpiry = validMedicineBatches
-                .map((item) => item.expiryDate)
-                .reduce((a, b) => a.isBefore(b) ? a : b);
+            final soonestBatch = validMedicineBatches
+                .reduce((a, b) => a.expiryDate.isBefore(b.expiryDate) ? a : b);
+            selectedBatchId = soonestBatch.batchId;
             final daysUntilExpiry =
-                soonestExpiry.difference(DateTime.now()).inDays;
+                soonestBatch.expiryDate.difference(DateTime.now()).inDays;
+
             if (daysUntilExpiry >= 0 && daysUntilExpiry <= 90) {
-              score += 100;
+              double expiryUrgency = (90 - daysUntilExpiry) / 90.0;
+              score += 100 * expiryUrgency;
               reasons.add('Near Expiry (${daysUntilExpiry}d)');
             }
           }
@@ -334,6 +338,7 @@ class OptimizationService {
               'qty': qtyToTake,
               'score': score,
               'reasoning': reasons.join(' + '),
+              'batchId': selectedBatchId,
             };
           }
         }
@@ -349,6 +354,7 @@ class OptimizationService {
             quantity: qtyTaken,
             score: (bestDonorMatch['score'] as num?)?.toDouble() ?? 0.0,
             reasoning: bestDonorMatch['reasoning']?.toString() ?? '',
+            batchId: bestDonorMatch['batchId']?.toString(),
           ));
 
           // Update state
