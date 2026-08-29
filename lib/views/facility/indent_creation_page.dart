@@ -424,10 +424,6 @@ class _IndentCreationPageState extends ConsumerState<IndentCreationPage> {
       ),
       child: const Row(
         children: [
-          SizedBox(
-              width: 40,
-              child: Icon(Icons.check_box_outline_blank,
-                  color: MediColors.textMuted, size: 20)),
           Expanded(
               flex: 3,
               child: Text('Medicine',
@@ -511,14 +507,6 @@ class _IndentCreationPageState extends ConsumerState<IndentCreationPage> {
       padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
       child: Row(
         children: [
-          SizedBox(
-              width: 40,
-              child: Checkbox(
-                  value: true,
-                  onChanged: (v) {},
-                  activeColor: MediColors.surfaceLight,
-                  checkColor: MediColors.textPrimary,
-                  side: const BorderSide(color: MediColors.textMuted))),
           Expanded(
             flex: 3,
             child:
