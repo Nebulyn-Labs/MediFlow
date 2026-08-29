@@ -47,6 +47,10 @@ class _AdminOverviewState extends ConsumerState<AdminOverview> {
   String _searchQuery = '';
   final TextEditingController _searchController = TextEditingController();
 
+  // ---- region filter state (Issue #149) ----
+  static const String _allRegionsOption = 'All Regions';
+  String _selectedRegion = _allRegionsOption;
+
   // ---- filter state (Sprint 4) ----
   static const List<String> _filterOptions = [
     'All',
@@ -514,35 +518,46 @@ class _AdminOverviewState extends ConsumerState<AdminOverview> {
                           ],
                         ),
                         const SizedBox(height: 36),
-                        TextField(
-                          controller: _searchController,
-                          onChanged: (value) {
-                            setState(() {
-                              _searchQuery = value.trim().toLowerCase();
-                            });
-                          },
-                          decoration: InputDecoration(
-                            hintText:
-                                'Search facilities, regions, or medicines...',
-                            prefixIcon: const Icon(Icons.search),
-                            suffixIcon: _searchController.text.isNotEmpty
-                                ? IconButton(
-                                    icon: const Icon(Icons.clear, size: 18),
-                                    onPressed: () {
-                                      _searchController.clear();
-                                      setState(() {
-                                        _searchQuery = '';
-                                      });
-                                    },
-                                  )
-                                : null,
-                            filled: true,
-                            fillColor: colors.surface,
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(8),
-                              borderSide: BorderSide(color: colors.border),
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Expanded(
+                              child: TextField(
+                                controller: _searchController,
+                                onChanged: (value) {
+                                  setState(() {
+                                    _searchQuery = value.trim().toLowerCase();
+                                  });
+                                },
+                                decoration: InputDecoration(
+                                  hintText:
+                                      'Search facilities, regions, or medicines...',
+                                  prefixIcon: const Icon(Icons.search),
+                                  suffixIcon: _searchController.text.isNotEmpty
+                                      ? IconButton(
+                                          icon:
+                                              const Icon(Icons.clear, size: 18),
+                                          onPressed: () {
+                                            _searchController.clear();
+                                            setState(() {
+                                              _searchQuery = '';
+                                            });
+                                          },
+                                        )
+                                      : null,
+                                  filled: true,
+                                  fillColor: colors.surface,
+                                  border: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(8),
+                                    borderSide:
+                                        BorderSide(color: colors.border),
+                                  ),
+                                ),
+                              ),
                             ),
-                          ),
+                            const SizedBox(width: 12),
+                            _buildRegionDropdown(colors),
+                          ],
                         ),
                         const SizedBox(height: 20),
                         _buildFilterChips(),
@@ -609,9 +624,105 @@ class _AdminOverviewState extends ConsumerState<AdminOverview> {
     );
   }
 
+  Widget _buildKpiCard(String title, String value, IconData icon,
+      {bool isAlert = false, Color? iconColor, VoidCallback? onTap}) {
+    final colors = context.mediTheme;
+    final finalIconColor = isAlert ? colors.error : (iconColor ?? colors.info);
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
+        constraints: const BoxConstraints(minWidth: 160, maxWidth: 250),
+        padding: const EdgeInsets.all(24),
+        decoration: BoxDecoration(
+          color: colors.surface,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: colors.border),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Expanded(
+                    child: Text(title,
+                        style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w700,
+                            color: colors.textSecondary,
+                            letterSpacing: 0.5),
+                        overflow: TextOverflow.ellipsis)),
+                const SizedBox(width: 8),
+                Icon(icon, color: finalIconColor, size: 20),
+              ],
+            ),
+            const SizedBox(height: 16),
+            Text(value,
+                style: TextStyle(
+                    fontSize: 28,
+                    fontWeight: FontWeight.w800,
+                    color: colors.textPrimary)),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Distinct, sorted list of facility regions, used to populate the
+  /// region filter dropdown (Issue #149).
+  List<String> get _availableRegions {
+    final regions = _facilities
+        .map((f) => f.region.trim())
+        .where((r) => r.isNotEmpty)
+        .toSet()
+        .toList()
+      ..sort();
+    return [_allRegionsOption, ...regions];
+  }
+
+  Widget _buildRegionDropdown(MediFlowTheme colors) {
+    return Container(
+      height: 48,
+      padding: const EdgeInsets.symmetric(horizontal: 12),
+      decoration: BoxDecoration(
+        color: colors.surface,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: colors.border),
+      ),
+      child: DropdownButtonHideUnderline(
+        child: DropdownButton<String>(
+          value: _availableRegions.contains(_selectedRegion)
+              ? _selectedRegion
+              : _allRegionsOption,
+          icon: const Icon(Icons.arrow_drop_down_rounded, size: 20),
+          items: _availableRegions
+              .map((region) => DropdownMenuItem(
+                    value: region,
+                    child: Text(
+                      region,
+                      style: TextStyle(fontSize: 13, color: colors.textPrimary),
+                    ),
+                  ))
+              .toList(),
+          onChanged: (value) {
+            if (value == null) return;
+            setState(() {
+              _selectedRegion = value;
+            });
+          },
+        ),
+      ),
+    );
+  }
+
   Widget _buildFacilityHealthGrid() {
     final colors = context.mediTheme;
     final filteredFacilities = _facilities.where((f) {
+      final matchesRegion =
+          _selectedRegion == _allRegionsOption || f.region == _selectedRegion;
+      if (!matchesRegion) return false;
+
       if (_searchQuery.isEmpty) return true;
       final q = _searchQuery;
       return f.name.toLowerCase().contains(q) ||
@@ -632,7 +743,7 @@ class _AdminOverviewState extends ConsumerState<AdminOverview> {
                     fontSize: 16,
                     fontWeight: FontWeight.w700,
                     color: colors.textPrimary)),
-            if (_searchQuery.isNotEmpty)
+            if (_searchQuery.isNotEmpty || _selectedRegion != _allRegionsOption)
               Text(
                 '${filteredFacilities.length} of ${_facilities.length} facilities shown',
                 style: TextStyle(fontSize: 12, color: colors.textSecondary),
@@ -644,7 +755,9 @@ class _AdminOverviewState extends ConsumerState<AdminOverview> {
           Padding(
             padding: const EdgeInsets.symmetric(vertical: 16),
             child: Text(
-              'No facilities match your search query.',
+              _selectedRegion != _allRegionsOption
+                  ? 'No facilities match your search and region filter.'
+                  : 'No facilities match your search query.',
               style: TextStyle(color: colors.textSecondary),
             ),
           )
