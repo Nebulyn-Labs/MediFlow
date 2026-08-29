@@ -226,11 +226,11 @@ const bigQueryRecovery = createBigQueryRecovery({
   location: BQ_LOCATION,
 });
 
-async function insertBigQuery(tableName, rows, source) {
-  return bigQueryRecovery.insert(tableName, rows, { source });
+async function insertBigQuery(tableName, rows, source, dedupeKeys) {
+  return bigQueryRecovery.insert(tableName, rows, { source, dedupeKeys });
 }
 
-async function auditEvent({ eventId, action, entityType, entityId, before, after, facilityId, medicineName, metadata, actorId = null }) {
+async function auditEvent({ eventId, action, entityType, entityId, before, after, facilityId, medicineName, metadata, actorId = null, dedupeKey = null }) {
   await insertBigQuery("audit_events", {
     event_id: eventId,
     occurred_at: new Date().toISOString(),
@@ -244,7 +244,7 @@ async function auditEvent({ eventId, action, entityType, entityId, before, after
     before_json: safeJson(before),
     after_json: safeJson(after),
     metadata_json: safeJson(metadata),
-  }, "audit_event");
+  }, "audit_event", dedupeKey);
 }
 
 
@@ -311,6 +311,10 @@ exports.mirrorRequestToBigQuery = onDocumentWritten("requests/{requestId}", asyn
   const rowData = after || before || {};
   const action = !before && after ? "created" : before && after ? "updated" : "deleted";
 
+  // event.id is the CloudEvent's globally unique id: Firestore triggers can
+  // redeliver the same event at least once, and every redelivery carries
+  // this same id, so it's a safe, stable basis for BigQuery's insertId
+  // (unlike Date.now()/captured_at, which differ on every redelivery).
   await insertBigQuery("transfer_requests", {
     request_id: requestId,
     facility_id: rowData.facilityId || null,
@@ -322,7 +326,7 @@ exports.mirrorRequestToBigQuery = onDocumentWritten("requests/{requestId}", asyn
     notes: rowData.notes || null,
     captured_at: new Date().toISOString(),
     payload_json: safeJson(rowData),
-  }, "mirror_request");
+  }, "mirror_request", `${event.id}:transfer_request`);
 
   await auditEvent({
     eventId: `request_${requestId}_${Date.now()}`,
@@ -333,6 +337,7 @@ exports.mirrorRequestToBigQuery = onDocumentWritten("requests/{requestId}", asyn
     after,
     facilityId: rowData.facilityId,
     medicineName: rowData.medicineName,
+    dedupeKey: `${event.id}:audit`,
   });
 
   if (after?.notes && String(after.notes).toLowerCase().includes("ai predicted")) {
@@ -350,7 +355,7 @@ exports.mirrorRequestToBigQuery = onDocumentWritten("requests/{requestId}", asyn
       period_days: null,
       input_json: null,
       output_json: safeJson(after),
-    }, "mirror_ai_request");
+    }, "mirror_ai_request", `${event.id}:ai_decision`);
   }
 });
 
@@ -372,7 +377,8 @@ exports.onUserWritten = onDocumentWritten("users/{userId}", async (event) => {
       metadata: {
         oldRole: before?.role || null,
         newRole: after?.role || null
-      }
+      },
+      dedupeKey: `${event.id}:audit`,
     });
   }
 });
@@ -408,7 +414,7 @@ exports.mirrorInventoryToBigQuery = onDocumentWritten("inventory/{facilityId}/me
     status: after ? stockStatus(data) : "deleted",
     captured_at: new Date().toISOString(),
     payload_json: safeJson(data),
-  }, "mirror_inventory");
+  }, "mirror_inventory", `${event.id}:inventory_snapshot`);
 
   await auditEvent({
     eventId: `inventory_${facilityId}_${medicineId}_${Date.now()}`,
@@ -419,6 +425,7 @@ exports.mirrorInventoryToBigQuery = onDocumentWritten("inventory/{facilityId}/me
     after,
     facilityId,
     medicineName: data.medicineName,
+    dedupeKey: `${event.id}:audit`,
   });
 });
 
@@ -442,7 +449,7 @@ exports.mirrorUsageLogToBigQuery = onDocumentWritten("daily_usage_logs/{facility
     total_patients: Number(data.totalPatients || 0),
     captured_at: new Date().toISOString(),
     payload_json: safeJson(data),
-  })), "mirror_usage_log");
+  })), "mirror_usage_log", medicines.map((_, index) => `${event.id}:usage:${index}`));
 
   await auditEvent({
     eventId: `usage_${facilityId}_${logId}_${Date.now()}`,
@@ -452,6 +459,7 @@ exports.mirrorUsageLogToBigQuery = onDocumentWritten("daily_usage_logs/{facility
     before,
     after,
     facilityId,
+    dedupeKey: `${event.id}:audit`,
   });
 });
 

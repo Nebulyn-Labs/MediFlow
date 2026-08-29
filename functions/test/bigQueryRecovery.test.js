@@ -152,6 +152,82 @@ describe("BigQuery recovery", () => {
     assert.equal(documents.size, 0);
   });
 
+  it("keeps the insertId stable across redeliveries when rows carry a wall-clock field, given a dedupeKey (#316)", async () => {
+    const insertionIds = [];
+    const { firestore } = createFirestore();
+    const { recovery } = createRecovery({
+      firestore,
+      insert: async (rows) => {
+        insertionIds.push(rows[0].insertId);
+      },
+    });
+
+    // Simulate two redeliveries of the same logical CloudEvent: each carries
+    // a different wall-clock captured_at, but the same stable event id.
+    await recovery.insert(
+      "events",
+      { event_id: "evt-dup", captured_at: new Date("2026-07-22T00:00:00.000Z") },
+      { dedupeKeys: ["cloudevent-123"] }
+    );
+    await recovery.insert(
+      "events",
+      { event_id: "evt-dup", captured_at: new Date("2026-07-22T00:00:05.000Z") },
+      { dedupeKeys: ["cloudevent-123"] }
+    );
+
+    assert.equal(insertionIds.length, 2);
+    assert.equal(insertionIds[0], insertionIds[1]);
+  });
+
+  it("falls back to content hashing (varies with the row) when no dedupeKey is given", async () => {
+    const insertionIds = [];
+    const { firestore } = createFirestore();
+    const { recovery } = createRecovery({
+      firestore,
+      insert: async (rows) => {
+        insertionIds.push(rows[0].insertId);
+      },
+    });
+
+    await recovery.insert("events", { event_id: "evt-a" });
+    await recovery.insert("events", { event_id: "evt-b" });
+
+    assert.notEqual(insertionIds[0], insertionIds[1]);
+  });
+
+  it("reuses the original dedupeKey on recovery replay instead of content hashing", async () => {
+    let shouldFail = true;
+    let currentTime = new Date("2026-07-22T00:00:00.000Z");
+    const insertionIds = [];
+    const { firestore, documents } = createFirestore();
+    const { recovery } = createRecovery({
+      firestore,
+      insert: async (rows) => {
+        insertionIds.push(rows[0].insertId);
+        if (shouldFail) {
+          const error = new Error("service unavailable");
+          error.code = 503;
+          throw error;
+        }
+      },
+      overrides: { maxAttempts: 1, now: () => currentTime },
+    });
+
+    const queued = await recovery.insert(
+      "events",
+      { event_id: "evt-replay", captured_at: currentTime },
+      { dedupeKeys: ["cloudevent-replay"] }
+    );
+    assert.equal(documents.get(queued.failureId).dedupeKeys[0], "cloudevent-replay");
+
+    shouldFail = false;
+    currentTime = new Date("2026-07-22T00:01:00.000Z");
+    await recovery.recoverPending();
+
+    assert.equal(insertionIds.length, 2);
+    assert.equal(insertionIds[0], insertionIds[1]);
+  });
+
   it("queues an observable failure after a non-retryable error", async () => {
     const { firestore, documents } = createFirestore();
     const schemaError = new Error("invalid field");
