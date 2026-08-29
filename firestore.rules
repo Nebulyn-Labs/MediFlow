@@ -69,14 +69,38 @@ service cloud.firestore {
     match /requests/{requestId} {
       allow read: if isAdmin() || (isAuthenticated() && resource != null && isFacilityUser(resource.data.facilityId));
       allow create: if isAdmin() || (isAuthenticated() && request.resource.data.facilityId != null && isFacilityUser(request.resource.data.facilityId));
-      // Facility users may update their own requests but cannot escalate status to approved/fulfilled;
-      // only admins are permitted to approve or fulfil a request.
+      // Facility users may update their own requests but cannot escalate status to approved/fulfilled/dispatched/in_transit;
+      // only admins are permitted to escalate. Facility users can transition to verified.
       allow update: if isAdmin() ||
         (isAuthenticated()
          && isFacilityUser(resource.data.facilityId)
          && request.resource.data.facilityId == resource.data.facilityId
-         && !(request.resource.data.status in ['approved', 'fulfilled']));
+         && !(request.resource.data.status in ['approved', 'dispatched', 'in_transit', 'fulfilled']));
       allow delete: if (isAuthenticated() && isFacilityUser(resource.data.facilityId)); // Admin deletions must go through backend audit Callable Function
+
+      match /transfer_events/{eventId} {
+        allow read: if isAdmin() || (isAuthenticated() && isFacilityUser(get(/databases/$(database)/documents/requests/$(requestId)).data.facilityId));
+        allow create: if isAdmin() || (isAuthenticated() && isFacilityUser(get(/databases/$(database)/documents/requests/$(requestId)).data.facilityId));
+        allow update, delete: if false;
+      }
+    }
+
+    // Transfer Threads collection
+    match /transfer_threads/{threadId} {
+      allow read, update: if isAdmin() || (isAuthenticated() && resource != null && 
+        (isFacilityUser(resource.data.donorFacilityId) || isFacilityUser(resource.data.recipientFacilityId)));
+      allow create: if false; // Only Cloud Functions create threads
+      
+      match /messages/{messageId} {
+        allow read: if isAdmin() || (isAuthenticated() && 
+          (isFacilityUser(get(/databases/$(database)/documents/transfer_threads/$(threadId)).data.donorFacilityId) || 
+           isFacilityUser(get(/databases/$(database)/documents/transfer_threads/$(threadId)).data.recipientFacilityId)));
+        allow create: if isAuthenticated() && request.resource.data.senderId != null &&
+          isFacilityUser(request.resource.data.senderId) &&
+          (isFacilityUser(get(/databases/$(database)/documents/transfer_threads/$(threadId)).data.donorFacilityId) || 
+           isFacilityUser(get(/databases/$(database)/documents/transfer_threads/$(threadId)).data.recipientFacilityId));
+        allow update, delete: if false;
+      }
     }
 
     // Audit Logs collection
