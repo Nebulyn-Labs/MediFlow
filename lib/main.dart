@@ -11,6 +11,7 @@ import 'package:med_supply_prototype/theme/medi_flow_theme.dart';
 import 'package:med_supply_prototype/views/shared/not_found_page.dart';
 
 import 'services/firebase_setup.dart';
+import 'services/role_guard.dart';
 import 'views/admin/admin_indent_approval_page.dart';
 import 'views/admin/admin_indent_status_page.dart';
 // Admin Pages
@@ -120,11 +121,30 @@ String? authRedirect(BuildContext context, GoRouterState state) {
   return null;
 }
 
+/// Full guard used by [_router]: [authRedirect] for authentication plus a
+/// role- and facility-aware authorization check resolved from Firestore
+/// (cached — see `resolveUserRole` in `services/role_guard.dart`).
+Future<String?> routeGuard(BuildContext context, GoRouterState state) async {
+  final unauthenticatedRedirect = authRedirect(context, state);
+  if (unauthenticatedRedirect != null) return unauthenticatedRedirect;
+
+  final user = FirebaseAuth.instance.currentUser;
+  // Signed-out users only ever reach auth routes past this point.
+  if (user == null) return null;
+
+  final resolved = await resolveUserRole(user.uid);
+  return authorizedLocation(
+    uri: state.uri.toString(),
+    role: resolved?.role,
+    facilityId: resolved?.facilityId,
+  );
+}
+
 final _router = GoRouter(
   navigatorKey: _rootNavigatorKey,
   initialLocation: '/',
   errorBuilder: (context, state) => const NotFoundPage(),
-  redirect: authRedirect,
+  redirect: routeGuard,
   routes: [
     GoRoute(
       path: '/',
