@@ -26,6 +26,8 @@ class FakeFirebaseService implements FirebaseService {
   final List<InventoryItem> inventory;
   final List<MedRequest> requests;
   int getFacilitiesCallCount = 0;
+  int streamAllMedicinesCallCount = 0;
+  int streamRequestsCallCount = 0;
 
   FakeFirebaseService({
     required this.facilities,
@@ -53,11 +55,13 @@ class FakeFirebaseService implements FirebaseService {
 
   @override
   Stream<List<InventoryItem>> streamAllMedicines() {
+    streamAllMedicinesCallCount++;
     return Stream.value(inventory);
   }
 
   @override
   Stream<List<MedRequest>> streamRequests(String? facilityId) {
+    streamRequestsCallCount++;
     if (facilityId != null) {
       return Stream.value(
           requests.where((r) => r.facilityId == facilityId).toList());
@@ -351,6 +355,36 @@ void main() {
 
       // PolylineLayer should not have any polyline since showRoutes is false initially
       expect(find.byType(PolylineLayer), findsNothing);
+    });
+
+    testWidgets(
+        'Generate Optimal Routes does not reopen Firestore streams (#322)',
+        (WidgetTester tester) async {
+      tester.view.physicalSize = const Size(1920, 1080);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
+      final firebase = FakeFirebaseService(
+        facilities: [donor, recipient],
+        inventory: [inventory],
+        requests: [request],
+      );
+
+      await tester.pumpWidget(createWidgetUnderTest(
+        [recommendation],
+        firebaseService: firebase,
+      ));
+      await tester.pumpAndSettle();
+
+      expect(firebase.streamAllMedicinesCallCount, 1);
+      expect(firebase.streamRequestsCallCount, 1);
+
+      await tester.tap(find.text('Generate Optimal Routes'));
+      await tester.pumpAndSettle();
+
+      expect(firebase.streamAllMedicinesCallCount, 1);
+      expect(firebase.streamRequestsCallCount, 1);
     });
 
     testWidgets('generates routes, displays recommendations and AI summary',

@@ -42,11 +42,24 @@ class _ActiveIndentsPageState extends ConsumerState<ActiveIndentsPage> {
   int _selectedPeriod = 30;
   RequestStatus? _selectedHistoryStatus;
   _IndentSortOption _selectedHistorySort = _IndentSortOption.newestFirst;
+  late Stream<List<MedRequest>> _requestsStream;
 
   @override
   void initState() {
     super.initState();
+    // One requests listener for drafts and history; split locally (#322).
+    _requestsStream =
+        ref.read(firebaseServiceProvider).streamRequests(widget.facilityId);
     _fetchInventory();
+  }
+
+  @override
+  void didUpdateWidget(ActiveIndentsPage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.facilityId != widget.facilityId) {
+      _requestsStream =
+          ref.read(firebaseServiceProvider).streamRequests(widget.facilityId);
+    }
   }
 
   @override
@@ -781,628 +794,600 @@ class _ActiveIndentsPageState extends ConsumerState<ActiveIndentsPage> {
   }
 
   // ----- Drafts List -----
-  Widget _draftsList() {
-    return StreamBuilder<List<MedRequest>>(
-      stream:
-          ref.read(firebaseServiceProvider).streamRequests(widget.facilityId),
-      builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Column(
-            children: [
-              SkeletonCard(height: 140),
-              SizedBox(height: 12),
-              SkeletonCard(height: 140),
-            ],
-          );
-        }
-        if (snapshot.hasError) {
-          return Center(
-              child: Text('Error: ${snapshot.error}',
-                  style: const TextStyle(color: MediColors.error)));
-        }
-        final drafts = snapshot.data
-                ?.where((r) => r.status == RequestStatus.draft)
-                .toList() ??
+  Widget _draftsList(AsyncSnapshot<List<MedRequest>> snapshot) {
+    if (snapshot.connectionState == ConnectionState.waiting) {
+      return const Column(
+        children: [
+          SkeletonCard(height: 140),
+          SizedBox(height: 12),
+          SkeletonCard(height: 140),
+        ],
+      );
+    }
+    if (snapshot.hasError) {
+      return Center(
+          child: Text('Error: ${snapshot.error}',
+              style: const TextStyle(color: MediColors.error)));
+    }
+    final drafts =
+        snapshot.data?.where((r) => r.status == RequestStatus.draft).toList() ??
             [];
-        if (drafts.isEmpty) {
-          return Center(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(vertical: 32),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(Icons.assignment_outlined,
-                      size: 72,
-                      color: MediColors.textMuted.withValues(alpha: 0.5)),
-                  const SizedBox(height: 20),
-                  const Text('No Active Indents',
-                      style: TextStyle(
-                          color: MediColors.textPrimary,
-                          fontSize: 18,
-                          fontWeight: FontWeight.w700)),
+    if (drafts.isEmpty) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 32),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.assignment_outlined,
+                  size: 72, color: MediColors.textMuted.withValues(alpha: 0.5)),
+              const SizedBox(height: 20),
+              const Text('No Active Indents',
+                  style: TextStyle(
+                      color: MediColors.textPrimary,
+                      fontSize: 18,
+                      fontWeight: FontWeight.w700)),
+              const SizedBox(height: 8),
+              const Padding(
+                padding: EdgeInsets.symmetric(horizontal: 32),
+                child: Text(
+                  'You have no active supply requests right now. '
+                  'Use the AI analysis above to create a new indent.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(color: MediColors.textMuted, fontSize: 13),
+                ),
+              ),
+              const SizedBox(height: 20),
+              FilledButton.icon(
+                onPressed: _goToCreateIndent,
+                icon: const Icon(Icons.add_circle_outline, size: 18),
+                label: const Text('Create New Indent'),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _sectionHeader('Pending Requests'),
+        const SizedBox(height: 12),
+        ListView.builder(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          itemCount: drafts.length,
+          itemBuilder: (context, idx) {
+            final draft = drafts[idx];
+            if (!_draftControllers.containsKey(draft.id)) {
+              _draftControllers[draft.id] =
+                  TextEditingController(text: draft.quantity.toString());
+            }
+            final medicineInfo = Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(draft.medicineName,
+                    style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: MediColors.textPrimary)),
+                const SizedBox(height: 4),
+                Text('Created: ${DateFormatter.formatDate(draft.requestDate)}',
+                    style: const TextStyle(
+                        fontSize: 12, color: MediColors.textMuted)),
+                if (draft.notes != null) ...[
                   const SizedBox(height: 8),
-                  const Padding(
-                    padding: EdgeInsets.symmetric(horizontal: 32),
-                    child: Text(
-                      'You have no active supply requests right now. '
-                      'Use the AI analysis above to create a new indent.',
-                      textAlign: TextAlign.center,
-                      style:
-                          TextStyle(color: MediColors.textMuted, fontSize: 13),
-                    ),
+                  Text(draft.notes!,
+                      style: const TextStyle(
+                          fontSize: 12,
+                          color: MediColors.info,
+                          fontStyle: FontStyle.italic)),
+                ],
+                const SizedBox(height: 6),
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: draft.type == RequestType.surplus
+                        ? MediColors.successOverlay
+                        : MediColors.errorOverlay,
+                    borderRadius: BorderRadius.circular(6),
                   ),
-                  const SizedBox(height: 20),
-                  FilledButton.icon(
-                    onPressed: _goToCreateIndent,
-                    icon: const Icon(Icons.add_circle_outline, size: 18),
-                    label: const Text('Create New Indent'),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        draft.type == RequestType.surplus
+                            ? Icons.arrow_upward_rounded
+                            : Icons.trending_down_rounded,
+                        color: draft.type == RequestType.surplus
+                            ? MediColors.success
+                            : MediColors.error,
+                        size: 12,
+                      ),
+                      const SizedBox(width: 4),
+                      Text(
+                        draft.type == RequestType.surplus
+                            ? 'Offering Redistribution'
+                            : 'Requesting Restock',
+                        style: TextStyle(
+                            color: draft.type == RequestType.surplus
+                                ? MediColors.success
+                                : MediColors.error,
+                            fontSize: 11,
+                            fontWeight: FontWeight.bold),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            );
+
+            final quantityEditor = Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Flexible(
+                  child: Text('Request Qty: ',
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(color: MediColors.textSecondary)),
+                ),
+                const SizedBox(width: 8),
+                SizedBox(
+                  width: 80,
+                  height: 40,
+                  child: TextField(
+                    controller: _draftControllers[draft.id],
+                    keyboardType: TextInputType.number,
+                    style: const TextStyle(fontSize: 14),
+                    decoration: InputDecoration(
+                        contentPadding:
+                            const EdgeInsets.symmetric(horizontal: 10),
+                        border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(8))),
+                    onSubmitted: (val) {
+                      final qty = int.tryParse(val) ?? draft.quantity;
+                      _updateQuantity(draft.id, qty);
+                    },
+                  ),
+                ),
+              ],
+            );
+
+            final actions = Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                IconButton(
+                    icon: const Icon(Icons.delete_outline_rounded,
+                        color: MediColors.error),
+                    onPressed: _isDraftActionInProgress
+                        ? null
+                        : () => _deleteDraft(draft.id),
+                    tooltip: 'Remove Draft'),
+                const SizedBox(width: 8),
+                FilledButton.icon(
+                  onPressed: _isDraftActionInProgress
+                      ? null
+                      : () => _finalSubmit(draft.id),
+                  icon: const Icon(Icons.send_rounded, size: 16),
+                  label: const Text('Submit to CMS'),
+                  style: FilledButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 16, vertical: 12)),
+                ),
+              ],
+            );
+
+            return Card(
+              margin: const EdgeInsets.only(bottom: 16),
+              child: Padding(
+                padding: const EdgeInsets.all(20),
+                child: LayoutBuilder(
+                  builder: (context, constraints) {
+                    final isNarrow = constraints.maxWidth < 560;
+                    if (isNarrow) {
+                      return Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          medicineInfo,
+                          const SizedBox(height: 16),
+                          quantityEditor,
+                          const SizedBox(height: 16),
+                          Align(
+                              alignment: Alignment.centerRight, child: actions),
+                        ],
+                      );
+                    }
+                    return Row(
+                      children: [
+                        Expanded(flex: 3, child: medicineInfo),
+                        Expanded(flex: 2, child: quantityEditor),
+                        actions,
+                      ],
+                    );
+                  },
+                ),
+              ),
+            );
+          },
+        ),
+      ],
+    );
+  }
+
+  Widget _historyList(AsyncSnapshot<List<MedRequest>> snapshot) {
+    if (snapshot.connectionState == ConnectionState.waiting) {
+      return const SizedBox.shrink();
+    }
+    if (snapshot.hasError || snapshot.data == null) {
+      return const SizedBox.shrink();
+    }
+    final allHistory = snapshot.data!
+        .where((request) => request.status != RequestStatus.draft)
+        .toList();
+    final history = _filterAndSortHistory(snapshot.data!);
+
+    if (allHistory.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const SizedBox(height: 32),
+        Wrap(
+          spacing: 12,
+          runSpacing: 8,
+          crossAxisAlignment: WrapCrossAlignment.center,
+          children: [
+            _sectionHeader('Request History'),
+            OutlinedButton.icon(
+              onPressed: _isExportingHistoryCsv || history.isEmpty
+                  ? null
+                  : () => _exportRequestHistoryCsv(history),
+              icon: _isExportingHistoryCsv
+                  ? const SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(Icons.file_download_outlined, size: 18),
+              label: const Text('Export CSV'),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: MediColors.textSecondary,
+                side: const BorderSide(color: MediColors.border),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10)),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        _historyControls(history.length, allHistory.length),
+        const SizedBox(height: 12),
+        if (history.isEmpty)
+          Card(
+            child: Padding(
+              padding: const EdgeInsets.all(24),
+              child: Row(
+                children: [
+                  Icon(Icons.search_off_rounded,
+                      color: MediColors.textMuted.withValues(alpha: 0.8)),
+                  const SizedBox(width: 12),
+                  const Expanded(
+                    child: Text(
+                      'No requests match the selected filter.',
+                      style: TextStyle(color: MediColors.textSecondary),
+                    ),
                   ),
                 ],
               ),
             ),
-          );
-        }
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _sectionHeader('Pending Requests'),
-            const SizedBox(height: 12),
-            ListView.builder(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              itemCount: drafts.length,
-              itemBuilder: (context, idx) {
-                final draft = drafts[idx];
-                if (!_draftControllers.containsKey(draft.id)) {
-                  _draftControllers[draft.id] =
-                      TextEditingController(text: draft.quantity.toString());
-                }
-                final medicineInfo = Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(draft.medicineName,
-                        style: const TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
-                            color: MediColors.textPrimary)),
-                    const SizedBox(height: 4),
-                    Text(
-                        'Created: ${DateFormatter.formatDate(draft.requestDate)}',
-                        style: const TextStyle(
-                            fontSize: 12, color: MediColors.textMuted)),
-                    if (draft.notes != null) ...[
-                      const SizedBox(height: 8),
-                      Text(draft.notes!,
-                          style: const TextStyle(
-                              fontSize: 12,
-                              color: MediColors.info,
-                              fontStyle: FontStyle.italic)),
-                    ],
-                    const SizedBox(height: 6),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 8, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: draft.type == RequestType.surplus
-                            ? MediColors.successOverlay
-                            : MediColors.errorOverlay,
-                        borderRadius: BorderRadius.circular(6),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(
-                            draft.type == RequestType.surplus
-                                ? Icons.arrow_upward_rounded
-                                : Icons.trending_down_rounded,
-                            color: draft.type == RequestType.surplus
-                                ? MediColors.success
-                                : MediColors.error,
-                            size: 12,
-                          ),
-                          const SizedBox(width: 4),
-                          Text(
-                            draft.type == RequestType.surplus
-                                ? 'Offering Redistribution'
-                                : 'Requesting Restock',
-                            style: TextStyle(
-                                color: draft.type == RequestType.surplus
-                                    ? MediColors.success
-                                    : MediColors.error,
-                                fontSize: 11,
-                                fontWeight: FontWeight.bold),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                );
+          ),
+        ListView.builder(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          itemCount: history.length,
+          itemBuilder: (context, idx) {
+            final req = history[idx];
+            final isRejected = req.status == RequestStatus.rejected;
+            final needsReview = req.status == RequestStatus.needsManualReview;
+            final hasResolution = req.resolvedAt != null;
 
-                final quantityEditor = Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Flexible(
-                      child: Text('Request Qty: ',
-                          overflow: TextOverflow.ellipsis,
-                          style:
-                              const TextStyle(color: MediColors.textSecondary)),
-                    ),
-                    const SizedBox(width: 8),
-                    SizedBox(
-                      width: 80,
-                      height: 40,
-                      child: TextField(
-                        controller: _draftControllers[draft.id],
-                        keyboardType: TextInputType.number,
-                        style: const TextStyle(fontSize: 14),
-                        decoration: InputDecoration(
-                            contentPadding:
-                                const EdgeInsets.symmetric(horizontal: 10),
-                            border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(8))),
-                        onSubmitted: (val) {
-                          final qty = int.tryParse(val) ?? draft.quantity;
-                          _updateQuantity(draft.id, qty);
-                        },
-                      ),
-                    ),
-                  ],
-                );
+            final Color statusColor;
+            switch (req.status) {
+              case RequestStatus.approved:
+                statusColor = MediColors.success;
+                break;
+              case RequestStatus.rejected:
+                statusColor = MediColors.error;
+                break;
+              case RequestStatus.pending:
+                statusColor = MediColors.warning;
+                break;
+              case RequestStatus.fulfilled:
+                statusColor = MediColors.info;
+                break;
+              case RequestStatus.needsManualReview:
+                statusColor = MediColors.violet;
+                break;
+              default:
+                statusColor = MediColors.textMuted;
+            }
 
-                final actions = Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    IconButton(
-                        icon: const Icon(Icons.delete_outline_rounded,
-                            color: MediColors.error),
-                        onPressed: _isDraftActionInProgress
-                            ? null
-                            : () => _deleteDraft(draft.id),
-                        tooltip: 'Remove Draft'),
-                    const SizedBox(width: 8),
-                    FilledButton.icon(
-                      onPressed: _isDraftActionInProgress
-                          ? null
-                          : () => _finalSubmit(draft.id),
-                      icon: const Icon(Icons.send_rounded, size: 16),
-                      label: const Text('Submit to CMS'),
-                      style: FilledButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 16, vertical: 12)),
-                    ),
-                  ],
-                );
+            String resolutionText = '';
+            if (hasResolution) {
+              final resDate = req.resolvedAt!;
+              resolutionText =
+                  'Resolved: ${DateFormatter.formatDate(resDate)} ${resDate.hour.toString().padLeft(2, '0')}:${resDate.minute.toString().padLeft(2, '0')}';
+            }
 
-                return Card(
-                  margin: const EdgeInsets.only(bottom: 16),
-                  child: Padding(
-                    padding: const EdgeInsets.all(20),
-                    child: LayoutBuilder(
-                      builder: (context, constraints) {
-                        final isNarrow = constraints.maxWidth < 560;
-                        if (isNarrow) {
-                          return Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              medicineInfo,
-                              const SizedBox(height: 16),
-                              quantityEditor,
-                              const SizedBox(height: 16),
-                              Align(
-                                  alignment: Alignment.centerRight,
-                                  child: actions),
-                            ],
-                          );
-                        }
-                        return Row(
-                          children: [
-                            Expanded(flex: 3, child: medicineInfo),
-                            Expanded(flex: 2, child: quantityEditor),
-                            actions,
-                          ],
-                        );
-                      },
-                    ),
-                  ),
-                );
-              },
-            ),
-          ],
-        );
-      },
-    );
-  }
-
-  Widget _historyList() {
-    return StreamBuilder<List<MedRequest>>(
-      stream:
-          ref.read(firebaseServiceProvider).streamRequests(widget.facilityId),
-      builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return const SizedBox.shrink();
-        }
-        if (snapshot.hasError || snapshot.data == null) {
-          return const SizedBox.shrink();
-        }
-        final allHistory = snapshot.data!
-            .where((request) => request.status != RequestStatus.draft)
-            .toList();
-        final history = _filterAndSortHistory(snapshot.data!);
-
-        if (allHistory.isEmpty) {
-          return const SizedBox.shrink();
-        }
-
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const SizedBox(height: 32),
-            Wrap(
-              spacing: 12,
-              runSpacing: 8,
-              crossAxisAlignment: WrapCrossAlignment.center,
+            final requestInfo = Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                _sectionHeader('Request History'),
-                OutlinedButton.icon(
-                  onPressed: _isExportingHistoryCsv || history.isEmpty
-                      ? null
-                      : () => _exportRequestHistoryCsv(history),
-                  icon: _isExportingHistoryCsv
-                      ? const SizedBox(
-                          width: 16,
-                          height: 16,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : const Icon(Icons.file_download_outlined, size: 18),
-                  label: const Text('Export CSV'),
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: MediColors.textSecondary,
-                    side: const BorderSide(color: MediColors.border),
-                    shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(10)),
+                Text(req.medicineName,
+                    style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: MediColors.textPrimary)),
+                const SizedBox(height: 4),
+                Text('Submitted: ${DateFormatter.formatDate(req.requestDate)}',
+                    style: const TextStyle(
+                        fontSize: 12, color: MediColors.textMuted)),
+                if (hasResolution) ...[
+                  const SizedBox(height: 2),
+                  Text(resolutionText,
+                      style: const TextStyle(
+                          fontSize: 12,
+                          color: MediColors.textSecondary,
+                          fontWeight: FontWeight.w500)),
+                ],
+                if (isRejected &&
+                    req.rejectionReason != null &&
+                    req.rejectionReason!.isNotEmpty) ...[
+                  const SizedBox(height: 8),
+                  Container(
+                    padding: const EdgeInsets.all(10),
+                    width: double.infinity,
+                    decoration: BoxDecoration(
+                      color: MediColors.errorOverlay,
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(
+                          color: MediColors.error.withValues(alpha: 0.3)),
+                    ),
+                    child: Text(
+                      'Rejection Reason: ${req.rejectionReason}',
+                      style: const TextStyle(
+                          fontSize: 12,
+                          color: MediColors.error,
+                          fontWeight: FontWeight.w600),
+                    ),
                   ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 12),
-            _historyControls(history.length, allHistory.length),
-            const SizedBox(height: 12),
-            if (history.isEmpty)
-              Card(
-                child: Padding(
-                  padding: const EdgeInsets.all(24),
+                ],
+                if (needsReview) ...[
+                  const SizedBox(height: 8),
+                  Container(
+                    padding: const EdgeInsets.all(10),
+                    width: double.infinity,
+                    decoration: BoxDecoration(
+                      color: MediColors.violet.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(
+                          color: MediColors.violet.withValues(alpha: 0.3)),
+                    ),
+                    child: const Text(
+                      'This request hit a system error while being processed. '
+                      'An administrator has been notified and will review it shortly — '
+                      'no action is needed from you.',
+                      style: TextStyle(
+                          fontSize: 12,
+                          color: MediColors.violet,
+                          fontWeight: FontWeight.w600),
+                    ),
+                  ),
+                ],
+                const SizedBox(height: 6),
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: req.type == RequestType.surplus
+                        ? MediColors.successOverlay
+                        : MediColors.errorOverlay,
+                    borderRadius: BorderRadius.circular(6),
+                  ),
                   child: Row(
+                    mainAxisSize: MainAxisSize.min,
                     children: [
-                      Icon(Icons.search_off_rounded,
-                          color: MediColors.textMuted.withValues(alpha: 0.8)),
-                      const SizedBox(width: 12),
-                      const Expanded(
-                        child: Text(
-                          'No requests match the selected filter.',
-                          style: TextStyle(color: MediColors.textSecondary),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ListView.builder(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              itemCount: history.length,
-              itemBuilder: (context, idx) {
-                final req = history[idx];
-                final isRejected = req.status == RequestStatus.rejected;
-                final needsReview =
-                    req.status == RequestStatus.needsManualReview;
-                final hasResolution = req.resolvedAt != null;
-
-                final Color statusColor;
-                switch (req.status) {
-                  case RequestStatus.approved:
-                    statusColor = MediColors.success;
-                    break;
-                  case RequestStatus.rejected:
-                    statusColor = MediColors.error;
-                    break;
-                  case RequestStatus.pending:
-                    statusColor = MediColors.warning;
-                    break;
-                  case RequestStatus.fulfilled:
-                    statusColor = MediColors.info;
-                    break;
-                  case RequestStatus.needsManualReview:
-                    statusColor = MediColors.violet;
-                    break;
-                  default:
-                    statusColor = MediColors.textMuted;
-                }
-
-                String resolutionText = '';
-                if (hasResolution) {
-                  final resDate = req.resolvedAt!;
-                  resolutionText =
-                      'Resolved: ${DateFormatter.formatDate(resDate)} ${resDate.hour.toString().padLeft(2, '0')}:${resDate.minute.toString().padLeft(2, '0')}';
-                }
-
-                final requestInfo = Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(req.medicineName,
-                        style: const TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
-                            color: MediColors.textPrimary)),
-                    const SizedBox(height: 4),
-                    Text(
-                        'Submitted: ${DateFormatter.formatDate(req.requestDate)}',
-                        style: const TextStyle(
-                            fontSize: 12, color: MediColors.textMuted)),
-                    if (hasResolution) ...[
-                      const SizedBox(height: 2),
-                      Text(resolutionText,
-                          style: const TextStyle(
-                              fontSize: 12,
-                              color: MediColors.textSecondary,
-                              fontWeight: FontWeight.w500)),
-                    ],
-                    if (isRejected &&
-                        req.rejectionReason != null &&
-                        req.rejectionReason!.isNotEmpty) ...[
-                      const SizedBox(height: 8),
-                      Container(
-                        padding: const EdgeInsets.all(10),
-                        width: double.infinity,
-                        decoration: BoxDecoration(
-                          color: MediColors.errorOverlay,
-                          borderRadius: BorderRadius.circular(8),
-                          border: Border.all(
-                              color: MediColors.error.withValues(alpha: 0.3)),
-                        ),
-                        child: Text(
-                          'Rejection Reason: ${req.rejectionReason}',
-                          style: const TextStyle(
-                              fontSize: 12,
-                              color: MediColors.error,
-                              fontWeight: FontWeight.w600),
-                        ),
-                      ),
-                    ],
-                    if (needsReview) ...[
-                      const SizedBox(height: 8),
-                      Container(
-                        padding: const EdgeInsets.all(10),
-                        width: double.infinity,
-                        decoration: BoxDecoration(
-                          color: MediColors.violet.withValues(alpha: 0.1),
-                          borderRadius: BorderRadius.circular(8),
-                          border: Border.all(
-                              color: MediColors.violet.withValues(alpha: 0.3)),
-                        ),
-                        child: const Text(
-                          'This request hit a system error while being processed. '
-                          'An administrator has been notified and will review it shortly — '
-                          'no action is needed from you.',
-                          style: TextStyle(
-                              fontSize: 12,
-                              color: MediColors.violet,
-                              fontWeight: FontWeight.w600),
-                        ),
-                      ),
-                    ],
-                    const SizedBox(height: 6),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 8, vertical: 4),
-                      decoration: BoxDecoration(
+                      Icon(
+                        req.type == RequestType.surplus
+                            ? Icons.arrow_upward_rounded
+                            : Icons.trending_down_rounded,
                         color: req.type == RequestType.surplus
-                            ? MediColors.successOverlay
-                            : MediColors.errorOverlay,
-                        borderRadius: BorderRadius.circular(6),
+                            ? MediColors.success
+                            : MediColors.error,
+                        size: 12,
                       ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(
-                            req.type == RequestType.surplus
-                                ? Icons.arrow_upward_rounded
-                                : Icons.trending_down_rounded,
+                      const SizedBox(width: 4),
+                      Text(
+                        req.type == RequestType.surplus
+                            ? 'Offering Redistribution'
+                            : 'Requesting Restock',
+                        style: TextStyle(
                             color: req.type == RequestType.surplus
                                 ? MediColors.success
                                 : MediColors.error,
-                            size: 12,
-                          ),
-                          const SizedBox(width: 4),
-                          Text(
-                            req.type == RequestType.surplus
-                                ? 'Offering Redistribution'
-                                : 'Requesting Restock',
-                            style: TextStyle(
-                                color: req.type == RequestType.surplus
-                                    ? MediColors.success
-                                    : MediColors.error,
-                                fontSize: 11,
-                                fontWeight: FontWeight.bold),
-                          ),
-                        ],
+                            fontSize: 11,
+                            fontWeight: FontWeight.bold),
                       ),
-                    ),
-                  ],
-                );
-
-                final statusBadge = Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                  decoration: BoxDecoration(
-                    color: statusColor.withValues(alpha: 0.12),
-                    borderRadius: BorderRadius.circular(8),
-                    border:
-                        Border.all(color: statusColor.withValues(alpha: 0.25)),
+                    ],
                   ),
-                  child: Text(
-                    req.status.label.toUpperCase(),
-                    style: TextStyle(
-                        color: statusColor,
-                        fontSize: 12,
-                        fontWeight: FontWeight.bold),
+                ),
+              ],
+            );
+
+            final statusBadge = Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              decoration: BoxDecoration(
+                color: statusColor.withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: statusColor.withValues(alpha: 0.25)),
+              ),
+              child: Text(
+                req.status.label.toUpperCase(),
+                style: TextStyle(
+                    color: statusColor,
+                    fontSize: 12,
+                    fontWeight: FontWeight.bold),
+              ),
+            );
+
+            final bool isDeliveryPending =
+                req.status == RequestStatus.dispatched ||
+                    req.status == RequestStatus.inTransit ||
+                    req.status == RequestStatus.received;
+            final bool isRecipient = req.type == RequestType.regularIndent ||
+                req.type == RequestType.shortage;
+
+            Widget? confirmDeliveryButton;
+            if (isDeliveryPending && isRecipient) {
+              confirmDeliveryButton = Padding(
+                padding: const EdgeInsets.only(left: 12.0),
+                child: FilledButton.icon(
+                  onPressed: () async {
+                    try {
+                      await ref
+                          .read(firebaseServiceProvider)
+                          .updateRequestStatus(req.id, RequestStatus.verified);
+                      if (context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                              content:
+                                  Text('Delivery confirmed successfully!')),
+                        );
+                      }
+                    } catch (e) {
+                      if (context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                              content: Text('Failed to confirm delivery: $e')),
+                        );
+                      }
+                    }
+                  },
+                  icon: const Icon(Icons.check_circle_outline, size: 16),
+                  label: const Text('Confirm Delivery'),
+                  style: FilledButton.styleFrom(
+                    backgroundColor: MediColors.success,
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                   ),
-                );
+                ),
+              );
+            }
 
-                final bool isDeliveryPending =
-                    req.status == RequestStatus.dispatched ||
-                        req.status == RequestStatus.inTransit ||
-                        req.status == RequestStatus.received;
-                final bool isRecipient =
-                    req.type == RequestType.regularIndent ||
-                        req.type == RequestType.shortage;
-
-                Widget? confirmDeliveryButton;
-                if (isDeliveryPending && isRecipient) {
-                  confirmDeliveryButton = Padding(
-                    padding: const EdgeInsets.only(left: 12.0),
-                    child: FilledButton.icon(
-                      onPressed: () async {
-                        try {
-                          await ref
-                              .read(firebaseServiceProvider)
-                              .updateRequestStatus(
-                                  req.id, RequestStatus.verified);
-                          if (context.mounted) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                  content:
-                                      Text('Delivery confirmed successfully!')),
-                            );
-                          }
-                        } catch (e) {
-                          if (context.mounted) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                  content:
-                                      Text('Failed to confirm delivery: $e')),
-                            );
-                          }
-                        }
-                      },
-                      icon: const Icon(Icons.check_circle_outline, size: 16),
-                      label: const Text('Confirm Delivery'),
-                      style: FilledButton.styleFrom(
-                        backgroundColor: MediColors.success,
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 16, vertical: 8),
-                      ),
-                    ),
-                  );
-                }
-
-                return Card(
-                  margin: const EdgeInsets.only(bottom: 16),
-                  child: Padding(
-                    padding: const EdgeInsets.all(20),
-                    child: LayoutBuilder(
-                      builder: (context, constraints) {
-                        final isNarrow = constraints.maxWidth < 560;
-                        if (isNarrow) {
-                          return Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
+            return Card(
+              margin: const EdgeInsets.only(bottom: 16),
+              child: Padding(
+                padding: const EdgeInsets.all(20),
+                child: LayoutBuilder(
+                  builder: (context, constraints) {
+                    final isNarrow = constraints.maxWidth < 560;
+                    if (isNarrow) {
+                      return Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          requestInfo,
+                          const SizedBox(height: 16),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
-                              requestInfo,
-                              const SizedBox(height: 16),
-                              Row(
-                                mainAxisAlignment:
-                                    MainAxisAlignment.spaceBetween,
-                                children: [
-                                  Text(
-                                    'Quantity: ${req.quantity}',
-                                    style: const TextStyle(
-                                        fontSize: 14,
-                                        fontWeight: FontWeight.bold,
-                                        color: MediColors.textPrimary),
-                                  ),
-                                  Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      statusBadge,
-                                      if (req.status ==
-                                              RequestStatus.approved ||
-                                          req.status ==
-                                              RequestStatus.fulfilled) ...[
-                                        const SizedBox(width: 8),
-                                        IconButton(
-                                          icon: const Icon(Icons.chat,
-                                              color: MediColors.primary),
-                                          onPressed: () => Navigator.push(
-                                              context,
-                                              MaterialPageRoute(
-                                                builder: (_) =>
-                                                    TransferChatPage(
-                                                  threadId: req.id,
-                                                  facilityId: widget.facilityId,
-                                                ),
-                                              )),
-                                        ),
-                                      ],
-                                      if (confirmDeliveryButton != null) ...[
-                                        const SizedBox(width: 8),
-                                        confirmDeliveryButton,
-                                      ],
-                                    ],
-                                  ),
-                                ],
-                              ),
-                            ],
-                          );
-                        }
-                        return Row(
-                          children: [
-                            Expanded(flex: 3, child: requestInfo),
-                            Expanded(
-                              flex: 2,
-                              child: Text(
+                              Text(
                                 'Quantity: ${req.quantity}',
                                 style: const TextStyle(
-                                    fontSize: 15,
+                                    fontSize: 14,
                                     fontWeight: FontWeight.bold,
                                     color: MediColors.textPrimary),
                               ),
-                            ),
-                            Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                statusBadge,
-                                if (req.status == RequestStatus.approved ||
-                                    req.status == RequestStatus.fulfilled) ...[
-                                  const SizedBox(width: 8),
-                                  IconButton(
-                                    icon: const Icon(Icons.chat,
-                                        color: MediColors.primary),
-                                    onPressed: () => Navigator.push(
-                                        context,
-                                        MaterialPageRoute(
-                                          builder: (_) => TransferChatPage(
-                                            threadId: req.id,
-                                            facilityId: widget.facilityId,
-                                          ),
-                                        )),
-                                  ),
+                              Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  statusBadge,
+                                  if (req.status == RequestStatus.approved ||
+                                      req.status ==
+                                          RequestStatus.fulfilled) ...[
+                                    const SizedBox(width: 8),
+                                    IconButton(
+                                      icon: const Icon(Icons.chat,
+                                          color: MediColors.primary),
+                                      onPressed: () => Navigator.push(
+                                          context,
+                                          MaterialPageRoute(
+                                            builder: (_) => TransferChatPage(
+                                              threadId: req.id,
+                                              facilityId: widget.facilityId,
+                                            ),
+                                          )),
+                                    ),
+                                  ],
+                                  if (confirmDeliveryButton != null) ...[
+                                    const SizedBox(width: 8),
+                                    confirmDeliveryButton,
+                                  ],
                                 ],
-                                if (confirmDeliveryButton != null) ...[
-                                  const SizedBox(width: 8),
-                                  confirmDeliveryButton,
-                                ],
-                              ],
-                            ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      );
+                    }
+                    return Row(
+                      children: [
+                        Expanded(flex: 3, child: requestInfo),
+                        Expanded(
+                          flex: 2,
+                          child: Text(
+                            'Quantity: ${req.quantity}',
+                            style: const TextStyle(
+                                fontSize: 15,
+                                fontWeight: FontWeight.bold,
+                                color: MediColors.textPrimary),
+                          ),
+                        ),
+                        Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            statusBadge,
+                            if (req.status == RequestStatus.approved ||
+                                req.status == RequestStatus.fulfilled) ...[
+                              const SizedBox(width: 8),
+                              IconButton(
+                                icon: const Icon(Icons.chat,
+                                    color: MediColors.primary),
+                                onPressed: () => Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (_) => TransferChatPage(
+                                        threadId: req.id,
+                                        facilityId: widget.facilityId,
+                                      ),
+                                    )),
+                              ),
+                            ],
+                            if (confirmDeliveryButton != null) ...[
+                              const SizedBox(width: 8),
+                              confirmDeliveryButton,
+                            ],
                           ],
-                        );
-                      },
-                    ),
-                  ),
-                );
-              },
-            ),
-          ],
-        );
-      },
+                        ),
+                      ],
+                    );
+                  },
+                ),
+              ),
+            );
+          },
+        ),
+      ],
     );
   }
 
@@ -1508,10 +1493,17 @@ class _ActiveIndentsPageState extends ConsumerState<ActiveIndentsPage> {
                     ),
                   ),
                   const SizedBox(height: 32),
-                  // ----- Draft Requests -----
-                  _draftsList(),
-                  // ----- Submitted Requests History -----
-                  _historyList(),
+                  StreamBuilder<List<MedRequest>>(
+                    stream: _requestsStream,
+                    builder: (context, snapshot) {
+                      return Column(
+                        children: [
+                          _draftsList(snapshot),
+                          _historyList(snapshot),
+                        ],
+                      );
+                    },
+                  ),
                 ],
               ),
             ),
