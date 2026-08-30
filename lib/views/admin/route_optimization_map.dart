@@ -33,10 +33,17 @@ class _RouteOptimizationMapState extends ConsumerState<RouteOptimizationMap> {
   // Stores the full RouteResult (polyline + road distance/duration) for each
   // multi-stop route, keyed by the donor facility id.
   Map<String, RouteResult> _roadRoutes = {};
+  late final Stream<List<InventoryItem>> _medicinesStream;
+  late final Stream<List<MedRequest>> _requestsStream;
 
   @override
   void initState() {
     super.initState();
+    final firebase = ref.read(firebaseServiceProvider);
+    // Cache once so Generate Optimal Routes (setState) does not tear down
+    // the Firestore listeners (#322).
+    _medicinesStream = firebase.streamAllMedicines();
+    _requestsStream = firebase.streamRequests(null);
     _loadData();
   }
 
@@ -223,12 +230,12 @@ class _RouteOptimizationMapState extends ConsumerState<RouteOptimizationMap> {
       backgroundColor: MediColors.bg,
       appBar: AppBar(title: const Text('Advanced Route Optimization')),
       body: StreamBuilder<List<InventoryItem>>(
-        stream: ref.watch(firebaseServiceProvider).streamAllMedicines(),
+        stream: _medicinesStream,
         builder: (context, invSnapshot) {
           final allMeds = invSnapshot.data ?? [];
 
           return StreamBuilder<List<MedRequest>>(
-            stream: ref.watch(firebaseServiceProvider).streamRequests(null),
+            stream: _requestsStream,
             builder: (context, snapshot) {
               final requests = snapshot.data ?? [];
 

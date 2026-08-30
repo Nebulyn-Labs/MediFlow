@@ -25,8 +25,43 @@ class SidebarLayout extends ConsumerStatefulWidget {
 }
 
 class _SidebarLayoutState extends ConsumerState<SidebarLayout> {
+  static final Stream<List<notif.NotificationModel>> _emptyNotifications =
+      Stream.value(const []);
+  static final Stream<List<InventoryItem>> _emptyInventory =
+      Stream.value(const []);
+
   bool _isExpanded = false;
   final ScrollController _mainScrollController = ScrollController();
+  late Stream<List<notif.NotificationModel>> _notificationsStream;
+  late Stream<List<InventoryItem>> _inventoryStream;
+
+  @override
+  void initState() {
+    super.initState();
+    _bindFacilityStreams();
+  }
+
+  @override
+  void didUpdateWidget(SidebarLayout oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.facilityId != widget.facilityId ||
+        oldWidget.role != widget.role) {
+      _bindFacilityStreams();
+    }
+  }
+
+  /// Cached so hover setState does not reopen Firestore listeners (#322).
+  void _bindFacilityStreams() {
+    if (widget.role == 'facility' && widget.facilityId != null) {
+      final firebase = ref.read(firebaseServiceProvider);
+      _notificationsStream = firebase.streamNotifications(widget.facilityId!);
+      _inventoryStream = firebase.streamInventory(widget.facilityId!);
+    } else {
+      _notificationsStream = _emptyNotifications;
+      _inventoryStream = _emptyInventory;
+    }
+  }
+
   @override
   void dispose() {
     _mainScrollController.dispose();
@@ -187,24 +222,14 @@ class _SidebarLayoutState extends ConsumerState<SidebarLayout> {
                           .copyWith(scrollbars: false),
                       child: SingleChildScrollView(
                         child: StreamBuilder<List<notif.NotificationModel>>(
-                          stream: widget.role == 'facility' &&
-                                  widget.facilityId != null
-                              ? ref
-                                  .watch(firebaseServiceProvider)
-                                  .streamNotifications(widget.facilityId!)
-                              : Stream.value([]),
+                          stream: _notificationsStream,
                           builder: (context, notifSnapshot) {
                             final notifications = notifSnapshot.data ?? [];
                             final unreadCount =
                                 notifications.where((n) => !n.isRead).length;
 
                             return StreamBuilder<List<InventoryItem>>(
-                              stream: widget.role == 'facility' &&
-                                      widget.facilityId != null
-                                  ? ref
-                                      .watch(firebaseServiceProvider)
-                                      .streamInventory(widget.facilityId!)
-                                  : Stream.value([]),
+                              stream: _inventoryStream,
                               builder: (context, snapshot) {
                                 final inventory = snapshot.data ?? [];
                                 // Use the centralized hasAlert getter from
