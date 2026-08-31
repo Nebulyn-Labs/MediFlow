@@ -34,7 +34,8 @@ class _FakeFirebaseService implements FirebaseService {
   });
 
   @override
-  Future<List<Facility>> getFacilities({List<String>? regions}) async => facilities;
+  Future<List<Facility>> getFacilities({List<String>? regions}) async =>
+      facilities;
 
   @override
   User? get currentUser => null;
@@ -50,7 +51,8 @@ class _FakeFirebaseService implements FirebaseService {
       Stream.value([]);
 
   @override
-  Stream<List<MedRequest>> streamRequestsForFacilities(List<String> facilityIds) =>
+  Stream<List<MedRequest>> streamRequestsForFacilities(
+          List<String> facilityIds) =>
       Stream.value([]);
 
   @override

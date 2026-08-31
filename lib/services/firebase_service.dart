@@ -149,7 +149,8 @@ class FirebaseService {
     }
     final snapshot = await query.get();
     return snapshot.docs
-        .map((doc) => Facility.fromMap(doc.data() as Map<String, dynamic>, doc.id))
+        .map((doc) =>
+            Facility.fromMap(doc.data() as Map<String, dynamic>, doc.id))
         .toList();
   }
 
@@ -509,9 +510,10 @@ class FirebaseService {
         .toList());
   }
 
-  Stream<List<MedRequest>> streamRequestsForFacilities(List<String> facilityIds) {
+  Stream<List<MedRequest>> streamRequestsForFacilities(
+      List<String> facilityIds) {
     if (facilityIds.isEmpty) return Stream.value([]);
-    
+
     if (facilityIds.length <= 30) {
       return _firestore
           .collection('requests')
@@ -528,7 +530,8 @@ class FirebaseService {
           i, i + 30 > facilityIds.length ? facilityIds.length : i + 30));
     }
 
-    final latestData = List<List<MedRequest>>.filled(chunkedFacilities.length, []);
+    final latestData =
+        List<List<MedRequest>>.filled(chunkedFacilities.length, []);
     late StreamController<List<MedRequest>> controller;
     final subscriptions = <StreamSubscription>[];
 
@@ -542,7 +545,7 @@ class FirebaseService {
               .map((snapshot) => snapshot.docs
                   .map((doc) => MedRequest.fromMap(doc.data(), doc.id))
                   .toList());
-          
+
           subscriptions.add(stream.listen((data) {
             latestData[i] = data;
             final combined = latestData.expand((e) => e).toList();
