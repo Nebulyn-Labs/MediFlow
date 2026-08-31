@@ -34,6 +34,10 @@ class _AdminOverviewState extends ConsumerState<AdminOverview> {
   String? _errorMessage;
   List<String> _failedFacilities = [];
   StreamSubscription? _requestsSub;
+  StreamSubscription? _evalsSub;
+
+  double _globalAIHealth = 0.0;
+  int _aiEvaluationsCount = 0;
 
   // ---- medicines pagination state (Issue #209) ----
   List<InventoryItem> _allMedicines = [];
@@ -65,6 +69,7 @@ class _AdminOverviewState extends ConsumerState<AdminOverview> {
   @override
   void dispose() {
     _requestsSub?.cancel();
+    _evalsSub?.cancel();
     _searchController.dispose();
     super.dispose();
   }
@@ -75,6 +80,7 @@ class _AdminOverviewState extends ConsumerState<AdminOverview> {
 
     if (!mounted) return;
     await _requestsSub?.cancel();
+    await _evalsSub?.cancel();
 
     // Reset medicines pagination on full refresh
     if (mounted) {
@@ -177,6 +183,25 @@ class _AdminOverviewState extends ConsumerState<AdminOverview> {
       },
       onError: (e) {
         debugPrint('Failed to stream facility requests: $e');
+      },
+    );
+
+    _evalsSub = firebaseService.streamGlobalForecastEvaluations().listen(
+      (evals) {
+        if (!mounted) return;
+        if (evals.isEmpty) return;
+        double totalMape = 0;
+        for (var e in evals) {
+          totalMape += e.mape;
+        }
+        setState(() {
+          _globalAIHealth =
+              (100.0 - (totalMape / evals.length)).clamp(0.0, 100.0);
+          _aiEvaluationsCount = evals.length;
+        });
+      },
+      onError: (e) {
+        debugPrint('Failed to stream AI evaluations: $e');
       },
     );
 
@@ -503,6 +528,15 @@ class _AdminOverviewState extends ConsumerState<AdminOverview> {
                               iconColor: colors.info,
                               onTap: () => context.go('/admin/approvals'),
                             ),
+                            if (_aiEvaluationsCount > 0)
+                              KpiCard(
+                                title: 'AI HEALTH',
+                                value: '${_globalAIHealth.toStringAsFixed(1)}%',
+                                icon: Icons.psychology_rounded,
+                                iconColor: _globalAIHealth > 85
+                                    ? colors.success
+                                    : colors.warning,
+                              ),
                             if (_needsManualReview > 0)
                               KpiCard(
                                 title: 'NEEDS REVIEW',

@@ -9,6 +9,7 @@ import 'package:med_supply_prototype/constants/colors.dart';
 import '../shared/confirm_logout_dialog.dart';
 import '../shared/skeleton_loaders.dart';
 import '../../utils/date_formatter.dart';
+import 'forecast_accuracy_page.dart';
 
 class FacilityOverview extends ConsumerStatefulWidget {
   final String facilityId;
@@ -301,6 +302,24 @@ class _FacilityOverviewState extends ConsumerState<FacilityOverview> {
                           : const Icon(Icons.analytics_outlined),
                       label: Text(
                           _isSimulating ? 'Running...' : 'Simulate Analytics'),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: MediColors.primary,
+                        side: const BorderSide(color: MediColors.primary),
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10)),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    OutlinedButton.icon(
+                      onPressed: () => Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => ForecastAccuracyPage(
+                              facilityId: widget.facilityId),
+                        ),
+                      ),
+                      icon: const Icon(Icons.auto_graph_rounded),
+                      label: const Text('Forecast Accuracy'),
                       style: OutlinedButton.styleFrom(
                         foregroundColor: MediColors.primary,
                         side: const BorderSide(color: MediColors.primary),

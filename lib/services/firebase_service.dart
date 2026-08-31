@@ -11,6 +11,7 @@ import '../models/request.dart';
 import '../models/audit_log.dart';
 import '../models/transfer_thread.dart';
 import '../models/transfer_message.dart';
+import '../models/forecast_evaluation.dart';
 import '../models/notification.dart' as import_notification;
 import 'simulation_service.dart';
 
@@ -598,6 +599,32 @@ class FirebaseService {
         .collection('items')
         .doc(notificationId)
         .update({'isRead': true});
+  }
+
+  // --- FORECAST EVALUATION ---
+
+  Stream<List<ForecastEvaluation>> streamForecastEvaluations(
+      String facilityId) {
+    return _firestore
+        .collection('forecast_evaluations')
+        .where('facilityId', isEqualTo: facilityId)
+        .orderBy('evaluatedAt', descending: true)
+        .limit(100)
+        .snapshots()
+        .map((snapshot) => snapshot.docs
+            .map((doc) => ForecastEvaluation.fromMap(doc.data(), doc.id))
+            .toList());
+  }
+
+  Stream<List<ForecastEvaluation>> streamGlobalForecastEvaluations() {
+    return _firestore
+        .collection('forecast_evaluations')
+        .orderBy('evaluatedAt', descending: true)
+        .limit(200)
+        .snapshots()
+        .map((snapshot) => snapshot.docs
+            .map((doc) => ForecastEvaluation.fromMap(doc.data(), doc.id))
+            .toList());
   }
 
   // --- CLEANUP & SEEDING ---

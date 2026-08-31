@@ -11,6 +11,7 @@ import 'package:med_supply_prototype/models/daily_usage_log.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:med_supply_prototype/services/firebase_service.dart';
 import 'package:med_supply_prototype/services/ai_service.dart';
+import 'package:med_supply_prototype/models/forecast_evaluation.dart';
 import 'package:med_supply_prototype/views/admin/admin_overview.dart';
 
 class _FakeAIService implements AIService {
@@ -52,6 +53,15 @@ class _FakeFirebaseService implements FirebaseService {
         lastDocument: null,
         hasMore: false,
       );
+
+  @override
+  Stream<List<ForecastEvaluation>> streamGlobalForecastEvaluations() =>
+      Stream.value([]);
+
+  @override
+  Stream<List<ForecastEvaluation>> streamForecastEvaluations(
+          String facilityId) =>
+      Stream.value([]);
 
   @override
   dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
