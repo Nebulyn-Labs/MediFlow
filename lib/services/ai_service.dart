@@ -9,6 +9,7 @@ import '../models/facility.dart';
 import '../models/inventory_item.dart';
 import '../constants/inventory_thresholds.dart';
 import '../utils/prompt_hardener.dart';
+import 'firebase_service.dart';
 
 typedef GeminiCaller = Future<String> Function(
   String prompt, {
@@ -135,7 +136,8 @@ class AIService {
     /// Computes the rule-based forecast and audit-logs it as a fallback.
     /// [error] is attached to the audit input when the remote call threw.
     Future<Map<String, dynamic>> localForecastResult(Object? error) async {
-      final result = _localForecast(medLogs, daysToForecast, medicineName);
+      final result = await _localForecast(medLogs, daysToForecast, medicineName,
+          facilityId: facilityId);
       await _logAIDecision(
         facilityId: facilityId,
         medicineName: medicineName,
@@ -211,17 +213,57 @@ class AIService {
     }
   }
 
-  Map<String, dynamic> _localForecast(List<Map<String, dynamic>> medLogs,
-      int daysToForecast, String medicineName) {
+  Future<Map<String, dynamic>> _localForecast(
+      List<Map<String, dynamic>> medLogs,
+      int daysToForecast,
+      String medicineName,
+      {String? facilityId}) async {
     double avg = medLogs.isEmpty
         ? 10.0
         : medLogs
                 .map((l) => (l['used'] as int).toDouble())
                 .fold(0.0, (a, b) => a + b) /
             medLogs.length;
-    int prediction = (avg * daysToForecast * 1.1).round();
 
-    String reason = "Standard historical average computation with 10% buffer.";
+    double bufferMultiplier = 1.1; // Default 10%
+    String bufferReason =
+        "Standard historical average computation with 10% buffer.";
+
+    if (ref != null && facilityId != null) {
+      try {
+        final evals = await ref!
+            .read(firebaseServiceProvider)
+            .streamForecastEvaluations(facilityId)
+            .first;
+        final medEvals =
+            evals.where((e) => e.medicineName == medicineName).toList();
+        if (medEvals.isNotEmpty) {
+          double totalPctBias = 0;
+          for (var e in medEvals) {
+            if (e.actualUsage > 0) {
+              totalPctBias += (e.bias / e.actualUsage);
+            }
+          }
+          double avgPctBias = totalPctBias / medEvals.length;
+
+          if (avgPctBias < -0.05) {
+            bufferMultiplier += avgPctBias.abs();
+            bufferReason =
+                "Dynamic buffer applied (+${(avgPctBias.abs() * 100).toStringAsFixed(1)}%) due to historical under-prediction by AI.";
+          } else if (avgPctBias > 0.05) {
+            bufferMultiplier = (bufferMultiplier - avgPctBias).clamp(1.0, 1.5);
+            bufferReason =
+                "Dynamic buffer reduced due to historical over-prediction by AI.";
+          }
+        }
+      } catch (e) {
+        debugPrint("Error fetching evaluations for dynamic buffer: $e");
+      }
+    }
+
+    int prediction = (avg * daysToForecast * bufferMultiplier).round();
+
+    String reason = bufferReason;
     if (medicineName == "Cough Syrup") {
       reason =
           "Seasonal logic: High respiratory demand expected in winters, stabilizing towards spring. Applied rural demographic factor.";

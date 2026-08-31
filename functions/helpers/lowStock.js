@@ -179,7 +179,7 @@ function createLowStockService({ serverTimestamp }) {
 
       for (const medDoc of medicinesSnapshot.docs) {
         const data = medDoc.data();
-        const { status, existed } = await syncAlertForMedicine(
+        await syncAlertForMedicine(
           db,
           facilityDoc.id,
           medDoc.id,

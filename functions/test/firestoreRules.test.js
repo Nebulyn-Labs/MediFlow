@@ -16,8 +16,7 @@
 
 'use strict';
 
-const { describe, it, test, before, after, beforeEach } = require('node:test');
-const assert = require('node:assert/strict');
+const { describe, test, before, after, beforeEach } = require('node:test');
 const {
   initializeTestEnvironment,
   assertFails,

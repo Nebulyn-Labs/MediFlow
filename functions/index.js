@@ -14,6 +14,7 @@ const { handleCspReport, getClientIp } = require("./helpers/cspReport");
 const { wrapUserContent, wrapDataContent } = require("./helpers/promptHardener");
 const { isValidQuantity } = require("./helpers/quantityValidation");
 const { runToolCallLoop } = require("./helpers/toolCallLoop");
+const { runForecastEvaluation } = require("./helpers/forecastEvaluation");
 const {
   ApprovalBusinessRuleError,
   handleApprovalFailure,
@@ -483,6 +484,14 @@ exports.checkLowStock = onSchedule("every 24 hours", async () => {
       await admin.messaging().send({ token, notification });
     },
   });
+});
+
+/**
+ * 2b. evaluateForecastAccuracy() - Scheduled daily CRON
+ * Compares past AI forecasts with actual usage and updates accuracy metrics.
+ */
+exports.evaluateForecastAccuracy = onSchedule("every 24 hours", async () => {
+  await runForecastEvaluation(bigquery, logger, BQ_DATASET);
 });
 
 /**
