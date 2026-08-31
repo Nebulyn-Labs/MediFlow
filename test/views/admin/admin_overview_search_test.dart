@@ -12,6 +12,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:med_supply_prototype/services/firebase_service.dart';
 import 'package:med_supply_prototype/services/ai_service.dart';
 import 'package:med_supply_prototype/views/admin/admin_overview.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 class _FakeAIService implements AIService {
   @override
@@ -33,13 +34,23 @@ class _FakeFirebaseService implements FirebaseService {
   });
 
   @override
-  Future<List<Facility>> getFacilities() async => facilities;
+  Future<List<Facility>> getFacilities({List<String>? regions}) async => facilities;
+
+  @override
+  User? get currentUser => null;
+
+  @override
+  FirebaseFirestore get firestore => throw UnimplementedError();
 
   @override
   Future<List<InventoryItem>> getInventoryOnce(String facilityId) async => [];
 
   @override
   Stream<List<MedRequest>> streamRequests(String? facilityId) =>
+      Stream.value([]);
+
+  @override
+  Stream<List<MedRequest>> streamRequestsForFacilities(List<String> facilityIds) =>
       Stream.value([]);
 
   @override

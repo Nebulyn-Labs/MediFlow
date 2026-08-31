@@ -94,7 +94,31 @@ class _AdminOverviewState extends ConsumerState<AdminOverview> {
 
     List<Facility> facs = [];
     try {
-      facs = await ref.read(firebaseServiceProvider).getFacilities();
+      final user = ref.read(firebaseServiceProvider).currentUser;
+      if (user != null) {
+        final userDoc = await ref
+            .read(firebaseServiceProvider)
+            .firestore
+            .collection('users')
+            .doc(user.uid)
+            .get();
+        final userData = userDoc.data();
+        if (userData != null && userData['role'] == 'regional_admin') {
+          final regionsRaw = userData['regions'] as List<dynamic>?;
+          if (regionsRaw != null) {
+            final regions = regionsRaw.map((e) => e.toString()).toList();
+            facs = await ref
+                .read(firebaseServiceProvider)
+                .getFacilities(regions: regions);
+          } else {
+            facs = await ref.read(firebaseServiceProvider).getFacilities();
+          }
+        } else {
+          facs = await ref.read(firebaseServiceProvider).getFacilities();
+        }
+      } else {
+        facs = await ref.read(firebaseServiceProvider).getFacilities();
+      }
     } catch (e) {
       debugPrint('Failed to load facilities: $e');
       if (mounted) {
@@ -147,7 +171,9 @@ class _AdminOverviewState extends ConsumerState<AdminOverview> {
       }),
     );
 
-    _requestsSub = firebaseService.streamRequests(null).listen(
+    _requestsSub = firebaseService
+        .streamRequestsForFacilities(facs.map((f) => f.id).toList())
+        .listen(
       (reqs) {
         if (!mounted) return;
         int shortage = 0;
@@ -200,8 +226,42 @@ class _AdminOverviewState extends ConsumerState<AdminOverview> {
 
     final requestId = ++_medicinesRequestId;
     if (mounted) setState(() => _medicinesLoading = true);
-
     try {
+      final user = ref.read(firebaseServiceProvider).currentUser;
+      final userDoc = user != null
+          ? await ref
+              .read(firebaseServiceProvider)
+              .firestore
+              .collection('users')
+              .doc(user.uid)
+              .get()
+          : null;
+      final isRegionalAdmin = userDoc?.data()?['role'] == 'regional_admin';
+
+      if (isRegionalAdmin) {
+        // For regional admins, we already fetched all their inventory in _loadData.
+        // We can just skip pagination and show everything, as the dataset is constrained to their regions.
+        if (_allMedicines.isEmpty && _facilities.isNotEmpty) {
+          List<InventoryItem> allRegionalMeds = [];
+          for (var f in _facilities) {
+            final inv =
+                await ref.read(firebaseServiceProvider).getInventoryOnce(f.id);
+            allRegionalMeds.addAll(inv);
+          }
+          if (mounted && requestId == _medicinesRequestId) {
+            setState(() {
+              _allMedicines = allRegionalMeds;
+              _medicinesHasMore = false;
+              _medicinesLoading = false;
+              _medicinesError = null;
+            });
+          }
+        } else {
+          if (mounted) setState(() => _medicinesLoading = false);
+        }
+        return;
+      }
+
       final result = await ref
           .read(firebaseServiceProvider)
           .getPaginatedMedicines(startAfter: _medicinesLastDoc);

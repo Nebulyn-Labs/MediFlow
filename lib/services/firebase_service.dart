@@ -1,4 +1,5 @@
 import 'dart:math';
+import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_auth/firebase_auth.dart' as auth;
@@ -29,6 +30,9 @@ class FirebaseService {
       {this.isDebugMode = kDebugMode}) {
     _simulation = SimulationService(_firestore);
   }
+
+  auth.User? get currentUser => _auth.currentUser;
+  FirebaseFirestore get firestore => _firestore;
 
   // --- AUTH & FACILITY ---
 
@@ -133,10 +137,19 @@ class FirebaseService {
     await _simulation.runFullSimulation(facilityId, facility.type);
   }
 
-  Future<List<Facility>> getFacilities() async {
-    final snapshot = await _firestore.collection('facilities').get();
+  Future<List<Facility>> getFacilities({List<String>? regions}) async {
+    Query query = _firestore.collection('facilities');
+    if (regions != null && regions.isNotEmpty) {
+      if (regions.length <= 30) {
+        query = query.where('region', whereIn: regions);
+      } else {
+        // Fallback or complex handling if > 30 regions (usually not the case)
+        query = query.where('region', whereIn: regions.sublist(0, 30));
+      }
+    }
+    final snapshot = await query.get();
     return snapshot.docs
-        .map((doc) => Facility.fromMap(doc.data(), doc.id))
+        .map((doc) => Facility.fromMap(doc.data() as Map<String, dynamic>, doc.id))
         .toList();
   }
 
@@ -494,6 +507,57 @@ class FirebaseService {
     return query.snapshots().map((snapshot) => snapshot.docs
         .map((doc) => MedRequest.fromMap(doc.data(), doc.id))
         .toList());
+  }
+
+  Stream<List<MedRequest>> streamRequestsForFacilities(List<String> facilityIds) {
+    if (facilityIds.isEmpty) return Stream.value([]);
+    
+    if (facilityIds.length <= 30) {
+      return _firestore
+          .collection('requests')
+          .where('facilityId', whereIn: facilityIds)
+          .snapshots()
+          .map((snapshot) => snapshot.docs
+              .map((doc) => MedRequest.fromMap(doc.data(), doc.id))
+              .toList());
+    }
+
+    final chunkedFacilities = <List<String>>[];
+    for (var i = 0; i < facilityIds.length; i += 30) {
+      chunkedFacilities.add(facilityIds.sublist(
+          i, i + 30 > facilityIds.length ? facilityIds.length : i + 30));
+    }
+
+    final latestData = List<List<MedRequest>>.filled(chunkedFacilities.length, []);
+    late StreamController<List<MedRequest>> controller;
+    final subscriptions = <StreamSubscription>[];
+
+    controller = StreamController<List<MedRequest>>.broadcast(
+      onListen: () {
+        for (var i = 0; i < chunkedFacilities.length; i++) {
+          final stream = _firestore
+              .collection('requests')
+              .where('facilityId', whereIn: chunkedFacilities[i])
+              .snapshots()
+              .map((snapshot) => snapshot.docs
+                  .map((doc) => MedRequest.fromMap(doc.data(), doc.id))
+                  .toList());
+          
+          subscriptions.add(stream.listen((data) {
+            latestData[i] = data;
+            final combined = latestData.expand((e) => e).toList();
+            controller.add(combined);
+          }));
+        }
+      },
+      onCancel: () {
+        for (var sub in subscriptions) {
+          sub.cancel();
+        }
+      },
+    );
+
+    return controller.stream;
   }
 
   Future<List<MedRequest>> getRequestsOnce([String? facilityId]) async {
