@@ -16,6 +16,7 @@ import 'package:med_supply_prototype/services/ai_service.dart';
 import 'package:med_supply_prototype/services/routing_service.dart';
 import 'package:med_supply_prototype/services/optimization_service.dart';
 import 'package:med_supply_prototype/views/admin/route_optimization_map.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 // -----------------------------------------------------------------------------
 // FAKES
@@ -34,10 +35,16 @@ class FakeFirebaseService implements FirebaseService {
   });
 
   @override
-  Future<List<Facility>> getFacilities() async {
+  Future<List<Facility>> getFacilities({List<String>? regions}) async {
     getFacilitiesCallCount++;
     return facilities;
   }
+
+  @override
+  User? get currentUser => null;
+
+  @override
+  FirebaseFirestore get firestore => throw UnimplementedError();
 
   late final Stream<List<MedRequest>> _requestsStream = Stream.value(requests);
 
@@ -89,10 +96,16 @@ class FailingFirebaseService implements FirebaseService {
   FailingFirebaseService(this.exception);
 
   @override
-  Future<List<Facility>> getFacilities() async {
+  Future<List<Facility>> getFacilities({List<String>? regions}) async {
     callCount++;
     throw exception;
   }
+
+  @override
+  User? get currentUser => null;
+
+  @override
+  FirebaseFirestore get firestore => throw UnimplementedError();
 
   @override
   Future<PaginatedMedicinesResult> getPaginatedMedicines(
@@ -135,13 +148,19 @@ class RetryableFirebaseService implements FirebaseService {
   });
 
   @override
-  Future<List<Facility>> getFacilities() async {
+  Future<List<Facility>> getFacilities({List<String>? regions}) async {
     callCount++;
     if (callCount <= failUntilAttempt) {
       throw Exception('Network unavailable');
     }
     return facilities;
   }
+
+  @override
+  User? get currentUser => null;
+
+  @override
+  FirebaseFirestore get firestore => throw UnimplementedError();
 
   @override
   Future<PaginatedMedicinesResult> getPaginatedMedicines(
