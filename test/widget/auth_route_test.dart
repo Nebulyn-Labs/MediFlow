@@ -1,4 +1,4 @@
-﻿import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -8,6 +8,7 @@ import 'package:mocktail/mocktail.dart';
 import 'package:med_supply_prototype/main.dart' show authRedirect;
 import 'package:med_supply_prototype/models/facility.dart';
 import 'package:med_supply_prototype/services/firebase_service.dart';
+import 'package:med_supply_prototype/services/notification_service.dart';
 import 'package:med_supply_prototype/views/auth/login_screen.dart';
 
 // -------- Mocks --------
@@ -17,6 +18,8 @@ class MockUserCredential extends Mock implements UserCredential {}
 class MockFacility extends Mock implements Facility {}
 
 class MockFirebaseService extends Mock implements FirebaseService {}
+
+class MockNotificationService extends Mock implements NotificationService {}
 
 // -------- Helpers --------
 
@@ -39,9 +42,16 @@ GoRouter createTestRouter({
         path: '/login/:role',
         builder: (context, state) {
           final role = state.pathParameters['role']!;
+
+          final mockNotificationService = MockNotificationService();
+          when(() => mockNotificationService.registerForPushNotifications())
+              .thenAnswer((_) async {});
+
           return ProviderScope(
             overrides: [
               firebaseServiceProvider.overrideWithValue(mockServiceProvider()),
+              notificationServiceProvider
+                  .overrideWithValue(mockNotificationService),
             ],
             child: LoginScreen(role: role),
           );
@@ -220,7 +230,7 @@ void main() {
       await tester.tap(find.byType(FilledButton));
       await tester.pumpAndSettle();
 
-      // Should still be on the login screen â€” no navigation occurred.
+      // Should still be on the login screen — no navigation occurred.
       expect(find.byType(TextField), findsAtLeast(2));
       expect(find.text('Login failed: No user found'), findsOneWidget);
     });

@@ -265,3 +265,69 @@ describe('Issue #274 – database wipe and delete rules enforcement', () => {
     await assertFails(db.doc('requests/req-001').delete());
   });
 });
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Issue #208 – facility head can register their own FCM token, but not escalate role
+// ═══════════════════════════════════════════════════════════════════════════════
+
+describe('Issue #208 – users fcmToken self-update guard', () => {
+  test('facility head CAN update their own fcmToken', async () => {
+    const db = authedDb(FACILITY_HEAD_UID, FACILITY_EMAIL);
+    await assertSucceeds(
+      db.doc(`users/${FACILITY_HEAD_UID}`).set(
+        { fcmToken: 'token-abc-123' },
+        { merge: true },
+      ),
+    );
+  });
+
+  test('admin CAN still update any user document', async () => {
+    const db = authedDb(ADMIN_UID, 'admin@mediflow.internal');
+    await assertSucceeds(
+      db.doc(`users/${FACILITY_HEAD_UID}`).set(
+        { fcmToken: 'token-xyz-789' },
+        { merge: true },
+      ),
+    );
+  });
+
+  test('facility head CANNOT self-promote role while updating fcmToken', async () => {
+    const db = authedDb(FACILITY_HEAD_UID, FACILITY_EMAIL);
+    await assertFails(
+      db.doc(`users/${FACILITY_HEAD_UID}`).set(
+        { fcmToken: 'token-abc-123', role: 'admin' },
+        { merge: true },
+      ),
+    );
+  });
+
+  test('facility head CANNOT smuggle a facilityId change alongside fcmToken', async () => {
+    const db = authedDb(FACILITY_HEAD_UID, FACILITY_EMAIL);
+    await assertFails(
+      db.doc(`users/${FACILITY_HEAD_UID}`).set(
+        { fcmToken: 'token-abc-123', facilityId: OTHER_FACILITY_ID },
+        { merge: true },
+      ),
+    );
+  });
+
+  test('facility head CANNOT update fcmToken on another user\'s document', async () => {
+    const db = authedDb(FACILITY_HEAD_UID, FACILITY_EMAIL);
+    await assertFails(
+      db.doc(`users/${ADMIN_UID}`).set(
+        { fcmToken: 'stolen-token' },
+        { merge: true },
+      ),
+    );
+  });
+
+  test('unauthenticated user CANNOT update any fcmToken', async () => {
+    const db = testEnv.unauthenticatedContext().firestore();
+    await assertFails(
+      db.doc(`users/${FACILITY_HEAD_UID}`).set(
+        { fcmToken: 'anon-token' },
+        { merge: true },
+      ),
+    );
+  });
+});

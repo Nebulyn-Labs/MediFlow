@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../services/firebase_service.dart';
+import '../../services/notification_service.dart';
 import 'package:med_supply_prototype/constants/colors.dart';
 
 class LoginScreen extends ConsumerStatefulWidget {
@@ -83,6 +84,13 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
             _emailController.text.trim(),
             _passwordController.text,
           );
+
+      // Register FCM token now that the user is authenticated, so the
+      // low-stock alert function can actually deliver push notifications.
+      await ref
+          .read(notificationServiceProvider)
+          .registerForPushNotifications();
+
       if (widget.role == 'facility') {
         final email = _emailController.text.trim();
         final fac =
