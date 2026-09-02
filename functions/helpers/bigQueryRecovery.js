@@ -88,6 +88,7 @@ function createBigQueryRecovery({
   maxAttempts = 3,
   maxRecoveryAttempts = 10,
   baseDelayMs = 250,
+  resolvedRetentionMs = 7 * 24 * 60 * 60 * 1000,
   wait = sleep,
   now = () => new Date(),
 }) {
@@ -305,7 +306,78 @@ function createBigQueryRecovery({
     return summary;
   }
 
-  return { insert, recoverPending };
+  /**
+   * Deletes resolved (recovered/dead) failure documents once they're older
+   * than the retention window. Recovered/dead records are terminal - nothing
+   * ever reads them again after the fact - so left alone they accumulate in
+   * bigquery_insert_failures forever (#240).
+   */
+  async function cleanupResolved({ retentionMs = resolvedRetentionMs, limit = 500 } = {}) {
+    const currentTime = now();
+    const cutoff = new Date(currentTime.getTime() - retentionMs);
+
+    const recoveredQuery = firestore
+      .collection(FAILURE_COLLECTION)
+      .where("status", "==", "recovered")
+      .where("recoveredAt", "<=", cutoff)
+      .limit(limit);
+    const deadQuery = firestore
+      .collection(FAILURE_COLLECTION)
+      .where("status", "==", "dead")
+      .where("lastFailedAt", "<=", cutoff)
+      .limit(limit);
+    const [recoveredSnapshot, deadSnapshot] = await Promise.all([
+      recoveredQuery.get(),
+      deadQuery.get(),
+    ]);
+    const candidates = [...recoveredSnapshot.docs, ...deadSnapshot.docs].slice(0, limit);
+
+    const summary = { scanned: candidates.length, deleted: 0 };
+    const seen = new Set();
+    let batch = firestore.batch();
+    let opsInBatch = 0;
+
+    for (const document of candidates) {
+      if (seen.has(document.id)) continue;
+      seen.add(document.id);
+
+      const data = document.data();
+      if (!data) continue;
+
+      // Defensive re-check against the document itself, in case the query
+      // layer ever returns something broader than what was asked for - we
+      // never want to delete a record that isn't actually resolved and past
+      // retention.
+      const resolvedAt = data.status === "recovered"
+        ? toDate(data.recoveredAt)
+        : data.status === "dead"
+          ? toDate(data.lastFailedAt)
+          : null;
+      const isResolved = data.status === "recovered" || data.status === "dead";
+      if (!isResolved || !resolvedAt || resolvedAt.getTime() > cutoff.getTime()) {
+        continue;
+      }
+
+      batch.delete(document.ref);
+      opsInBatch += 1;
+      summary.deleted += 1;
+
+      if (opsInBatch >= 500) {
+        await batch.commit();
+        batch = firestore.batch();
+        opsInBatch = 0;
+      }
+    }
+
+    if (opsInBatch > 0) {
+      await batch.commit();
+    }
+
+    logger.info("BigQuery failure cleanup run completed", summary);
+    return summary;
+  }
+
+  return { insert, recoverPending, cleanupResolved };
 }
 
 module.exports = {

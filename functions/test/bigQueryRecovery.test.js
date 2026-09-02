@@ -72,6 +72,15 @@ function createFirestore() {
       };
       return query;
     },
+    batch: () => {
+      const ops = [];
+      return {
+        delete: (ref) => ops.push(ref.id),
+        commit: async () => {
+          for (const id of ops) documents.delete(id);
+        },
+      };
+    },
     runTransaction: async (callback) => callback({
       get: async (ref) => snapshot(ref),
       update: (ref, value) => {
@@ -282,6 +291,65 @@ describe("BigQuery recovery", () => {
     assert.equal(summary.recovered, 1);
     assert.equal(documents.get(queued.failureId).status, "recovered");
     assert.equal(documents.get(queued.failureId).recoveryAttempts, 1);
+  });
+
+  it("deletes resolved (recovered/dead) records past the retention window, leaves recent ones (#240)", async () => {
+    const { firestore, documents } = createFirestore();
+    const currentTime = new Date("2026-08-01T00:00:00.000Z");
+    const { recovery } = createRecovery({
+      firestore,
+      insert: async () => {},
+      overrides: {
+        now: () => currentTime,
+        resolvedRetentionMs: 7 * 24 * 60 * 60 * 1000,
+      },
+    });
+
+    documents.set("old-recovered", {
+      status: "recovered",
+      recoveredAt: new Date("2026-07-01T00:00:00.000Z"), // 31 days old
+    });
+    documents.set("recent-recovered", {
+      status: "recovered",
+      recoveredAt: new Date("2026-07-30T00:00:00.000Z"), // 2 days old
+    });
+    documents.set("old-dead", {
+      status: "dead",
+      lastFailedAt: new Date("2026-07-01T00:00:00.000Z"), // 31 days old
+    });
+
+    const summary = await recovery.cleanupResolved();
+
+    assert.equal(summary.deleted, 2);
+    assert.equal(documents.has("old-recovered"), false);
+    assert.equal(documents.has("old-dead"), false);
+    assert.equal(documents.has("recent-recovered"), true);
+  });
+
+  it("never deletes pending/retrying records regardless of age (#240)", async () => {
+    const { firestore, documents } = createFirestore();
+    const currentTime = new Date("2026-08-01T00:00:00.000Z");
+    const { recovery } = createRecovery({
+      firestore,
+      insert: async () => {},
+      overrides: { now: () => currentTime },
+    });
+
+    documents.set("old-pending", {
+      status: "pending",
+      firstFailedAt: new Date("2026-01-01T00:00:00.000Z"),
+      nextRetryAt: new Date("2026-01-01T00:05:00.000Z"),
+    });
+    documents.set("old-retrying", {
+      status: "retrying",
+      retryStartedAt: new Date("2026-01-01T00:00:00.000Z"),
+    });
+
+    const summary = await recovery.cleanupResolved();
+
+    assert.equal(summary.deleted, 0);
+    assert.equal(documents.has("old-pending"), true);
+    assert.equal(documents.has("old-retrying"), true);
   });
 });
 
