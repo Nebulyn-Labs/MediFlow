@@ -10,6 +10,8 @@ const { cleanupExpiredRateLimitRecords } = require("./helpers/rateLimiter");
 const { checkRateLimit, LIMITS } = require("./helpers/rateLimiter");
 const { createBigQueryRecovery } = require("./helpers/bigQueryRecovery");
 const { createLowStockService } = require("./helpers/lowStock");
+const { createFcmSender } = require("./helpers/fcmSender");
+const { registerFcmToken, unregisterFcmToken } = require("./helpers/fcmTokens");
 const { handleCspReport, getClientIp } = require("./helpers/cspReport");
 const { wrapUserContent, wrapDataContent } = require("./helpers/promptHardener");
 const { isValidQuantity } = require("./helpers/quantityValidation");
@@ -301,7 +303,59 @@ exports.logAIDecision = onCall(async (request) => {
 });
 
 /**
- * 1c. Firestore -> BigQuery mirrors for analytics, transfer decisions, and audit.
+ * 1c. registerFcmToken(token)
+ * Persists the caller's current FCM registration token onto their user doc
+ * so scheduled/real-time low-stock alerts (see helpers/lowStock.js) have
+ * somewhere to actually deliver a push notification. Without this, every
+ * device's `users/{uid}.fcmToken` field stays unset forever and the
+ * `if (user.fcmToken && sendNotification)` check in lowStock.js silently
+ * skips sending on every run (#208).
+ */
+exports.registerFcmToken = onCall(async (request) => {
+  if (!request.auth) throw new HttpsError("unauthenticated", "User must log in");
+
+  await checkRateLimit(request.auth.uid, "registerFcmToken", LIMITS.GENERAL);
+
+  try {
+    await registerFcmToken(admin.firestore(), request.auth.uid, request.data?.token, {
+      serverTimestamp: () => admin.firestore.FieldValue.serverTimestamp(),
+    });
+  } catch (error) {
+    if (error.code === "invalid-argument") {
+      throw new HttpsError("invalid-argument", error.message);
+    }
+    throw error;
+  }
+
+  return { ok: true };
+});
+
+/**
+ * 1d. unregisterFcmToken()
+ * Clears the caller's stored FCM token (e.g. on logout), so a signed-out
+ * device doesn't keep receiving low-stock pushes meant for whoever signs in
+ * next, and so the sweep in lowStock.js doesn't keep retrying a token that's
+ * about to go stale.
+ */
+exports.unregisterFcmToken = onCall(async (request) => {
+  if (!request.auth) throw new HttpsError("unauthenticated", "User must log in");
+
+  await unregisterFcmToken(admin.firestore(), request.auth.uid, {
+    serverTimestamp: () => admin.firestore.FieldValue.serverTimestamp(),
+    deleteValue: admin.firestore.FieldValue.delete(),
+  });
+
+  return { ok: true };
+});
+
+const fcmSendNotification = createFcmSender({
+  messaging: admin.messaging(),
+  firestore: admin.firestore(),
+  logger,
+});
+
+/**
+ * 1e. Firestore -> BigQuery mirrors for analytics, transfer decisions, and audit.
  */
 exports.mirrorRequestToBigQuery = onDocumentWritten("requests/{requestId}", async (event) => {
   const change = event.data;
@@ -395,9 +449,7 @@ exports.mirrorInventoryToBigQuery = onDocumentWritten("inventory/{facilityId}/me
   const action = !before && after ? "created" : before && after ? "updated" : "deleted";
 
   const db = admin.firestore();
-  await lowStockService.syncAlertForMedicine(db, facilityId, medicineId, after, null, async (token, notification) => {
-    await admin.messaging().send({ token, notification });
-  });
+  await lowStockService.syncAlertForMedicine(db, facilityId, medicineId, after, null, fcmSendNotification);
 
   await insertBigQuery("inventory_snapshots", {
     snapshot_id: `${facilityId}_${medicineId}_${Date.now()}`,
@@ -472,6 +524,15 @@ exports.retryFailedBigQueryInsertions = onSchedule("every 5 minutes", async () =
 });
 
 /**
+ * Purges bigquery_insert_failures documents once they're resolved
+ * (recovered or dead) and past the retention window, so the dead-letter
+ * collection doesn't grow unbounded with records nobody will act on again (#240).
+ */
+exports.cleanupResolvedBigQueryFailures = onSchedule("every 24 hours", async () => {
+  return bigQueryRecovery.cleanupResolved();
+});
+
+/**
  * 2. checkLowStock() - Scheduled daily CRON
  * Scans all facilities and creates/updates alerts.
  */
@@ -479,9 +540,7 @@ exports.checkLowStock = onSchedule("every 24 hours", async () => {
   const db = admin.firestore();
   return lowStockService.runLowStockSweep({
     db,
-    sendNotification: async (token, notification) => {
-      await admin.messaging().send({ token, notification });
-    },
+    sendNotification: fcmSendNotification,
   });
 });
 
