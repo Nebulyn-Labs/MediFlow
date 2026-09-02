@@ -472,6 +472,15 @@ exports.retryFailedBigQueryInsertions = onSchedule("every 5 minutes", async () =
 });
 
 /**
+ * Purges bigquery_insert_failures documents once they're resolved
+ * (recovered or dead) and past the retention window, so the dead-letter
+ * collection doesn't grow unbounded with records nobody will act on again (#240).
+ */
+exports.cleanupResolvedBigQueryFailures = onSchedule("every 24 hours", async () => {
+  return bigQueryRecovery.cleanupResolved();
+});
+
+/**
  * 2. checkLowStock() - Scheduled daily CRON
  * Scans all facilities and creates/updates alerts.
  */
