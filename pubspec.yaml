@@ -25,7 +25,7 @@ dependencies:
   go_router: ^17.3.0
 
   # Web Map & Routing
-  flutter_map: ^8.3.1
+  flutter_map: ^8.3.2
   latlong2: ^0.10.1
   fl_chart: ^1.2.0
   google_fonts: ^8.2.0
